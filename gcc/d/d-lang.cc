@@ -285,7 +285,8 @@ deps_write (Module *module, obstack *buffer)
    the option handlers.  */
 
 static void
-d_init_options (unsigned int, cl_decoded_option *decoded_options)
+d_init_options (unsigned int decoded_options_count,
+		cl_decoded_option *decoded_options)
 {
   /* Initialize the D runtime.  */
   rt_init ();
@@ -299,6 +300,8 @@ d_init_options (unsigned int, cl_decoded_option *decoded_options)
 
   /* Default extern(C++) mangling to C++17.  */
   global.params.cplusplus = CppStdRevisionCpp17;
+
+  global.preprocess = &d_cpp_preprocess;
 
   /* Warnings and deprecations are disabled by default.  */
   global.params.useDeprecated = DIAGNOSTICinform;
@@ -317,6 +320,9 @@ d_init_options (unsigned int, cl_decoded_option *decoded_options)
   d_option.deps_target = vNULL;
   d_option.deps_phony = false;
   d_option.stdinc = true;
+
+  /* Initialize CPP-related options.  */
+  d_cpp_init_options (decoded_options_count);
 }
 
 /* Implements the lang_hooks.init_options_struct routine for language D.
@@ -808,6 +814,10 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
       break;
 
     default:
+      if (cl_options[code].flags & d_option_lang_mask ())
+	break;
+
+      result = false;
       break;
     }
 
@@ -815,6 +825,9 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
 			scode, arg, value,
 			d_option_lang_mask (), kind,
 			loc, handlers, global_dc);
+
+  if (d_cpp_handle_option (scode, arg))
+    return true;
 
   return result;
 }

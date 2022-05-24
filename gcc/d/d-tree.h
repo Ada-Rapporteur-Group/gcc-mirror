@@ -41,7 +41,9 @@ class Parameter;
 struct BaseClass;
 struct Scope;
 struct Loc;
+struct OutBuffer;
 
+template <typename TYPE> struct DArray;
 template <typename TYPE> struct Array;
 typedef Array <Expression *> Expressions;
 
@@ -646,6 +648,11 @@ extern struct lang_type *build_lang_type (Type *);
 extern struct lang_decl *build_lang_decl (Declaration *);
 extern tree d_pushdecl (tree);
 extern void d_keep (tree);
+
+/* In d-preprocess.cc.  */
+extern void d_cpp_init_options (unsigned int);
+extern bool d_cpp_handle_option (size_t, const char *);
+extern DArray<unsigned char> d_cpp_preprocess (FileName, Loc, OutBuffer &);
 
 /* In decl.cc.  */
 extern const char *d_mangle_decl (Dsymbol *);

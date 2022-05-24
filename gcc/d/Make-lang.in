@@ -225,6 +225,7 @@ D_OBJS = \
 	d/d-lang.o \
 	d/d-longdouble.o \
 	d/d-port.o \
+	d/d-preprocess.o \
 	d/d-target.o \
 	d/decl.o \
 	d/expr.o \

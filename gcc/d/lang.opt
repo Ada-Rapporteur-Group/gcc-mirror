@@ -42,6 +42,10 @@ D NoDriverArg Separate Alias(MD)
 D NoDriverArg Separate Alias(MMD)
 ; Documented in C
 
+D
+D Joined Separate
+; Documented in C
+
 H
 D
 ; Different from documented use in C.
@@ -95,6 +99,10 @@ D Joined Separate
 ; Documented in C
 
 MQ
+D Joined Separate
+; Documented in C
+
+U
 D Joined Separate
 ; Documented in C
 
@@ -487,11 +495,27 @@ fweak-templates
 D Var(flag_weak_templates) Init(1)
 Emit template instantiations as weak symbols.
 
+idirafter
+D Joined Separate
+; Documented in C
+
+imacros
+D Joined Separate MissingArgError(missing filename after %qs)
+; Documented in C
+
 imultilib
 D Joined Separate
 ; Documented in C
 
+include
+D Joined Separate MissingArgError(missing filename after %qs)
+; Documented in C
+
 iprefix
+D Joined Separate
+; Documented in C
+
+iquote
 D Joined Separate
 ; Documented in C
 

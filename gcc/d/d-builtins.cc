@@ -758,7 +758,17 @@ covariant_with_builtin_type_p (Type *t1, Type *t2)
 	  || fparam1->isLazy () != fparam2->isLazy ())
 	return false;
 
-      if (!matches_builtin_type (fparam1->type, fparam2->type))
+      /* va_list array parameters are implicitly converted to pointers.  */
+      Type *fptype1 = fparam1->type;
+      Type *fptype2 = fparam2->type;
+
+      if (valist_array_p (fptype1))
+	fptype1 = dmd::pointerTo (fptype1->nextOf ());
+
+      if (valist_array_p (fptype2))
+	fptype2 = dmd::pointerTo (fptype2->nextOf ());
+
+      if (!matches_builtin_type (fptype1, fptype2))
 	return false;
     }
 
