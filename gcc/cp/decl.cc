@@ -1216,9 +1216,7 @@ decls_match (tree newdecl, tree olddecl, bool record_versions /* = true */)
 	  && targetm.target_option.function_versions (newdecl, olddecl))
 	{
 	  if (record_versions)
-	    maybe_version_functions (newdecl, olddecl,
-				     (!DECL_FUNCTION_VERSIONED (newdecl)
-				      || !DECL_FUNCTION_VERSIONED (olddecl)));
+	    maybe_version_functions (newdecl, olddecl);
 	  return 0;
 	}
     }
@@ -1289,7 +1287,7 @@ maybe_mark_function_versioned (tree decl)
    If RECORD is set to true, record function versions.  */
 
 bool
-maybe_version_functions (tree newdecl, tree olddecl, bool record)
+maybe_version_functions (tree newdecl, tree olddecl)
 {
   if (!targetm.target_option.function_versions (newdecl, olddecl))
     return false;
@@ -1312,8 +1310,7 @@ maybe_version_functions (tree newdecl, tree olddecl, bool record)
       maybe_mark_function_versioned (newdecl);
     }
 
-  if (record)
-    cgraph_node::record_function_versions (olddecl, newdecl);
+  cgraph_node::record_function_versions (olddecl, newdecl);
 
   return true;
 }
