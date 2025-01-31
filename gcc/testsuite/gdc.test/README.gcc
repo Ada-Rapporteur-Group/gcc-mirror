@@ -9,6 +9,7 @@ The following directories are part of DMD:
   compilable/
   fail_compilation/
   runnable/
+  runnable_cxx/
 
 All changes to dmd should go through the upstream repository first,
 then merged back to GCC.

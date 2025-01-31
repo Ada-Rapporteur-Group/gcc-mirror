@@ -1,0 +1,20 @@
+The tests in testsuite/gdc.dg are for checking options, code generation and PRs
+specific to the D front-end.
+
+Subdirectories:
+
+analyzer    Tests for AddressSanitizer support.
+asan        Tests for analyzer support.
+debug       Tests for debugging options.
+extern-c++  Tests for ABI compatibility with C++.
+gcov        Tests for GCOV (code coverage) support.
+lto         Tests for Link Time Optimization.
+torture     Tests for code generation at all optimization levels.
+ubsan       Tests for UndefinedBehaviorSanitizer support.
+
+
+Copyright (C) 2025 Free Software Foundation, Inc.
+
+Copying and distribution of this file, with or without modification,
+are permitted in any medium without royalty provided the copyright
+notice and this notice are preserved.
