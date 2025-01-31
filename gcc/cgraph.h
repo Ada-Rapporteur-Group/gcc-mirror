@@ -2629,6 +2629,7 @@ tree clone_function_name (const char *name, const char *suffix,
 tree clone_function_name (tree decl, const char *suffix,
 			  unsigned long number);
 tree clone_function_name (tree decl, const char *suffix);
+tree clone_identifier (tree decl, const char *suffix);
 
 void tree_function_versioning (tree, tree, vec<ipa_replace_map *, va_gc> *,
 			       ipa_param_adjustments *,

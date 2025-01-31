@@ -557,6 +557,14 @@ clone_function_name (tree decl, const char *suffix)
   /* For consistency this needs to behave the same way as
      ASM_FORMAT_PRIVATE_NAME does, but without the final number
      suffix.  */
+  return clone_identifier (identifier, suffix);
+}
+
+/* Return a new clone of ID ending with the string SUFFIX.  */
+
+tree
+clone_identifier (tree id, const char *suffix)
+{
   char *separator = XALLOCAVEC (char, 2);
   separator[0] = symbol_table::symbol_suffix_separator ();
   separator[1] = 0;
@@ -565,14 +573,10 @@ clone_function_name (tree decl, const char *suffix)
 #else
   const char *prefix = "";
 #endif
-  char *result = ACONCAT ((prefix,
-			   IDENTIFIER_POINTER (identifier),
-			   separator,
-			   suffix,
-			   (char*)0));
+  char *result = ACONCAT (
+    (prefix, IDENTIFIER_POINTER (id), separator, suffix, (char *) 0));
   return get_identifier (result);
 }
-
 
 /* Create callgraph node clone with new declaration.  The actual body will be
    copied later at compilation stage.  The name of the new clone will be
