@@ -1072,25 +1072,19 @@ apply_tm_attr (tree fndecl, tree attr)
   decl_attributes (&TREE_TYPE (fndecl), tree_cons (attr, NULL, NULL), 0);
 }
 
-/* Makes a function attribute of the form NAME(ARG_NAME) and chains
+/* Makes a function attribute of the form NAME (ARG_NAME) and chains
    it to CHAIN.  */
 
 tree
-make_attribute (const char *name, const char *arg_name, tree chain)
+make_attribute (string_slice name, string_slice arg_name, tree chain)
 {
-  tree attr_name;
-  tree attr_arg_name;
-  tree attr_args;
-  tree attr;
-
-  attr_name = get_identifier (name);
-  attr_arg_name = build_string (strlen (arg_name), arg_name);
-  attr_args = tree_cons (NULL_TREE, attr_arg_name, NULL_TREE);
-  attr = tree_cons (attr_name, attr_args, chain);
+  tree attr_name = get_identifier_with_length (name.begin (), name.size ());
+  tree attr_arg_name = build_string (arg_name.size (), arg_name.begin ());
+  tree attr_args = tree_cons (NULL_TREE, attr_arg_name, NULL_TREE);
+  tree attr = tree_cons (attr_name, attr_args, chain);
   return attr;
 }
 
-
 /* Common functions used for target clone support.  */
 
 /* Comparator function to be used in qsort routine to sort attribute
