@@ -907,7 +907,9 @@ struct GTY((tag ("SYMTAB_FUNCTION"))) cgraph_node : public symtab_node
       used_as_abstract_origin (false),
       lowered (false), process (false), frequency (NODE_FREQUENCY_NORMAL),
       only_called_at_startup (false), only_called_at_exit (false),
-      tm_clone (false), dispatcher_function (false), calls_comdat_local (false),
+      tm_clone (false), dispatcher_function (false),
+      dispatcher_resolver_function (false), is_target_clone (false),
+      calls_comdat_local (false),
       icf_merged (false), nonfreeing_fn (false), merged_comdat (false),
       merged_extern_inline (false), parallelized_function (false),
       split_part (false), indirect_call_target (false), local (false),
@@ -1465,6 +1467,11 @@ struct GTY((tag ("SYMTAB_FUNCTION"))) cgraph_node : public symtab_node
   unsigned tm_clone : 1;
   /* True if this decl is a dispatcher for function versions.  */
   unsigned dispatcher_function : 1;
+  /* True if this decl is a resolver for function versions.  */
+  unsigned dispatcher_resolver_function : 1;
+  /* True this is part of a multiversioned set and the default version
+     comes from a target_clone attribute.  */
+  unsigned is_target_clone : 1;
   /* True if this decl calls a COMDAT-local function.  This is set up in
      compute_fn_summary and inline_call.  */
   unsigned calls_comdat_local : 1;
