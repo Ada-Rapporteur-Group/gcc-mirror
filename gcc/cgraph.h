@@ -856,6 +856,9 @@ struct GTY((for_user)) cgraph_function_version_info {
      dispatcher. The dispatcher decl is an alias to the resolver
      function decl.  */
   tree dispatcher_resolver;
+
+  /* The assmbly name of the function set before version mangling.  */
+  tree assembler_name;
 };
 
 #define DEFCIFCODE(code, type, string)	CIF_ ## code,
