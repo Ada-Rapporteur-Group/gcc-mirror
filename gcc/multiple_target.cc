@@ -166,9 +166,6 @@ create_dispatcher_calls (struct cgraph_node *node)
 	}
     }
 
-  tree fname = clone_function_name (node->decl, "default");
-  symtab->change_decl_assembler_name (node->decl, fname);
-
   if (node->definition)
     {
       /* FIXME: copy of cgraph_node::make_local that should be cleaned up
@@ -182,100 +179,6 @@ create_dispatcher_calls (struct cgraph_node *node)
       DECL_ARTIFICIAL (node->decl) = 1;
       node->force_output = true;
     }
-}
-
-/* Create string with attributes separated by TARGET_CLONES_ATTR_SEPARATOR.
-   Return number of attributes.  */
-
-static int
-get_attr_str (tree arglist, char *attr_str)
-{
-  tree arg;
-  size_t str_len_sum = 0;
-  int argnum = 0;
-
-  for (arg = arglist; arg; arg = TREE_CHAIN (arg))
-    {
-      const char *str = TREE_STRING_POINTER (TREE_VALUE (arg));
-      size_t len = strlen (str);
-      for (const char *p = strchr (str, TARGET_CLONES_ATTR_SEPARATOR);
-	   p;
-	   p = strchr (p + 1, TARGET_CLONES_ATTR_SEPARATOR))
-	argnum++;
-      memcpy (attr_str + str_len_sum, str, len);
-      attr_str[str_len_sum + len]
-	= TREE_CHAIN (arg) ? TARGET_CLONES_ATTR_SEPARATOR : '\0';
-      str_len_sum += len + 1;
-      argnum++;
-    }
-  return argnum;
-}
-
-/* Return number of attributes separated by TARGET_CLONES_ATTR_SEPARATOR
-   and put them into ARGS.
-   If there is no DEFAULT attribute return -1.
-   If there is an empty string in attribute return -2.
-   If there are multiple DEFAULT attributes return -3.
-   */
-
-static int
-separate_attrs (char *attr_str, char **attrs, int attrnum)
-{
-  int i = 0;
-  int default_count = 0;
-  static const char separator_str[] = { TARGET_CLONES_ATTR_SEPARATOR, 0 };
-
-  for (char *attr = strtok (attr_str, separator_str);
-       attr != NULL; attr = strtok (NULL, separator_str))
-    {
-      if (strcmp (attr, "default") == 0)
-	{
-	  default_count++;
-	  continue;
-	}
-      attrs[i++] = attr;
-    }
-  if (default_count == 0)
-    return -1;
-  else if (default_count > 1)
-    return -3;
-  else if (i + default_count < attrnum)
-    return -2;
-
-  return i;
-}
-
-/*  Return true if symbol is valid in assembler name.  */
-
-static bool
-is_valid_asm_symbol (char c)
-{
-  if ('a' <= c && c <= 'z')
-    return true;
-  if ('A' <= c && c <= 'Z')
-    return true;
-  if ('0' <= c && c <= '9')
-    return true;
-  if (c == '_')
-    return true;
-  return false;
-}
-
-/*  Replace all not valid assembler symbols with '_'.  */
-
-static void
-create_new_asm_name (char *old_asm_name, char *new_asm_name)
-{
-  int i;
-  int old_name_len = strlen (old_asm_name);
-
-  /* Replace all not valid assembler symbols with '_'.  */
-  for (i = 0; i < old_name_len; i++)
-    if (!is_valid_asm_symbol (old_asm_name[i]))
-      new_asm_name[i] = '_';
-    else
-      new_asm_name[i] = old_asm_name[i];
-  new_asm_name[old_name_len] = '\0';
 }
 
 /*  Creates target clone of NODE.  */
@@ -313,7 +216,6 @@ create_target_clone (cgraph_node *node, bool definition, char *name,
 static bool
 expand_target_clones (struct cgraph_node *node, bool definition)
 {
-  int i;
   /* Parsing target attributes separated by TARGET_CLONES_ATTR_SEPARATOR.  */
   tree attr_target = lookup_attribute ("target_clones",
 				       DECL_ATTRIBUTES (node->decl));
@@ -321,11 +223,12 @@ expand_target_clones (struct cgraph_node *node, bool definition)
   if (!attr_target)
     return false;
 
-  tree arglist = TREE_VALUE (attr_target);
-  int attr_len = get_target_clone_attr_len (arglist);
+  int num_defaults = 0;
+  auto_vec<string_slice> attr_list = get_clone_versions (node->decl,
+							 &num_defaults);
 
   /* No need to clone for 1 target attribute.  */
-  if (attr_len == -1)
+  if (attr_list.length () == 1)
     {
       warning_at (DECL_SOURCE_LOCATION (node->decl),
 		  0, "single %<target_clones%> attribute is ignored");
@@ -352,67 +255,74 @@ expand_target_clones (struct cgraph_node *node, bool definition)
       return false;
     }
 
-  char *attr_str = XNEWVEC (char, attr_len);
-  int attrnum = get_attr_str (arglist, attr_str);
-  char **attrs = XNEWVEC (char *, attrnum);
-
-  attrnum = separate_attrs (attr_str, attrs, attrnum);
-  switch (attrnum)
+  /* Disallow multiple defaults.  */
+  if (num_defaults > 1)
     {
-    case -1:
-      error_at (DECL_SOURCE_LOCATION (node->decl),
-		"%<default%> target was not set");
-      break;
-    case -2:
-      error_at (DECL_SOURCE_LOCATION (node->decl),
-		"an empty string cannot be in %<target_clones%> attribute");
-      break;
-    case -3:
       error_at (DECL_SOURCE_LOCATION (node->decl),
 		"multiple %<default%> targets were set");
-      break;
-    default:
-      break;
+      return false;
     }
-
-  if (attrnum < 0)
+  /* Disallow target clones with no defaults.  */
+  if (num_defaults == 0)
     {
-      XDELETEVEC (attrs);
-      XDELETEVEC (attr_str);
+      error_at (DECL_SOURCE_LOCATION (node->decl),
+		"%<default%> target was not set");
       return false;
     }
 
-  const char *new_attr_name = (TARGET_HAS_FMV_TARGET_ATTRIBUTE
-			       ? "target" : "target_version");
+  /* Disallow any empty values in the clone attr.  */
+  for (string_slice attr : attr_list)
+    if (attr.empty () || !attr.is_valid ())
+      {
+	error_at (DECL_SOURCE_LOCATION (node->decl),
+		  "an empty string cannot be in %<target_clones%> attribute");
+	return false;
+      }
+
+  string_slice new_attr_name = TARGET_HAS_FMV_TARGET_ATTRIBUTE
+			       ? "target"
+			       : "target_version";
+
   cgraph_function_version_info *decl1_v = NULL;
   cgraph_function_version_info *decl2_v = NULL;
   cgraph_function_version_info *before = NULL;
   cgraph_function_version_info *after = NULL;
+
   decl1_v = node->function_version ();
-  if (decl1_v == NULL)
+  if (!decl1_v)
     decl1_v = node->insert_new_function_version ();
-  before = decl1_v;
+
+  node->is_target_clone = true;
   DECL_FUNCTION_VERSIONED (node->decl) = 1;
 
-  for (i = 0; i < attrnum; i++)
+  before = decl1_v;
+
+  /* The existing decl is turned into one of the target versions.
+     If there is a default in the list then this decl is used for that version
+     as the calls are already to it so in the case where there is no
+     implementation and !TARGET_HAS_FMV_TARGET_ATTRIBUTE there is no redirection
+     necessary.
+     Otherwise, the last version listed in the attribute is used.  */
+  string_slice this_node_version = num_defaults ? "default" : attr_list.pop ();
+
+    /* Remove the target_clones attribute, as this can confuse
+       is_function_default_version.  */
+    remove_attribute ("target_clones", DECL_ATTRIBUTES (node->decl));
+
+  for (string_slice attr : attr_list)
     {
-      char *attr = attrs[i];
+      /* Skip default nodes.  */
+      if (attr == "default")
+	continue;
 
       /* Create new target clone.  */
       tree attributes = make_attribute (new_attr_name, attr,
 					DECL_ATTRIBUTES (node->decl));
 
-      char *suffix = XNEWVEC (char, strlen (attr) + 1);
-      create_new_asm_name (attr, suffix);
-      cgraph_node *new_node = create_target_clone (node, definition, suffix,
-						   attributes);
-      XDELETEVEC (suffix);
+      cgraph_node *new_node
+	= create_target_clone (node, definition, NULL, attributes);
       if (new_node == NULL)
-	{
-	  XDELETEVEC (attrs);
-	  XDELETEVEC (attr_str);
-	  return false;
-	}
+	return false;
       new_node->local = false;
 
       decl2_v = new_node->function_version ();
@@ -430,17 +340,30 @@ expand_target_clones (struct cgraph_node *node, bool definition)
 
       before->next = after;
       after->prev = before;
-      DECL_FUNCTION_VERSIONED (new_node->decl) = 1;
+      DECL_FUNCTION_VERSIONED (new_node->decl) = true;
+
+      /* Use the base nodes assembler name for all created nodes.  */
+      new_node->function_version ()->assembler_name
+	= node->function_version ()->assembler_name;
+      new_node->is_target_clone = true;
+
+      /* Mangle all new nodes.  */
+      tree id = targetm.mangle_decl_assembler_name
+	(new_node->decl, new_node->function_version ()->assembler_name);
+      symtab->change_decl_assembler_name (new_node->decl, id);
     }
 
-  XDELETEVEC (attrs);
-  XDELETEVEC (attr_str);
-
   /* Setting new attribute to initial function.  */
-  tree attributes = make_attribute (new_attr_name, "default",
+  tree attributes = make_attribute (new_attr_name, this_node_version,
 				    DECL_ATTRIBUTES (node->decl));
   DECL_ATTRIBUTES (node->decl) = attributes;
   node->local = false;
+
+  /* Remangle base node after new target version string set.  */
+  tree id = targetm.mangle_decl_assembler_name
+	      (node->decl, node->function_version ()->assembler_name);
+  symtab->change_decl_assembler_name (node->decl, id);
+
   return true;
 }
 

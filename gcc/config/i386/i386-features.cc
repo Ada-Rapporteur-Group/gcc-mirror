@@ -3888,6 +3888,37 @@ dispatch_function_versions (tree dispatch_decl,
   return 0;
 }
 
+/*  Return true if symbol is valid in assembler name.  */
+
+static bool
+is_valid_asm_symbol (char c)
+{
+  if ('a' <= c && c <= 'z')
+    return true;
+  if ('A' <= c && c <= 'Z')
+    return true;
+  if ('0' <= c && c <= '9')
+    return true;
+  if (c == '_')
+    return true;
+  return false;
+}
+
+/*  Replace all not valid assembler symbols with '_'.  */
+static void
+create_new_asm_name (char *old_asm_name, char *new_asm_name)
+{
+  int i;
+  int old_name_len = strlen (old_asm_name);
+  /* Replace all not valid assembler symbols with '_'.  */
+  for (i = 0; i < old_name_len; i++)
+    if (!is_valid_asm_symbol (old_asm_name[i]))
+      new_asm_name[i] = '_';
+    else
+      new_asm_name[i] = old_asm_name[i];
+  new_asm_name[old_name_len] = '\0';
+}
+
 /* This function changes the assembler name for functions that are
    versions.  If DECL is a function version and has a "target"
    attribute, it appends the attribute string to its assembler name.  */
@@ -3896,8 +3927,7 @@ static tree
 ix86_mangle_function_version_assembler_name (tree decl, tree id)
 {
   tree version_attr;
-  const char *orig_name, *version_string;
-  char *attr_str, *assembler_name;
+  char *attr_str;
 
   if (DECL_DECLARED_INLINE_P (decl)
       && lookup_attribute ("gnu_inline",
@@ -3915,25 +3945,24 @@ ix86_mangle_function_version_assembler_name (tree decl, tree id)
   /* target attribute string cannot be NULL.  */
   gcc_assert (version_attr != NULL_TREE);
 
-  orig_name = IDENTIFIER_POINTER (id);
-  version_string
-    = TREE_STRING_POINTER (TREE_VALUE (TREE_VALUE (version_attr)));
-
-  if (strcmp (version_string, "default") == 0)
+  cgraph_node *node = cgraph_node::get (decl);
+  if (!node && node->is_target_clone && is_function_default_version (decl))
     return id;
 
   attr_str = sorted_attr_string (TREE_VALUE (version_attr));
-  assembler_name = XNEWVEC (char, strlen (orig_name) + strlen (attr_str) + 2);
 
-  sprintf (assembler_name, "%s.%s", orig_name, attr_str);
+  char *suffix = XNEWVEC (char, strlen (attr_str) + 1);
+  create_new_asm_name (attr_str, suffix);
 
   /* Allow assembler name to be modified if already set.  */
   if (DECL_ASSEMBLER_NAME_SET_P (decl))
     SET_DECL_RTL (decl, NULL);
 
-  tree ret = get_identifier (assembler_name);
+  tree ret = clone_identifier (id, suffix);
+
   XDELETEVEC (attr_str);
-  XDELETEVEC (assembler_name);
+  XDELETEVEC (suffix);
+
   return ret;
 }
 
@@ -3941,9 +3970,21 @@ tree
 ix86_mangle_decl_assembler_name (tree decl, tree id)
 {
   /* For function version, add the target suffix to the assembler name.  */
-  if (TREE_CODE (decl) == FUNCTION_DECL
-      && DECL_FUNCTION_VERSIONED (decl))
-    id = ix86_mangle_function_version_assembler_name (decl, id);
+  if (TREE_CODE (decl) == FUNCTION_DECL)
+    {
+      cgraph_node *node = cgraph_node::get (decl);
+      /* Mangle all versions when annotated with target_clones, but only
+	 non-default versions when annotated with target attributes.  */
+      if (DECL_FUNCTION_VERSIONED (decl)
+	  && (node->is_target_clone
+	      || !is_function_default_version (node->decl)))
+	id = ix86_mangle_function_version_assembler_name (decl, id);
+      /* Mangle the dispatched symbol but only in the case of target clones.  */
+      else if (node && node->dispatcher_function && !node->is_target_clone)
+	id = clone_identifier (id, "ifunc");
+      else if (node && node->dispatcher_resolver_function)
+	id = clone_identifier (id, "resolver");
+    }
 #ifdef SUBTARGET_MANGLE_DECL_ASSEMBLER_NAME
   id = SUBTARGET_MANGLE_DECL_ASSEMBLER_NAME (decl, id);
 #endif
@@ -3982,6 +4023,7 @@ ix86_get_function_versions_dispatcher (void *decl)
   default_version_info = node_v;
   while (default_version_info->prev != NULL)
     default_version_info = default_version_info->prev;
+  default_node = default_version_info->this_node;
 
   /* If there is no default node, just return NULL.  */
   if (!is_function_default_version (default_node->decl))
@@ -3991,20 +4033,9 @@ ix86_get_function_versions_dispatcher (void *decl)
   if (targetm.has_ifunc_p ())
     {
       struct cgraph_function_version_info *it_v = NULL;
-      struct cgraph_node *dispatcher_node = NULL;
-      struct cgraph_function_version_info *dispatcher_version_info = NULL;
 
       /* Right now, the dispatching is done via ifunc.  */
       dispatch_decl = make_dispatcher_decl (default_node->decl);
-      TREE_NOTHROW (dispatch_decl) = TREE_NOTHROW (fn);
-
-      dispatcher_node = cgraph_node::get_create (dispatch_decl);
-      gcc_assert (dispatcher_node != NULL);
-      dispatcher_node->dispatcher_function = 1;
-      dispatcher_version_info
-	= dispatcher_node->insert_new_function_version ();
-      dispatcher_version_info->next = default_version_info;
-      dispatcher_node->definition = 1;
 
       /* Set the dispatcher for all the versions.  */
       it_v = default_version_info;
@@ -4038,17 +4069,28 @@ make_resolver_func (const tree default_decl,
 {
   tree decl, type, t;
 
-  /* Create resolver function name based on default_decl.  */
-  tree decl_name = clone_function_name (default_decl, "resolver");
-  const char *resolver_name = IDENTIFIER_POINTER (decl_name);
-
   /* The resolver function should return a (void *). */
   type = build_function_type_list (ptr_type_node, NULL_TREE);
 
-  decl = build_fn_decl (resolver_name, type);
-  SET_DECL_ASSEMBLER_NAME (decl, decl_name);
+  cgraph_node *node = cgraph_node::get (default_decl);
+  gcc_assert (node && node->function_version ());
 
-  DECL_NAME (decl) = decl_name;
+  decl = build_fn_decl (IDENTIFIER_POINTER (DECL_NAME (default_decl)), type);
+
+  /* Set the assembler name to prevent cgraph_node attempting to mangle.  */
+  SET_DECL_ASSEMBLER_NAME (decl, DECL_ASSEMBLER_NAME (default_decl));
+
+  cgraph_node *resolver_node = cgraph_node::get_create (decl);
+  resolver_node->dispatcher_resolver_function = true;
+
+  if (node->is_target_clone)
+    resolver_node->is_target_clone = true;
+
+  tree id = ix86_mangle_decl_assembler_name
+    (decl, node->function_version ()->assembler_name);
+  SET_DECL_ASSEMBLER_NAME (decl, id);
+
+  DECL_NAME (decl) = DECL_NAME (default_decl);
   TREE_USED (decl) = 1;
   DECL_ARTIFICIAL (decl) = 1;
   DECL_IGNORED_P (decl) = 1;
@@ -4095,7 +4137,7 @@ make_resolver_func (const tree default_decl,
   gcc_assert (ifunc_alias_decl != NULL);
   /* Mark ifunc_alias_decl as "ifunc" with resolver as resolver_name.  */
   DECL_ATTRIBUTES (ifunc_alias_decl)
-    = make_attribute ("ifunc", resolver_name,
+    = make_attribute ("ifunc", IDENTIFIER_POINTER (DECL_ASSEMBLER_NAME (decl)),
 		      DECL_ATTRIBUTES (ifunc_alias_decl));
 
   /* Create the alias for dispatch to resolver here.  */
