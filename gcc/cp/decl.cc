@@ -2022,8 +2022,11 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 	    }
 	  /* For function versions, params and types match, but they
 	     are not ambiguous.  */
-	  else if ((!DECL_FUNCTION_VERSIONED (newdecl)
-		    && !DECL_FUNCTION_VERSIONED (olddecl))
+	  else if (((!DECL_FUNCTION_VERSIONED (newdecl)
+		     && !DECL_FUNCTION_VERSIONED (olddecl))
+		    || !comptypes (TREE_TYPE (TREE_TYPE (newdecl)),
+				   TREE_TYPE (TREE_TYPE (olddecl)),
+				   COMPARE_STRICT))
 		   /* Let constrained hidden friends coexist for now, we'll
 		      check satisfaction later.  */
 		   && !member_like_constrained_friend_p (newdecl)
