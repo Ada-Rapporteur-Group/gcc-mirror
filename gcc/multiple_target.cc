@@ -58,8 +58,15 @@ replace_function_decl (tree *op, int *walk_subtrees, void *data)
   return NULL;
 }
 
-/* If the call in NODE has multiple target attribute with multiple fields,
-   replace it with dispatcher call and create dispatcher (once).  */
+/* In target FMV attributes, if the call in NODE has multiple target attribute
+   with multiple fields, replace it with calls to the dispatched symbol and
+   create the disptacher body (once).
+
+   In target_version semantics, if it is a lone annotated default, then
+   the dispatched symbol is changed to be an alias and no resolver is
+   required.  Otherwise, redirect all calls and references to the dispatched
+   symbol, but only create the resolver body if the default version is
+   implemented.  */
 
 static void
 create_dispatcher_calls (struct cgraph_node *node)
@@ -90,13 +97,48 @@ create_dispatcher_calls (struct cgraph_node *node)
 
   cgraph_node *inode = cgraph_node::get (idecl);
   gcc_assert (inode);
-  tree resolver_decl = targetm.generate_version_dispatcher_body (inode);
+  cgraph_function_version_info *inode_info = inode->function_version ();
+  gcc_assert (inode_info);
 
-  /* Update aliases.  */
-  inode->alias = true;
-  inode->alias_target = resolver_decl;
-  if (!inode->analyzed)
-    inode->resolve_alias (cgraph_node::get (resolver_decl));
+  tree resolver_decl = NULL;
+
+  /* For target_version semantics, if there is a lone default declaration
+     it needs to be mangled, with an alias from the dispatched symbol to the
+     default version.  */
+  if (!TARGET_HAS_FMV_TARGET_ATTRIBUTE
+      && TREE_STATIC (node->decl)
+      && inode_info->next
+      && !inode_info->next->next)
+    {
+      inode->alias = true;
+      inode->alias_target = inode_info->next->this_node->decl;
+      inode->externally_visible = true;
+      if (!inode->analyzed)
+	inode->resolve_alias
+	  (cgraph_node::get (inode_info->next->this_node->decl));
+
+      DECL_ATTRIBUTES (idecl)
+	= make_attribute ("alias",
+			  IDENTIFIER_POINTER
+			    (DECL_ASSEMBLER_NAME
+			       (inode_info->next->this_node->decl)),
+			  DECL_ATTRIBUTES (node->decl));
+      TREE_USED (idecl) = true;
+      DECL_EXTERNAL (idecl) = false;
+      TREE_STATIC (idecl) = true;
+      return;
+    }
+  /* In target_version semantics, only create the resolver if the
+     default node is implemented.  */
+  else if (TARGET_HAS_FMV_TARGET_ATTRIBUTE || TREE_STATIC (node->decl))
+    {
+      resolver_decl = targetm.generate_version_dispatcher_body (inode);
+      /* Update aliases.  */
+      inode->alias = true;
+      inode->alias_target = resolver_decl;
+      if (!inode->analyzed)
+	inode->resolve_alias (cgraph_node::get (resolver_decl));
+    }
 
   auto_vec<cgraph_edge *> edges_to_redirect;
   /* We need to capture the references by value rather than just pointers to them
@@ -432,8 +474,19 @@ ipa_target_clone (void)
   auto_vec<cgraph_node *> to_dispatch;
 
   FOR_EACH_FUNCTION (node)
-    if (expand_target_clones (node, node->definition))
+    /* Expand all target versions.  */
+    if (expand_target_clones (node, node->definition)
+	&& TARGET_HAS_FMV_TARGET_ATTRIBUTE)
+      /* In non target_version semantics, dispatch all target clone sets.  */
       to_dispatch.safe_push (node);
+
+  /* In target_version semantics dispatch all FMV function sets with a default
+     implementation.  */
+  if (!TARGET_HAS_FMV_TARGET_ATTRIBUTE)
+    FOR_EACH_FUNCTION (node)
+      if (is_function_default_version (node->decl)
+	  && DECL_FUNCTION_VERSIONED (node->decl))
+	to_dispatch.safe_push (node);
 
   for (unsigned i = 0; i < to_dispatch.length (); i++)
     create_dispatcher_calls (to_dispatch[i]);

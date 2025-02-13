@@ -6171,6 +6171,13 @@ start_decl (const cp_declarator *declarator,
 
   was_public = TREE_PUBLIC (decl);
 
+  /* For target_version semantics, mark any annotated function as versioned
+     so that it gets mangled even when on its own in a TU.  */
+  if (!TARGET_HAS_FMV_TARGET_ATTRIBUTE
+      && TREE_CODE (decl) == FUNCTION_DECL
+      && lookup_attribute ("target_version", DECL_ATTRIBUTES (decl)))
+    maybe_mark_function_versioned (decl);
+
   if ((DECL_EXTERNAL (decl) || TREE_CODE (decl) == FUNCTION_DECL)
       && current_function_decl)
     {
@@ -18812,6 +18819,13 @@ start_preparsed_function (tree decl1, tree attrs, int flags)
 
   if (!DECL_OMP_DECLARE_REDUCTION_P (decl1))
     start_lambda_scope (decl1);
+
+  /* For target_version semantics, mark any annotated function as versioned
+     so that it gets mangled even when on its own in a TU.  */
+  if (!TARGET_HAS_FMV_TARGET_ATTRIBUTE
+      && TREE_CODE (decl1) == FUNCTION_DECL
+      && lookup_attribute ("target_version", DECL_ATTRIBUTES (decl1)))
+    maybe_mark_function_versioned (decl1);
 
   return true;
 }
