@@ -111,6 +111,8 @@ selftest::run_tests ()
   opts_diagnostic_cc_tests ();
   path_coverage_cc_tests ();
 
+  gimple_exec_cc_tests ();
+
   /* This one relies on most of the above.  */
   function_tests_cc_tests ();
 
