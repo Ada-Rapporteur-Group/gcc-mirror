@@ -542,6 +542,10 @@ STAGE1_CONFIGURE_FLAGS = $(STAGE1_CHECKING) \
 	  --disable-build-format-warnings
 
 @if target-libphobos-bootstrap
+# Defaults for each stage if we're bootstrapping D.
+[+ FOR bootstrap-stage +]
+STAGE[+id+]_GDCFLAGS = $(GDCFLAGS)
+[+ ENDFOR bootstrap-stage +]
 STAGE1_CONFIGURE_FLAGS += --with-libphobos-druntime-only
 STAGE2_CONFIGURE_FLAGS += --with-libphobos-druntime-only
 @endif target-libphobos-bootstrap
@@ -555,6 +559,10 @@ STAGE2_CFLAGS += -fno-checking
 STAGE2_TFLAGS += -fno-checking
 STAGE3_CFLAGS += -fchecking=1
 STAGE3_TFLAGS += -fchecking=1
+@if target-libphobos-bootstrap
+STAGE2_GDCFLAGS += -fno-checking
+STAGE3_GDCFLAGS += -fchecking=1
+@endif target-libphobos-bootstrap
 
 STAGEprofile_CFLAGS = $(STAGE2_CFLAGS) -fprofile-generate
 STAGEprofile_TFLAGS = $(STAGE2_TFLAGS)
@@ -709,6 +717,7 @@ BASE_FLAGS_TO_PASS =[+ FOR flags_to_pass +][+ IF optional +] \
 	"[+flag+]=$([+flag+])"[+ ENDIF optional+][+ ENDFOR flags_to_pass +][+ FOR bootstrap-stage +] \
 	"STAGE[+id+]_CFLAGS=$(STAGE[+id+]_CFLAGS)" \
 	"STAGE[+id+]_CXXFLAGS=$(STAGE[+id+]_CXXFLAGS)" \
+	"STAGE[+id+]_GDCFLAGS=$(STAGE[+id+]_GDCFLAGS)" \
 	"STAGE[+id+]_GENERATOR_CFLAGS=$(STAGE[+id+]_GENERATOR_CFLAGS)" \
 	"STAGE[+id+]_TFLAGS=$(STAGE[+id+]_TFLAGS)"[+ ENDFOR bootstrap-stage +] \
 	$(CXX_FOR_TARGET_FLAG_TO_PASS) \
@@ -1236,7 +1245,8 @@ configure-stage[+id+]-[+prefix+][+module+]:
 	CXXFLAGS="$(CXXFLAGS_FOR_TARGET)"; export CXXFLAGS; \
 	LIBCFLAGS="$(LIBCFLAGS_FOR_TARGET)"; export LIBCFLAGS;[+ ELSE prefix +] \
 	CFLAGS="$(STAGE[+id+]_CFLAGS)"; export CFLAGS; \
-	CXXFLAGS="$(STAGE[+id+]_CXXFLAGS)"; export CXXFLAGS;[+ IF prev +] \
+	CXXFLAGS="$(STAGE[+id+]_CXXFLAGS)"; export CXXFLAGS;[+ IF (= (get "module") "gcc") +] \
+	GDCFLAGS="$(STAGE[+id+]_GDCFLAGS)"; export GDCFLAGS;[+ ENDIF +][+ IF prev +] \
 	LIBCFLAGS="$(STAGE[+id+]_CFLAGS)"[+ ELSE prev +] \
 	LIBCFLAGS="$(LIBCFLAGS)"[+ ENDIF prev +]; export LIBCFLAGS;[+
   ENDIF prefix +] [+extra_exports+] \
@@ -1306,7 +1316,8 @@ all-stage[+id+]-[+prefix+][+module+]: configure-stage[+id+]-[+prefix+][+module+]
 		LIBCFLAGS="$(LIBCFLAGS_FOR_TARGET)"[+ ELSE prefix +] \
 		CFLAGS="$(STAGE[+id+]_CFLAGS)" \
 		GENERATOR_CFLAGS="$(STAGE[+id+]_GENERATOR_CFLAGS)" \
-		CXXFLAGS="$(STAGE[+id+]_CXXFLAGS)"[+ IF prev +] \
+		CXXFLAGS="$(STAGE[+id+]_CXXFLAGS)"[+ IF (= (get "module") "gcc") +] \
+		GDCFLAGS="$(STAGE[+id+]_GDCFLAGS)"[+ ENDIF +][+ IF prev +] \
 		LIBCFLAGS="$(STAGE[+id+]_CFLAGS)"[+ ELSE prev +] \
 		LIBCFLAGS="$(LIBCFLAGS)"[+ ENDIF prev +][+ ENDIF prefix +] \
 		CFLAGS_FOR_TARGET="$(CFLAGS_FOR_TARGET)" \
