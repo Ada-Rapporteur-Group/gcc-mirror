@@ -18004,6 +18004,13 @@ skip_interfaces:
 }
 
 
+void
+gfc_resolve_symbol (gfc_symbol *sym)
+{
+  resolve_symbol (sym);
+}
+
+
 /************* Resolve DATA statements *************/
 
 static struct
