@@ -4105,7 +4105,19 @@ skip_simple_arithmetic (tree expr)
 	expr = TREE_OPERAND (expr, 0);
       else if (BINARY_CLASS_P (expr))
 	{
-	  if (tree_invariant_p (TREE_OPERAND (expr, 1)))
+	  /* Before commutative binary operands are canonicalized,
+	     it is quite common to have constants in the first operand.
+	     Check for that common case first so that we don't walk
+	     large expressions with tree_invariant_p unnecessarily.
+	     This can still have terrible compile time complexity,
+	     we should limit the depth of the tree_invariant_p and
+	     skip_simple_arithmetic recursion.  */
+	  if ((TREE_CONSTANT (TREE_OPERAND (expr, 0))
+	       || (TREE_READONLY (TREE_OPERAND (expr, 0))
+		   && !TREE_SIDE_EFFECTS (TREE_OPERAND (expr, 0))))
+	      && tree_invariant_p (TREE_OPERAND (expr, 0)))
+	    expr = TREE_OPERAND (expr, 1);
+	  else if (tree_invariant_p (TREE_OPERAND (expr, 1)))
 	    expr = TREE_OPERAND (expr, 0);
 	  else if (tree_invariant_p (TREE_OPERAND (expr, 0)))
 	    expr = TREE_OPERAND (expr, 1);
@@ -13982,6 +13994,7 @@ gimple_canonical_types_compatible_p (const_tree t1, const_tree t2,
      flexible array members, we allow mismatching modes for structures or
      unions.  */
   if (!RECORD_OR_UNION_TYPE_P (t1)
+      && TREE_CODE (t1) != ARRAY_TYPE
       && TYPE_MODE (t1) != TYPE_MODE (t2))
     return false;
 
@@ -14313,6 +14326,7 @@ verify_type (const_tree t)
 	 flexible array members.  */
       && !RECORD_OR_UNION_TYPE_P (t)
       && !RECORD_OR_UNION_TYPE_P (TYPE_CANONICAL (t))
+      && TREE_CODE (t) != ARRAY_TYPE
       && TYPE_MODE (t) != TYPE_MODE (TYPE_CANONICAL (t)))
     {
       error ("%<TYPE_MODE%> of %<TYPE_CANONICAL%> is not compatible");
@@ -15316,15 +15330,17 @@ get_attr_nonstring_decl (tree expr, tree *ref)
      DECL.  */
   if (var)
     decl = var;
-  else if (TREE_CODE (decl) == ARRAY_REF)
-    decl = TREE_OPERAND (decl, 0);
-  else if (TREE_CODE (decl) == COMPONENT_REF)
-    decl = TREE_OPERAND (decl, 1);
-  else if (TREE_CODE (decl) == MEM_REF)
-    return get_attr_nonstring_decl (TREE_OPERAND (decl, 0), ref);
+  else
+    {
+      while (TREE_CODE (decl) == ARRAY_REF)
+	decl = TREE_OPERAND (decl, 0);
+      if (TREE_CODE (decl) == COMPONENT_REF)
+	decl = TREE_OPERAND (decl, 1);
+      else if (TREE_CODE (decl) == MEM_REF)
+	return get_attr_nonstring_decl (TREE_OPERAND (decl, 0), ref);
+    }
 
-  if (DECL_P (decl)
-      && lookup_attribute ("nonstring", DECL_ATTRIBUTES (decl)))
+  if (DECL_P (decl) && lookup_attribute ("nonstring", DECL_ATTRIBUTES (decl)))
     return decl;
 
   return NULL_TREE;

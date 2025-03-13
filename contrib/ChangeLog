@@ -1,3 +1,22 @@
+2025-03-12  Jason Merrill  <jason@redhat.com>
+
+	PR libstdc++/119081
+	* relpath.sh: Give relative path even at /.
+
+2025-03-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	* gcc-git-customization.sh: Delete outdated commands for
+	migrating from very old git setups.
+
+2025-03-11  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc-changelog/git_commit.py (bug_components): Add cobol.
+
+2025-03-10  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc-changelog/git_commit.py (default_changelog_locations):
+	Add gcc/cobol and libgcobol entries.
+
 2025-01-02  Jakub Jelinek  <jakub@redhat.com>
 
 	* update-copyright.py (GCCFilter): Ignore gen-evolution.awk and

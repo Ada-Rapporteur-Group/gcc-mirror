@@ -11328,17 +11328,14 @@ aarch64_valid_fp_move (rtx dst, rtx src, machine_mode mode)
   if (MEM_P (src))
     return true;
 
-  if (!DECIMAL_FLOAT_MODE_P (mode))
-    {
-      if (aarch64_can_const_movi_rtx_p (src, mode)
-	  || aarch64_float_const_representable_p (src)
-	  || aarch64_float_const_zero_rtx_p (src))
-	return true;
+  if (aarch64_can_const_movi_rtx_p (src, mode)
+      || aarch64_float_const_representable_p (src)
+      || aarch64_float_const_zero_rtx_p (src))
+    return true;
 
-      /* Block FP immediates which are split during expand.  */
-      if (aarch64_float_const_rtx_p (src))
-	return false;
-    }
+  /* Block FP immediates which are split during expand.  */
+  if (aarch64_float_const_rtx_p (src))
+    return false;
 
   return can_create_pseudo_p ();
 }
@@ -15873,6 +15870,118 @@ aarch64_memory_move_cost (machine_mode mode, reg_class_t rclass_i, bool in)
 	  : base + aarch64_tune_params.memmov_cost.store_int);
 }
 
+/* CALLEE_SAVED_REGS is the set of callee-saved registers that the
+   RA has already decided to use.  Return the total number of registers
+   in class RCLASS that need to be saved and restored, including the
+   frame link registers.  */
+static int
+aarch64_count_saves (const HARD_REG_SET &callee_saved_regs, reg_class rclass)
+{
+  auto saved_gprs = callee_saved_regs & reg_class_contents[rclass];
+  auto nregs = hard_reg_set_popcount (saved_gprs);
+
+  if (TEST_HARD_REG_BIT (reg_class_contents[rclass], LR_REGNUM))
+    {
+      if (aarch64_needs_frame_chain ())
+	nregs += 2;
+      else if (!crtl->is_leaf || df_regs_ever_live_p (LR_REGNUM))
+	nregs += 1;
+    }
+  return nregs;
+}
+
+/* CALLEE_SAVED_REGS is the set of callee-saved registers that the
+   RA has already decided to use.  Return the total number of registers
+   that need to be saved above the hard frame pointer, including the
+   frame link registers.  */
+static int
+aarch64_count_above_hard_fp_saves (const HARD_REG_SET &callee_saved_regs)
+{
+  /* FP and Advanced SIMD registers are saved above the frame pointer
+     but SVE registers are saved below it.  */
+  if (known_le (GET_MODE_SIZE (aarch64_reg_save_mode (V8_REGNUM)), 16U))
+    return aarch64_count_saves (callee_saved_regs, POINTER_AND_FP_REGS);
+  return aarch64_count_saves (callee_saved_regs, POINTER_REGS);
+}
+
+/* Implement TARGET_CALLEE_SAVE_COST.  */
+static int
+aarch64_callee_save_cost (spill_cost_type spill_type, unsigned int regno,
+			  machine_mode mode, unsigned int nregs, int mem_cost,
+			  const HARD_REG_SET &callee_saved_regs,
+			  bool existing_spill_p)
+{
+  /* If we've already committed to saving an odd number of GPRs, assume that
+     saving one more will involve turning an STR into an STP and an LDR
+     into an LDP.  This should still be more expensive than not spilling
+     (meaning that the minimum cost is 1), but it should usually be cheaper
+     than a separate store or load.  */
+  if (GP_REGNUM_P (regno)
+      && nregs == 1
+      && (aarch64_count_saves (callee_saved_regs, GENERAL_REGS) & 1))
+    return 1;
+
+  /* Similarly for saving FP registers, if we only need to save the low
+     64 bits.  (We can also use STP/LDP instead of STR/LDR for Q registers,
+     but that is less likely to be a saving.)  */
+  if (FP_REGNUM_P (regno)
+      && nregs == 1
+      && known_eq (GET_MODE_SIZE (aarch64_reg_save_mode (regno)), 8U)
+      && (aarch64_count_saves (callee_saved_regs, FP_REGS) & 1))
+    return 1;
+
+  /* If this would be the first register that we save, add the cost of
+     allocating or deallocating the frame.  For GPR, FPR, and Advanced SIMD
+     saves, the allocation and deallocation can be folded into the save and
+     restore.  */
+  if (!existing_spill_p
+      && !GP_REGNUM_P (regno)
+      && !(FP_REGNUM_P (regno)
+	   && known_le (GET_MODE_SIZE (aarch64_reg_save_mode (regno)), 16U)))
+    return default_callee_save_cost (spill_type, regno, mode, nregs, mem_cost,
+				     callee_saved_regs, existing_spill_p);
+
+  return mem_cost;
+}
+
+/* Implement TARGET_FRAME_ALLOCATION_COST.  */
+static int
+aarch64_frame_allocation_cost (frame_cost_type,
+			       const HARD_REG_SET &callee_saved_regs)
+{
+  /* The intention is to model the relative costs of different approaches
+     to storing data on the stack, rather than to model the cost of saving
+     data vs not saving it.  This means that we should return 0 if:
+
+     - any frame is going to be allocated with:
+
+	  stp x29, x30, [sp, #-...]!
+
+       to create a frame link.
+
+     - any frame is going to be allocated with:
+
+	  str x30, [sp, #-...]!
+
+       to save the link register.
+
+     In both cases, the allocation and deallocation instructions are the
+     same however we store data to the stack.  (In the second case, the STR
+     could be converted to an STP by saving an extra call-preserved register,
+     but that is modeled by aarch64_callee_save_cost.)
+
+     In other cases, assume that a frame would need to be allocated with a
+     separate subtraction and deallocated with a separate addition.  Saves
+     of call-clobbered registers can then reclaim this cost using a
+     predecrement store and a postincrement load.
+
+     For simplicity, give this addition or subtraction the same cost as
+     a GPR move.  We could parameterize this if necessary.  */
+  if (aarch64_count_above_hard_fp_saves (callee_saved_regs) == 0)
+    return aarch64_tune_params.regmove_cost->GP2GP;
+  return 0;
+}
+
 /* Implement TARGET_INSN_COST.  We have the opportunity to do something
    much more productive here, such as using insn attributes to cost things.
    But we don't, not yet.
@@ -17389,7 +17498,8 @@ aarch64_vector_costs::count_ops (unsigned int count, vect_cost_for_stmt kind,
 
   /* Calculate the minimum cycles per iteration imposed by a reduction
      operation.  */
-  if ((kind == scalar_stmt || kind == vector_stmt || kind == vec_to_scalar)
+  if (stmt_info
+      && (kind == scalar_stmt || kind == vector_stmt || kind == vec_to_scalar)
       && vect_is_reduction (stmt_info))
     {
       unsigned int base
@@ -17425,7 +17535,8 @@ aarch64_vector_costs::count_ops (unsigned int count, vect_cost_for_stmt kind,
      costing when we see a vec_to_scalar on a stmt with VMAT_GATHER_SCATTER we
      are dealing with an emulated instruction and should adjust costing
      properly.  */
-  if (kind == vec_to_scalar
+  if (stmt_info
+      && kind == vec_to_scalar
       && (m_vec_flags & VEC_ADVSIMD)
       && vect_mem_access_type (stmt_info, node) == VMAT_GATHER_SCATTER)
     {
@@ -17481,7 +17592,8 @@ aarch64_vector_costs::count_ops (unsigned int count, vect_cost_for_stmt kind,
     case vector_load:
     case unaligned_load:
       ops->loads += count;
-      if (m_vec_flags || FLOAT_TYPE_P (aarch64_dr_type (stmt_info)))
+      if (m_vec_flags
+	  || (stmt_info && FLOAT_TYPE_P (aarch64_dr_type (stmt_info))))
 	ops->general_ops += base_issue->fp_simd_load_general_ops * count;
       break;
 
@@ -17489,24 +17601,29 @@ aarch64_vector_costs::count_ops (unsigned int count, vect_cost_for_stmt kind,
     case unaligned_store:
     case scalar_store:
       ops->stores += count;
-      if (m_vec_flags || FLOAT_TYPE_P (aarch64_dr_type (stmt_info)))
+      if (m_vec_flags
+	  || (stmt_info && FLOAT_TYPE_P (aarch64_dr_type (stmt_info))))
 	ops->general_ops += base_issue->fp_simd_store_general_ops * count;
       break;
     }
 
   /* Add any embedded comparison operations.  */
-  if ((kind == scalar_stmt || kind == vector_stmt || kind == vec_to_scalar)
+  if (stmt_info
+      && (kind == scalar_stmt || kind == vector_stmt || kind == vec_to_scalar)
       && vect_embedded_comparison_type (stmt_info))
     ops->general_ops += count;
 
   /* COND_REDUCTIONS need two sets of VEC_COND_EXPRs, whereas so far we
      have only accounted for one.  */
-  if ((kind == vector_stmt || kind == vec_to_scalar)
+  if (stmt_info
+      && (kind == vector_stmt || kind == vec_to_scalar)
       && vect_reduc_type (m_vinfo, stmt_info) == COND_REDUCTION)
     ops->general_ops += count;
 
   /* Count the predicate operations needed by an SVE comparison.  */
-  if (sve_issue && (kind == vector_stmt || kind == vec_to_scalar))
+  if (stmt_info
+      && sve_issue
+      && (kind == vector_stmt || kind == vec_to_scalar))
     if (tree type = vect_comparison_type (stmt_info))
       {
 	unsigned int base = (FLOAT_TYPE_P (type)
@@ -17516,7 +17633,7 @@ aarch64_vector_costs::count_ops (unsigned int count, vect_cost_for_stmt kind,
       }
 
   /* Add any extra overhead associated with LD[234] and ST[234] operations.  */
-  if (simd_issue)
+  if (stmt_info && simd_issue)
     switch (aarch64_ld234_st234_vectors (kind, stmt_info, node))
       {
       case 2:
@@ -17533,7 +17650,8 @@ aarch64_vector_costs::count_ops (unsigned int count, vect_cost_for_stmt kind,
       }
 
   /* Add any overhead associated with gather loads and scatter stores.  */
-  if (sve_issue
+  if (stmt_info
+      && sve_issue
       && (kind == scalar_load || kind == scalar_store)
       && vect_mem_access_type (stmt_info, node) == VMAT_GATHER_SCATTER)
     {
@@ -17743,16 +17861,6 @@ aarch64_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
       stmt_cost = aarch64_adjust_stmt_cost (m_vinfo, kind, stmt_info, node,
 					    vectype, m_vec_flags, stmt_cost);
 
-      /* If we're recording a nonzero vector loop body cost for the
-	 innermost loop, also estimate the operations that would need
-	 to be issued by all relevant implementations of the loop.  */
-      if (loop_vinfo
-	  && (m_costing_for_scalar || where == vect_body)
-	  && (!LOOP_VINFO_LOOP (loop_vinfo)->inner || in_inner_loop_p)
-	  && stmt_cost != 0)
-	for (auto &ops : m_ops)
-	  count_ops (count, kind, stmt_info, node, &ops);
-
       /* If we're applying the SVE vs. Advanced SIMD unrolling heuristic,
 	 estimate the number of statements in the unrolled Advanced SIMD
 	 loop.  For simplicitly, we assume that one iteration of the
@@ -17776,6 +17884,16 @@ aarch64_vector_costs::add_stmt_cost (int count, vect_cost_for_stmt kind,
 	    }
 	}
     }
+
+  /* If we're recording a nonzero vector loop body cost for the
+     innermost loop, also estimate the operations that would need
+     to be issued by all relevant implementations of the loop.  */
+  if (loop_vinfo
+      && (m_costing_for_scalar || where == vect_body)
+      && (!LOOP_VINFO_LOOP (loop_vinfo)->inner || in_inner_loop_p)
+      && stmt_cost != 0)
+    for (auto &ops : m_ops)
+      count_ops (count, kind, stmt_info, node, &ops);
 
   /* If the statement stores to a decl that is known to be the argument
      to a vld1 in the same function, ignore the store for costing purposes.
@@ -25499,6 +25617,10 @@ aarch64_float_const_representable_p (rtx x)
 {
   x = unwrap_const_vec_duplicate (x);
   machine_mode mode = GET_MODE (x);
+
+  if (DECIMAL_FLOAT_MODE_P (mode))
+    return false;
+
   if (!CONST_DOUBLE_P (x))
     return false;
 
@@ -26301,7 +26423,7 @@ aarch64_evpc_dup (struct expand_vec_perm_d *d)
   in0 = d->op0;
   lane = GEN_INT (elt); /* The pattern corrects for big-endian.  */
 
-  rtx parallel = gen_rtx_PARALLEL (vmode, gen_rtvec (1, lane));
+  rtx parallel = gen_rtx_PARALLEL (VOIDmode, gen_rtvec (1, lane));
   rtx select = gen_rtx_VEC_SELECT (GET_MODE_INNER (vmode), in0, parallel);
   emit_set_insn (out, gen_rtx_VEC_DUPLICATE (vmode, select));
   return true;
@@ -26739,8 +26861,8 @@ aarch64_vectorize_vec_perm_const (machine_mode vmode, machine_mode op_mode,
   d.op_vec_flags = aarch64_classify_vector_mode (d.op_mode);
   d.target = target;
   d.op0 = op0 ? force_reg (op_mode, op0) : NULL_RTX;
-  if (op0 == op1)
-    d.op1 = d.op0;
+  if (op0 && d.one_vector_p)
+    d.op1 = copy_rtx (d.op0);
   else
     d.op1 = op1 ? force_reg (op_mode, op1) : NULL_RTX;
   d.testing_p = !target;
@@ -31336,6 +31458,16 @@ aarch64_test_sysreg_encoding_clashes (void)
     }
 }
 
+/* Test SVE arithmetic folding.  */
+
+static void
+aarch64_test_sve_folding ()
+{
+  tree res = fold_unary (BIT_NOT_EXPR, ssizetype,
+			 ssize_int (poly_int64 (1, 1)));
+  ASSERT_TRUE (operand_equal_p (res, ssize_int (poly_int64 (-2, -1))));
+}
+
 /* Run all target-specific selftests.  */
 
 static void
@@ -31344,6 +31476,7 @@ aarch64_run_selftests (void)
   aarch64_test_loading_full_dump ();
   aarch64_test_fractional_cost ();
   aarch64_test_sysreg_encoding_clashes ();
+  aarch64_test_sve_folding ();
 }
 
 } // namespace selftest
@@ -31556,6 +31689,12 @@ aarch64_libgcc_floating_mode_supported_p
 
 #undef TARGET_MEMORY_MOVE_COST
 #define TARGET_MEMORY_MOVE_COST aarch64_memory_move_cost
+
+#undef TARGET_CALLEE_SAVE_COST
+#define TARGET_CALLEE_SAVE_COST aarch64_callee_save_cost
+
+#undef TARGET_FRAME_ALLOCATION_COST
+#define TARGET_FRAME_ALLOCATION_COST aarch64_frame_allocation_cost
 
 #undef TARGET_MIN_DIVISIONS_FOR_RECIP_MUL
 #define TARGET_MIN_DIVISIONS_FOR_RECIP_MUL aarch64_min_divisions_for_recip_mul

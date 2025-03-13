@@ -2429,7 +2429,9 @@ resolve_elemental_actual (gfc_expr *expr, gfc_code *c)
 	  for (a = arg0; a; a = a->next)
 	    if (a != arg
 		&& a->expr->rank == arg->expr->rank
-		&& !a->expr->symtree->n.sym->attr.optional)
+		&& (a->expr->expr_type != EXPR_VARIABLE
+		    || (a->expr->expr_type == EXPR_VARIABLE
+			&& !a->expr->symtree->n.sym->attr.optional)))
 	      {
 		t = true;
 		break;
@@ -3427,6 +3429,32 @@ resolve_function (gfc_expr *expr)
       return false;
     }
 
+  /* Add and check formal interface when -fc-prototypes-external is in
+     force, see comment in resolve_call().  */
+
+  if (warn_external_argument_mismatch && sym && sym->attr.dummy
+      && sym->attr.external)
+    {
+      if (sym->formal)
+	{
+	  bool conflict;
+	  conflict = !gfc_compare_actual_formal (&expr->value.function.actual,
+						 sym->formal, 0, 0, 0, NULL);
+	  if (conflict)
+	    {
+	      sym->ext_dummy_arglist_mismatch = 1;
+	      gfc_warning (OPT_Wexternal_argument_mismatch,
+			   "Different argument lists in external dummy "
+			   "function %s at %L and %L", sym->name,
+			   &expr->where, &sym->formal_at);
+	    }
+	}
+      else
+	{
+	  gfc_get_formal_from_actual_arglist (sym, expr->value.function.actual);
+	  sym->formal_at = expr->where;
+	}
+    }
   /* See if function is already resolved.  */
 
   if (expr->value.function.name != NULL
@@ -3938,6 +3966,43 @@ resolve_call (gfc_code *c)
   /* If external, check for usage.  */
   if (csym && is_external_proc (csym))
     resolve_global_procedure (csym, &c->loc, 1);
+
+  /* If we have an external dummy argument, we want to write out its arguments
+     with -fc-prototypes-external.  Code like
+
+     subroutine foo(a,n)
+       external a
+       if (n == 1) call a(1)
+       if (n == 2) call a(2,3)
+     end subroutine foo
+
+     is actually legal Fortran, but it is not possible to generate a C23-
+     compliant prototype for this, so we just record the fact here and
+     handle that during -fc-prototypes-external processing.  */
+
+  if (warn_external_argument_mismatch && csym && csym->attr.dummy
+      && csym->attr.external)
+    {
+      if (csym->formal)
+	{
+	  bool conflict;
+	  conflict = !gfc_compare_actual_formal (&c->ext.actual, csym->formal,
+						 0, 0, 0, NULL);
+	  if (conflict)
+	    {
+	      csym->ext_dummy_arglist_mismatch = 1;
+	      gfc_warning (OPT_Wexternal_argument_mismatch,
+			   "Different argument lists in external dummy "
+			   "subroutine %s at %L and %L", csym->name,
+			   &c->loc, &csym->formal_at);
+	    }
+	}
+      else
+	{
+	  gfc_get_formal_from_actual_arglist (csym, c->ext.actual);
+	  csym->formal_at = c->loc;
+	}
+    }
 
   t = true;
   if (c->resolved_sym == NULL)
@@ -5393,6 +5458,81 @@ resolve_array_ref (gfc_array_ref *ar)
 	ar->dimen_type[n] = DIMEN_THIS_IMAGE;
     }
 
+  if (ar->codimen)
+    {
+      if (ar->team_type == TEAM_NUMBER)
+	{
+	  if (!gfc_resolve_expr (ar->team))
+	    return false;
+
+	  if (ar->team->rank != 0)
+	    {
+	      gfc_error ("TEAM_NUMBER argument at %L must be scalar",
+			 &ar->team->where);
+	      return false;
+	    }
+
+	  if (ar->team->ts.type != BT_INTEGER)
+	    {
+	      gfc_error ("TEAM_NUMBER argument at %L must be of INTEGER "
+			 "type, found %s",
+			 &ar->team->where,
+			 gfc_basic_typename (ar->team->ts.type));
+	      return false;
+	    }
+	}
+      else if (ar->team_type == TEAM_TEAM)
+	{
+	  if (!gfc_resolve_expr (ar->team))
+	    return false;
+
+	  if (ar->team->rank != 0)
+	    {
+	      gfc_error ("TEAM argument at %L must be scalar",
+			 &ar->team->where);
+	      return false;
+	    }
+
+	  if (ar->team->ts.type != BT_DERIVED
+	      || ar->team->ts.u.derived->from_intmod != INTMOD_ISO_FORTRAN_ENV
+	      || ar->team->ts.u.derived->intmod_sym_id != ISOFORTRAN_TEAM_TYPE)
+	    {
+	      gfc_error ("TEAM argument at %L must be of TEAM_TYPE from "
+			 "the intrinsic module ISO_FORTRAN_ENV, found %s",
+			 &ar->team->where,
+			 gfc_basic_typename (ar->team->ts.type));
+	      return false;
+	    }
+	}
+      if (ar->stat)
+	{
+	  if (!gfc_resolve_expr (ar->stat))
+	    return false;
+
+	  if (ar->stat->rank != 0)
+	    {
+	      gfc_error ("STAT argument at %L must be scalar",
+			 &ar->stat->where);
+	      return false;
+	    }
+
+	  if (ar->stat->ts.type != BT_INTEGER)
+	    {
+	      gfc_error ("STAT argument at %L must be of INTEGER "
+			 "type, found %s",
+			 &ar->stat->where,
+			 gfc_basic_typename (ar->stat->ts.type));
+	      return false;
+	    }
+
+	  if (ar->stat->expr_type != EXPR_VARIABLE)
+	    {
+	      gfc_error ("STAT's expression at %L must be a variable",
+			 &ar->stat->where);
+	      return false;
+	    }
+	}
+    }
   return true;
 }
 
@@ -13818,7 +13958,8 @@ gfc_verify_DTIO_procedures (gfc_symbol *sym)
 
 /* Verify that any binding labels used in a given namespace do not collide
    with the names or binding labels of any global symbols.  Multiple INTERFACE
-   for the same procedure are permitted.  */
+   for the same procedure are permitted.  Abstract interfaces and dummy
+   arguments are not checked.  */
 
 static void
 gfc_verify_binding_labels (gfc_symbol *sym)
@@ -13827,7 +13968,8 @@ gfc_verify_binding_labels (gfc_symbol *sym)
   const char *module;
 
   if (!sym || !sym->attr.is_bind_c || sym->attr.is_iso_c
-      || sym->attr.flavor == FL_DERIVED || !sym->binding_label)
+      || sym->attr.flavor == FL_DERIVED || !sym->binding_label
+      || sym->attr.abstract || sym->attr.dummy)
     return;
 
   gsym = gfc_find_case_gsymbol (gfc_gsym_root, sym->binding_label);

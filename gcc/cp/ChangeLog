@@ -1,3 +1,239 @@
+2025-03-12  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/119150
+	* constexpr.cc (cxx_eval_call_expression): For
+	DECL_IMMEDIATE_FUNCTION_P (fun) set manifestly_const_eval in new_ctx
+	and new_call to mce_true and set ctx to &new_ctx.
+
+2025-03-12  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/118799
+	* module.cc (depset::hash::is_tu_local_entity): Only types,
+	functions, variables, and template (specialisations) can be
+	TU-local.  Explicit type aliases are TU-local iff the type they
+	refer to are.
+	(module_state::write_namespaces): Allow unnamed namespaces in
+	named modules.
+	(check_module_decl_linkage): Error for all exported declarations
+	in an unnamed namespace.
+
+2025-03-12  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/119154
+	* decl2.cc (vague_linkage_p): Don't treat gnu_inline functions
+	as having vague linkage.
+	* module.cc (trees_out::core_bools): Clear DECL_INTERFACE_KNOWN
+	for vague-linkage entities.
+	(read_var_def): Maybe set comdat linkage for imported var
+	definitions.
+	(module_state::read_cluster): Use expand_or_defer_fn instead of
+	ad-hoc linkage management.
+	(post_load_processing): Likewise.
+	* semantics.cc (expand_or_defer_fn_1): Don't forget that we had
+	a definition at all.
+
+2025-03-12  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/117512
+	* typeck.cc (cp_build_indirect_ref_1): Only do the *&e -> e
+	folding if the result would be an lvalue.
+
+2025-03-12  Simon Martin  <simon@nasilyan.com>
+
+	PR c++/110584
+	* cp-tree.h (strip_normal_capture_proxy): Declare.
+	* lambda.cc (strip_normal_capture_proxy): New function to look
+	through normal capture proxies.
+	(build_capture_proxy): Use it.
+	* semantics.cc (process_outer_var_ref): Likewise.
+
+2025-03-12  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/119134
+	* pt.cc (check_for_bare_parameter_packs): Check DECL_CONTEXT.
+
+2025-03-12  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/119076
+	* module.cc (trees_out::start): Handle RAW_DATA_CST.
+	(trees_in::start): Likewise.
+	(trees_out::core_vals): Likewise.
+	(trees_in::core_vals): Likewise.
+
+2025-03-11  Jason Merrill  <jason@redhat.com>
+
+	PR c++/119162
+	* constexpr.cc (find_deleted_heap_var): New.
+	(cxx_eval_call_expression): Don't cache a
+	reference to heap_deleted.
+
+2025-03-10  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	* module.cc (trees_out::has_tu_local_dep): Also look at the
+	TI_TEMPLATE if we don't find a dep for a decl.
+	(depset::hash::is_tu_local_entity): Handle unnamed template
+	types, treat lambdas specially.
+	(is_exposure_of_member_type): New function.
+	(depset::hash::add_dependency): Use it.
+	(depset::hash::finalize_dependencies): Likewise.
+
+2025-03-08  Sandra Loosemore  <sloosemore@baylibre.com>
+
+	* parser.cc (cp_parser_asm_definition): Make comment more explicit.
+	(cp_parser_asm_operand_list): Likewise.  Also correct the comment
+	block at the top of the function to reflect reality.
+
+2025-03-08  Jason Merrill  <jason@redhat.com>
+	    Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/114630
+	PR c++/114795
+	* pt.cc (reopen_tinst_level): Set or clear MK_PURVIEW.
+	(mark_decl_instantiated): Call set_instantiating_module.
+	(instantiate_pending_templates): Save and restore module_kind so
+	it isn't affected by reopen_tinst_level.
+
+2025-03-07  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/118775
+	* constexpr.cc (cxx_eval_call_expression): Check tree_fits_uhwi_p.
+
+2025-03-07  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	* constexpr.cc (potential_constant_expression_1): Handle
+	TU_LOCAL_ENTITY.
+	* pt.cc (expr_contains_tu_local_entity): Remove.
+	(function_contains_tu_local_entity): Remove.
+	(dependent_operand_p): Remove special handling for
+	TU_LOCAL_ENTITY.
+	(tsubst_expr): Handle TU_LOCAL_ENTITY when tsubsting OVERLOADs;
+	remove now-unnecessary extra handling.
+	(type_dependent_expression_p): Handle TU_LOCAL_ENTITY.
+
+2025-03-06  Simon Martin  <simon@nasilyan.com>
+
+	* cp-tree.h (processing_contract_condition): Fix comment typo,
+	paramter -> parameter.
+	* parser.cc (cp_parser_requires_expression): Fix comment typo,
+	delared -> declared.
+
+2025-03-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/98533
+	PR c++/119123
+	* parser.cc (cp_parser_class_specifier): Update TYPE_FIELDS of
+	variant types in case cp_parser_late_parsing_default_args etc. change
+	TYPE_FIELDS on the main variant.  Add switch_to_class lambda and
+	use it to simplify repeated class switching code.
+
+2025-03-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/119138
+	* pt.cc (apply_late_template_attributes): Set p to NULL if
+	ATTR_FLAG_TYPE_IN_PLACE is not set in attr_flags.
+	(tsubst) <case POINTER_TYPE, case REFERENCE_TYPE, case ARRAY_TYPE>:
+	Reuse original type even if TYPE_ATTRIBUTES is non-NULL, but all
+	the attributes are non-dependent.
+
+2025-03-06  Simon Martin  <simon@nasilyan.com>
+
+	PR c++/117504
+	* call.cc (perform_implicit_conversion_flags): Don't call
+	mark_{l,r}value_use.
+
+2025-03-05  Jason Merrill  <jason@redhat.com>
+	    Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/117364
+	PR c++/118874
+	* coroutines.cc (cp_coroutine_transform::build_ramp_function): For
+	!aggregate_value_p return force return value into a local temp.
+
+2025-03-05  Da Xie  <xxie_xd@163.com>
+
+	PR c++/100589
+	* decl.cc (grokdeclarator): Issue an error for a declarator with
+	constrained auto type specifier and trailing return types. Include
+	function names if available.
+
+2025-03-05  Simon Martin  <simon@nasilyan.com>
+
+	PR c++/116740
+	* name-lookup.cc (set_identifier_type_value_with_scope): Don't
+	fail assert with ill-formed input.
+
+2025-03-05  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/119102
+	* module.cc (enum streamed_extensions): Add SE_OPENMP_SIMD
+	and SE_OPENACC, change value of SE_OPENMP and SE_BITS.
+	(CASE_OMP_SIMD_CODE, CASE_OMP_CODE, CASE_OACC_CODE): Define.
+	(trees_out::start): Don't set SE_OPENMP extension for OMP_CLAUSE.
+	Set SE_OPENMP_SIMD extension for CASE_OMP_SIMD_CODE, SE_OPENMP
+	for CASE_OMP_CODE and SE_OPENACC for CASE_OACC_CODE.
+	(trees_in::start): Don't fail for OMP_CLAUSE with missing
+	SE_OPENMP extension.  Do fail for CASE_OMP_SIMD_CODE and missing
+	SE_OPENMP_SIMD extension, or CASE_OMP_CODE and missing SE_OPENMP
+	extension, or CASE_OACC_CODE and missing SE_OPENACC extension.
+	(module_state::write_readme): Write all of SE_OPENMP_SIMD, SE_OPENMP
+	and SE_OPENACC extensions.
+	(module_state::read_config): Diagnose missing -fopenmp, -fopenmp-simd
+	and/or -fopenacc depending on extensions used.
+
+2025-03-05  Jakub Jelinek  <jakub@redhat.com>
+
+	* typeck.cc (check_return_expr): Fix comment typo, rom -> from.
+
+2025-03-05  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/118787
+	* pt.cc (tsubst) <case ARRAY_TYPE>: Use return t; only if it doesn't
+	have any TYPE_ATTRIBUTES.  Call apply_late_template_attributes.
+	<case POINTER_TYPE, case REFERENCE_TYPE>: Likewise.  Formatting fix.
+
+2025-03-04  Jason Merrill  <jason@redhat.com>
+
+	PR c++/119073
+	* call.cc (extend_temps_r): Preserve types of COND_EXPR arms.
+
+2025-03-04  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/109431
+	* cp-tree.h (range_expr_nelts): Declare.
+	* init.cc (build_vec_init): If the CONSTRUCTOR's index is a
+	RANGE_EXPR, use range_expr_nelts to count how many elements
+	were initialized.
+
+2025-02-28  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/114913
+	PR c++/110822
+	* constexpr.cc (replace_decl_r): If we've replaced something
+	inside of an ADDR_EXPR, call cxx_mark_addressable and
+	recompute_tree_invariant_for_addr_expr on the resulting ADDR_EXPR.
+
+2025-02-28  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/118986
+	* constexpr.cc (cxx_eval_call_expression): Check that the types match
+	before calling replace_decl, if not, set *non_constant_p.
+	(maybe_constant_init_1): Don't strip INIT_EXPR if it would change the
+	type of the expression.
+
+2025-02-28  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/119038
+	* lambda.cc (maybe_generic_this_capture): Consider xobj
+	member functions as well, not just iobj.  Update function
+	comment.
+
+2025-02-28  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/119045
+	* constexpr.cc (cxx_eval_store_expression) <case REALPART_EXPR>:
+	Assert that refs->is_empty () rather than probe == target.
+	(cxx_eval_store_expression) <case IMAGPART_EXPR>: Likewise.
+
 2025-02-27  Marek Polacek  <polacek@redhat.com>
 
 	PR c++/118928

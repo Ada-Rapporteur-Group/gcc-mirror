@@ -1762,8 +1762,7 @@
 	      && aarch64_float_const_zero_rtx_p (operands[1])))
       operands[1] = force_reg (<MODE>mode, operands[1]);
 
-    if (!DECIMAL_FLOAT_MODE_P (<MODE>mode)
-	&& GET_CODE (operands[1]) == CONST_DOUBLE
+    if (GET_CODE (operands[1]) == CONST_DOUBLE
 	&& can_create_pseudo_p ()
 	&& !aarch64_can_const_movi_rtx_p (operands[1], <MODE>mode)
 	&& !aarch64_float_const_representable_p (operands[1])
@@ -6435,8 +6434,8 @@
 			  (match_dup 1))
 	(match_dup 2))]
   {
-    operands[2] = lowpart_subreg (<GPI:MODE>mode, operands[2],
-				  <ALLX:MODE>mode);
+    operands[2] = force_lowpart_subreg (<GPI:MODE>mode, operands[2],
+					<ALLX:MODE>mode);
   }
   [(set_attr "type" "bfm,neon_ins_q,neon_ins_q")
    (set_attr "arch" "*,simd,simd")]
@@ -7480,7 +7479,7 @@
     {
       emit_insn (gen_ior<vq_int_equiv>3 (
 	lowpart_subreg (<VQ_INT_EQUIV>mode, operands[0], <MODE>mode),
-	lowpart_subreg (<VQ_INT_EQUIV>mode, operands[1], <MODE>mode),
+	force_lowpart_subreg (<VQ_INT_EQUIV>mode, operands[1], <MODE>mode),
 	v_bitmask));
       DONE;
     }
