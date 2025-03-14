@@ -721,6 +721,8 @@ cgraph_add_edge_to_call_site_hash (cgraph_edge *e)
      one indirect); always hash the direct one.  */
   if (e->speculative && e->indirect_unknown_callee)
     return;
+  if (e->callback)
+    return;
   cgraph_edge **slot = e->caller->call_site_hash->find_slot_with_hash
       (e->call_stmt, cgraph_edge_hasher::hash (e->call_stmt), INSERT);
   if (*slot)
@@ -768,6 +770,9 @@ cgraph_node::get_edge (gimple *call_stmt)
 	  break;
 	n++;
       }
+
+  if (e && e->callback)
+    e = e->get_callback_parent_edge ();
 
   if (n > 100)
     {
@@ -845,7 +850,7 @@ cgraph_edge::set_call_stmt (cgraph_edge *e, gcall *new_stmt,
     {
       cgraph_edge *current, *next;
 
-      current = e;
+      current = e->first_callback_target ();
       gcall *old_stmt = current->call_stmt;
       for (cgraph_edge *d = current; d; d = next)
 	{
@@ -1209,6 +1214,36 @@ cgraph_edge::get_callback_parent_edge ()
     {
       if (e->has_callback && e->call_stmt == call_stmt)
 	break;
+    }
+  return e;
+}
+
+cgraph_edge *
+cgraph_edge::first_callback_target ()
+{
+  gcc_checking_assert (has_callback || callback);
+  cgraph_edge *e = NULL;
+  for (e = caller->callees; e; e = e->next_callee)
+    {
+      if (e->callback && e->call_stmt == call_stmt)
+	{
+	  break;
+	}
+    }
+  return e;
+}
+
+cgraph_edge *
+cgraph_edge::next_callback_target ()
+{
+  gcc_checking_assert (has_callback || callback);
+  cgraph_edge *e = NULL;
+  for (e = next_callee; e; e = e->next_callee)
+    {
+      if (e->callback && e->call_stmt == call_stmt)
+	{
+	  break;
+	}
     }
   return e;
 }
@@ -1867,6 +1902,17 @@ cgraph_node::remove_callers (void)
   for (e = callers; e; e = f)
     {
       f = e->next_caller;
+      if (e->has_callback)
+	{
+	  cgraph_edge *cbe, *next_cbe = NULL;
+	  for (cbe = e->first_callback_target (); cbe; cbe = next_cbe)
+	    {
+	      next_cbe = cbe->next_callback_target ();
+	      symtab->call_edge_removal_hooks (cbe);
+	      cbe->remove_caller ();
+	      symtab->free_edge (cbe);
+	    }
+	}
       symtab->call_edge_removal_hooks (e);
       e->remove_caller ();
       symtab->free_edge (e);
@@ -4032,11 +4078,20 @@ cgraph_node::verify_node (void)
 			ncallbacks++)
 		;
 	      for (cgraph_edge *cbe = callees; cbe; cbe = cbe->next_callee)
-		if (cbe->callback && cbe->call_stmt == e->call_stmt)
-		  nfound_edges++;
+		{
+		  if (cbe->callback && cbe->call_stmt == e->call_stmt) {
+
+		    nfound_edges++;
+
+		      }
+		  else if (cbe->callback) {
+		    fprintf (stderr, "sus verify %s -> %s\n",
+			     cbe->caller->name (), cbe->callee->name ());
+		      }
+	}
 	      if (ncallbacks != nfound_edges)
 		{
-		  error ("callback edge %s->%s child edge count mismach, "
+		  error ("callback edge %s->%s child edge count mismatch, "
 			 "expected %d, found %d",
 			 identifier_to_locale (e->caller->name ()),
 			 identifier_to_locale (e->callee->name ()), ncallbacks,

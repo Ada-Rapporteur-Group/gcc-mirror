@@ -3106,12 +3106,18 @@ analyze_function_body (struct cgraph_node *node, bool early)
 
 	      /* Treat callback edges the same way
 		 we treat speculative edges. */
-	      if (edge->callback)
+	      if (edge->has_callback)
 		{
-		  cgraph_edge *parent = edge->get_callback_parent_edge ();
-		  ipa_call_summary *es2
-		    = ipa_call_summaries->get_create (parent);
-		  ipa_call_summaries->duplicate (edge, parent, es, es2);
+		  cgraph_edge *child;
+		  for (child = edge->first_callback_target (); child;
+		       child = child->next_callback_target ())
+		    {
+		      ipa_call_summary *es2 = ipa_call_summaries->get (child);
+		      if (es2)
+			continue;
+		      es2 = ipa_call_summaries->get_create (child);
+		      ipa_call_summaries->duplicate (edge, child, es, es2);
+		    }
 		}
 	    }
 

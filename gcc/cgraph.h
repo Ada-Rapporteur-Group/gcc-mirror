@@ -1747,6 +1747,12 @@ public:
      this method is caled on. */
   cgraph_edge *get_callback_parent_edge ();
 
+  /* TODO DOCS */
+  cgraph_edge *first_callback_target ();
+
+  /* TODO DOCS */
+  cgraph_edge *next_callback_target ();
+
   /* Speculative call consists of an indirect edge and one or more
      direct edge+ref pairs.  Speculative will expand to the following sequence:
 

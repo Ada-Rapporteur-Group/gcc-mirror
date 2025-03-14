@@ -2340,6 +2340,19 @@ copy_bb (copy_body_data *id, basic_block bb,
 			  indirect->count
 			     = copy_basic_block->count.apply_probability (prob);
 			}
+		      /* If edge is a callback parent edge, copy all its
+		       * children as well */
+		      else if (edge->has_callback)
+			{
+			  edge
+			    = edge->clone (id->dst_node, call_stmt,
+					   gimple_uid (stmt), num, den, true);
+			  cgraph_edge *e;
+			  for (e = old_edge->first_callback_target (); e;
+			       e = e->next_callback_target ())
+			    edge = e->clone (id->dst_node, call_stmt,
+					     gimple_uid (stmt), num, den, true);
+			}
 		      else
 			{
 			  edge = edge->clone (id->dst_node, call_stmt,

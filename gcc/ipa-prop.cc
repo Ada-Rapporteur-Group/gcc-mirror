@@ -2443,7 +2443,7 @@ ipa_compute_jump_functions_for_edge (struct ipa_func_body_info *fbi,
 	  if (TREE_CODE (arg) == ADDR_EXPR)
 	    {
 	      tree pointee = TREE_OPERAND (arg, 0);
-	      if (TREE_CODE (pointee) == FUNCTION_DECL && !cs->callback)
+	      if (TREE_CODE (pointee) == FUNCTION_DECL && !cs->callback && cs->callee)
 		{
 		  /* Argument is a pointer to a function. Look for a callback attribute
 		     describing this argument. */
