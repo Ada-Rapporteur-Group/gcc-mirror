@@ -1563,7 +1563,7 @@ copy_descriptor (stmtblock_t *block, tree dest, tree src,
       && dest_ls->akind != src_ls->akind)
     tmp1 = build1 (VIEW_CONVERT_EXPR, TREE_TYPE (dest), src);
   else
-    tmp1 = desc;
+    tmp1 = src;
 
   /* Copy the descriptor for pointer assignments.  */
   gfc_add_modify (block, dest, tmp1);
@@ -1572,7 +1572,7 @@ copy_descriptor (stmtblock_t *block, tree dest, tree src,
   gfc_get_dataptr_offset (block, dest, src, NULL_TREE, subref, src_expr);
 
   /* ....and set the span field.  */
-  tree tmp2
+  tree tmp2;
   if (src_expr->ts.type == BT_CHARACTER)
     tmp2 = gfc_conv_descriptor_span_get (src);
   else
