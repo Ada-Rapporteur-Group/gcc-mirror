@@ -1090,6 +1090,7 @@ enum descr_change_type {
   UNKNOWN_CHANGE,
   EXPLICIT_NULLIFICATION,
   INITIALISATION,
+  DEFAULT_INITIALISATION,
   SCALAR_VALUE
 };
 
@@ -1102,6 +1103,12 @@ struct descr_change_info {
       class modify_info *unknown_info;
       class nullification *nullification_info;
       class init_info *initialization_info;
+      struct
+	{
+	  class default_init *info;
+	  const symbol_attribute *attr; 
+	}
+      default_init;
       struct
 	{
 	  class scalar_value *info;
@@ -1154,6 +1161,13 @@ get_descr_data_value (const descr_change_info &info)
     case INITIALISATION:
       return info.u.initialization_info->get_data_value ();
 
+    case DEFAULT_INITIALISATION:
+      if (!info.u.default_init.attr->pointer
+	  || (gfc_option.rtcheck & GFC_RTCHECK_POINTER))
+	return null_pointer_node;
+      else
+	return NULL_TREE;
+
     case SCALAR_VALUE:
       {
 	tree value = info.u.scalar_value.value;
@@ -1177,6 +1191,7 @@ get_descr_span (const descr_change_info &info)
     case UNKNOWN_CHANGE:
     case EXPLICIT_NULLIFICATION:
     case INITIALISATION:
+    case DEFAULT_INITIALISATION:
       return NULL_TREE;
 
     case SCALAR_VALUE:
@@ -1200,6 +1215,7 @@ get_descr_caf_token (const descr_change_info &info)
     case UNKNOWN_CHANGE:
     case EXPLICIT_NULLIFICATION:
     case INITIALISATION:
+    case DEFAULT_INITIALISATION:
       return null_pointer_node;
 
     case SCALAR_VALUE:
@@ -1333,6 +1349,8 @@ get_descr_dtype (const descr_change_info &change_info, gfc_typespec *ts,
   const init_info *init_info = nullptr;
   if (change_info.type == INITIALISATION)
     init_info = change_info.u.initialization_info;
+  else if (change_info.type == DEFAULT_INITIALISATION)
+    init_info = change_info.u.default_init.info;
   else if (change_info.type == SCALAR_VALUE)
     init_info = change_info.u.scalar_value.info;
   else
@@ -1412,7 +1430,7 @@ get_default_array_descriptor_init (tree type, gfc_typespec &ts, int rank,
 
   default_init di (attr);
   struct descr_change_info info;
-  info.type = INITIALISATION;
+  info.type = DEFAULT_INITIALISATION;
   info.descriptor_type = type;
   info.u.initialization_info = &di;
 
@@ -1455,7 +1473,7 @@ gfc_build_default_array_descriptor (tree type, gfc_typespec &ts, int rank,
 
   default_init di (attr);
   struct descr_change_info info;
-  info.type = INITIALISATION;
+  info.type = DEFAULT_INITIALISATION;
   info.descriptor_type = type;
   info.u.initialization_info = &di;
 
