@@ -41,6 +41,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "omp-low.h"
 #include "memmodel.h"  /* For MEMMODEL_ enums.  */
 #include "dependency.h"
+#include "trans-descriptor.h"
 
 #undef GCC_DIAG_STYLE
 #define GCC_DIAG_STYLE __gcc_tdiag__
