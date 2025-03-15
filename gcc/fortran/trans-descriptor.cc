@@ -1066,7 +1066,7 @@ public:
 };
 
 
-class scalar_value : public modify_info
+class scalar_value : public init_info
 {
 private:
   bool initialisation;
