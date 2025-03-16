@@ -1476,7 +1476,12 @@ bool is_rtx_insn_prelive(rtx_insn *insn) {
   if (GET_CODE(body) == CLOBBER) // gcc/gcc/testsuite/gcc.c-torture/compile/20000605-1.c
     return true;
 
-  if (side_effects_with_mem(body) || can_throw_internal(body))
+  // may_trap_or_fault_p helps a lot to pass some tests from RUNTESTSFLAGS=execute.exp
+  // e. g. this one: testsuite/gcc.c-torture/execute/20020418-1.c
+  // TODO : debug the testcase
+  // It seems that the issue was due to trap_if rtl insn and fixed with may_trap_or_fault_p
+  // What about can_throw_internal?
+  if (side_effects_with_mem(body) || can_throw_internal(body) || may_trap_or_fault_p(body))
     return true;
 
   // TODO : parallel, {pre,post}_{int,dec}, {pre,post}_modify, may_trap_or_fault_p
@@ -1526,6 +1531,8 @@ bool is_prelive(insn_info *insn)
 static void
 rtl_ssa_dce_init()
 {
+  // internal compiler error: gcc.c-torture/execute/20040811-1.c - rtl_ssa::function_info::add_phi_nodes
+
   calculate_dominance_info(CDI_DOMINATORS);
   // here we create ssa form for function
   crtl->ssa = new rtl_ssa::function_info(cfun);
