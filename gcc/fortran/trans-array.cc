@@ -10749,16 +10749,6 @@ gfc_alloc_allocatable_for_assignment (gfc_loopinfo *loop,
      running offset.  Use the saved_offset instead.  */
   gfc_conv_descriptor_offset_set (&fblock, desc, offset);
 
-  /* Now set the deltas for the lhs.  */
-  for (n = 0; n < expr1->rank; n++)
-    {
-      tmp = gfc_conv_descriptor_lbound_get (desc, gfc_rank_cst[n]);
-      dim = lss->dim[n];
-      tmp = fold_build2_loc (input_location, MINUS_EXPR,
-			     gfc_array_index_type, tmp,
-			     loop->from[dim]);
-    }
-
   /* Take into account _len of unlimited polymorphic entities, so that span
      for array descriptors and allocation sizes are computed correctly.  */
   if (UNLIMITED_POLY (expr2))
