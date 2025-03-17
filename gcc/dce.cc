@@ -1454,8 +1454,7 @@ bool is_rtx_insn_prelive(rtx_insn *insn) {
     // return !find_call_stack_args (as_a <rtx_call_insn *> (insn), false, fast, arg_stores);
 
   // Only rtx_insn should be handled here
-  auto code = GET_CODE(insn);
-  gcc_assert(code == INSN);
+  gcc_assert(GET_CODE(insn) == INSN);
 
   /* Don't delete insns that may throw if we cannot do so.  */
   if (!(cfun->can_delete_dead_exceptions && can_alter_cfg) && !insn_nothrow_p (insn))
@@ -1476,6 +1475,11 @@ bool is_rtx_insn_prelive(rtx_insn *insn) {
   if (GET_CODE(body) == CLOBBER) // gcc/gcc/testsuite/gcc.c-torture/compile/20000605-1.c
     return true;
 
+  if (GET_CODE(body) == PREFETCH)
+    return true;
+
+  // See deletable_insn_p_1 for UNSPEC. TRAP_IF is caught by may_trap_or_fault_p
+
   // may_trap_or_fault_p helps a lot to pass some tests from RUNTESTSFLAGS=execute.exp
   // e. g. this one: testsuite/gcc.c-torture/execute/20020418-1.c
   // TODO : debug the testcase
@@ -1483,10 +1487,6 @@ bool is_rtx_insn_prelive(rtx_insn *insn) {
   // What about can_throw_internal?
   if (side_effects_with_mem(body) || can_throw_internal(body) || may_trap_or_fault_p(body))
     return true;
-
-  // TODO : parallel, {pre,post}_{int,dec}, {pre,post}_modify, may_trap_or_fault_p
-  // Parallel is handled by volatile_refs_p
-
 
   return false;
 }
@@ -1767,8 +1767,9 @@ namespace
   public:
     pass_rtl_ssa_dce(gcc::context *ctxt)
         : rtl_opt_pass(pass_data_rtl_ssa_dce, ctxt)
-    {
-    }
+    {}
+
+    opt_pass * clone () final override { return new pass_rtl_ssa_dce (m_ctxt); }
 
     /* opt_pass methods: */
     bool gate(function *) final override { return optimize > 0 && flag_dce; }
