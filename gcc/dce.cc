@@ -1306,15 +1306,6 @@ public:
 
 } // namespace
 
-
-bool sets_global_register(const_rtx rtx) {
-  auto code = GET_CODE(rtx);
-  if (GET_RTX_CLASS(code) != RTX_INSN)
-    return false;
-
-  return sets_global_register(static_cast<const rtx_insn*>(rtx));
-}
-
 // We should mark stack registers
 // use HARD_FRAME_POINTER_REGNUM, REGNO_PTR_FRAME_P
 // muzeme mit parallel, ktery ma napr. dva single sety, nebo asm statement
@@ -1327,12 +1318,12 @@ bool sets_global_register(rtx_insn* insn) {
   rtx dest = SET_DEST(set);
 
   // TODO : rewrite to simple return
-  //std::cerr << "first pseudo: " << FIRST_PSEUDO_REGISTER << '\n';
+  std::cerr << "first pseudo: " << FIRST_PSEUDO_REGISTER << '\n';
   //std::cerr << "register: " << REGNO(dest) << "\n";
   //debug(insn);
   // If I understand correctly, global_regs[i] is 1 iff reg i is used
   if (REG_P(dest) && HARD_REGISTER_NUM_P(REGNO(dest))) { // && global_regs[REGNO(dest)]
-    //std::cerr << "sets_global_register: true\n";
+    std::cerr << "sets_global_register: true\n";
     return true;
   }
 
@@ -1377,10 +1368,6 @@ bool side_effects_with_mem (const_rtx x)
     case ASM_INPUT:
     case ASM_OPERANDS:
 	    return true;
-
-    // This should rather by RTX_BODY in is_rtx_insn_prelive - like global clobber
-    // case USE:
-      // return true;
 
     default:
       break;
@@ -1451,8 +1438,8 @@ bool is_rtx_insn_prelive(rtx_insn *insn) {
     return true;
 
   // Mark set of a global register
-  if (sets_global_register(insn)) // check rtx_class with GET_RTX_CLASS if RTX_ISNS and convert if needed
-    return true;
+  // if (sets_global_register(insn)) // check rtx_class with GET_RTX_CLASS if RTX_ISNS and convert if needed
+  //   return true;
 
   rtx body = PATTERN(insn);
   if (GET_CODE(body) == CLOBBER) // gcc/gcc/testsuite/gcc.c-torture/compile/20000605-1.c
@@ -1472,7 +1459,7 @@ bool is_rtx_insn_prelive(rtx_insn *insn) {
   // It seems that the issue was due to trap_if rtl insn and fixed with may_trap_or_fault_p
   // What about can_throw_internal?
   // || can_throw_internal(body) - testy na ntb prochazi
-  if (side_effects_with_mem(body)) // || may_trap_or_fault_p(body))
+  if (side_effects_with_mem(body)) // || may_trap_or_fault_p(body)) // replaced by TRAP_IF
     return true;
 
   return false;
@@ -1506,37 +1493,26 @@ bool is_prelive(insn_info *insn)
   gcc_assert (insn->is_real());
   auto rtl = insn->rtl();
 
-  if (!INSN_P(rtl)) // This might be useless
-    return false;
+  for (auto&& __def : insn->defs()) {
+    def_info * def = __def;
+    if (!def->is_reg()) {
+      continue;
+    }
 
-  auto res = is_rtx_insn_prelive(rtl);
+    // this ignore clobbers, which is probably fine
+    if (def->kind() == access_kind::SET && HARD_REGISTER_NUM_P(def->regno())) {
+      // We might try to write something like def->regno() == REGNO (pic_offset_table_rtx) ...
+      // TODO : else if (DF_REF_REG (def) == pic_offset_table_rtx && REGNO (pic_offset_table_rtx) >= FIRST_PSEUDO_REGISTER)
+      // std::cerr << "hello, dear hard register! regno: " << def->regno() << "\n";
+      // debug(rtl);
+      return true;
+    }
+  }
+
+  // auto res = is_rtx_insn_prelive(rtl);
   //std::cerr << "Trying to mark insn: " << insn->uid() << " as prelive: " << res << '\n';
 
   return is_rtx_insn_prelive(rtl);
-}
-
-static void
-rtl_ssa_dce_init()
-{
-  // internal compiler error: gcc.c-torture/execute/20040811-1.c - rtl_ssa::function_info::add_phi_nodes
-
-  calculate_dominance_info(CDI_DOMINATORS);
-  // here we create ssa form for function
-  crtl->ssa = new rtl_ssa::function_info(cfun);
-}
-
-static void
-rtl_ssa_dce_done()
-{
-  free_dominance_info(CDI_DOMINATORS);
-  if (crtl->ssa->perform_pending_updates())
-    cleanup_cfg(0);
-
-  delete crtl->ssa;
-  crtl->ssa = nullptr;
-
-  if (dump_file)
-    fprintf(dump_file, "\nFinished running rtl_ssa_dce\n\n");
 }
 
 static void
@@ -1558,18 +1534,8 @@ rtl_ssa_dce_prelive(std::unordered_set<insn_info *> &marked)
   for (insn_info *insn = crtl->ssa->first_insn(); insn; insn = next)
   {
     next = insn->next_any_insn();
-    /*
-    I would like to mark visited instruction with something like plf (Pass local flags) as in gimple
-
-    This file contains some useful functions: e.g. marked_insn_p, mark_insn
-    mark_insn does much more than I want now...
-    It does quite a useful job. If rtl_insn is a call and it is obsolete, it will find call arguments.
-    */
-
     if (is_prelive(insn))
-    {
       rtl_ssa_dce_mark_live(insn, worklist, marked);
-    }
 
     // if (insn->can_be_optimized () || insn->is_debug_insn ())
     //  if (fwprop_insn (insn, fwprop_addr_p))
@@ -1710,6 +1676,30 @@ rtl_ssa_dce_sweep(std::unordered_set<insn_info *> marked)
   } else {
     // std::cerr << "Changes are not correct\n";
   }
+}
+
+static void
+rtl_ssa_dce_init()
+{
+  // internal compiler error: gcc.c-torture/execute/20040811-1.c - rtl_ssa::function_info::add_phi_nodes
+
+  calculate_dominance_info(CDI_DOMINATORS);
+  // here we create ssa form for function
+  crtl->ssa = new rtl_ssa::function_info(cfun);
+}
+
+static void
+rtl_ssa_dce_done()
+{
+  free_dominance_info(CDI_DOMINATORS);
+  if (crtl->ssa->perform_pending_updates())
+    cleanup_cfg(0);
+
+  delete crtl->ssa;
+  crtl->ssa = nullptr;
+
+  if (dump_file)
+    fprintf(dump_file, "\nFinished running rtl_ssa_dce\n\n");
 }
 
 static unsigned int
