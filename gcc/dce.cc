@@ -1317,6 +1317,8 @@ bool sets_global_register(const_rtx rtx) {
 
 // We should mark stack registers
 // use HARD_FRAME_POINTER_REGNUM, REGNO_PTR_FRAME_P
+// muzeme mit parallel, ktery ma napr. dva single sety, nebo asm statement
+// pouzit note_pattern_stores nebo note_stores
 bool sets_global_register(rtx_insn* insn) {
   rtx set = single_set(insn);
   if (!set)
@@ -1335,25 +1337,6 @@ bool sets_global_register(rtx_insn* insn) {
   }
 
   return false;
-}
-
-bool is_control_flow(rtx_code code) {
-  // What about BARRIERs?
-  switch (code) {
-    case JUMP_INSN:
-    case JUMP_TABLE_DATA: // Be careful with Table jump addresses - ADDR_VEC, ADDR_DIFF_VEC, PREFETCH 
-    case TRAP_IF:
-    case IF_THEN_ELSE: // Also COMPARE?
-    case COND_EXEC: // We might want to check the operation that is under this?
-    case RETURN:
-    case SIMPLE_RETURN:
-    case EH_RETURN:
-    case LABEL_REF:
-      return true;
-
-    default:
-      return false;
-  }
 }
 
 bool side_effects_with_mem (const_rtx x)
@@ -1396,8 +1379,8 @@ bool side_effects_with_mem (const_rtx x)
 	    return true;
 
     // This should rather by RTX_BODY in is_rtx_insn_prelive - like global clobber
-    case USE:
-      return true;
+    // case USE:
+      // return true;
 
     default:
       break;
@@ -1478,6 +1461,9 @@ bool is_rtx_insn_prelive(rtx_insn *insn) {
   if (GET_CODE(body) == PREFETCH)
     return true;
 
+  if (GET_CODE(body) == USE || GET_CODE(body) == TRAP_IF || GET_CODE(body) == UNSPEC)
+    return true;
+
   // See deletable_insn_p_1 for UNSPEC. TRAP_IF is caught by may_trap_or_fault_p
 
   // may_trap_or_fault_p helps a lot to pass some tests from RUNTESTSFLAGS=execute.exp
@@ -1485,7 +1471,8 @@ bool is_rtx_insn_prelive(rtx_insn *insn) {
   // TODO : debug the testcase
   // It seems that the issue was due to trap_if rtl insn and fixed with may_trap_or_fault_p
   // What about can_throw_internal?
-  if (side_effects_with_mem(body) || can_throw_internal(body) || may_trap_or_fault_p(body))
+  // || can_throw_internal(body) - testy na ntb prochazi
+  if (side_effects_with_mem(body)) // || may_trap_or_fault_p(body))
     return true;
 
   return false;
