@@ -1,0 +1,485 @@
+Enter a country code (space to stop) :- ZW is Zimbabwe                 
+ 
+Enter a country code (space to stop) :- ZR is Zaire                    
+ 
+Enter a country code (space to stop) :- ZM is Zambia                   
+ 
+Enter a country code (space to stop) :- ZA is South Africa             
+ 
+Enter a country code (space to stop) :- YU is Yugoslavia               
+ 
+Enter a country code (space to stop) :- YT is Mayotte                  
+ 
+Enter a country code (space to stop) :- YE is Yemen                    
+ 
+Enter a country code (space to stop) :- WS is Samoa                    
+ 
+Enter a country code (space to stop) :- WF is Wallis and Futuna Islands
+ 
+Enter a country code (space to stop) :- VU is Vanuatu                  
+ 
+Enter a country code (space to stop) :- VN is Viet Nam                 
+ 
+Enter a country code (space to stop) :- VI is Virgin Islands (US)      
+ 
+Enter a country code (space to stop) :- VG is Virgin Islands (British) 
+ 
+Enter a country code (space to stop) :- VE is Venezuela                
+ 
+Enter a country code (space to stop) :- VC is St Vincent & Grenadines  
+ 
+Enter a country code (space to stop) :- VA is Vatican City State       
+ 
+Enter a country code (space to stop) :- UZ is Uzbekistan               
+ 
+Enter a country code (space to stop) :- UY is Uruguay                  
+ 
+Enter a country code (space to stop) :- US is United States            
+ 
+Enter a country code (space to stop) :- UM is US Minor Outlying Isls   
+ 
+Enter a country code (space to stop) :- UK is United Kingdom           
+ 
+Enter a country code (space to stop) :- UG is Uganda                   
+ 
+Enter a country code (space to stop) :- UA is Ukraine                  
+ 
+Enter a country code (space to stop) :- TZ is Tanzania                 
+ 
+Enter a country code (space to stop) :- TW is Taiwan                   
+ 
+Enter a country code (space to stop) :- TV is Tuvalu                   
+ 
+Enter a country code (space to stop) :- TT is Trinidad and Tobago      
+ 
+Enter a country code (space to stop) :- TR is Turkey                   
+ 
+Enter a country code (space to stop) :- TP is East Timor               
+ 
+Enter a country code (space to stop) :- TO is Tonga                    
+ 
+Enter a country code (space to stop) :- TN is Tunisia                  
+ 
+Enter a country code (space to stop) :- TM is Turkmenistan             
+ 
+Enter a country code (space to stop) :- TK is Tokelau                  
+ 
+Enter a country code (space to stop) :- TJ is Tajikistan               
+ 
+Enter a country code (space to stop) :- TH is Thailand                 
+ 
+Enter a country code (space to stop) :- TG is Togo                     
+ 
+Enter a country code (space to stop) :- TF is French Southern Territ   
+ 
+Enter a country code (space to stop) :- TD is Chad                     
+ 
+Enter a country code (space to stop) :- TC is Turks and Caicos Islands 
+ 
+Enter a country code (space to stop) :- SZ is Swaziland                
+ 
+Enter a country code (space to stop) :- SY is Syria                    
+ 
+Enter a country code (space to stop) :- SV is El Salvador              
+ 
+Enter a country code (space to stop) :- SU is USSR (former)            
+ 
+Enter a country code (space to stop) :- ST is Sao Tome and Principe    
+ 
+Enter a country code (space to stop) :- SR is Suriname                 
+ 
+Enter a country code (space to stop) :- SO is Somalia                  
+ 
+Enter a country code (space to stop) :- SN is Senegal                  
+ 
+Enter a country code (space to stop) :- SM is San Marino               
+ 
+Enter a country code (space to stop) :- SL is Sierra Leone             
+ 
+Enter a country code (space to stop) :- SK is Slovak Republic          
+ 
+Enter a country code (space to stop) :- SJ is Svalbard & Jan Mayen Isls
+ 
+Enter a country code (space to stop) :- SI is Slovenia                 
+ 
+Enter a country code (space to stop) :- SH is St Helena                
+ 
+Enter a country code (space to stop) :- SG is Singapore                
+ 
+Enter a country code (space to stop) :- SE is Sweden                   
+ 
+Enter a country code (space to stop) :- SD is Sudan                    
+ 
+Enter a country code (space to stop) :- SC is Seychelles               
+ 
+Enter a country code (space to stop) :- SB is Solomon Islands          
+ 
+Enter a country code (space to stop) :- SA is Saudi Arabia             
+ 
+Enter a country code (space to stop) :- RW is Rwanda                   
+ 
+Enter a country code (space to stop) :- RU is Russian Federation       
+ 
+Enter a country code (space to stop) :- RO is Romania                  
+ 
+Enter a country code (space to stop) :- RE is Reunion                  
+ 
+Enter a country code (space to stop) :- QA is Qatar                    
+ 
+Enter a country code (space to stop) :- PY is Paraguay                 
+ 
+Enter a country code (space to stop) :- PW is Palau                    
+ 
+Enter a country code (space to stop) :- PT is Portugal                 
+ 
+Enter a country code (space to stop) :- PR is Puerto Rico              
+ 
+Enter a country code (space to stop) :- PN is Pitcairn                 
+ 
+Enter a country code (space to stop) :- PM is St Pierre and Miquelon   
+ 
+Enter a country code (space to stop) :- PL is Poland                   
+ 
+Enter a country code (space to stop) :- PK is Pakistan                 
+ 
+Enter a country code (space to stop) :- PH is Philippines              
+ 
+Enter a country code (space to stop) :- PG is Papua New Guinea         
+ 
+Enter a country code (space to stop) :- PF is French Polynesia         
+ 
+Enter a country code (space to stop) :- PE is Peru                     
+ 
+Enter a country code (space to stop) :- PA is Panama                   
+ 
+Enter a country code (space to stop) :- OM is Oman                     
+ 
+Enter a country code (space to stop) :- NZ is New Zealand (Aotearoa)   
+ 
+Enter a country code (space to stop) :- NU is Niue                     
+ 
+Enter a country code (space to stop) :- NT is Neutral Zone             
+ 
+Enter a country code (space to stop) :- NR is Nauru                    
+ 
+Enter a country code (space to stop) :- NP is Nepal                    
+ 
+Enter a country code (space to stop) :- NO is Norway                   
+ 
+Enter a country code (space to stop) :- NL is Netherlands              
+ 
+Enter a country code (space to stop) :- NI is Nicaragua                
+ 
+Enter a country code (space to stop) :- NG is Nigeria                  
+ 
+Enter a country code (space to stop) :- NF is Norfolk Island           
+ 
+Enter a country code (space to stop) :- NE is Niger                    
+ 
+Enter a country code (space to stop) :- NC is New Caledonia            
+ 
+Enter a country code (space to stop) :- NA is Namibia                  
+ 
+Enter a country code (space to stop) :- MZ is Mozambique               
+ 
+Enter a country code (space to stop) :- MY is Malaysia                 
+ 
+Enter a country code (space to stop) :- MX is Mexico                   
+ 
+Enter a country code (space to stop) :- MW is Malawi                   
+ 
+Enter a country code (space to stop) :- MV is Maldives                 
+ 
+Enter a country code (space to stop) :- MU is Mauritius                
+ 
+Enter a country code (space to stop) :- MT is Malta                    
+ 
+Enter a country code (space to stop) :- MS is Montserrat               
+ 
+Enter a country code (space to stop) :- MR is Mauritania               
+ 
+Enter a country code (space to stop) :- MQ is Martinique               
+ 
+Enter a country code (space to stop) :- MP is Northern Mariana Islands 
+ 
+Enter a country code (space to stop) :- MO is Macau                    
+ 
+Enter a country code (space to stop) :- MN is Mongolia                 
+ 
+Enter a country code (space to stop) :- MM is Myanmar                  
+ 
+Enter a country code (space to stop) :- ML is Mali                     
+ 
+Enter a country code (space to stop) :- MK is Macedonia                
+ 
+Enter a country code (space to stop) :- MH is Marshall Islands         
+ 
+Enter a country code (space to stop) :- MG is Madagascar               
+ 
+Enter a country code (space to stop) :- MD is Moldova                  
+ 
+Enter a country code (space to stop) :- MC is Monaco                   
+ 
+Enter a country code (space to stop) :- MA is Morocco                  
+ 
+Enter a country code (space to stop) :- LY is Libya                    
+ 
+Enter a country code (space to stop) :- LV is Latvia                   
+ 
+Enter a country code (space to stop) :- LU is Luxembourg               
+ 
+Enter a country code (space to stop) :- LT is Lithuania                
+ 
+Enter a country code (space to stop) :- LS is Lesotho                  
+ 
+Enter a country code (space to stop) :- LR is Liberia                  
+ 
+Enter a country code (space to stop) :- LK is Sri Lanka                
+ 
+Enter a country code (space to stop) :- LI is Liechtenstein            
+ 
+Enter a country code (space to stop) :- LC is Saint Lucia              
+ 
+Enter a country code (space to stop) :- LA is Laos                     
+ 
+Enter a country code (space to stop) :- KZ is Kazakhstan               
+ 
+Enter a country code (space to stop) :- KY is Cayman Islands           
+ 
+Enter a country code (space to stop) :- KW is Kuwait                   
+ 
+Enter a country code (space to stop) :- KR is Korea (South)            
+ 
+Enter a country code (space to stop) :- KP is Korea (North)            
+ 
+Enter a country code (space to stop) :- KN is Saint Kitts and Nevis    
+ 
+Enter a country code (space to stop) :- KM is Comoros                  
+ 
+Enter a country code (space to stop) :- KI is Kiribati                 
+ 
+Enter a country code (space to stop) :- KH is Cambodia                 
+ 
+Enter a country code (space to stop) :- KG is Kyrgyzstan               
+ 
+Enter a country code (space to stop) :- KE is Kenya                    
+ 
+Enter a country code (space to stop) :- JP is Japan                    
+ 
+Enter a country code (space to stop) :- JO is Jordan                   
+ 
+Enter a country code (space to stop) :- JM is Jamaica                  
+ 
+Enter a country code (space to stop) :- IT is Italy                    
+ 
+Enter a country code (space to stop) :- IS is Iceland                  
+ 
+Enter a country code (space to stop) :- IR is Iran                     
+ 
+Enter a country code (space to stop) :- IQ is Iraq                     
+ 
+Enter a country code (space to stop) :- IO is British Ind Ocean Territ 
+ 
+Enter a country code (space to stop) :- IN is India                    
+ 
+Enter a country code (space to stop) :- IL is Israel                   
+ 
+Enter a country code (space to stop) :- IE is Ireland                  
+ 
+Enter a country code (space to stop) :- ID is Indonesia                
+ 
+Enter a country code (space to stop) :- HU is Hungary                  
+ 
+Enter a country code (space to stop) :- HT is Haiti                    
+ 
+Enter a country code (space to stop) :- HR is Croatia (Hrvatska)       
+ 
+Enter a country code (space to stop) :- HN is Honduras                 
+ 
+Enter a country code (space to stop) :- HM is Heard and McDonald Isls  
+ 
+Enter a country code (space to stop) :- HK is Hong Kong                
+ 
+Enter a country code (space to stop) :- GY is Guyana                   
+ 
+Enter a country code (space to stop) :- GW is Guinea-Bissau            
+ 
+Enter a country code (space to stop) :- GU is Guam                     
+ 
+Enter a country code (space to stop) :- GT is Guatemala                
+ 
+Enter a country code (space to stop) :- GS is S Georgia & SSandwich    
+ 
+Enter a country code (space to stop) :- GR is Greece                   
+ 
+Enter a country code (space to stop) :- GQ is Equatorial Guinea        
+ 
+Enter a country code (space to stop) :- GP is Guadeloupe               
+ 
+Enter a country code (space to stop) :- GN is Guinea                   
+ 
+Enter a country code (space to stop) :- GM is Gambia                   
+ 
+Enter a country code (space to stop) :- GL is Greenland                
+ 
+Enter a country code (space to stop) :- GI is Gibraltar                
+ 
+Enter a country code (space to stop) :- GH is Ghana                    
+ 
+Enter a country code (space to stop) :- GF is French Guiana            
+ 
+Enter a country code (space to stop) :- GE is Georgia                  
+ 
+Enter a country code (space to stop) :- GD is Grenada                  
+ 
+Enter a country code (space to stop) :- GB is Great Britain (UK)       
+ 
+Enter a country code (space to stop) :- GA is Gabon                    
+ 
+Enter a country code (space to stop) :- FX is France, Metropolitan     
+ 
+Enter a country code (space to stop) :- FR is France                   
+ 
+Enter a country code (space to stop) :- FO is Faroe Islands            
+ 
+Enter a country code (space to stop) :- FM is Micronesia               
+ 
+Enter a country code (space to stop) :- FK is Falkland Islands         
+ 
+Enter a country code (space to stop) :- FJ is Fiji                     
+ 
+Enter a country code (space to stop) :- FI is Finland                  
+ 
+Enter a country code (space to stop) :- ET is Ethiopia                 
+ 
+Enter a country code (space to stop) :- ES is Spain                    
+ 
+Enter a country code (space to stop) :- ER is Eritrea                  
+ 
+Enter a country code (space to stop) :- EH is Western Sahara           
+ 
+Enter a country code (space to stop) :- EG is Egypt                    
+ 
+Enter a country code (space to stop) :- EE is Estonia                  
+ 
+Enter a country code (space to stop) :- EC is Ecuador                  
+ 
+Enter a country code (space to stop) :- DZ is Algeria                  
+ 
+Enter a country code (space to stop) :- DO is Dominican Republic       
+ 
+Enter a country code (space to stop) :- DM is Dominica                 
+ 
+Enter a country code (space to stop) :- DK is Denmark                  
+ 
+Enter a country code (space to stop) :- DJ is Djibouti                 
+ 
+Enter a country code (space to stop) :- DE is Germany                  
+ 
+Enter a country code (space to stop) :- CZ is Czech Republic           
+ 
+Enter a country code (space to stop) :- CY is Cyprus                   
+ 
+Enter a country code (space to stop) :- CX is Christmas Island         
+ 
+Enter a country code (space to stop) :- CV is Cape Verde               
+ 
+Enter a country code (space to stop) :- CU is Cuba                     
+ 
+Enter a country code (space to stop) :- CS is Czechoslovakia (former)  
+ 
+Enter a country code (space to stop) :- CR is Costa Rica               
+ 
+Enter a country code (space to stop) :- CO is Colombia                 
+ 
+Enter a country code (space to stop) :- CN is China                    
+ 
+Enter a country code (space to stop) :- CM is Cameroon                 
+ 
+Enter a country code (space to stop) :- CL is Chile                    
+ 
+Enter a country code (space to stop) :- CK is Cook Islands             
+ 
+Enter a country code (space to stop) :- CI is Ivory Coast              
+ 
+Enter a country code (space to stop) :- CH is Switzerland              
+ 
+Enter a country code (space to stop) :- CG is Congo                    
+ 
+Enter a country code (space to stop) :- CF is Central African Republic 
+ 
+Enter a country code (space to stop) :- CC is Cocos (Keeling) Islands  
+ 
+Enter a country code (space to stop) :- CA is Canada                   
+ 
+Enter a country code (space to stop) :- BZ is Belize                   
+ 
+Enter a country code (space to stop) :- BY is Belarus                  
+ 
+Enter a country code (space to stop) :- BW is Botswana                 
+ 
+Enter a country code (space to stop) :- BV is Bouvet Island            
+ 
+Enter a country code (space to stop) :- BT is Bhutan                   
+ 
+Enter a country code (space to stop) :- BS is Bahamas                  
+ 
+Enter a country code (space to stop) :- BR is Brazil                   
+ 
+Enter a country code (space to stop) :- BO is Bolivia                  
+ 
+Enter a country code (space to stop) :- BN is Brunei Darussalam        
+ 
+Enter a country code (space to stop) :- BM is Bermuda                  
+ 
+Enter a country code (space to stop) :- BJ is Benin                    
+ 
+Enter a country code (space to stop) :- BI is Burundi                  
+ 
+Enter a country code (space to stop) :- BH is Bahrain                  
+ 
+Enter a country code (space to stop) :- BG is Bulgaria                 
+ 
+Enter a country code (space to stop) :- BF is Burkina Faso             
+ 
+Enter a country code (space to stop) :- BE is Belgium                  
+ 
+Enter a country code (space to stop) :- BD is Bangladesh               
+ 
+Enter a country code (space to stop) :- BB is Barbados                 
+ 
+Enter a country code (space to stop) :- BA is Bosnia and Herzegovina   
+ 
+Enter a country code (space to stop) :- AZ is Azerbaijan               
+ 
+Enter a country code (space to stop) :- AW is Aruba                    
+ 
+Enter a country code (space to stop) :- AU is Australia                
+ 
+Enter a country code (space to stop) :- AT is Austria                  
+ 
+Enter a country code (space to stop) :- AS is American Samoa           
+ 
+Enter a country code (space to stop) :- AR is Argentina                
+ 
+Enter a country code (space to stop) :- AQ is Antarctica               
+ 
+Enter a country code (space to stop) :- AO is Angola                   
+ 
+Enter a country code (space to stop) :- AN is Netherlands Antilles     
+ 
+Enter a country code (space to stop) :- AM is Armenia                  
+ 
+Enter a country code (space to stop) :- AL is Albania                  
+ 
+Enter a country code (space to stop) :- AI is Anguilla                 
+ 
+Enter a country code (space to stop) :- AG is Antigua and Barbuda      
+ 
+Enter a country code (space to stop) :- AF is Afghanistan              
+ 
+Enter a country code (space to stop) :- AE is United Arab Emirates     
+ 
+Enter a country code (space to stop) :- AD is Andorra                  
+ 
+Enter a country code (space to stop) :-  

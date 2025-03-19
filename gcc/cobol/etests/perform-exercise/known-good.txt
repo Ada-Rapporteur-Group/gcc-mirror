@@ -1,0 +1,139 @@
+Perform paragraph-AAA once                                                                                                          
+      I am paragraph_AAA                                                                                                            
+Perform paragraph-AAA 3 times                                                                                                       
+      I am paragraph_AAA                                                                                                            
+      I am paragraph_AAA                                                                                                            
+      I am paragraph_AAA                                                                                                            
+Perform paragraph-BBB THROUGH paragraph-CCC once                                                                                    
+      I am paragraph_BBB                                                                                                            
+      I am paragraph_CCC                                                                                                            
+Perform paragraph-BBB THROUGH paragraph-CCC 3 TIMES                                                                                 
+      I am paragraph_BBB                                                                                                            
+      I am paragraph_CCC                                                                                                            
+      I am paragraph_BBB                                                                                                            
+      I am paragraph_CCC                                                                                                            
+      I am paragraph_BBB                                                                                                            
+      I am paragraph_CCC                                                                                                            
+Trying (counter=0) PERFORM BUMP-COUNTER UNTIL counter >= 5                                                                          
+0 1 2 3 4                                                                                                                                     
+Trying (counter=0) PERFORM BUMP-COUNTER TEST BEFORE UNTIL counter >= 5                                                              
+0 1 2 3 4                                                                                                                                     
+Trying (counter=0) PERFORM BUMP-COUNTER WITH TEST BEFORE UNTIL counter >= 5                                                         
+0 1 2 3 4                                                                                                                                     
+Trying (counter=5) PERFORM BUMP-COUNTER UNTIL counter >= 5                                                                          
+                                                                                                                                    
+Trying (counter=5) PERFORM BUMP-COUNTER TEST BEFORE UNTIL counter >= 5                                                              
+                                                                                                                                    
+Trying (counter=5) PERFORM BUMP-COUNTER WITH TEST BEFORE UNTIL counter >= 5                                                         
+                                                                                                                                    
+PERFORM proc (testing after, start at 0) UNTIL                                                                                      
+Trying (counter=0) PERFORM BUMP-COUNTER TEST AFTER UNTIL counter >= 5                                                               
+0 1 2 3 4                                                                                                                                     
+Trying (counter=0) PERFORM BUMP-COUNTER WITH TEST AFTER UNTIL counter >= 5                                                          
+0 1 2 3 4                                                                                                                                     
+Trying (counter=5) PERFORM BUMP-COUNTER TEST AFTER UNTIL counter >= 5                                                               
+5                                                                                                                                     
+Trying (counter=5) PERFORM BUMP-COUNTER WITH TEST AFTER UNTIL counter >= 5                                                          
+5                                                                                                                                     
+Trying PERFORM PARAGRAPH-AAA VARYING counter FROM 0 BY 1 UNTIL counter >= 3                                                         
+      I am paragraph_AAA                                                                                                            
+      I am paragraph_AAA                                                                                                            
+      I am paragraph_AAA                                                                                                            
+Trying PERFORM paragraph-AAA TEST BEFORE VARYING counter FROM 0 BY 1 UNTIL counter >= 3                                             
+      I am paragraph_AAA                                                                                                            
+      I am paragraph_AAA                                                                                                            
+      I am paragraph_AAA                                                                                                            
+Trying PERFORM paragraph-AAA WITH TEST BEFORE VARYING counter FROM 0 BY 1 UNTIL counter >= 3                                        
+      I am paragraph_AAA                                                                                                            
+      I am paragraph_AAA                                                                                                            
+      I am paragraph_AAA                                                                                                            
+Trying PERFORM PARAGRAPH-AAA VARYING counter FROM 5 BY 1 UNTIL counter >= 3                                                         
+Trying PERFORM paragraph-AAA TEST BEFORE VARYING counter FROM 5 BY 1 UNTIL counter >= 3                                             
+Trying PERFORM paragraph-AAA WITH TEST BEFORE VARYING counter FROM 5 BY 1 UNTIL counter >= 3                                        
+Trying PERFORM paragraph-AAA TEST AFTER VARYING counter FROM 0 BY 1 UNTIL counter >= 3                                              
+      I am paragraph_AAA                                                                                                            
+      I am paragraph_AAA                                                                                                            
+      I am paragraph_AAA                                                                                                            
+      I am paragraph_AAA                                                                                                            
+Trying PERFORM paragraph-AAA WITH TEST AFTER VARYING counter FROM 0 BY 1 UNTIL counter >= 3                                         
+      I am paragraph_AAA                                                                                                            
+      I am paragraph_AAA                                                                                                            
+      I am paragraph_AAA                                                                                                            
+      I am paragraph_AAA                                                                                                            
+Trying PERFORM paragraph-AAA TEST AFTER VARYING counter FROM 5 BY 1 UNTIL counter >= 3                                              
+      I am paragraph_AAA                                                                                                            
+Trying PERFORM paragraph-AAA WITH TEST AFTER VARYING counter FROM 5 BY 1 UNTIL counter >= 3                                         
+      I am paragraph_AAA                                                                                                            
+Trying (count = 0) PERFORM <counter += 1> UNTIL counter >= 5                                                                        
+0 1 2 3 4                                                                                                                                     
+Trying (count = 0) TEST BEFORE PERFORM <counter += 1> UNTIL counter >= 5                                                            
+0 1 2 3 4                                                                                                                                     
+Trying (count = 0) WITH TEST BEFORE PERFORM <counter += 1> UNTIL counter >= 5                                                       
+0 1 2 3 4                                                                                                                                     
+Trying (count = 5) PERFORM <counter += 1> UNTIL counter >= 5                                                                        
+Trying (count = 5) TEST BEFORE PERFORM <counter += 1> UNTIL counter >= 5                                                            
+Trying (count = 5) WITH TEST BEFORE PERFORM <counter += 1> UNTIL counter >= 5                                                       
+Trying (count = 0) TEST AFTER PERFORM <counter += 1> UNTIL counter >= 5                                                             
+0 1 2 3 4                                                                                                                                     
+Trying (count = 0) WITH TEST AFTER PERFORM <counter += 1> UNTIL counter >= 5                                                        
+0 1 2 3 4                                                                                                                                     
+Trying (count = 5) TEST AFTER PERFORM <counter += 1> UNTIL counter >= 5                                                             
+5                                                                                                                                     
+Trying (count = 5) WITH TEST AFTER PERFORM <counter += 1> UNTIL counter >= 5                                                        
+5                                                                                                                                     
+Trying PERFORM BUMP-COUNTER VARYING counter FROM 0 BY 1 UNTIL counter >= 5                                                          
+0 2 4                                                                                                                                     
+Trying PERFORM BUMP-COUNTER TEST BEFORE VARYING counter FROM 0 BY 1 UNTIL counter >= 5                                              
+0 2 4                                                                                                                                     
+Trying PERFORM BUMP-COUNTER WITH TEST BEFORE VARYING counter FROM 0 BY 1 UNTIL counter >= 5                                         
+0 2 4                                                                                                                                     
+Trying PERFORM BUMP-COUNTER VARYING counter FROM 5 BY 1 UNTIL counter >= 5                                                          
+Trying PERFORM BUMP-COUNTER TEST BEFORE VARYING counter FROM 5 BY 1 UNTIL counter >= 5                                              
+Trying PERFORM BUMP-COUNTER WITH TEST BEFORE VARYING counter FROM 5 BY 1 UNTIL counter >= 5                                         
+Trying PERFORM BUMP-COUNTER TEST AFTER VARYING counter FROM 0 BY 1 UNTIL counter >= 5                                               
+0 2 4                                                                                                                                     
+Trying PERFORM BUMP-COUNTER WITH TEST AFTER VARYING counter FROM 0 BY 1 UNTIL counter >= 5                                          
+0 2 4                                                                                                                                     
+Trying PERFORM BUMP-COUNTER TEST AFTER VARYING counter FROM 5 BY 1 UNTIL counter >= 5                                               
+5                                                                                                                                     
+Trying PERFORM BUMP-COUNTER WITH TEST AFTER VARYING counter FROM 5 BY 1 UNTIL counter >= 5                                          
+5                                                                                                                                     
+Trying PERFORM VARYING counter FROM 0 BY 1 UNTIL counter >= 5                                                                       
+0 1 2 3 4                                                                                                                                     
+Trying PERFORM TEST BEFORE VARYING counter FROM 0 BY 1 UNTIL counter >= 5                                                           
+0 1 2 3 4                                                                                                                                     
+Trying PERFORM WITH TEST BEFORE VARYING counter FROM 0 BY 1 UNTIL counter >= 5                                                      
+0 1 2 3 4                                                                                                                                     
+Trying PERFORM VARYING counter FROM 5 BY 1 UNTIL counter >= 5                                                                       
+Trying PERFORM TEST BEFORE VARYING counter FROM 5 BY 1 UNTIL counter >= 5                                                           
+Trying PERFORM WITH TEST BEFORE VARYING counter FROM 5 BY 1 UNTIL counter >= 5                                                      
+Trying PERFORM TEST AFTER VARYING counter FROM 0 BY 1 UNTIL counter >= 5                                                            
+0 1 2 3 4 5                                                                                                                                     
+Trying PERFORM WITH TEST AFTER VARYING counter FROM 0 BY 1 UNTIL counter >= 5                                                       
+0 1 2 3 4 5                                                                                                                                     
+Trying PERFORM TEST AFTER VARYING counter FROM 5 BY 1 UNTIL counter >= 5                                                            
+5                                                                                                                                     
+Trying PERFORM WITH TEST AFTER VARYING counter FROM 5 BY 1 UNTIL counter >= 5                                                       
+5                                                                                                                                     
+Trying PERFORM 5 TIMES                                                                                                              
+5 6 7 8 9  
+PERFORM 10 TIMES; Skip 4, end at 7                                                                                                  
+1 2 3 5 6 7  
+PERFORM TEST AFTER VARYING; skip 4, end at 7                                                                                        
+0 1 2 3 5 6 7                                                                                                                                     
+PERFORM WITH TEST BEFORE VARYING; skip 4, end at 7                                                                                  
+0 1 2 3 5 6 7                                                                                                                                     
+Testing EXIT PARAGRAPH...                                                                                                           
+Now you see me...                                                                                                                   
+Testing EXIT SECTION...                                                                                                             
+PARAGRAPH-AAA2                                                                                                                      
+PARAGRAPH-BBB2                                                                                                                      
+PARAGRAPH-CCC2                                                                                                                      
+ 
+                  AAA OF SEC2                                                                                                       
+Should have been 'AAA of SEC2'                                                                                                      
+                  AAA OF SEC1                                                                                                       
+Should have been 'AAA of SEC1'                                                                                                      
+Duplicated pass-through 1                                                                                                           
+Duplicated pass-through 2                                                                                                           
+Duplicated pass-through 3                                                                                                           

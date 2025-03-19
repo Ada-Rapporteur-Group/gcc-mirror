@@ -1,0 +1,66 @@
+## Copyright (C) 2003-2012, 2015-2019 Free Software Foundation, Inc.
+## Written by Keisuke Nishida, Roger While, Simon Sobisch, Edward Hart
+##
+## This file is part of GnuCOBOL.
+##
+## The GnuCOBOL compiler is free software: you can redistribute it
+## and/or modify it under the terms of the GNU General Public License
+## as published by the Free Software Foundation, either version 3 of the
+## License, or (at your option) any later version.
+##
+## GnuCOBOL is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with GnuCOBOL.  If not, see <https://www.gnu.org/licenses/>.
+
+### GnuCOBOL Test Suite
+
+### ISO+IEC+1989-2002 13.16.36 OCCURS clause
+### ISO+IEC+1989-202x 3rd WD 13.18.38 OCCURS clause
+
+AT_SETUP([Nested OCCURS clause])
+AT_KEYWORDS([occurs])
+# NOT IMPLEMENTED: Diagnostic messages
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 G-1.
+        02 G-2          OCCURS 2.
+         03 G-3         OCCURS 2.
+          04 G-4        OCCURS 2.
+           05 G-5       OCCURS 2.
+            06 G-6      OCCURS 2.
+             07 G-7     OCCURS 2.
+              08 G-8    OCCURS 2.
+               09 X     PIC X.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [0], [], [])
+AT_CLEANUP
+
+
+AT_SETUP([LEVEL01 OCCURS])
+AT_KEYWORDS([bugs])
+AT_DATA([prog.cob], [
+        program-id. prog.
+        data division.
+        working-storage section.
+        01 tabl pic x(16) occurs 10 times.
+        procedure division.
+        move "howdy" to tabl(2)
+        display """"tabl(1)""""
+        display """"tabl(2)""""
+        display """"tabl(3)""""
+        goback.
+        end program prog.
+])
+AT_CHECK([$COMPILE -dialect mf prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], ["                "
+"howdy           "
+"                "
+], [])
+AT_CLEANUP

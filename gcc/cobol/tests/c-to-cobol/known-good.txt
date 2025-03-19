@@ -1,0 +1,43 @@
+Return from chdir is +000
+About to call the libc.so routine "getcwd" 
+CWD is '/usr/local/bin'
+ 
+About to call getcwd with RETURNING phrase
+CWD is '/usr/local/bin'
+RETURNED-CWD is '/usr/local/bin'
+ 
+About to call "imitationcwd", which works like the libc.so routine "cwd" 
+CWD is '/just/like/cwd'
+ 
+About to call imitationcwd with RETURNING phrase
+CWD is '/just/like/cwd'
+RETURNED-CWD is '/just/like/cwd'
+ 
+The COBOL "returner" routine will return "Whassup?" through RETURNING 
+returner returned 'Whassup?                                                                                            '
+ 
+About to call string_to_long with "123456"
+string_to_long returned 123456
+ 
+About to call long_to_string with 654321
+long_to_string returned "654321"
+ 
+ 
+COBOL will call C Routine_B, which will call COBOL routine_c
+      I am COBOL routine_c
+ 
+simple check of cobol-to-cobol BY CONTENT and BY REFERENCE
+Before
+I shouldn't change      
+I should change         
+ 
+after
+I shouldn't change      
+Good: I changed!        
+pass 128-bit value to a C routine
+The C routine string_to_long got the string "123456" from the caller, 
+and is returning the 64-bit value 123456
+The C code got the long integer 654321 from the caller, 
+and is returning the string "654321"
+   I am C routine_b(); I will call COBOL routine_c()
+012345678901234567890123456789

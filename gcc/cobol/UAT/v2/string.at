@@ -1,0 +1,173 @@
+AT_SETUP([STRING 1 - lit TO var ])
+AT_KEYWORDS([string ])
+AT_DATA([prog.cob], [
+m4_include(src/string_001.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./$TEST_PROGRAM], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([STRING 1a - alpha-lit,lit TO var ])
+AT_KEYWORDS([string ])
+AT_DATA([prog.cob], [
+m4_include(src/string_001a.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./$TEST_PROGRAM], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([STRING 1b - num-lit TO var ])
+AT_KEYWORDS([string ])
+AT_DATA([prog.cob], [
+m4_include(src/string_001b.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [1], ignore, ignore)
+AT_CLEANUP
+
+AT_SETUP([STRING 1c - alpha-lit,lit delimited by TO var ])
+AT_KEYWORDS([string ])
+AT_DATA([prog.cob], [
+m4_include(src/string_001c.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./$TEST_PROGRAM], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([STRING 1d numeric display var with V TO var ])
+AT_KEYWORDS([string ])
+AT_DATA([prog.cob], [
+m4_include(src/string_001d.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./$TEST_PROGRAM], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([STRING 2 - var TO var ])
+AT_KEYWORDS([string ])
+AT_DATA([prog.cob], [
+m4_include(src/string_002.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./$TEST_PROGRAM], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([STRING 2a - var,lit TO var ])
+AT_KEYWORDS([string ])
+AT_DATA([prog.cob], [
+m4_include(src/string_002a.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./$TEST_PROGRAM], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([STRING 2b - lit,space TO var ])
+AT_KEYWORDS([string ])
+AT_DATA([prog.cob], [
+m4_include(src/string_002b.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./$TEST_PROGRAM], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([STRING 2c - SPACE,var TO var ])
+AT_KEYWORDS([string ])
+AT_DATA([prog.cob], [
+m4_include(src/string_002c.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./$TEST_PROGRAM], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([STRING 2d - SPACE,lit delimited by TO var ])
+AT_KEYWORDS([string ])
+AT_DATA([prog.cob], [
+m4_include(src/string_002d.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./$TEST_PROGRAM], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([STRING 3 - empty lit TO var ])
+AT_KEYWORDS([string ])
+AT_DATA([prog.cob], [
+m4_include(src/string_003.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./$TEST_PROGRAM], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([STRING 4 - lit TO var: overflows ])
+AT_KEYWORDS([string ])
+AT_DATA([prog.cob], [
+m4_include(src/string_004.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./$TEST_PROGRAM], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([STRING 5 - lit TO literal])
+AT_KEYWORDS([string ])
+AT_DATA([prog.cob], [
+m4_include(src/string_005.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [1], [], [cobol1: syntax error, prog.cob line 6 at '"'
+cobol1: max errors 0 reached, prog.cob line 6 at '"'
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([STRING 6 - delimited by lit space TO var])
+AT_KEYWORDS([string ])
+AT_DATA([prog.cob], [
+m4_include(src/string_006.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./$TEST_PROGRAM], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([STRING 7 - delimited by lit "w" TO var])
+AT_KEYWORDS([string ])
+AT_DATA([prog.cob], [
+m4_include(src/string_007.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./$TEST_PROGRAM], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([STRING 8 - END-STRING, same line])
+AT_KEYWORDS([string ])
+AT_DATA([prog.cob], [
+m4_include(src/string_008.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([STRING 9 - END-STRING and dot, next line])
+AT_KEYWORDS([string ])
+AT_DATA([prog.cob], [
+m4_include(src/string_009.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./$TEST_PROGRAM], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([STRING 20 - ON OVERFLOW overflows])
+AT_KEYWORDS([string ])
+AT_DATA([prog.cob], [
+m4_include(src/string_020.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./$TEST_PROGRAM], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([STRING 21 - ON OVERFLOW overflows])
+AT_KEYWORDS([string ])
+AT_DATA([prog.cob], [
+m4_include(src/string_021.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./$TEST_PROGRAM], [0], [], [])
+AT_CLEANUP
+
+# Clauses not tested at all:
+#   WITH POINTER

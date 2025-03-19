@@ -1,0 +1,845 @@
+#
+# Makefile for compiling and testing NIST test suite programs
+#
+
+### We need to know the root of the source file directory tree
+###
+### This bit of boilerplate establishes the top-level directory of the
+### repository.  It's useful in the GCOBOL environment that tests the binaries
+### under development because not all Makefiles are the same distance away from
+### the repository top-level folder.
+###
+### There are other ways of determining SRCDIR, but the portability of this
+### construction has its merits
+###
+### The GIT_ERROR test is a nod to the reality that all environments are not
+### like my environment, and the user deserves at least a head's up about what's
+### wrong and how to fix it.
+
+GIT_ERROR=$(shell git rev-parse --show-toplevel >/dev/null 2>/dev/null; echo $$?)
+ifneq ($(GIT_ERROR), 0)
+SPACE := $(subst ,, )
+$(info )
+$(info This Makefile assumes that it is part of a GIT repository.)
+$(info Because it is not, it cannot determine the top level directory.)
+$(info You will have to provide that information like this:)
+$(info )
+$(info $(SPACE)    make <rule> TOP_LEVEL=<top-level-directory>)
+$(info )
+$(error Aborting)
+endif
+SRCDIR=$(shell git rev-parse --show-toplevel)
+BUILDDIR = $(SRCDIR)/build
+
+GCOBOL = $(BUILDDIR)/gcc/gcobol -B$(BUILDDIR)/gcc
+COBOL1 = $(BUILDDIR)/gcc/cobol1
+
+CATALOG = $(SRCDIR)/gcc/cobol/nist/catalog
+NC.CONF = $(SRCDIR)/gcc/cobol/nist/nc.conf
+ARCHIVE = newcob.val
+
+URL = http://www.itl.nist.gov/div897/ctg/suites/newcob.val.Z
+#     http://www.itl.nist.gov/div897/ctg/cobol_form.htm
+
+NISTPREP = $(SRCDIR)/gcc/cobol/nist/nistprep
+WORKDIR = playground
+
+#
+# Examples:
+#   make nc         produce and compile all NC files
+#   make nc-src     produce the NC .cbl files
+#   make -munged     re-produce the NC data files (borked)
+#   make nc-dat     re-produce the NC data files from $(ARCHIVE)
+#   make ncx        execute all NC files
+#   make nc-clean   remove all NC executables & reports
+#                   use CLEAN to limit what it removed, e.g.
+#                       CLEAN=NC/NC2 to remove only 200-Level tests
+#   make report     produce summary of reports for all files marked "OK" in catalog
+#
+
+# All files except those marked "no"
+SRC = $(shell awk '/^[A-Z]/ && $$2 != "no"  {print $$1}' $(CATALOG))
+OBJ = $(subst .cbl,,$(SRC))
+OUT = $(subst .cbl,.out,$(SRC))
+
+## DAT is probably ineffective if newcob.val is missing
+DAT = $(shell awk -F '[, ]+' '/^[*]HEADER,DATA/ { print $$3 ".dat" }' $(ARCHIVE))
+
+SM.CLB= SM/CLBRY.K101A SM/CLBRY.K1DAA SM/CLBRY.K1FDA SM/CLBRY.K1P01	\
+	SM/CLBRY.K1PRA SM/CLBRY.K1PRB SM/CLBRY.K1PRC SM/CLBRY.K1SEA	\
+	SM/CLBRY.K1W01 SM/CLBRY.K1W02 SM/CLBRY.K1W03 SM/CLBRY.K1W04	\
+	SM/CLBRY.K1WKA SM/CLBRY.K1WKB SM/CLBRY.K1WKC SM/CLBRY.K1WKY	\
+	SM/CLBRY.K1WKZ SM/CLBRY.K2PRA SM/CLBRY.K2SEA SM/CLBRY.K3FCA	\
+	SM/CLBRY.K3FCB SM/CLBRY.K3IOA SM/CLBRY.K3IOB SM/CLBRY.K3LGE	\
+	SM/CLBRY.K3OCA SM/CLBRY.K3SCA SM/CLBRY.K3SML SM/CLBRY.K3SNA	\
+	SM/CLBRY.K3SNB SM/CLBRY.K4NTA SM/CLBRY.K501A SM/CLBRY.K501B	\
+	SM/CLBRY.K5SDA SM/CLBRY.K5SDB SM/CLBRY.K6SCA SM/CLBRY.K7SEA	\
+	SM/CLBRY.KK208A SM/CLBRY.KP001 SM/CLBRY.KP002 SM/CLBRY.KP003	\
+	SM/CLBRY.KP004 SM/CLBRY.KP005 SM/CLBRY.KP006 SM/CLBRY.KP007	\
+	SM/CLBRY.KP008 SM/CLBRY.KP009 SM/CLBRY.KP010 SM/CLBRY.KSM31	\
+	SM/CLBRY.KSM41 
+
+# Only files marked "OK"
+SRC.ok = $(shell awk '/^[A-Z]/ && $$2 == "OK"  {print $$1}' $(CATALOG))
+OBJ.ok = $(subst .cbl,,$(SRC.ok))
+OUT.ok = $(subst .cbl,.out,$(SRC.ok))
+
+# Core
+NC.src = $(addprefix NC/,$(filter NC%,$(SRC)))
+NC.dat = $(addprefix NC/,$(filter NC%,$(DAT)))
+NC     = $(addprefix NC/,$(filter NC%,$(OBJ)))
+NC.out = $(addprefix NC/,$(filter NC%,$(OUT)))
+NC.ok =  $(addprefix NC/,$(filter NC%,$(OUT.ok)))
+
+SM.src = $(addprefix SM/,$(filter SM%,$(SRC)))
+SM.cpy = $(subst CLBRY.,CLBRY/,$(SM.CLB))
+SM.alt = SM/ALTLB SM/COPYALT/ALTLB
+SM     = $(addprefix SM/,$(filter SM%,$(OBJ)))
+SM.out = $(addprefix SM/,$(filter SM%,$(OUT)))
+SM.ok =  $(addprefix SM/,$(filter SM%,$(OUT.ok)))
+
+IC.src = $(addprefix IC/,$(filter IC%,$(SRC)))
+IC =     $(shell awk '/^IC/ && $$2 !~ /^(module|no)$$/ \
+		 {print "IC/" substr($$1, 1,6)}' $(CATALOG))
+IC.out = $(addsuffix .out,$(IC))
+IC.ok =  $(addprefix IC/,$(filter IC%,$(OUT.ok)))
+
+# I/O
+SQ = $(addprefix SQ/,$(filter SQ%,$(OBJ)))
+ST = $(addprefix ST/,$(filter ST%,$(OBJ)))
+RL = $(addprefix RL/,$(filter RL%,$(OBJ)))
+IX = $(addprefix IX/,$(filter IX%,$(OBJ)))
+
+# Advanced
+IF.src = $(addprefix IF/,$(filter IF%,$(SRC)))
+IF.dat = $(addprefix IF/,$(filter IF%,$(DAT)))
+IF     = $(addprefix IF/,$(filter IF%,$(OBJ)))
+IF.out = $(addprefix IF/,$(filter IF%,$(OUT)))
+IF.ok =  $(addprefix IF/,$(filter IF%,$(OUT.ok)))
+
+IX.src = $(addprefix IX/,$(filter IX%,$(SRC)))
+IX.dat = $(addprefix IX/,$(filter IX%,$(DAT)))
+IX     = $(addprefix IX/,$(filter IX%,$(OBJ)))
+IX.out = $(addprefix IX/,$(filter IX%,$(OUT)))
+IX.ok =  $(addprefix IX/,$(filter IX%,$(OUT.ok)))
+
+RL.src = $(addprefix RL/,$(filter RL%,$(SRC)))
+RL.dat = $(addprefix RL/,$(filter RL%,$(DAT)))
+RL     = $(addprefix RL/,$(filter RL%,$(OBJ)))
+RL.out = $(addprefix RL/,$(filter RL%,$(OUT)))
+RL.ok =  $(addprefix RL/,$(filter RL%,$(OUT.ok)))
+
+SQ.src = $(addprefix SQ/,$(filter SQ%,$(SRC)))
+SQ.dat = $(addprefix SQ/,$(filter SQ%,$(DAT)))
+SQ     = $(addprefix SQ/,$(filter SQ%,$(OBJ)))
+SQ.out = $(addprefix SQ/,$(filter SQ%,$(OUT)))
+SQ.ok =  $(addprefix SQ/,$(filter SQ%,$(OUT.ok)))
+
+ST.src = $(addprefix ST/,$(filter ST%,$(SRC)))
+ST.dat = $(addprefix ST/,$(filter ST%,$(DAT)))
+ST     = $(addprefix ST/,$(filter ST%,$(OBJ)))
+ST.out = $(addprefix ST/,$(filter ST%,$(OUT)))
+ST.ok =  $(addprefix ST/,$(filter ST%,$(OUT.ok)))
+
+RW = $(addprefix RW/,$(filter RW%,$(OBJ)))
+CM = $(addprefix CM/,$(filter CM%,$(OBJ)))
+SG = $(addprefix SG/,$(filter SG%,$(OBJ)))
+DB = $(addprefix DB/,$(filter DB%,$(OBJ)))
+OB = $(addprefix OB/,$(filter OB%,$(OBJ)))
+
+COBFLAGS =  
+
+LIBGCOBOL_NAME = libgcobol.a
+LIBGCOBOL_PATH=$(dir $(shell find $(BUILDDIR) -name $(LIBGCOBOL_NAME)))
+LIBGCOBOL_A = $(LIBGCOBOL_PATH)/$(LIBGCOBOL_NAME)
+
+LIBROOT = $(subst /libgcobol/.libs/,,$(LIBGCOBOL_PATH))
+LIBSTDC_PATH = $(LIBROOT)/libstdc++-v3/src/.libs
+LIBQUADMATH_PATH = $(LIBROOT)/libquadmath/.libs
+
+RPATH_OPT = -Wl,-rpath=
+RPATH = $(addprefix $(RPATH_OPT),$(LIBGCOBOL_PATH) $(LIBSTDC_PATH) $(LIBQUADMATH_PATH))
+
+LDFLAGS = $(LIBGCOBOL_A) $(RPATH)
+
+SEARCH_PATHS = -L $(LIBSTDC_PATH) -L $(LIBGCOBOL_PATH) -L $(LIBQUADMATH_PATH) 
+
+GCOBFLAGS = $(COBFLAGS) -I SM/CLBRY -fmax-errors 2 $(SEARCH_PATHS)
+
+LIB-PATHS = $(dir $(shell find $(BUILDDIR) \
+		-name libstdc++.so -or -name libgcobol.so))
+
+EXEC85.ENV =	XXXXX001=../newcob.val		\
+	     	XXXXX002=SOURCE-COBOL-PROGRAMS	\
+		XXXXX003=XXXXX003		\
+		XXXXX055=PRINT-FILE		\
+		XXXXX058=$(NC.CONF)
+
+# runs from top directory, invocation defines XXXXX002
+EXEC85.MOD =	XXXXX001=newcob.val		\
+	     	XXXXX002=$1.archive			\
+		XXXXX003=XXXXX003		\
+		XXXXX055=PRINT-FILE		\
+		XXXXX058=$1.conf
+
+.PHONY: all test testd show doable redo fetch clean cleanall
+.PHONY: cm db ic if ix nc ob rl rw sg sm sq st
+.PHONY: cmx dbx icx ifx ixx ncx obx rlx rwx sgx smx sqx stx
+
+all: test
+
+test: obj/EXEC85
+	mkdir -p $(WORKDIR) && rm -f $(WORKDIR)/*
+	cd $(WORKDIR) && $(EXEC85.ENV) ../obj/EXEC85
+	sed -e 's/^      \*/*/g' -i $(WORKDIR)/SOURCE-COBOL-PROGRAMS
+	cd $(WORKDIR) && $(NISTPREP) ../$(ARCHIVE)
+
+obj/EXEC85: cbl/EXEC85.cbl $(firstword $(GCOBOL))
+	@mkdir -p obj
+	$(GCOBOL) -o $@ $(GCOBFLAGS) -main $< $(LDFLAGS)
+
+show: cbl/EXEC85.cbl
+	SHOW_PARSE=1 \
+	$(GCOBOL) -o $@ $(GCOBFLAGS) -main $^ $(LDFLAGS)
+
+#
+# Modules
+#
+cm: $(CM)
+db: $(DB)
+ic: $(IC)
+if: $(IF)
+ix: $(IX)
+nc: $(NC)
+ob: $(OB)
+rl: $(RL)
+rw: $(RW)
+sg: $(SG)
+sm: $(SM)
+sq: $(SQ)
+st: $(ST)
+
+cmx: $(CM.out)
+dbx: $(DB.out)
+icx: $(IC.out)
+ifx: $(IF.out)
+ixx: $(IX.out)
+ncx: $(NC.out)
+ncx-2: $(filter NC/NC2%,$(NC.out))
+nc-ok: $(filter NC/$(OK)%,$(NC.ok))
+obx: $(OB.out)
+rlx: $(RL.out)
+rwx: $(RW.out)
+sgx: $(SG.out)
+smx: $(SM.out)
+sqx: $(SQ.out)
+stx: $(ST.out)
+
+# Produce module source code from module archive
+nc-src: $(NC.src)
+$(NC.src): NC/.archive NC/.conf 
+	cd $(dir $@) && $(NISTPREP) $(notdir $<)
+#       Overwrite data files from original archive.
+	mkdir -p $(dir $@)/dat
+	cd $(dir $@)/dat && $(NISTPREP) ../../$(ARCHIVE)
+	cd $(dir $@)/dat && mv $(notdir $(NC.dat)) ..
+	rm -rf $(dir $@)/dat
+
+# Produce module data files from main archive because EXEC85 seems to
+# output data files without trailing blanks.
+nc-dat: $(NC.dat)
+$(NC.dat): NC/.archive NC/.conf
+	mkdir -p $(dir $<)/dat
+	cd $(dir $<)/dat && $(NISTPREP) ../../$(ARCHIVE)
+	cd $(dir $<)/dat && mv $(notdir $(NC.dat)) ..
+	rm -rf $(dir $<)/dat
+
+# Produce a per-module configuration file, changing Line 1 to match the module.
+NC/.conf: $(NC.CONF)
+	@mkdir -p $(dir $@)
+	sed -e 's/ NC$$/ $(subst /,,$(dir $@))/'	\
+	    -e 's/SWITCH-/UPSI-/'			\
+	    -e 's/"REPORT"/REPORT/'			\
+		$^ > $@~ && mv $@~ $@
+
+# Produce a per-module "population file" with EXEC85, applying configuration. 
+NC/.archive: obj/EXEC85 NC/.conf $(ARCHIVE)
+	@echo make zee archive
+	$(call EXEC85.MOD,$(dir $@)) $(GDB) obj/EXEC85
+
+
+
+# Produce module source code from module archive
+if-src: $(IF.src)
+$(IF.src): IF/.archive IF/.conf 
+	cd $(dir $@) && $(NISTPREP) $(notdir $<)
+#       Overwrite data files from original archive.
+	mkdir -p $(dir $@)/dat
+	cd $(dir $@)/dat && $(NISTPREP) ../../$(ARCHIVE)
+	if [ "$(IF.dat)" ]; then \
+		cd $(dir $@)/dat && mv $(notdir $(IF.dat)) .. ; fi
+	rm -rf $(dir $@)/dat
+
+# Produce module data files from master archive
+if-dat: $(IF.dat)
+$(IF.dat): IF/.archive IF/.conf
+	mkdir -p $(dir $<)/dat
+	cd $(dir $<)/dat && $(NISTPREP) ../../$(ARCHIVE)
+	cd $(dir $<)/dat && mv $(notdir $(IF.dat)) ..
+	rm -rf $(dir $<)/dat
+###
+
+# Produce module source code from module archive
+ic-src: $(IC.src)
+$(IC.src): IC/.archive IC/.conf 
+	cd $(dir $@) && $(NISTPREP) $(notdir $<)
+#       Overwrite data files from original archive.
+	mkdir -p $(dir $@)/dat
+	cd $(dir $@)/dat && $(NISTPREP) ../../$(ARCHIVE)
+	if [ "$(IC.dat)" ]; then \
+		cd $(dir $@)/dat && mv $(notdir $(IC.dat)) .. ; fi
+	rm -rf $(dir $@)/dat
+
+# Produce module data files from master archive
+ic-dat: $(IC.dat)
+$(IC.dat): IC/.archive IC/.conf
+	mkdir -p $(dir $<)/dat
+	cd $(dir $<)/dat && $(NISTPREP) ../../$(ARCHIVE)
+	cd $(dir $<)/dat && mv $(notdir $(IC.dat)) ..
+	rm -rf $(dir $<)/dat
+
+# Produce module source code from module archive
+ix-src: $(IX.src)
+$(IX.src): IX/.archive IX/.conf 
+	cd $(dir $@) && $(NISTPREP) $(notdir $<)
+#       Overwrite data files from original archive.
+	mkdir -p $(dir $@)/dat
+	cd $(dir $@)/dat && $(NISTPREP) ../../$(ARCHIVE)
+	if [ "$(IX.dat)" ]; then \
+		cd $(dir $@)/dat && mv $(notdir $(IX.dat)) .. ; fi
+	rm -rf $(dir $@)/dat
+
+# Produce module data files from master archive
+ix-dat: $(IX.dat)
+$(IX.dat): $(ARCHIVE)
+	mkdir -p $(dir $@)/dat
+	cd $(dir $@)/dat && $(NISTPREP) ../../$<
+	test "$@" && cd $(dir $@)/dat && mv $(notdir $@) ..
+	rm -rf $(dir $@)/dat
+###
+
+# Produce module source code from module archive
+rl-src: $(RL.src)
+$(RL.src): RL/.archive RL/.conf 
+	cd $(dir $@) && $(NISTPREP) $(notdir $<)
+#       Overwrite data files from original archive.
+	mkdir -p $(dir $@)/dat
+	cd $(dir $@)/dat && $(NISTPREP) ../../$(ARCHIVE)
+	if [ "$(RL.dat)" ]; then \
+		cd $(dir $@)/dat && mv $(notdir $(RL.dat)) .. ; fi
+	rm -rf $(dir $@)/dat
+
+# Produce module data files from master archive
+rl-dat: $(RL.dat)
+$(RL.dat): RL/.archive RL/.conf
+	mkdir -p $(dir $<)/dat
+	cd $(dir $<)/dat && $(NISTPREP) ../../$(ARCHIVE)
+	cd $(dir $<)/dat && mv $(notdir $(RL.dat)) ..
+	rm -rf $(dir $<)/dat
+###
+
+# Produce module source code from module archive
+sq-src: $(SQ.src)
+$(SQ.src): SQ/.archive SQ/.conf 
+	cd $(dir $@) && $(NISTPREP) $(notdir $<)
+#       Overwrite data files from original archive.
+	mkdir -p $(dir $@)/dat
+	cd $(dir $@)/dat && $(NISTPREP) ../../$(ARCHIVE)
+	if [ "$(SQ.dat)" ]; then \
+		cd $(dir $@)/dat && mv $(notdir $(SQ.dat)) .. ; fi
+	rm -rf $(dir $@)/dat
+
+# Produce module source code from module archive
+st-src: $(ST.src)
+$(ST.src): ST/.archive ST/.conf 
+	cd $(dir $@) && $(NISTPREP) $(notdir $<)
+#       Overwrite data files from original archive.
+	mkdir -p $(dir $@)/dat
+	cd $(dir $@)/dat && $(NISTPREP) ../../$(ARCHIVE)
+	if [ "$(ST.dat)" ]; then \
+		cd $(dir $@)/dat && mv $(notdir $(ST.dat)) .. ; fi
+	rm -rf $(dir $@)/dat
+	@rm -f ST/CLBRY* ST/*.dat
+
+# Produce module data files from master archive
+##### Something seems wrong with this, sez Dubner
+#####sq-dat: $(SQ.dat)
+#####$(SQ.dat): $(ARCHIVE)
+#####	mkdir -p $(dir $@)/dat
+#####	cd $(dir $@)/dat && $(NISTPREP) ../../$<
+#####	test "$@" && cd $(dir $@)/dat && mv $(notdir $@) ..
+#####	rm -rf $(dir $@)/dat
+#####	for 
+###
+
+# Produce module source code from module archive
+$(SM.cpy): $(SM.CLB)
+$(SM.CLB): SM/.extracted
+$(SM): $(SM.src) $(SM.cpy) $(SM.alt)
+
+sm-src: SM/.extracted
+SM/.extracted: $(SM.src)
+	@ls $(SM.CLB)
+	touch $@
+
+$(SM.src): SM/.archive SM/.conf 
+	cd $(dir $@) && $(NISTPREP) $(notdir $<)
+
+# Move copybooks to a subdirectory. Copybook are produced by nistprep
+# while as a byproduct of producing the .cbl files.
+#
+# Copybook filenames in the archive
+# have a prefix with '.' separator that reflects
+# grouping.  We move e.g. CLBRY.KP003 to CLBRY/KP003.
+# Use "ln -f" to overwrite a stale target. 
+sm-cpy: $(SM.cpy)
+SM/CLBRY/% : SM/CLBRY.% 
+	@mkdir -p $(dir $@)
+	ln -f $< $@
+# show one
+	@if [ SM/CLBRY/K101A = $@ ]; then stat $@; fi 
+
+SM/CLBRY.ALTLB SM/CLBRY.ALTL1: SM/.extracted
+$(SM.alt): SM/CLBRY.ALTLB SM/CLBRY.ALTL1
+
+sm-alt: $(SM.alt)
+SM/ALTLB: SM/CLBRY.ALTLB
+	ln -f $< $@
+	@D=SM/$(shell awk '/^X-047/ {print $$2; exit}' SM/.conf) &&	\
+	echo X-047 is $$D && 						\
+	wc -l $$D/$(notdir $@) 
+
+SM/COPYALT/ALTLB: SM/CLBRY.ALTL1
+	mkdir -p $(dir $@)
+	ln -f $< $@
+	@D=SM/$(shell awk '/^X-048/ {print $$2; exit}' SM/.conf) &&	\
+	echo X-048 is $$D && 						\
+	test "$$D/" = $(dir $@)
+
+###
+
+# Produce a per-module configuration file, changing Line 1 to match the module.
+LOCAL.CONF = $(addsuffix /.conf,IC IF IX RL SM SQ ST)
+$(LOCAL.CONF): $(NC.CONF)
+	@mkdir -p $(dir $@)
+	sed -e 's/ NC$$/ $(subst /,,$(dir $@))/'	\
+	    -e 's/SWITCH-/UPSI-/'			\
+	    -e 's/FORMFEED/AFP-5A/'			\
+	    -e 's/"REPORT"/REPORT/'			\
+	    -e 's/"..[/]copyalt"/COPYALT/'		\
+		$^ > $@~ && mv $@~ $@
+
+# Produce a per-module "population file" with EXEC85, applying configuration.
+LOCAL.ARCHIVE = $(subst conf,archive,$(LOCAL.CONF))
+$(LOCAL.ARCHIVE): obj/EXEC85 $(ARCHIVE)
+	@echo making $@ with:
+	@echo $(call EXEC85.MOD,$(dir $@)) $(GDB) obj/EXEC85
+	$(call EXEC85.MOD,$(dir $@)) $(GDB) obj/EXEC85
+
+IC/.archive: IC/.conf
+IF/.archive: IF/.conf
+IX/.archive: IX/.conf
+RL/.archive: RL/.conf
+SM/.archive: SM/.conf
+SQ/.archive: SQ/.conf
+ST/.archive: ST/.conf
+
+vis:
+	@echo IC.src is $(IC.src)
+
+#
+# Overall test: Run all tests marked OK to produce rpt files, and
+# summarize the results.
+#
+
+report: $(NC.ok) $(IF.ok) $(IX.ok) $(SQ.ok) $(RL.ok) $(IC.ok) $(SM.ok) $(ST.ok)
+# It is necessary to rm XXXXX* because there are tests to make sure the correct
+# error responses come back when opening files that don't already exist, versus
+# opening files that do already exist.
+	@rm -f XXXXX*
+	@./report.awk $^
+	@echo $(shell wc -l $^ | tail -1) 'lines of Cobol tested'
+#
+# Initialize
+#
+doable:
+	@ls $(SRC)
+
+redo:
+	rm -rf dat cbl
+	$(MAKE) -f Makefile fetch
+
+fetch: dat/NC109M.dat cbl/EXEC85.cbl
+
+dat/NC109M.dat: cbl/EXEC85.cbl
+	@mkdir -p dat && rm -f dat/*
+	mv $(filter-out %.cbl,$(wildcard $(dir $^)/*)) dat/
+
+cbl/EXEC85.cbl: $(ARCHIVE)
+	@mkdir -p $(dir $@)
+	cd $(dir $@) && $(NISTPREP) ../$(ARCHIVE)
+	cp cbl/EXEC85.cbl cbl/EXEC85.cbl.original
+	patch cbl/EXEC85.cbl < $(SRCDIR)/gcc/cobol/nist/EXEC85.diff
+
+# Keep a copy of the .Z because uncompress(1) removes it.  Set the
+# date of the .Z to match that of newcob.val, so it's not downloaded
+# again.
+newcob.val: newcob.val.Z
+	uncompress $^
+	touch -r $@ $^
+
+newcob.val.Z:
+# The file from NIST doesn't exist, so we need to download it.
+	wget -O $@~ $(URL)
+	@mv $@~ $@
+
+cm-clean:
+	@rm -f $(CM) $(CM.out)
+db-clean:
+	@rm -f $(DB) $(DB.out)
+ic-clean:
+	@rm -f $(IC) $(IC.out) IC/IC*.o
+if-clean:
+	@rm -f $(IF) $(IF.out)
+ix-clean:
+	@rm -f $(IX) $(IX.out)
+nc-clean:
+	rm -v -f $(filter $(CLEAN)%,$(NC) $(NC.out)) $(NC.dat)
+ob-clean:
+	@rm -f $(OB) $(OB.out)
+rl-clean:
+	@rm -f $(RL) $(RL.out)
+rw-clean:
+	@rm -f $(RW) $(RW.out)
+sg-clean:
+	@rm -f $(SG) $(SG.out)
+sm-clean:
+	@rm -f $(SM) $(SM.out) $(SM.cpy) $(SM.alt) SM/.extracted
+sq-clean:
+	@rm -f $(SQ) $(SQ.out)
+st-clean:
+	@rm -f $(ST) $(ST.out)
+
+UNTRACKED = $(shell git status --short | awk '/^[?][?] $1/ {print $$2}')
+
+clean: ix-clean st-clean
+	rm -fr dat cbl obj $(WORKDIR) test test.s PRINT-FILE REPORT \
+        IC IF NC RL SM SQ XXXXX* \
+	$(call UNTRACKED,IX) IX/*.conf~ \
+	$(call UNTRACKED,ST) ST/*.conf~ 
+
+cleanall: clean
+	rm -fr newcob* 
+
+#
+# Patterns
+#
+
+obj/% : cbl/%.cbl
+	@echo '---> $(notdir $@)'
+	@mkdir -p $(dir $@)
+	$(GCOBOL) -o $@ $(GCOBFLAGS) -main $< $(LDFLAGS)
+
+% : %.cbl
+	@echo '---> $(notdir $@)'
+	ulimit -t 120 && $(GCOBOL) -o $@ $(GCOBFLAGS) -main $^ $(LDFLAGS)
+%.o : %.cbl
+	@echo '---> $(notdir $@)'
+	$(GCOBOL) -c -o $@ $(GCOBFLAGS) $^
+
+# Execute the compiled program using its full name (not necessarily "./name")
+# Produce <name>.out instead of "REPORT".
+
+# STDIN is called with X.out and returns X.dat if extant, else /dev/null
+# It supplies the input file name for any test program X.
+# Some awks don't accept /^#/ as a regex, and others reject /^\#/, so we're
+#      trying /^\x23/ as the hex representation. 
+STDIN = $(shell name="$(wildcard $(subst .out,.dat,$1))" && \
+		echo $${name:-/dev/null})
+ENV_OF = $(shell awk -e '/^$(notdir $1)/ && $$3 !~ /^\x23/ {print $$3}' $(CATALOG))
+
+%.out : %
+	@echo '---> $(notdir $@)'
+# 	ensure any input file has only 80-byte records
+	@dat=$(subst .out,.dat,$@); if [ -f $$dat ]; then			 \
+		awk 'length($$0) && length($$0) != 80 {				 \
+			printf("%s:%d: %d/80: incorrect data record: \"%s\"\n",	 \
+				FILENAME, NR, length($$0), $$0) > "/dev/stderr"; \
+			exit 1 }' $$dat; fi
+
+	REPORTT=$@ $(call ENV_OF,$^) timeout 5 $(shell realpath $<) \
+		< $(call STDIN,$@) > $@-stdout
+	@test -s $@-stdout || rm $@-stdout
+	@touch $@
+
+#
+# Build dependencies
+#
+IC/IC101A: IC/IC102A.o
+IC/IC103A: IC/IC104A.o IC/IC105A.o
+IC/IC106A: IC/IC107A.o
+IC/IC108A: IC/IC109A.o IC/IC110A.o IC/IC111A.o
+IC/IC112A: IC/IC113A.o
+IC/IC114A: IC/IC115A.o
+IC/IC116M: IC/IC117M.o IC/IC118M.o
+IC/IC201A: IC/IC202A.o
+IC/IC203A: IC/IC204A.o IC/IC205A.o IC/IC206A.o
+IC/IC207A: IC/IC208A.o
+IC/IC209A: IC/IC210A.o IC/IC211A.o IC/IC212A.o
+IC/IC213A: IC/IC214A.o IC/IC215A.o
+IC/IC216A: IC/IC217A.o
+
+#
+# Runtime dependencies
+#
+
+IC/IC102A.out: IC/IC101A.out  
+IC/IC105A.out: IC/IC104A.out
+IC/IC104A.out: IC/IC103A.out
+IC/IC107A.out: IC/IC106A.out 
+IC/IC111A.out: IC/IC110A.out
+IC/IC111A.out: IC/IC110A.out
+IC/IC110A.out: IC/IC109A.out
+IC/IC109A.out: IC/IC108A.out 
+IC/IC113A.out: IC/IC112A.out 
+IC/IC115A.out: IC/IC114A.out 
+IC/IC118M.out: IC/IC117M.out
+IC/IC117M.out: IC/IC116M.out 
+IC/IC202A.out: IC/IC201A.out 
+IC/IC206A.out: IC/IC205A.out
+IC/IC206A.out: IC/IC205A.out
+IC/IC205A.out: IC/IC204A.out
+IC/IC204A.out: IC/IC203A.out 
+IC/IC208A.out: IC/IC207A.out 
+IC/IC212A.out: IC/IC211A.out
+IC/IC211A.out: IC/IC210A.out
+IC/IC210A.out: IC/IC209A.out 
+IC/IC215A.out: IC/IC214A.out
+IC/IC214A.out: IC/IC213A.out 
+IC/IC217A.out: IC/IC216A.out 
+
+OBIC1A.out: OBIC2A.out OBIC3A.out
+
+IX/IX103A.out: IX/IX102A.out
+IX/IX102A.out: IX/IX101A.out
+
+IX/IX112A.out: IX/IX111A.out
+IX/IX111A.out: IX/IX110A.out
+IX/IX110A.out: IX/IX109A.out 
+
+IX/IX120A.out: IX/IX119A.out
+IX/IX119A.out: IX/IX118A.out
+IX/IX118A.out: IX/IX117A.out
+IX/IX117A.out: IX/IX116A.out
+IX/IX116A.out: IX/IX115A.out
+IX/IX115A.out: IX/IX114A.out
+IX/IX114A.out: IX/IX113A.out
+
+IX/IX203A.out: IX/IX202A.out
+IX/IX202A.out: IX/IX201A.out 
+
+RL/RL102A.out: RL/RL101A.out 
+RL/RL103A.out: RL/RL102A.out
+RL/RL109A.out: RL/RL108A.out 
+RL/RL110A.out: RL/RL109A.out
+RL/RL202A.out: RL/RL201A.out 
+RL/RL203A.out: RL/RL202A.out
+RL/RL207A.out: RL/RL206A.out 
+RL/RL208A.out: RL/RL207A.out
+RL/RL213A.out: RL/RL212A.out 
+
+SM/SM102A.out: SM/SM101A.out 
+SM/SM104A.out: SM/SM103A.out 
+SM/SM202A.out: SM/SM201A.out 
+SM/SM204A.out: SM/SM203A.out 
+
+SQ/SQ203A.out: SQ/SQ202A.out 
+
+SQ/OBSQ/SQ5A.out: SQ/OBSQ/SQ4A.out SQ/OBSQ/SQ3A.out 
+
+ST/ST102A.out: ST/ST101A.out 
+ST/ST103A.out: ST/ST102A.out
+ST/ST105A.out: ST/ST104A.out 
+ST/ST107A.out: ST/ST106A.out 
+ST/ST110A.out: ST/ST109A.out 
+ST/ST111A.out: ST/ST110A.out
+ST/ST113M.out: ST/ST112M.out 
+ST/ST114M.out: ST/ST113M.out
+ST/ST116A.out: ST/ST115A.out 
+ST/ST117A.out: ST/ST116A.out
+ST/ST120A.out: ST/ST119A.out 
+ST/ST121A.out: ST/ST120A.out
+ST/ST123A.out: ST/ST122A.out 
+ST/ST124A.out: ST/ST123A.out
+ST/ST126A.out: ST/ST125A.out 
+
+#
+# Dubner at work
+#
+
+DEBUG_FLAGS=-ggdb -O0
+SOURCE_FILE=NC/NC101A.cbl
+
+DELEXEC   := $(EXEC_FILE)
+EXEC_FILE ?= test
+DELREPORT := $(REPORTT)
+REPORTT   ?= REPORTT
+
+REPORTA   := $(REPORTT)A
+
+ifeq ($(SOURCE_FILE),  NC/NC109M.cbl)
+STD_INPUT := <NC/NC109M.dat
+STD_OUTPUTC := >/dev/null
+endif
+
+ifeq ($(SOURCE_FILE), NC/NC110M.cbl)
+# NC110M does not open a REPORTT file
+KNOWN_GOOD  := NC110M.known-good
+DELEXEC     := NC110M
+EXEC_FILE   := NC110M
+STD_OUTPUT  := NC110M.stdout
+STD_OUTPUTC := >NC110M.stdout
+endif
+
+ifeq ($(SOURCE_FILE), NC/NC113M.cbl)
+# NC113M opens a report file that doesn't check tests
+KNOWN_GOOD  := NC113M.known-good
+DELEXEC     := NC113M
+EXEC_FILE   := NC113M
+STD_OUTPUT  := $(REPORTT)
+endif
+
+ifeq ($(SOURCE_FILE),  NC/NC121M.cbl)
+KNOWN_GOOD  := NC121M.known-good
+DELEXEC     := NC121M
+EXEC_FILE   := NC121M
+STD_OUTPUT  := NC121M.stdout
+STD_OUTPUTC := >NC121M.stdout
+endif
+
+ifeq ($(SOURCE_FILE),  NC/NC220M.cbl)
+KNOWN_GOOD  := NC220M.known-good
+DELEXEC     := NC220M
+EXEC_FILE   := NC220M
+STD_OUTPUT  := NC220M.stdout
+STD_OUTPUTC := >NC220M.stdout
+endif
+
+ifeq ($(SOURCE_FILE),  NC/NC204M.cbl)
+KNOWN_GOOD  := NC204M.known-good
+STD_INPUT   := <NC/NC204M.dat
+DELEXEC     := NC204M
+EXEC_FILE   := NC204M
+STD_OUTPUT  := NC204M.stdout
+STD_OUTPUTC := >NC204M.stdout
+endif
+
+ifeq ($(SOURCE_FILE), SQ/SQ101M.cbl)
+# SQ101M opens a report file that doesn't check tests
+KNOWN_GOOD  := SQ101M.known-good
+DELEXEC     := SQ101M
+EXEC_FILE   := SQ101M
+STD_OUTPUT  := $(REPORTT)
+endif
+
+
+ifeq ($(SOURCE_FILE),  NC/NC174A.cbl)
+UPSI  := 01
+endif
+
+ifeq ($(SOURCE_FILE),  NC/NC211A.cbl)
+UPSI  := 01
+endif
+
+ifeq ($(SOURCE_FILE),  NC/NC254A.cbl)
+UPSI  := 010
+endif
+
+ifeq ($(SOURCE_FILE), NC/NC302M.cbl)
+# NC302M does not open a REPORTT file
+KNOWN_GOOD  := NC302M.known-good
+DELEXEC     := NC302M
+EXEC_FILE   := NC302M
+STD_OUTPUT  := NC302M.stdout
+STD_OUTPUTC := >NC302M.stdout
+endif
+
+.PHONY: testv
+testv:
+	$(GCOBOL) $(DEBUG_FLAGS) -o $(EXEC_FILE) $(SOURCE_FILE) $(GCOBFLAGS) $(LDFLAGS)
+ifeq ($(JUST_COMPILE), )
+	rm -f $(REPORTT)
+	UPSI=$(UPSI) REPORTT=$(REPORTT) ./$(EXEC_FILE) $(STD_INPUT) $(STD_OUTPUTC)
+endif
+	@echo "                                      $(SOURCE_FILE)"
+ifeq ($(JUST_COMPILE), )
+ifneq ($(KNOWN_GOOD), )
+	@diff -u $(STD_OUTPUT) $(KNOWN_GOOD); EXIT_STATUS=$$? ; rm -fr $(EXEC_FILE) $(STD_OUTPUT) ; exit $$EXIT_STATUS
+endif
+	@if ! test -f "$(REPORTT)" ; \
+	then \
+	echo "                                                    FORCING SUCCESSFULLY" > $(REPORTT) ; \
+	echo "                                                    FORCING NO  TEST(S) FAILED" >> $(REPORTT) ; \
+	fi
+	@tr '\014' '\012' <$(REPORTT) >$(REPORTA)
+	@mv $(REPORTA) $(REPORTT)
+	@grep -a SUCCESSFULLY $(REPORTT)
+	@grep -a "TEST(S) FAILED" $(REPORTT)
+	@if grep -qa 'NO  TEST(S) FAILED' $(REPORTT) ; \
+	then \
+		exit 0 ; \
+	else \
+		exit 1 ; \
+	fi
+	@rm -f $(DELREPORT) $(DELEXEC)
+endif
+
+.PHONY: testic
+testic:
+ifeq ($(JUST_COMPILE), )
+	rm -f $(REPORTT)
+	UPSI=$(UPSI) REPORTT=$(REPORTT) ./$(EXEC_FILE) $(STD_INPUT) $(STD_OUTPUTC)
+endif
+	@echo "                                      $(EXEC_FILE)"
+ifeq ($(JUST_COMPILE), )
+ifneq ($(KNOWN_GOOD), )
+	@diff -u $(STD_OUTPUT) $(KNOWN_GOOD); EXIT_STATUS=$$? ; rm -fr $(EXEC_FILE) $(STD_OUTPUT) ; exit $$EXIT_STATUS
+endif
+	@if ! test -f "$(REPORTT)" ; \
+	then \
+	echo "                                                    FORCING SUCCESSFULLY" > $(REPORTT) ; \
+	echo "                                                    FORCING NO  TEST(S) FAILED" >> $(REPORTT) ; \
+	fi
+	@tr '\014' '\012' <$(REPORTT) >$(REPORTA)
+	@mv $(REPORTA) $(REPORTT)
+	@grep -a SUCCESSFULLY $(REPORTT)
+	@grep -a "TEST(S) FAILED" $(REPORTT)
+	@if grep -qa 'NO  TEST(S) FAILED' $(REPORTT) ; \
+	then \
+		exit 0 ; \
+	else \
+		exit 1 ; \
+	fi
+	@rm -f $(DELREPORT)
+endif
+
+
+.PHONY: testd
+testd:
+	gdb --args $(COBOL1) $(SOURCE_FILE) -quiet -dumpdir test- \
+	-dumpbase $(SOURCE_FILE) -dumpbase-ext .cbl -mtune=generic \
+	-march=x86-64 $(DEBUG_FLAGS) -findicator-column 7 -o test.s
+
+.PHONY: extract
+extract: obj/EXEC85 nc-src ic-src if-src ix-src rl-src sq-src sm-src sm-cpy sm-alt sm-alt st-src
+

@@ -1,0 +1,15 @@
+Please enter your name - **********************
+00000001
+16010101
+getenv("USER") is First                   
+getenv("USER") is Second                  
+getenv("USER") is Third                   
+getenv("USER") is Fourth                  
+getenv("USER") is Fifth                   
+Command Line Count is 004
+Entire command line is poppa momma baby                                                                                                        
+First parameter is ./test                                                                                                                  
+Second parameter is poppa                                                                                                                   
+Third parameter is momma                                                                                                                   
+Fourth parameter is baby                                                                                                                    
+Fifth parameter is baby                                                                                                                    

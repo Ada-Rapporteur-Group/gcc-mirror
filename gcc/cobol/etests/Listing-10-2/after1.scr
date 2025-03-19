@@ -1,0 +1,5 @@
+#!/bin/sh
+
+iconv -f CP1140 -t UTF-8 Listing10-2.rpt >rpt
+mv rpt Listing10-2.rpt
+

@@ -70,6 +70,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "omp-offload.h"
 #include "context.h"
 #include "tree-nested.h"
+#include "dump-generic-nodes.h"
 #include "gcc-urlifier.h"
 
 /* Identifier for a basic condition, mapping it to other basic conditions of
@@ -20783,6 +20784,8 @@ gimplify_function_tree (tree fndecl)
   gbind *bind;
 
   gcc_assert (!gimple_body (fndecl));
+
+  dump_generic_nodes(NULL, fndecl);
 
   if (DECL_STRUCT_FUNCTION (fndecl))
     push_cfun (DECL_STRUCT_FUNCTION (fndecl));

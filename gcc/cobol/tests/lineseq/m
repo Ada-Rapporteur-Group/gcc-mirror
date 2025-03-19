@@ -1,0 +1,17 @@
+make gc
+hexdump -C NOORG.rpt
+hexdump -C SEQDEFAULT.rpt
+hexdump -C SEQAFTER.rpt
+hexdump -C SEQBEFORE.rpt
+hexdump -C LSEQDEFAULT.rpt
+hexdump -C LSEQAFTER.rpt
+hexdump -C LSEQBEFORE.rpt
+
+make testv
+hexdump -C NOORG.rpt
+hexdump -C SEQDEFAULT.rpt
+hexdump -C SEQAFTER.rpt
+hexdump -C SEQBEFORE.rpt
+hexdump -C LSEQDEFAULT.rpt
+hexdump -C LSEQAFTER.rpt
+hexdump -C LSEQBEFORE.rpt

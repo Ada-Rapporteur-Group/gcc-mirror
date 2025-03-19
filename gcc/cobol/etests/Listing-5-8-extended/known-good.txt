@@ -1,0 +1,10 @@
+Age is 02 and Height is 040, so Admission charged is $00.00
+Age is 02 and Height is 050, so Admission charged is $00.00
+Age is 06 and Height is 040, so Admission charged is $10.00
+Age is 06 and Height is 050, so Admission charged is $10.00
+Age is 10 and Height is 040, so Admission charged is $10.00
+Age is 10 and Height is 050, so Admission charged is $15.00
+Age is 20 and Height is 040, so Admission charged is $18.00
+Age is 20 and Height is 050, so Admission charged is $25.00
+Age is 80 and Height is 040, so Admission charged is $10.00
+Age is 80 and Height is 050, so Admission charged is $10.00

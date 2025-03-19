@@ -1,0 +1,156 @@
+## Copyright (C) 2003-2012, 2017-2018 Free Software Foundation, Inc.
+## Written by Keisuke Nishida, Roger While, Simon Sobisch
+##
+## This file is part of GnuCOBOL.
+##
+## The GnuCOBOL compiler is free software: you can redistribute it
+## and/or modify it under the terms of the GNU General Public License
+## as published by the Free Software Foundation, either version 3 of the
+## License, or (at your option) any later version.
+##
+## GnuCOBOL is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with GnuCOBOL.  If not, see <https://www.gnu.org/licenses/>.
+
+### GnuCOBOL Test Suite
+
+### ISO+IEC+1989-2002 13.16.61 VALUE clause
+
+AT_SETUP([Numeric-edited item])
+AT_KEYWORDS([value editing size])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X-SPACE       PIC **99.00  VALUE SPACE.
+       01 X-123         PIC **999.00 VALUE "123".
+       01 X-ABC         PIC **99.00  VALUE "abc".
+       01 X-MATCH       PIC **99.00  VALUE "*123.00".
+       01 X-OVERFLOW    PIC **99.00  VALUE "*123.000".
+       01 Y-SPACE       PIC **99.00  VALUE QUOTE.
+       01 Y-123         PIC **999.00 VALUE 123.
+       01 Y-ABC         PIC **99.00  VALUE 0.
+       01 Y-MATCH       PIC **99.00  VALUE 123.00.
+       01 Y-OVERFLOW    PIC **99.00  VALUE 123.000.
+       PROCEDURE        DIVISION.
+           DISPLAY """" X-SPACE     """"
+           DISPLAY """" X-123       """"
+           DISPLAY """" X-ABC       """"
+           DISPLAY """" X-MATCH     """"
+           DISPLAY """" X-OVERFLOW  """"
+           DISPLAY """" Y-SPACE     """"
+           DISPLAY """" Y-123       """"
+           DISPLAY """" Y-ABC       """"
+           DISPLAY """" Y-MATCH     """"
+           DISPLAY """" Y-OVERFLOW  """"
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], ["       "
+"123     "
+"abc    "
+"*123.00"
+"*123.00"
+"""""""""
+"**123.00"
+"**00.00"
+"*123.00"
+"*123.00"
+],
+[])
+AT_CLEANUP
+
+# 3) DONE
+AT_SETUP([Signed numeric literal])
+AT_KEYWORDS([value])
+# TYPE CHECKING TODO
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X-9P          PIC 9  VALUE +1.
+       01 X-9N          PIC 9  VALUE -1.
+       01 X-S9P         PIC S9 VALUE +1.
+       01 X-S9N         PIC S9 VALUE -1.
+       PROCEDURE        DIVISION.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], ,
+[prog.cob:7:8: error: X-9N is unsigned but has signed VALUE '-1'
+    7 |        01 X-9N          PIC 9  VALUE -1.
+      |        ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([Numeric item (integer)])
+AT_KEYWORDS([value size])
+# Unexpected return code 0 failure - We don't implement
+# type checking TODO
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+      * Gnu throws ERROR on next line TODO
+       01 X-SPACE       PIC 999 VALUE SPACE.
+      * Gnu Throws WARNING on next two lines TODO
+       01 X-ABC         PIC 999 VALUE "abc".
+       01 X-12-3        PIC 999 VALUE 12.3.
+       01 X-123         PIC 999 VALUE 123.
+      * Gnu Throws WARNING on next line
+       01 X-1234        PIC 999 VALUE 1234.
+       PROCEDURE        DIVISION.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], ,
+[prog.cob:7:25: error: numeric type X-SPACE VALUE 'SPACES' requires numeric VALUE
+    7 |        01 X-SPACE       PIC 999 VALUE SPACE.
+      |                         ^
+prog.cob:9:25: error: numeric type X-ABC VALUE 'abc' requires numeric VALUE
+    9 |        01 X-ABC         PIC 999 VALUE "abc".
+      |                         ^
+prog.cob:10:25: error: integer type X-12-3 VALUE '12.3' requires integer VALUE
+   10 |        01 X-12-3        PIC 999 VALUE 12.3.
+      |                         ^
+prog.cob:13:25: error: numeric X-1234 VALUE '1234' holds only 3 digits
+   13 |        01 X-1234        PIC 999 VALUE 1234.
+      |                         ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([Alphabetic item])
+AT_KEYWORDS([value size])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X-123         PIC AAA VALUE 123.
+       01 X-ZERO        PIC AAA VALUE ZERO.
+       01 X-AB1         PIC AAA VALUE "ab1".
+       01 X-ABC         PIC AAA VALUE "abc".
+       01 X-ABCD        PIC AAA VALUE "abcd".
+       PROCEDURE        DIVISION.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], ,
+[prog.cob:6:25: error: alpha-only X-123 VALUE '123' contains non-alphabetic data
+    6 |        01 X-123         PIC AAA VALUE 123.
+      |                         ^
+prog.cob:7:25: error: alpha-only X-ZERO VALUE 'ZEROS' contains non-alphabetic data
+    7 |        01 X-ZERO        PIC AAA VALUE ZERO.
+      |                         ^
+prog.cob:8:25: error: alpha-only X-AB1 VALUE 'ab1' contains non-alphabetic data
+    8 |        01 X-AB1         PIC AAA VALUE "ab1".
+      |                         ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP

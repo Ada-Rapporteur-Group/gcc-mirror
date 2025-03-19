@@ -1,0 +1,10 @@
+ValidationReturnCode is 0 Date is Ok
+ValidationReturnCode is 1 Error - The date must be numeric   
+ValidationReturnCode is 2 Error - The year cannot be zero    
+ValidationReturnCode is 3 Error - The month cannot be zero   
+ValidationReturnCode is 4 Error - The day cannot be zero     
+ValidationReturnCode is 5 Error - Year has already passed    
+ValidationReturnCode is 6 Error - Month is greater than 12   
+ValidationReturnCode is 7 Error - Day greater than 31        
+ValidationReturnCode is 8 Error - Day too big for this month 
+ValidationReturnCode is 9  

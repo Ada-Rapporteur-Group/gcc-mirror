@@ -1,0 +1,3 @@
+tr '\000' ' ' < under-test.txt >under-test.txtt
+rm under-test.txt
+mv under-test.txtt under-test.txt

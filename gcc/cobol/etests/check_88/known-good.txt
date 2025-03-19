@@ -1,0 +1,32 @@
+check_88.cbl:13:33: warning: '' has embedded NUL
+   13 |            88  CheckBinary VALUE X"000102".
+      |                                 ^
+-><-
+->   <-
+->"""<-
+->000<-
+->ÿÿÿ<-
+ 
+-><-
+->    <-
+->""""<-
+->0000<-
+->ÿÿÿÿ<-
+ 
+There should be no garbage after character 32
+-------------------------------*--------------------------------
+üüüüüüüüüüüüüüüüüüü Bundesstraße                                
+üüüüüüüüüüüüüüüüüüü Bundesstraße                                
+ 
+There should be no spaces before the final quote
+"üüüüüüüüüüüüüüüüüüü Bundesstraße"
+ 
+   IsLow   ""
+   IsZero  "000"
+   IsHi    "ÿÿÿ"
+   IsBob   "bob"
+   IsQuote """""
+   IsSpace "   "
+ 
+CheckBinary Properly True
+CheckBinary Properly False

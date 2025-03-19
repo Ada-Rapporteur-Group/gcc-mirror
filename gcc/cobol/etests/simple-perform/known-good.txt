@@ -1,0 +1,27 @@
+Do a forward-reference PERFORM para_CCC
+   We are inside para_CCC
+We are about to fall through the para_AAA, para_BBB, and para_CCC definitions
+   We are inside para_AAA
+   We are inside para_BBB
+   We are inside para_CCC
+We are about to PERFORM para_AAA
+   We are inside para_AAA
+We are about to PERFORM para_BBB three times
+   We are inside para_BBB
+   We are inside para_BBB
+   We are inside para_BBB
+We are about to PERFORM para_BBB through para_CCC
+   We are inside para_BBB
+   We are inside para_CCC
+We are about to PERFORM para_BBB through para_CCC another five times
+   We are inside para_BBB
+   We are inside para_CCC
+   We are inside para_BBB
+   We are inside para_CCC
+   We are inside para_BBB
+   We are inside para_CCC
+   We are inside para_BBB
+   We are inside para_CCC
+   We are inside para_BBB
+   We are inside para_CCC
+Thank you for visiting the PERFORM PARAGRAPH demo

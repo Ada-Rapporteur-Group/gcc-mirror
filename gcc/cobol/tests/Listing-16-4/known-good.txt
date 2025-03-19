@@ -1,0 +1,22 @@
+ 
+Enter the required operation (Dec or Inc) : You entered Inc
+Enter a three digit value : You entered 111
+The current value is    +111
+Enter a three digit value : You entered 222
+The current value is    +333
+Enter a three digit value : You entered 333
+The current value is    +666
+Enter a three digit value : You entered 000
+ 
+Enter the required operation (Dec or Inc) : You entered Dec
+Enter a three digit value : You entered 333
+The current value is    -333
+Enter a three digit value : You entered 222
+The current value is    -555
+Enter a three digit value : You entered 111
+The current value is    -666
+Enter a three digit value : You entered 000
+ 
+Enter the required operation (Dec or Inc) : You entered Bad
+Enter a three digit value : You entered 123
+"Bad" is not a valid operation

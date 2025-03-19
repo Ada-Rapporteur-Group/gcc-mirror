@@ -1,0 +1,6 @@
+Enter an arithmetic operator (+ - * /) (s to end) : Enter a single digit number - Enter a single digit number - Result is =   7.00
+Enter an arithmetic operator (+ - * /) (s to end) : Enter a single digit number - Enter a single digit number - Result is =  -5.00
+Enter an arithmetic operator (+ - * /) (s to end) : Enter a single digit number - Enter a single digit number - Result is =   6.00
+Enter an arithmetic operator (+ - * /) (s to end) : Enter a single digit number - Enter a single digit number - Result is =   0.17
+Enter an arithmetic operator (+ - * /) (s to end) : Enter a single digit number - Enter a single digit number - Result is =   0.16
+Enter an arithmetic operator (+ - * /) (s to end) : End of calculations

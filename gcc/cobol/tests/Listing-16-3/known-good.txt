@@ -1,0 +1,25 @@
+FirstString  value is - First parameter  =  
+SecondString value is - Second parameter =  
+ 
+>>> In the MultiplyNums subprogram
+First parameter  =  456
+Second parameter =  321
+ 
+Entire discount table 12430713862362
+Mon discount is  12%
+Tue discount is  43%
+Wed discount is  07%
+Thu discount is  13%
+Fri discount is  86%
+Sat discount is  23%
+Sun discount is  62%
+ 
+>>>> In InnerSubProg
+Days of the week = MonTueWedThuFriSatSun
+<<<< Leaving InnerSubProg
+ 
+<<<< Leaving MultiplyNums
+ 
+FirstString  value is - First parameter  =  
+SecondString value is - VALUE OVERWRITTEN   
+COMP value is 146,376

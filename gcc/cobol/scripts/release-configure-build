@@ -1,0 +1,123 @@
+#!/bin/sh
+
+set -e
+set -x
+
+# We want a relevant version code:
+if test -z "$(which git || true)" 
+then 
+    # Without git, we want *something*
+    COMMIT_VERSION=-rel-000000
+else
+    # git exists
+    MD5_HASH=-$(git log --abbrev-commit --abbrev=6 | head -n1 | head -n1 | sed 's/commit //')
+    # And we'll use the GIT date of the repo as a final pseudo-build number
+    # as a version tiebreaker.
+    GITDATE=$(git show --date=iso-strict | grep Date | head -n1 | sed 's/.*\([0-9]\{4\}\)[-]\([0-9]\{2\}\)[-]\([0-9]\{2\}\).*/\1\2\3/')
+    # As of this writing, we are building on Ubuntu 22.04 and 24.04 systems:
+    COMMIT_VERSION=-dev-$MD5_HASH
+fi
+
+RELEASE_ID=-$(cat /etc/os-release | grep "^ID=" | sed 's/ID=\(.*\).*$/\1/g' | sed 's/ubuntu/ubu/g')
+RELEASE_VERSION_ID=$(cat /etc/os-release | grep "^VERSION_ID=\"" | sed 's/^VERSION_ID="\([0-9]\+\)[.].*$/\1/g')
+
+if [ "$1" = "commit-release" ]
+then
+    # We want to know exactly where various files go for the purposes of
+    # creating the distribution package
+	ULIBDIR=--libdir=/usr/lib/gcobol
+	ULIBEXECDIR=--libexecdir=/usr/libexec/gcobol
+    shift
+fi
+
+ULIBDIR=--libdir=/usr/lib/gcobol
+ULIBEXECDIR=--libexecdir=/usr/libexec/gcobol
+
+
+
+# These prerequisites suffice for a compilation on Ubuntu 20.04 through 24.04  The various
+# tests avoid attempting to re-install packages, which can be annoying when the
+# user doesn't have complete sudo permissions.
+if test -z "$(which g++ || true)"; then sudo apt -y install g++; fi
+if test -z "$(find /usr/include/ -name gmp.h)"; then sudo apt -y install libgmp-dev; fi
+if test -z "$(find /usr/include/ -name mpfr.h)"; then sudo apt -y install libmpfr-dev; fi
+if test -z "$(find /usr/include/ -name mpc.h)"; then sudo apt -y install libmpc-dev; fi
+if test -z "$(find /usr/include/ -name zlib.h)"; then sudo apt -y install libz-dev; fi
+if test -z "$(which make || true)"; then sudo apt -y install make; fi
+if test -z "$(which bison || true)"; then sudo apt -y install bison; fi
+if test -z "$(which flex || true)"; then sudo apt -y install flex; fi
+
+DOTTED_VERSION=$(cat ${0%/*}/../../../gcc/BASE-VER)
+MAJOR_VERSION=$(echo $DOTTED_VERSION | sed 's/^\([0-9]\+\)[.].*$/\1/')
+PKGVERSION="GCOBOL-$MAJOR_VERSION.$GITDATE$MD5_HASH$SYSTEM$RELEASE_ID$RELEASE_VERSION_ID"
+PKGVERSION="GCOBOL-$DOTTED_VERSION.$GITDATE$MD5_HASH$SYSTEM$RELEASE_ID$RELEASE_VERSION_ID"
+
+arch=$(arch)
+
+test "$arch"
+if [ $arch = x86_64 ]
+then
+    arch_options='--with-abi=m64 --with-tune=generic --enable-default-pie'
+fi
+
+# We start in <repo>/gcc/cobol/scripts
+cd ${0%/*}/../../..
+if [ -z "$BUILDDIR" ]
+then
+    BUILDDIR=build
+fi
+mkdir -p $BUILDDIR
+cd $BUILDDIR
+rm -fr *
+
+../configure                                \
+	--with-pkgversion="$PKGVERSION"         \
+	--enable-languages=c,c++,cobol          \
+	--prefix=/usr                           \
+	  $ULIBDIR                              \
+	  $ULIBEXECDIR                          \
+	--with-gcc-major-version-only           \
+	--program-suffix=-$MAJOR_VERSION        \
+	--enable-shared                         \
+	--enable-linker-build-id                \
+	--without-included-gettext              \
+	--enable-threads=posix                  \
+	--disable-bootstrap                     \
+	--enable-clocale=gnu                    \
+	--enable-libstdcxx-debug                \
+	--enable-libstdcxx-time=yes             \
+	--with-default-libstdcxx-abi=new        \
+	--enable-gnu-unique-object              \
+	--disable-vtable-verify                 \
+	--enable-plugin                         \
+	--with-system-zlib                      \
+	--with-target-system-zlib=auto          \
+	--disable-werror                        \
+	--disable-cet                           \
+	  $arch_options                         \
+	--disable-multilib                      \
+	--without-cuda-driver                   \
+	--enable-checking=release               \
+	--build=${arch}-linux-gnu               \
+	--host=${arch}-linux-gnu                \
+	--target=${arch}-linux-gnu              \
+	--with-build-config=bootstrap-lto-lean  \
+	--enable-link-mutex --without-isl
+
+
+if [ "$1" ]
+then
+    make $@
+else
+    make -j $(nproc)
+fi
+
+if [ $USER = gitlab-runner ]
+then
+    if [ -w /usr/ ]
+    then
+        make -s install
+    else
+        echo "not installed; no access to /usr"
+    fi
+fi

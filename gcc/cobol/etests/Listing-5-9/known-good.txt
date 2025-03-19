@@ -1,0 +1,20 @@
+Qty QP Member: 02 00250 Y Discount = 00%
+Qty QP Member: 02 01000 Y Discount = 07%
+Qty QP Member: 02 01000 N Discount = 05%
+Qty QP Member: 02 03000 Y Discount = 10%
+Qty QP Member: 02 03000 N Discount = 08%
+ 
+Qty QP Member: 08 00250 Y Discount = 03%
+Qty QP Member: 08 00250 N Discount = 02%
+Qty QP Member: 08 01000 Y Discount = 12%
+Qty QP Member: 08 01000 N Discount = 10%
+Qty QP Member: 08 03000 Y Discount = 25%
+Qty QP Member: 08 03000 N Discount = 15%
+ 
+Qty QP Member: 30 00250 Y Discount = 05%
+Qty QP Member: 30 00250 N Discount = 03%
+Qty QP Member: 30 01000 Y Discount = 16%
+Qty QP Member: 30 01000 N Discount = 15%
+Qty QP Member: 30 03000 Y Discount = 30%
+Qty QP Member: 30 03000 N Discount = 20%
+ 

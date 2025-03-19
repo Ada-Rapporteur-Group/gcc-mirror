@@ -1,0 +1,78 @@
+## Copyright (C) 2003-2012, 2014, 2020 Free Software Foundation, Inc.
+## Written by Keisuke Nishida, Roger While, Simon Sobisch, Edward Hart
+##
+## This file is part of GnuCOBOL.
+##
+## The GnuCOBOL compiler is free software: you can redistribute it
+## and/or modify it under the terms of the GNU General Public License
+## as published by the Free Software Foundation, either version 3 of the
+## License, or (at your option) any later version.
+##
+## GnuCOBOL is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with GnuCOBOL.  If not, see <https://www.gnu.org/licenses/>.
+
+### GnuCOBOL Test Suite
+
+### ISO+IEC+1989-2002 8.4.1.2 Subscripts## 8.4.1.2.3 General rules
+
+
+AT_SETUP([Subscript bounds with OCCURS DEPENDING ON])
+AT_KEYWORDS([runsubscripts subscripts odo])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 G.
+         02 X           PIC X OCCURS 4 TO 6 DEPENDING ON N.
+       01 N             PIC 9 VALUE 4.
+       PROCEDURE        DIVISION.
+           DISPLAY X(0)
+           DISPLAY X(7)
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:10:21: error: X(0): subscript 1 out of range for 02 X OCCURS 4 to 6
+   10 |            DISPLAY X(0)
+      |                     ^
+prog.cob:11:21: error: X(7): subscript 1 out of range for 02 X OCCURS 4 to 6
+   11 |            DISPLAY X(7)
+      |                     ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+
+## 8.4.1.2.2 Syntax rules
+AT_SETUP([Subscripted item requires OCCURS clause])
+AT_KEYWORDS([subscripts])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 G.
+         02 X           PIC X.
+       PROCEDURE        DIVISION.
+           DISPLAY G(1)
+           END-DISPLAY.
+           DISPLAY X(1)
+           END-DISPLAY.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:9:20: error: 1 subscripts provided for G, which has no dimensions
+    9 |            DISPLAY G(1)
+      |                    ^
+prog.cob:11:20: error: 1 subscripts provided for X, which has no dimensions
+   11 |            DISPLAY X(1)
+      |                    ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+

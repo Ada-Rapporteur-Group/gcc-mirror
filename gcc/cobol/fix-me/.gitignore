@@ -1,0 +1,8 @@
+test
+a.out
+under-test.txt
+*.s
+*.rpt
+*.o
+*.nodes
+*.nodes.html

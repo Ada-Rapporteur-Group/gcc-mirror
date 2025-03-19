@@ -1,0 +1,16 @@
+#!/bin/sh
+
+set -e
+set -x
+
+# These prerequisites suffice for a compilation on Ubuntu 20 and 22  The various
+# tests avoid attempting to re-install packages, which can be annoying when the
+# user doesn't have complete sudo permissions.
+if test -z "$(which g++ || true)"; then sudo apt -y install g++; fi
+if test -z "$(find /usr/include/ -name gmp.h)"; then sudo apt -y install libgmp-dev; fi
+if test -z "$(find /usr/include/ -name mpfr.h)"; then sudo apt -y install libmpfr-dev; fi
+if test -z "$(find /usr/include/ -name mpc.h)"; then sudo apt -y install libmpc-dev; fi
+if test -z "$(find /usr/include/ -name zlib.h)"; then sudo apt -y install libz-dev; fi
+if test -z "$(which make || true)"; then sudo apt -y install make; fi
+if test -z "$(which bison || true)"; then sudo apt -y install bison; fi
+if test -z "$(which flex || true)"; then sudo apt -y install flex; fi

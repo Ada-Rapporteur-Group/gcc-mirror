@@ -1,0 +1,12 @@
+ 
+Enter a state number - 33
+33. NC North Carolina Raleigh         9,752,073
+ 
+Enter a two letter code - NJ
+30. NJ New Jersey     Trenton         8,864,590
+ 
+Enter a state name - Alaska        
+02. AK Alaska         Juneau            731,449
+ 
+Enter a state capital - Topeka        
+16. KS Kansas         Topeka          2,885,905

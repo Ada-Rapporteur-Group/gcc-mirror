@@ -1,0 +1,81 @@
+cbl/
+dat/
+obj/
+playground/
+newcob.val
+newcob.val.Z
+PRINT-FILE
+REPORTT
+EXEC85
+EXEC85.cbl
+test
+test.s
+dump.txt
+orig/
+pass1/*
+*/.conf
+*/.archive
+*/*.cbl
+*/*.rpt
+*/*.out
+*/*.out-stdout
+*/*-*[01234]
+*/*-*.seq
+*/*cbl-orig
+*/CLBRY*
+??/?????[AM].dat
+CM/
+DB/
+IC/
+IF/IF???[AM]
+IF/IF*.conf
+! IF/IF222A.conf
+IX/IX???[AM]
+IX/IX???[AM].idx
+IX/IX???*.indexed
+# ignore generated .conf files, but recognize tracked .conf files
+IX/IX*.conf
+! IX/IX101A.conf IX/IX102A.conf IX/IX102A.conf IX/IX103A.conf \
+  IX/IX109A.conf IX/IX110A.conf IX/IX110A.conf IX/IX111A.conf \
+  IX/IX111A.conf IX/IX112A.conf IX/IX113A.conf IX/IX114A.conf \
+  IX/IX114A.conf IX/IX115A.conf IX/IX115A.conf IX/IX116A.conf \
+  IX/IX116A.conf IX/IX117A.conf IX/IX117A.conf IX/IX118A.conf \
+  IX/IX118A.conf IX/IX119A.conf IX/IX119A.conf IX/IX120A.conf \
+  IX/IX201A.conf IX/IX202A.conf IX/IX202A.conf IX/IX203A.conf
+NC/NC???[AM]
+NC/NC*.conf
+! NC/NC109M.conf NC/NC204M.conf
+OB/
+RL/RL???[AM]
+RL/RL*.conf
+! RL/RL101A.conf RL/RL102A.conf RL/RL103A.conf RL/RL108A.conf \
+  RL/RL109A.conf RL/RL110A.conf RL/RL201A.conf RL/RL202A.conf \
+  RL/RL203A.conf RL/RL206A.conf RL/RL207A.conf RL/RL208A.conf \
+  RL/RL212A.conf RL/RL213A.conf
+RW/
+SG/
+SM/SM???[AM]
+SM/SM*.conf
+SM/SM*.cblx
+! SM/SM10[134]A.conf SM/SM20[2347]A.conf 
+SQ/SQ???[AM]
+SQ/SQ*.conf
+! SQ/SQ203A.conf 
+ST/ST???[AM]
+ST/ST*.conf
+ST/CLBRY*
+! ST/ST101A.conf ST/ST102A.conf ST/ST103A.conf ST/ST104A.conf \
+  ST/ST105A.conf ST/ST107A.conf ST/ST110A.conf ST/ST111A.conf \
+  ST/ST113M.conf ST/ST114A.conf ST/ST115A.conf ST/ST116A.conf ST/ST117A.conf \
+  ST/ST120A.conf ST/ST121A.conf ST/ST123A.conf ST/ST124A.conf \
+  ST/ST126A.conf ST/ST140A.conf ST/ST144A.conf
+*.exe
+*.report
+XXXXX*
+*.rdone
+ST/.archive
+printfile
+.newcob.val.Z
+SM/COPYALT/
+ebcdic/*
+! ebcdic/IF105A.diff ebcdic/IF127A.diff

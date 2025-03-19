@@ -1,0 +1,725 @@
+## Copyright (C) 2003-2012, 2014, 2016-2020 Free Software Foundation, Inc.
+## Written by Keisuke Nishida, Roger While, Simon Sobisch, Joe Robbins,
+## Edward Hart
+##
+## This file is part of GnuCOBOL.
+##
+## The GnuCOBOL compiler is free software: you can redistribute it
+## and/or modify it under the terms of the GNU General Public License
+## as published by the Free Software Foundation, either version 3 of the
+## License, or (at your option) any later version.
+##
+## GnuCOBOL is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with GnuCOBOL.  If not, see <https://www.gnu.org/licenses/>.
+
+### GnuCOBOL Test Suite
+
+
+AT_SETUP([valid key items])
+AT_KEYWORDS([file record alternate])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT      DIVISION.
+       INPUT-OUTPUT     SECTION.
+       FILE-CONTROL.
+       SELECT TEST-SOME ASSIGN TO 'FILE-TEST'
+                        ORGANIZATION  IS INDEXED
+                        ACCESS MODE   IS DYNAMIC
+                        RECORD    KEY IS TEST-P2 IN TEST-SOME
+                        ALTERNATE KEY IS TEST-P3 IN TEST-SOME.
+       SELECT TEST-FILE ASSIGN TO 'FILE-TEST2'
+                        ORGANIZATION  IS INDEXED
+                        ACCESS MODE   IS DYNAMIC
+                        RECORD    KEY IS TEST-P1
+                        ALTERNATE KEY IS TEST-P4.
+       DATA             DIVISION.
+       FILE             SECTION.
+       FD TEST-SOME.
+       01  SOME-REC.
+           05  TEST-P2   PIC S9(4) COMP.
+           05  TEST-P3   PIC S9(5) COMP-3.
+       FD TEST-FILE.
+       01  TEST-REC.
+           05 TEST-P1   PIC X(4).
+           05 FILLER    PIC X(4).
+           05 TEST-P4   PIC X(4).
+       WORKING-STORAGE  SECTION.
+       01  WS-REC.
+           05  TEST-P2   PIC S9(4) COMP.
+           05  TEST-P3   PIC S9(5) COMP-3.
+       PROCEDURE        DIVISION.
+           OPEN  INPUT TEST-FILE
+           CLOSE TEST-FILE
+           OPEN  OUTPUT TEST-SOME
+           MOVE CORRESPONDING WS-REC TO SOME-REC
+           WRITE SOME-REC
+           CLOSE TEST-SOME
+      *
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [0], [], [])
+AT_CLEANUP
+
+
+AT_SETUP([EXTERNAL file])
+AT_KEYWORDS([file])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT my-file
+               ASSIGN TO "somefile"
+               ORGANIZATION IS SEQUENTIAL.
+
+       DATA DIVISION.
+       FILE SECTION.
+       FD my-file EXTERNAL.
+       01 my-record.
+           03 my-record-data PIC X(80).
+
+       PROCEDURE DIVISION.
+           GOBACK.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [0], [], [])
+AT_CLEANUP
+
+
+
+AT_SETUP(490 [Missing SELECT])
+AT_KEYWORDS([file])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT file2 ASSIGN DISK.
+       DATA DIVISION.
+       FILE SECTION.
+       FD  file1.
+       01  file1-rec PIC X.
+       FD  file2.
+       01  file2-rec PIC X.
+       PROCEDURE DIVISION.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:10:12: error: file name not found
+   10 |        FD  file1.
+      |            ^
+prog.cob:7:19: error: line 7: file2 lacks a file description
+    7 |            SELECT file2 ASSIGN DISK.
+      |                   ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+
+AT_SETUP([489 Duplicated SELECT])
+AT_KEYWORDS([file])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+       SELECT file1 ASSIGN DISK.
+       SELECT file2 ASSIGN DISK.
+       SELECT file1 ASSIGN DISK.
+       DATA DIVISION.
+       FILE SECTION.
+       FD  file1.
+       01  file1-rec PIC X.
+       FD  file2.
+       01  file2-rec PIC X.
+       PROCEDURE DIVISION.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:9:15: error: file1 was defined previously on line 7
+    9 |        SELECT file1 ASSIGN DISK.
+      |               ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+
+## Each file named in a SELECT clause must be described once in the
+## DATA DIVISION.
+AT_SETUP([Missing FD])
+AT_KEYWORDS([file])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+       SELECT file1 ASSIGN DISK.
+       SELECT file2 ASSIGN DISK.
+       DATA DIVISION.
+       FILE SECTION.
+       FD file2.
+       01 file2-rec PIC X.
+       PROCEDURE DIVISION.
+           OPEN input file1
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:7:15: error: line 7: file1 lacks a file description
+    7 |        SELECT file1 ASSIGN DISK.
+      |               ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+
+AT_SETUP([Duplicated FD])
+AT_KEYWORDS([file])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+       SELECT file1 ASSIGN DISK.
+       SELECT file2 ASSIGN DISK.
+       DATA DIVISION.
+       FILE SECTION.
+       FD  file1.
+       01  file1-rec PIC X.
+       FD  file2.
+       01  file2-rec PIC X.
+       FD  file1.
+       01  file1-rec-2 PIC X.
+       PROCEDURE DIVISION.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:15:12: error: FD file1 previously defined on line 7
+   15 |        FD  file1.
+      |            ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+
+AT_SETUP([SELECT without ASSIGN])
+AT_KEYWORDS([file])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT      DIVISION.
+       INPUT-OUTPUT     SECTION.
+       FILE-CONTROL.
+       SELECT TEST-FILE
+              ORGANIZATION IS SEQUENTIAL.
+       DATA             DIVISION.
+       FILE             SECTION.
+       FD TEST-FILE.
+       01 TEST-REC      PIC X(4).
+       PROCEDURE        DIVISION.
+           OPEN  INPUT TEST-FILE.
+           CLOSE TEST-FILE.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:7:15: error: ASSIGN clause missing for TEST-FILE
+    7 |        SELECT TEST-FILE
+      |               ^
+cobol1: error: failed compiling prog.cob
+])
+
+AT_CLEANUP
+
+
+AT_SETUP([START on SEQUENTIAL file])
+AT_KEYWORDS([file])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT      DIVISION.
+       INPUT-OUTPUT     SECTION.
+       FILE-CONTROL.
+       SELECT TEST-FILE  ASSIGN       "./TEST-FILE"
+                         ORGANIZATION IS SEQUENTIAL.
+       SELECT TEST-FILE2 ASSIGN       "./TEST-FILE"
+                         ORGANIZATION IS LINE SEQUENTIAL.
+       DATA             DIVISION.
+       FILE             SECTION.
+       FD TEST-FILE.
+       01 TEST-REC      PIC X(4).
+       FD TEST-FILE2.
+       01 TEST-REC2     PIC X(4).
+       PROCEDURE        DIVISION.
+           OPEN  INPUT TEST-FILE TEST-FILE2
+           START TEST-FILE  KEY EQUAL TEST-REC
+           END-START
+           START TEST-FILE2 KEY EQUAL TEST-REC2
+           END-START
+           CLOSE TEST-FILE TEST-FILE2
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:19:18: error: START invalid with sequential file TEST-FILE
+   19 |            START TEST-FILE  KEY EQUAL TEST-REC
+      |                  ^
+prog.cob:21:18: error: START invalid with sequential file TEST-FILE2
+   21 |            START TEST-FILE2 KEY EQUAL TEST-REC2
+      |                  ^
+cobol1: error: failed compiling prog.cob
+])
+
+AT_CLEANUP
+
+
+AT_SETUP([INDEXED file invalid key items])
+AT_KEYWORDS([file record ALTERNATE split])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT      DIVISION.
+       INPUT-OUTPUT     SECTION.
+       FILE-CONTROL.
+       SELECT TEST-SOME ASSIGN TO 'FILE-TEST'
+                        ORGANIZATION  IS INDEXED
+                        ACCESS MODE   IS DYNAMIC
+                        RECORD    KEY IS TEST-P2
+                        ALTERNATE KEY IS TEST-P1
+                        ALTERNATE KEY IS TEST-P3.
+       SELECT TEST-FILE ASSIGN TO 'FILE-TEST2'
+                        ORGANIZATION  IS INDEXED
+                        ACCESS MODE   IS DYNAMIC
+                        RECORD    KEY IS TEST-P1
+                        ALTERNATE KEY IS TEST-P4
+                        ALTERNATE KEY IS NOT-THERE
+                        ALTERNATE KEY IS SOME-REC.
+       SELECT TEST-MORE ASSIGN TO 'FILE-TEST-EXT'
+                        ORGANIZATION  IS INDEXED
+                        ACCESS MODE   IS DYNAMIC
+                        RECORD KEY    IS NOT-HERE-KEY
+                           SOURCE     IS NOT-IN-FILE1
+                                         NOT-IN-FILE2.
+       DATA             DIVISION.
+       FILE             SECTION.
+       FD TEST-SOME.
+       01  SOME-REC  PIC X(20).
+       FD TEST-FILE.
+       01  TEST-REC.
+           05 TEST-P1   PIC X(4).
+           05 FILLER    PIC X(4).
+           05 TEST-P4   PIC X(4).
+       FD TEST-MORE.
+       01  MORE-REC.
+           05 MORE-DATA PIC X(4).
+       WORKING-STORAGE  SECTION.
+       77  TEST-P2   PIC S9(4) COMP.
+       77  TEST-P3   PIC S9(5) COMP-3.
+       PROCEDURE        DIVISION.
+           OPEN  INPUT TEST-FILE.
+           CLOSE TEST-FILE.
+           STOP RUN.
+])
+
+# FIXME: "is not defined" should be changed in "is not defined in file ..."
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:39:8: error: line 12: TEST-P2 of TEST-SOME is not defined in file description
+   39 |        77  TEST-P2   PIC S9(4) COMP.
+      |        ^
+prog.cob:32:12: error: line 12: TEST-P1 of TEST-SOME is not defined in file description
+   32 |            05 TEST-P1   PIC X(4).
+      |            ^
+prog.cob:40:8: error: line 12: TEST-P3 of TEST-SOME is not defined in file description
+   40 |        77  TEST-P3   PIC S9(5) COMP-3.
+      |        ^
+prog.cob:18:42: error: line 19: NOT-THERE of TEST-FILE is not defined
+   18 |                         ALTERNATE KEY IS NOT-THERE
+      |                                          ^
+prog.cob:29:8: error: line 19: SOME-REC of TEST-FILE is not defined in file description
+   29 |        01  SOME-REC  PIC X(20).
+      |        ^
+prog.cob:18:42: error: line 19: NOT-THERE of TEST-FILE is not defined
+   18 |                         ALTERNATE KEY IS NOT-THERE
+      |                                          ^
+prog.cob:24:42: error: line 25: NOT-IN-FILE1 of TEST-MORE is not defined
+   24 |                            SOURCE     IS NOT-IN-FILE1
+      |                                          ^
+prog.cob:25:42: error: line 25: NOT-IN-FILE2 of TEST-MORE is not defined
+   25 |                                          NOT-IN-FILE2.
+      |                                          ^
+prog.cob:24:42: error: line 25: NOT-IN-FILE1 of TEST-MORE is not defined
+   24 |                            SOURCE     IS NOT-IN-FILE1
+      |                                          ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+
+AT_SETUP([Clauses following invalid ACCESS clause])
+AT_KEYWORDS([file])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID.    prog.
+
+       ENVIRONMENT    DIVISION.
+       INPUT-OUTPUT   SECTION.
+       FILE-CONTROL.
+           SELECT testfile
+               ASSIGN TO filename
+               ORGANIZATION RELATIVE
+               ACCESS IS sequential
+               STATUS IS stat.
+])
+# cobc says: prog.cob:11: error: syntax error, unexpected Identifier, expecting DYNAMIC or RANDOM or SEQUENTIAL
+# but why?
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:8:19: error: line 12: testfile lacks a file description
+    8 |            SELECT testfile
+      |                   ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+
+AT_SETUP([RELATIVE KEY type checks])
+AT_KEYWORDS([RELATIVE FILE])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+            SELECT FILE1 ASSIGN DISK
+            ORGANIZATION RELATIVE ACCESS MODE RANDOM
+            RELATIVE KEY FILE1-KEY.
+            SELECT FILE2 ASSIGN DISK
+            ORGANIZATION RELATIVE ACCESS MODE RANDOM
+            RELATIVE KEY FILE2-KEY.
+            SELECT FILE3 ASSIGN DISK
+            ORGANIZATION RELATIVE ACCESS MODE RANDOM
+            RELATIVE KEY FILE3-KEY.
+            SELECT FILE4 ASSIGN DISK
+            ORGANIZATION RELATIVE ACCESS MODE RANDOM
+            RELATIVE KEY FILE4-KEY.
+            SELECT FILE5 ASSIGN DISK
+            ORGANIZATION RELATIVE ACCESS MODE RANDOM
+            RELATIVE KEY FILE5-KEY.
+       DATA DIVISION.
+       FILE SECTION.
+       FD FILE1.
+       01  FILE1-REC PIC X.
+       FD FILE2.
+       01  FILE2-REC PIC X.
+       FD FILE3.
+       01  FILE3-REC PIC X.
+       FD FILE4.
+       01  FILE4-REC.
+          05  FLD1      PIC X.
+          05  FILE4-KEY PIC 999.
+       FD FILE5.
+       01  FILE5-REC PIC X.
+       WORKING-STORAGE SECTION.
+       77  FILE1-KEY PIC XXXX.
+       01  FILE2-KEY.
+           05  F2-KEY PIC 9(5).
+       01  F3-KEY.
+           05  FILE3-KEY PIC 9(5) OCCURS 2 TIMES.
+       77  FILE5-KEY PIC 999V9.
+       PROCEDURE DIVISION.
+            STOP RUN.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:37:8: error: line 9: RELATIVE file FILE1 key FILE1-KEY must be integer type
+   37 |        77  FILE1-KEY PIC XXXX.
+      |        ^
+prog.cob:38:8: error: line 12: RELATIVE file FILE2 key FILE2-KEY must be integer type
+   38 |        01  FILE2-KEY.
+      |        ^
+prog.cob:41:12: error: line 15: RELATIVE file FILE3 key FILE3-KEY cannot have OCCURS clause
+   41 |            05  FILE3-KEY PIC 9(5) OCCURS 2 TIMES.
+      |            ^
+prog.cob:33:11: error: line 18: RELATIVE file FILE4 key FILE4-KEY is defined in file description
+   33 |           05  FILE4-KEY PIC 999.
+      |           ^
+prog.cob:42:8: error: line 21: RELATIVE file FILE5 key FILE5-KEY must be integer type
+   42 |        77  FILE5-KEY PIC 999V9.
+      |        ^
+cobol1: error: failed compiling prog.cob
+])
+
+AT_CLEANUP
+
+
+AT_SETUP([Mismatched KEY clause])
+AT_KEYWORDS([file RELATIVE INDEXED])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+            SELECT file-1 ASSIGN DISK,
+                INDEXED, RELATIVE KEY file-1-key.
+            SELECT file-2 ASSIGN DISK,
+                RELATIVE, RECORD KEY file-2-key.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:7:20: error: INDEXED file file-1 cannot have RELATIVE key file-1-key
+    7 |             SELECT file-1 ASSIGN DISK,
+      |                    ^
+prog.cob:9:20: error: RELATIVE file file-2 cannot have RECORD key file-2-key
+    9 |             SELECT file-2 ASSIGN DISK,
+      |                    ^
+prog.cob:7:20: error: line 8: file-1 lacks a file description
+    7 |             SELECT file-1 ASSIGN DISK,
+      |                    ^
+cobol1: error: failed compiling prog.cob
+])
+
+AT_CLEANUP
+
+
+# ISO 12.4.5.8 FILE STATUS clause: "VSAM" status is valid.
+AT_SETUP([VSAM status])
+AT_KEYWORDS([file status extensions])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT file1 ASSIGN TO 'FILE-TEST'
+                        ORGANIZATION IS INDEXED
+                        ACCESS MODE  IS DYNAMIC
+                        RECORD KEY   IS file1-key
+                        STATUS       IS STATUS-1.
+           SELECT file2 ASSIGN TO 'FILE-TEST'
+                        ORGANIZATION IS INDEXED
+                        ACCESS MODE  IS DYNAMIC
+                        RECORD KEY   IS file2-key
+                        STATUS       IS STATUS-1, STATUS-2.
+       DATA DIVISION.
+       FILE SECTION.
+       FD  FILE1.
+       01  FILE1-REC.
+           05 FILE1-KEY PIC X.
+       FD  FILE2.
+       01  FILE2-REC.
+           05 FILE2-KEY PIC 9.
+           05 FILE2-DAT PIC X.
+       WORKING-STORAGE SECTION.
+       77  STATUS-1 PIC X(02).
+       77  STATUS-2 PIC X(06).
+       PROCEDURE DIVISION.
+            STOP RUN.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [0], [],
+[])
+
+AT_CLEANUP
+
+
+
+
+
+AT_SETUP([WRITE / REWRITE on LINE SEQUENTIAL files])
+AT_KEYWORDS([file])
+
+# FIXME: this should be depending on a compilation flag,
+#        see reportwriter branch for this feature
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT f ASSIGN TO "ssad" LINE SEQUENTIAL.
+
+       DATA DIVISION.
+       FILE SECTION.
+       FD  f.
+       01  f-rec PIC X(05).
+
+       PROCEDURE DIVISION.
+           OPEN OUTPUT f
+           WRITE FILE f FROM "abc"
+           REWRITE FILE f FROM "abc"
+           CLOSE f
+           .
+])
+
+# cobc says:
+# prog.cob:18: error: REWRITE not allowed on LINE SEQUENTIAL files
+# ISO 14.9.35.4 General rules 17) describes how it works
+AT_CHECK([$COMPILE_ONLY prog.cob], [0], [],
+[])
+AT_CLEANUP
+
+
+AT_SETUP([482 OPEN I-O with LINE SEQUENTIAL])
+AT_KEYWORDS([file])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT file1 ASSIGN DISK ORGANIZATION LINE SEQUENTIAL.
+       DATA DIVISION.
+       FILE SECTION.
+       FD  file1.
+       01  file1-rec PIC X.
+       PROCEDURE DIVISION.
+           OPEN I-O file1.
+])
+
+# cobc says:
+# prog.cob:13: error: OPEN I-O not allowed on LINE SEQUENTIAL files
+# ISO Table 20 — Permissible I-O statements by access mode and open mode
+#     says I-O is acceptable, but prevents WRITE.
+AT_CHECK([$COMPILE_ONLY prog.cob], [0], [],
+[])
+
+AT_CLEANUP
+
+
+AT_SETUP([483 ACCESS RANDOM with ORG SEQUENTIAL])
+AT_KEYWORDS([file])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT file1 ASSIGN DISK ORGANIZATION SEQUENTIAL
+               ACCESS RANDOM.
+       DATA DIVISION.
+       FILE SECTION.
+       FD  file1.
+       01  file1-rec PIC X.
+       PROCEDURE DIVISION.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:7:19: error: SEQUENTIAL file file1 cannot have ACCESS RANDOM
+    7 |            SELECT file1 ASSIGN DISK ORGANIZATION SEQUENTIAL
+      |                   ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([488 GLOBAL FD nested progam])
+AT_KEYWORDS([file GLOBAL-FD])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT f ASSIGN "foo.dat"
+               ORGANIZATION INDEXED
+               RECORD KEY f-key.
+
+       DATA DIVISION.
+       FILE SECTION.
+       FD  f                                   GLOBAL.
+       01  f-rec                               GLOBAL.
+           03  f-key                           PIC 9.
+
+       PROCEDURE DIVISION.
+           CALL "output-statement".
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. output-statement.
+
+       PROCEDURE DIVISION.
+           WRITE f-rec.
+           END PROGRAM output-statement.
+       END PROGRAM prog.
+])
+
+# note: we actually want to check codegen -> C compilation here
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([DECLARATIVES outside reference)])
+AT_KEYWORDS([file])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT      DIVISION.
+       INPUT-OUTPUT     SECTION.
+       FILE-CONTROL.
+       SELECT TEST-FILE ASSIGN       "./TEST-FILE"
+                        ORGANIZATION IS LINE SEQUENTIAL.
+       DATA             DIVISION.
+       FILE             SECTION.
+       FD TEST-FILE.
+       01 TEST-REC      PIC X(4).
+       WORKING-STORAGE SECTION.
+       01 STOP-INFINITY PIC 9 VALUE ZERO.
+          88 BAIL VALUE 5.
+       PROCEDURE        DIVISION.
+       DECLARATIVES.
+       P01 SECTION.
+           USE AFTER ERROR PROCEDURE ON TEST-FILE.
+       P02.
+           DISPLAY "OK"
+           END-DISPLAY
+           ADD 1 TO STOP-INFINITY
+           IF BAIL
+                STOP RUN.
+       END DECLARATIVES.
+       PP01 SECTION.
+       PP02.
+           OPEN  INPUT TEST-FILE.
+           CLOSE TEST-FILE.
+      *> P02 should be inaccessible at this point
+           PERFORM P02.
+           GO TO P02.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [OK
+OK
+OK
+OK
+OK
+], [])
+AT_CLEANUP

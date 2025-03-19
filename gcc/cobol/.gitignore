@@ -1,0 +1,12 @@
+cscope.*
+TAGS
+*.tags
+*.gimple
+gc
+*.s
+nist/newcob.val
+nist/cbl
+nist/obj
+dump.txt
+.gawk_history
+.gawkrc

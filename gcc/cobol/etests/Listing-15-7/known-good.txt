@@ -1,0 +1,10 @@
+15 07 2013
+__________________________
+ 
+Characters unexamined
+15        
+__________________________
+ 
+/ delimits 15
+- delimits 07
+@ delimits 2013

@@ -1,0 +1,4 @@
+#1/bin/sh
+
+toascii Employee.dat
+cat Employee.dat >> under-test.txt

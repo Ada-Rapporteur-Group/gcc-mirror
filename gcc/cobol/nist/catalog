@@ -1,0 +1,497 @@
+# Core tests:
+# 
+#   NC - COBOL core tests
+#   SM - COPY sentence tests
+#   IC - CALL sentence tests
+# 
+# File I-O tests:
+# 
+#   SQ - Sequential file I-O tests
+#   RL - Relative file I-O tests
+#   IX - Indexed file I-O tests
+#   ST - SORT sentence tests
+# 
+# Advanced features:
+# 
+#   RW - REPORT SECTION tests
+#   CM - COMMUNICATION SECTION tests
+#   IF - Intrinsic Function tests
+#   SG - Segment tests
+#   DB - Debugging feature tests
+#   OB - Obsolete feature tests
+
+#
+# Status is:
+#   no:   gcobol is not intended to compile the program
+#   todo: not yet attempted
+#   OK:   program compiles and runs
+#   fail: known failure not yet remedied
+#
+# Column 3 holds any environment settings needed for the test to pass. 
+#
+CM101M.cbl	no
+CM102M.cbl	no
+CM103M.cbl	no
+CM104M.cbl	no
+CM105M.cbl	no
+CM201M.cbl	no
+CM202M.cbl	no
+CM303M.cbl	no
+CM401M.cbl	no
+DB101A.cbl	todo
+DB102A.cbl	todo
+DB103M.cbl	todo
+DB104A.cbl	todo
+DB105A.cbl	todo
+DB201A.cbl	todo
+DB202A.cbl	todo
+DB203A.cbl	todo
+DB204A.cbl	todo
+DB205A.cbl	todo
+DB301M.cbl	todo
+DB302M.cbl	todo
+DB303M.cbl	todo
+DB304M.cbl	todo
+DB305M.cbl	todo
+
+EXEC85.cbl	OK
+
+IC101A.cbl	OK
+IC102A.cbl	module
+IC103A.cbl	OK   
+IC104A.cbl	module 
+IC105A.cbl	module 
+IC106A.cbl	OK
+IC107A.cbl	module 
+IC108A.cbl	OK
+IC109A.cbl	module
+IC110A.cbl	module
+IC111A.cbl	module
+IC112A.cbl	OK
+IC113A.cbl	module
+IC114A.cbl	OK
+IC115A.cbl	module
+IC116M.cbl	OK
+IC117M.cbl	module
+IC118M.cbl	module
+IC201A.cbl	OK
+IC202A.cbl	module
+IC203A.cbl	OK
+IC204A.cbl	module
+IC205A.cbl	module
+IC206A.cbl	module
+IC207A.cbl	OK
+IC208A.cbl	module  
+IC209A.cbl	OK
+IC210A.cbl	module
+IC211A.cbl	module
+IC212A.cbl	module
+IC213A.cbl	OK
+IC214A.cbl	module
+IC215A.cbl	module
+IC216A.cbl	OK
+IC217A.cbl	module
+IC222A.cbl	OK
+IC223A.cbl	OK
+IC224A.cbl	OK
+IC225A.cbl	OK
+IC226A.cbl	OK
+IC227A.cbl	OK
+IC228A.cbl	OK
+IC233A.cbl	no    # Requires GLOBAL DECLARATIVE
+IC234A.cbl	no    # Requires GLOBAL DECLARATIVE
+IC235A.cbl	OK
+IC237A.cbl	OK
+IC401M.cbl	no
+
+IF101A.cbl	OK
+IF102A.cbl	OK
+IF103A.cbl	OK
+IF104A.cbl	OK
+IF105A.cbl	OK
+IF106A.cbl	OK
+IF107A.cbl	OK
+IF108A.cbl	OK
+IF109A.cbl	OK
+IF110A.cbl	OK
+IF111A.cbl	OK
+IF112A.cbl	OK
+IF113A.cbl	OK
+IF114A.cbl	OK
+IF115A.cbl	OK
+IF116A.cbl	OK
+IF117A.cbl	OK
+IF118A.cbl	OK
+IF119A.cbl	OK
+IF120A.cbl	OK
+IF121A.cbl	OK
+IF122A.cbl	OK
+IF123A.cbl	OK
+IF124A.cbl	OK
+IF125A.cbl	OK
+IF126A.cbl	OK
+IF127A.cbl	OK
+IF128A.cbl	OK
+IF129A.cbl	OK
+IF130A.cbl	OK
+IF131A.cbl	OK
+IF132A.cbl	OK
+IF133A.cbl	OK
+IF134A.cbl	OK
+IF135A.cbl	OK
+IF136A.cbl	OK
+IF137A.cbl	OK
+IF138A.cbl	OK
+IF139A.cbl	OK
+IF140A.cbl	OK
+IF141A.cbl	OK
+IF142A.cbl	OK
+IF401M.cbl	OK
+IF402M.cbl	OK
+IF403M.cbl	OK
+
+IX101A.cbl	OK
+IX102A.cbl	OK    # Depends on 101
+IX103A.cbl	OK    # Depends on 102
+IX104A.cbl	OK
+IX105A.cbl	OK
+IX106A.cbl	OK
+IX107A.cbl	OK
+IX108A.cbl	OK
+IX109A.cbl	OK
+IX110A.cbl	OK    # Depends on 109
+IX111A.cbl	OK
+IX112A.cbl	OK
+IX113A.cbl	OK
+IX114A.cbl	OK    # Depends on 113
+IX115A.cbl	OK    # Depends on 114
+IX116A.cbl	OK    # Depends on 115
+IX117A.cbl	OK    # Depends on 116
+IX118A.cbl	OK    # Depends on 117
+IX119A.cbl	OK    # Depends on 118
+IX120A.cbl	OK    # Depends on 119
+IX121A.cbl	OK
+IX201A.cbl	OK
+IX202A.cbl	OK    # Depends on 201
+IX203A.cbl	OK    # Depends on 202
+IX204A.cbl	OK
+IX205A.cbl	OK
+IX206A.cbl	OK
+IX207A.cbl	OK
+IX208A.cbl	OK
+IX209A.cbl	OK
+IX210A.cbl	OK
+IX211A.cbl	OK
+IX212A.cbl	OK
+IX213A.cbl	OK
+IX214A.cbl	OK
+IX215A.cbl	OK
+IX216A.cbl	OK
+IX217A.cbl	OK
+IX218A.cbl	OK
+IX301M.cbl	no   # This doesn't appear to do anything
+IX302M.cbl	no   # OBSOLETE
+IX401M.cbl	no   # NON-CONFORMING STANDARD
+
+NC101A.cbl	OK
+NC102A.cbl	OK
+NC103A.cbl	OK
+NC104A.cbl	OK
+NC105A.cbl	OK
+NC106A.cbl	OK
+NC107A.cbl	OK
+NC108M.cbl	OK
+NC109M.cbl	OK
+NC110M.cbl	OK
+NC111A.cbl	OK
+NC112A.cbl	OK
+NC113M.cbl	OK
+NC114M.cbl	OK
+NC115A.cbl	OK
+NC116A.cbl	OK
+NC117A.cbl	OK
+NC118A.cbl	OK
+NC119A.cbl	OK
+NC120A.cbl	OK
+NC121M.cbl	OK
+NC122A.cbl	OK
+NC123A.cbl	OK
+NC124A.cbl	OK
+NC125A.cbl	OK
+NC126A.cbl	OK
+NC127A.cbl	OK
+NC131A.cbl	OK
+NC132A.cbl	OK
+NC133A.cbl	OK
+NC134A.cbl	OK
+NC135A.cbl	OK
+NC136A.cbl	OK
+NC137A.cbl	OK
+NC138A.cbl	OK
+NC139A.cbl	OK
+NC140A.cbl	OK
+NC141A.cbl	OK
+NC170A.cbl	OK
+NC171A.cbl	OK
+NC172A.cbl	OK
+NC173A.cbl	OK
+NC174A.cbl	OK	UPSI=01		# SW-0 is OFF, SW-1 is ON
+NC175A.cbl	OK
+NC176A.cbl	OK
+NC177A.cbl	OK
+NC201A.cbl	OK
+NC202A.cbl	OK
+NC203A.cbl	OK  
+NC204M.cbl	OK
+NC205A.cbl	OK
+NC206A.cbl	OK
+NC207A.cbl	OK
+NC208A.cbl	OK
+NC209A.cbl	OK
+NC210A.cbl	OK
+NC211A.cbl	OK	UPSI=01	# SW-0 is OFF, SW-1 is ON
+NC214M.cbl	OK      # It apparently works, but doesn't actually test anything
+NC215A.cbl	OK
+NC216A.cbl	OK
+NC217A.cbl	OK
+NC218A.cbl	OK
+NC219A.cbl	OK
+NC220M.cbl	OK
+NC221A.cbl	OK
+NC222A.cbl	OK
+NC223A.cbl	OK
+NC224A.cbl	OK
+NC225A.cbl	OK
+NC231A.cbl	OK
+NC232A.cbl	OK
+NC233A.cbl	OK
+NC234A.cbl	OK
+NC235A.cbl	OK
+NC236A.cbl	OK
+NC237A.cbl	OK
+NC238A.cbl	OK
+NC239A.cbl	OK
+NC240A.cbl	OK
+NC241A.cbl	OK
+NC242A.cbl	OK
+NC243A.cbl	OK
+NC244A.cbl	OK
+NC245A.cbl	OK
+NC246A.cbl	OK
+NC247A.cbl	OK
+NC248A.cbl	OK
+NC250A.cbl	OK
+NC251A.cbl	OK
+NC252A.cbl	OK
+NC253A.cbl	OK
+NC254A.cbl	OK	UPSI=010	SW-1 is ON; SW-02 is OFF
+NC302M.cbl	no      # This one is just weird.
+NC303M.cbl	todo    # doesn't compile altered GO TO
+NC401M.cbl	todo    # doesn't compile altered GO TO and more
+OBIC1A.cbl	todo
+OBNC1M.cbl	todo
+OBNC2M.cbl	todo
+OBSQ1A.cbl	todo
+OBSQ3A.cbl	todo
+
+RL101A.cbl	OK
+RL102A.cbl	OK      # Depends on 101
+RL103A.cbl	OK      # Depends on 102  
+RL104A.cbl	OK
+RL105A.cbl	OK
+RL106A.cbl	OK
+RL107A.cbl	OK
+RL108A.cbl	OK
+RL109A.cbl	OK    # Depends on 108
+RL110A.cbl	OK    # Depends on 109
+RL111A.cbl	OK  
+RL112A.cbl	OK  # There is a warning
+RL113A.cbl	OK  # There is a warning
+RL114A.cbl	OK  # There is a warning
+RL115A.cbl	OK
+RL116A.cbl	OK
+RL117A.cbl	OK
+RL118A.cbl	OK
+RL119A.cbl	OK
+RL201A.cbl	OK
+RL202A.cbl	OK    # Depends on 201
+RL203A.cbl	OK    # Depends on 202
+RL204A.cbl	OK 
+RL205A.cbl	OK
+RL206A.cbl	OK
+RL207A.cbl	OK    # Depends on 206
+RL208A.cbl	OK    # Depends on 207
+RL209A.cbl	OK
+RL210A.cbl	OK
+RL211A.cbl	OK
+RL212A.cbl	OK
+RL213A.cbl	OK
+RL301M.cbl	no      # This program doesn't seem to be able to run
+RL302M.cbl	no      # obsolete
+RL401M.cbl	no      # This program doesn't seem to be able to run
+
+RW101A.cbl	todo
+RW102A.cbl	todo
+RW103A.cbl	todo
+RW104A.cbl	todo
+RW301M.cbl	todo
+RW302M.cbl	todo
+SG101A.cbl	todo
+SG102A.cbl	todo
+SG103A.cbl	todo
+SG104A.cbl	todo
+SG105A.cbl	todo
+SG106A.cbl	todo
+SG201A.cbl	todo
+SG202A.cbl	todo
+SG203A.cbl	todo
+SG204A.cbl	todo
+SG302M.cbl	todo
+SG303M.cbl	todo
+SG401M.cbl	todo
+
+SM101A.cbl	OK
+SM102A.cbl	OK   # Depends on 101
+SM103A.cbl	OK
+SM104A.cbl	OK
+SM105A.cbl	OK
+SM106A.cbl	OK
+SM107A.cbl	OK
+SM201A.cbl	OK
+SM202A.cbl	OK
+SM203A.cbl	OK
+SM204A.cbl	OK
+SM205A.cbl	OK
+SM206A.cbl	OK
+SM207A.cbl	OK
+SM208A.cbl	OK
+SM301M.cbl	no    # But doesn't do anything
+SM401M.cbl	no    # REPLACE OFF error reports
+
+
+SQ101M.cbl	OK      # Tests for overprinting.  We are ignoring it.
+SQ102A.cbl	OK
+SQ103A.cbl	OK
+SQ104A.cbl	OK
+SQ105A.cbl	OK
+SQ106A.cbl	OK
+SQ107A.cbl	OK
+SQ108A.cbl	OK
+SQ109M.cbl	OK
+SQ110M.cbl	OK
+SQ111A.cbl	OK
+SQ112A.cbl	OK
+SQ113A.cbl	OK
+SQ114A.cbl	OK
+SQ115A.cbl	OK
+SQ116A.cbl	OK
+SQ117A.cbl	OK
+SQ121A.cbl	OK
+SQ122A.cbl	OK
+SQ123A.cbl	OK
+SQ124A.cbl	OK
+SQ125A.cbl	OK
+SQ126A.cbl	OK
+SQ127A.cbl	OK
+SQ128A.cbl	OK
+SQ129A.cbl	OK
+SQ130A.cbl	OK
+SQ131A.cbl	OK
+SQ132A.cbl	OK
+SQ133A.cbl	OK
+SQ134A.cbl	OK
+SQ135A.cbl	OK
+SQ136A.cbl	OK
+SQ137A.cbl	OK
+SQ138A.cbl	OK
+SQ139A.cbl	OK
+SQ140A.cbl	OK
+SQ141A.cbl	OK
+SQ142A.cbl	OK
+SQ143A.cbl	OK
+SQ144A.cbl	OK
+SQ146A.cbl	OK
+SQ147A.cbl	OK
+SQ148A.cbl	OK
+SQ149A.cbl	OK
+SQ150A.cbl	OK
+SQ151A.cbl	OK
+SQ152A.cbl	OK
+SQ153A.cbl	OK
+SQ154A.cbl	OK
+SQ155A.cbl	OK
+SQ156A.cbl	OK
+SQ201M.cbl	todo # runs without terminating because it relies on LINAGE
+SQ202A.cbl	OK
+SQ203A.cbl	OK   # depends on SQ202A
+SQ204A.cbl	OK
+SQ205A.cbl	OK
+SQ206A.cbl	OK
+SQ207M.cbl	OK
+SQ208M.cbl	todo # Depends on LINAGE
+SQ209M.cbl	todo # Depends on LINAGE
+SQ210M.cbl	todo # Depends on LINAGE
+SQ211A.cbl	todo
+SQ212A.cbl	OK
+SQ213A.cbl	OK
+SQ214A.cbl	OK
+SQ215A.cbl	OK
+SQ216A.cbl	OK
+SQ217A.cbl	OK
+SQ218A.cbl	OK
+SQ219A.cbl	OK
+SQ220A.cbl	OK
+SQ221A.cbl	OK
+SQ222A.cbl	OK
+SQ223A.cbl	OK
+SQ224A.cbl	OK
+SQ225A.cbl	OK
+SQ226A.cbl	OK
+SQ227A.cbl	OK
+SQ228A.cbl	OK
+SQ229A.cbl	OK
+SQ230A.cbl	OK
+SQ302M.cbl	no      # OBSOLETE               
+SQ303M.cbl	no      # OBSOLETE               
+SQ401M.cbl	no      # NON-CONFORMING STANDARD
+
+ST101A.cbl	OK
+ST102A.cbl	OK      # depends on 101
+ST103A.cbl	OK      # depends on 102
+ST104A.cbl	OK
+ST105A.cbl	OK      # depends on 104
+ST106A.cbl	OK
+ST107A.cbl	OK      # depends on 106
+ST108A.cbl	OK
+ST109A.cbl	OK
+ST110A.cbl	OK      # depends on 109
+ST111A.cbl	OK      # depends on 110
+ST112M.cbl	OK
+ST113M.cbl	OK      # depends on 112
+ST114M.cbl	OK      # depends on 113
+ST115A.cbl	OK
+ST116A.cbl	OK      # depends on 115
+ST117A.cbl	OK      # depends on 116
+ST118A.cbl	OK
+ST119A.cbl	OK
+ST120A.cbl	OK      # Depends on 119
+ST121A.cbl	OK      # Depends on 120
+ST122A.cbl	OK
+ST123A.cbl	OK      # Depends on 122
+ST124A.cbl	OK      # Depends on 123
+ST125A.cbl	OK
+ST126A.cbl	OK
+ST127A.cbl	OK
+ST131A.cbl	OK
+ST132A.cbl	OK
+ST133A.cbl	OK
+ST134A.cbl	OK
+ST135A.cbl	OK
+ST136A.cbl	OK
+ST137A.cbl	OK
+ST139A.cbl	OK
+ST140A.cbl	OK
+ST144A.cbl	OK
+ST146A.cbl	OK
+ST147A.cbl	OK
+ST301M.cbl	no      # Can't work; tries to read files that aren't created

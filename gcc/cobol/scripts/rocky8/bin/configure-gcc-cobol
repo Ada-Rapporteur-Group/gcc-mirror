@@ -1,0 +1,130 @@
+#!/bin/sh
+set -e
+
+#
+# Configure gcc to build the COBOL compiler, gcobol, from the git repository.
+#
+# The command-line argument may be 'release'.  If present, the more
+# complex configure statement is run, see $args_release, below.
+#
+# This script relies on the following variables and default values:
+#
+# srcdir	$HOME/projects/gcc	where to put gcc source tree
+# branch	master+cobol		branch to check out from git
+# build		build			build subdirectory name 
+# bootstrap	--disable-bootstrap	whether to build the bootstrap xgcc
+# prefix	/usr/local		where to install the outputs
+# languages	cobol			GCC compilers to build
+#
+# Beware: No matter what, building gcc always means building a C
+# compiler.  That is, setting languages=cobol is the same as
+# languages=c,cobol.  That means wherever gcobol is installed, there
+# will also be a gcc.  If you don't want to overwrite your system's
+# gcc (and you probably don't) set to prefix to something other than
+# the one used by your system.  You may also wish to rename/remove the
+# new gcc built and installed by "make install".
+#
+# This script only prepares gcc to be built.  To build and install
+# gcobol for real, run "make && make install", as indicated by the
+# final message.
+
+srcdir=${srcdir:-$HOME/projects/gcc}
+branch=${branch:-master+cobol}
+
+if [ ! -d $srcdir/$branch ]
+then
+    mkdir -p $srcdir
+    cd $srcdir
+    git clone https://gitlab.cobolworx.com/COBOLworx/gcc-cobol.git $branch
+fi
+
+cd $srcdir/$branch
+git pull --no-edit origin $(git branch --show-current)
+
+
+VERSION=$(cat gcc/BASE-VER)
+MAJOR_VERSION=$(echo $VERSION | sed 's/^\([0-9]\+\)[.].*$/\1/')
+test "$VERSION"
+
+PKGVERSION="GCOBOL ${VERSION}${COMMIT_VERSION}"
+
+arch=$(arch)
+
+test "$arch"
+if [ $arch = x86_64 ]
+then
+    arch_options='--with-abi=m64 --with-tune=generic --enable-default-pie'
+fi
+
+build=${build:-build}
+
+rm -rf   $build
+mkdir -p $build
+cd $build
+
+bootstrap=${bootstrap:---disable-bootstrap}
+
+prefix=${prefix:-/usr/local}
+languages=${languages:-cobol}
+
+args_release="
+	--with-pkgversion="$PKGVERSION"
+	--enable-languages=$languages
+	--prefix=/usr
+	--libdir=/usr/lib/gcobol
+	--libexecdir=/usr/libexec/gcobol
+	--with-gcc-major-version-only
+	--program-suffix=-$MAJOR_VERSION
+	--enable-shared
+	--enable-linker-build-id
+	--without-included-gettext
+	--enable-threads=posix
+	--disable-bootstrap
+	--enable-clocale=gnu
+	--enable-libstdcxx-debug
+	--enable-libstdcxx-time=yes
+	--with-default-libstdcxx-abi=new
+	--enable-gnu-unique-object
+	--disable-vtable-verify
+	--enable-plugin
+	--with-system-zlib
+	--with-target-system-zlib=auto
+	--disable-werror
+	--disable-cet
+	  $arch_options
+	--disable-multilib
+	--without-cuda-driver
+	--enable-checking=release
+	--with-build-config=bootstrap-lto-lean
+	--enable-link-mutex --without-isl
+"
+
+args_min="
+	--prefix=$prefix
+	  $bootstrap
+	--disable-multilib
+	--enable-checking
+	--enable-languages=$languages
+"
+
+options="$args_min"
+config_type=minimal
+
+if [ "$1" = "release" ]
+then
+    options="$args_release"
+    config_type=release
+fi
+
+set -x
+
+../configure					\
+    --build=${arch}-linux-gnu			\
+    --host=${arch}-linux-gnu			\
+    --target=${arch}-linux-gnu			\
+    ${options}
+
+set +x
+
+echo "$config_type configure done, will be installed in $prefix"
+echo now: "cd $PWD && make && make install"

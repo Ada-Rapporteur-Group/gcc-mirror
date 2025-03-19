@@ -1,0 +1,6 @@
+Enter a Student Id : The Student id - 1111116 - is valid
+ 
+Enter a Student Id : The Student id - 1111111 - is not valid
+ 
+Enter a Student Id : The Student id - 2222221 - is valid
+ 

@@ -1,0 +1,4 @@
+Total records =     10,836
+Valid records =      9,022
+Compatible pairs   =    6,622 which is  73% of total
+Incompatible pairs =    2,400 which is  27% of total

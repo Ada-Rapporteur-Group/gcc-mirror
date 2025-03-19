@@ -1,0 +1,149 @@
+## Copyright (C) 2003-2012, 2014-2019 Free Software Foundation, Inc.
+## Copyright (C) 2020-2023 COBOLworx.
+## Written by Keisuke Nishida, Roger While, Simon Sobisch, Ron Norman,
+##    Marty Heyman, Nick Mower
+##
+## This file was copied from GnuCOBOL and modified for use with COBOL.
+## for GCC (gcobol).
+## The COBOL for GCC compiler is free software: you can redistribute it
+## and/or modify it under the terms of the Symas Open Licence. A copy
+## of that license is in the LICENSE file included in the distribution.
+##
+
+### COBOL for GCC Test Suite
+
+# FIXED FORMAT tests
+# $COMPILE_FIXED turns on `-findicator-column 7` for Reference
+# Format - Fixed Format
+
+AT_BANNER([Reference Fixed Format Tests])
+
+AT_SETUP([Comment Indicator in Column 6])
+AT_KEYWORDS([indicator])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. FF1.
+     * Asterisk in wrong column
+       PROCEDURE DIVISION.
+           DISPLAY 'Should Fail'.
+           EXIT PROGRAM.
+])
+
+AT_CHECK([$COMPILE_FIXED prog.cob], [1], [],
+[prog.cob:4:8: error: syntax error, unexpected NAME, expecting end of file
+    4 |      * Asterisk in wrong column
+      |        ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([Indicators ('*', '/', , '-', 'D')])
+AT_KEYWORDS([indicator])
+# DIALECT/EXTENSION: Fixed Format DEBUG Lines TOREVIEW
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. FF2.
+      *Asterisk in correct column
+      /
+       PROCEDURE DIVISION.
+           DISPLAY                                                 "gekk
+      -"os rule".
+           DISPLAY                                                 "gerb
+      * ISO says blank and comment lines do not interfere with
+      * literal continuation
+
+      -"ils don't rule".
+      * "D" is a deprecated feature of COBOL dropped from
+      *    the ISO-IEC standard. Lines with "D" in the indicator
+      *    column were enabled when OBJECT COMPUTER contained
+      *    "WITH DEBUG MODE". Otherwise they were treated as
+      *    comments. This behavior is a "vendor extension" to
+      *    the current standard but allows old code to be used
+      *    as it was prior to the deprecation.
+      D    DISPLAY 'Should not display'.
+           EXIT PROGRAM.
+])
+AT_CHECK([$COMPILE_FIXED prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0],
+[gekkos rule
+gerbils don't rule
+])
+AT_CLEANUP
+
+# Next three tests check for invalid characters in indicator
+# column in Fixed Format.
+AT_SETUP([Indicators ('.') in Column 6])
+AT_KEYWORDS([indicator])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. FF3.
+      .Bad Indicator character in correct column
+       PROCEDURE DIVISION.
+           DISPLAY 'Should display'.
+           EXIT PROGRAM.
+])
+
+AT_CHECK([$COMPILE_FIXED prog.cob], [1], [],
+[prog.cob:4: error: stray indicator '.' (0x2e): "      .Bad Indicator character in correct column"
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([Indicators ('E') in Column 6])
+AT_KEYWORDS([indicator])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. FF4.
+      EBad Indicator character in correct column
+       PROCEDURE DIVISION.
+           DISPLAY 'Should display'.
+           EXIT PROGRAM.
+])
+AT_CHECK([$COMPILE_FIXED prog.cob], [1], [],
+[prog.cob:4: error: stray indicator 'E' (0x45): "      EBad Indicator character in correct column"
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([Indicators ('9') in Column 6])
+AT_KEYWORDS([indicator])
+AT_DATA([prog.cob], [       IDENTIFICATION DIVISION.
+       PROGRAM-ID. FF5.
+      9Bad Indicator character in correct column
+       PROCEDURE DIVISION.
+           DISPLAY 'Should display'.
+           EXIT PROGRAM.
+])
+AT_CHECK([$COMPILE_FIXED prog.cob], [1], [],
+[prog.cob:3: error: stray indicator '9' (0x39): "      9Bad Indicator character in correct column"
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([Floating continuation indicator (1)])
+AT_KEYWORDS([indicator])
+AT_DATA([prog.cob], [       IDENTIFICATION DIVISION.
+      * testing floating continuation literals ("'-" and '"-')
+       PROGRAM-ID. FF2.
+       PROCEDURE DIVISION.
+           DISPLAY "hello "-
+             "world.".
+           DISPLAY 'hello '-
+             'world.'.
+           DISPLAY "hello "-
+      * non-interrupting comment
+             "world.".
+           DISPLAY 'hello '-
+             *> non-interrupting comment
+
+             'world.'.
+           EXIT PROGRAM.
+
+])
+AT_CHECK([$COMPILE_FIXED prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [hello world.
+hello world.
+hello world.
+hello world.
+], [])
+AT_CLEANUP

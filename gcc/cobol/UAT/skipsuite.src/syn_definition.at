@@ -1,0 +1,1043 @@
+## Copyright (C) 2003-2012, 2016-2020 Free Software Foundation, Inc.
+## Written by Keisuke Nishida, Roger While, Edward Hart, Simon Sobisch
+##
+## This file is part of GnuCOBOL.
+##
+## The GnuCOBOL compiler is free software: you can redistribute it
+## and/or modify it under the terms of the GNU General Public License
+## as published by the Free Software Foundation, either version 3 of the
+## License, or (at your option) any later version.
+##
+## GnuCOBOL is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with GnuCOBOL.  If not, see <https://www.gnu.org/licenses/>.
+
+### GnuCOBOL Test Suite
+
+AT_SETUP([404 invalid PROGRAM-ID type clause (2)])
+AT_KEYWORDS([definition])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# RECURSIVE not implemented.
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog IS INITIAL RECURSIVE.
+       PROCEDURE        DIVISION.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:3: error: syntax error, unexpected RECURSIVE, expecting .
+])
+
+AT_CLEANUP
+
+
+
+
+
+AT_SETUP([406 Undefined data name])
+AT_KEYWORDS([definition])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# Gnu specific error code
+# TODO report missing data definition
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       PROCEDURE        DIVISION.
+           DISPLAY X
+           END-DISPLAY.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:5: error: 'X' cannot be used here
+])
+
+AT_CLEANUP
+
+
+AT_SETUP([407 Undefined group name])
+AT_KEYWORDS([definition])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# Gnu specific error code
+# TODO report missing data definition
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC X.
+       PROCEDURE        DIVISION.
+           DISPLAY X IN G
+           END-DISPLAY.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:8: error: 'X IN G' is not defined
+])
+
+AT_CLEANUP
+
+
+AT_SETUP([408 Undefined data name in group])
+AT_KEYWORDS([definition])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# Gnu specific error code
+# TODO report missing data definition
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 G.
+         02 X           PIC X.
+       01 Y             PIC X.
+       PROCEDURE        DIVISION.
+           DISPLAY Y IN G
+           END-DISPLAY.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:10: error: 'Y IN G' is not defined
+])
+
+AT_CLEANUP
+
+
+AT_SETUP([410 Incomplete 01 definition])
+AT_KEYWORDS([definition])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# Gnu specific error code
+# TODO report missing data definition
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:6: error: PICTURE clause required for 'X'
+])
+
+AT_CLEANUP
+
+
+AT_SETUP([Redefinition of 01 items])
+AT_KEYWORDS([definition])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# GNU -f
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC X.
+       01 X             PIC X.
+])
+
+AT_CHECK([$COBC -fsyntax-only prog.cob], [0], [], [])
+AT_CHECK([$COMPILE_ONLY prog.cob], [0], [],
+[prog.cob:7: warning: redefinition of 'X'
+prog.cob:6: note: 'X' previously defined here
+])
+AT_CHECK([$COMPILE_ONLY -Wno-redefinition prog.cob], [0], [], [])
+AT_CHECK([$COMPILE_ONLY -Werror=redefinition prog.cob], [1], [],
+[[prog.cob:7: error: redefinition of 'X'
+prog.cob:6: note: 'X' previously defined here
+]])
+AT_CHECK([$COMPILE_ONLY -fdiagnostics-show-option -Werror=redefinition prog.cob], [1], [],
+[[prog.cob:7: error: redefinition of 'X' [-Werror=redefinition]
+prog.cob:6: note: 'X' previously defined here [-Werror=redefinition]
+]])
+AT_CLEANUP
+
+
+AT_SETUP([Redefinition of program-name by other programs])
+AT_KEYWORDS([definition])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# GNU -f
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  PROG         PIC X.
+
+       PROCEDURE        DIVISION.
+           CONTINUE
+           .
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      foo COMMON.
+       END PROGRAM      foo.
+
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      barr.
+       PROCEDURE        DIVISION.
+           CONTINUE
+           .
+       *> This should cause an error (clashes with COMMON subprog foo)
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      foo.
+       END PROGRAM      foo.
+       END PROGRAM      barr.
+       END PROGRAM      prog.
+
+
+       *> This should cause an error.
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  foo          PIC X.
+
+       PROCEDURE        DIVISION.
+           CONTINUE
+           .
+       *> This should clash with the data definition.
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      foo.
+       END PROGRAM      foo.
+       END PROGRAM      prog.
+
+       *> This should cause an error
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      samename.
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      samename.
+       END PROGRAM      samename.
+       END PROGRAM      samename.
+])
+
+AT_CHECK([$COMPILE_ONLY --ffold-call=upper -fdiagnostics-show-option prog.cob], [1], [],
+[[prog.cob:7: warning: redefinition of 'prog' [-Wredefinition]
+prog.cob:3: note: 'prog' previously defined here [-Wredefinition]
+prog.cob:23: error: redefinition of program name 'foo'
+prog.cob:31: error: redefinition of program name 'prog'
+prog.cob:42: error: redefinition of 'foo'
+prog.cob:35: note: 'foo' previously defined here [-Wredefinition]
+prog.cob:42: error: redefinition of program name 'foo'
+prog.cob:49: error: PROCEDURE DIVISION header missing
+prog.cob:50: error: redefinition of program name 'samename'
+]])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:23: error: redefinition of program ID 'foo'
+prog.cob:31: error: redefinition of program ID 'prog'
+prog.cob:42: error: redefinition of program ID 'foo'
+prog.cob:49: error: PROCEDURE DIVISION header missing
+prog.cob:50: error: redefinition of program ID 'samename'
+])
+
+AT_CLEANUP
+
+
+AT_SETUP([Redefinition of program-name within program])
+AT_KEYWORDS([definition])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# GNU -f
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION  DIVISION.
+       PROGRAM-ID.     prog.
+
+       DATA            DIVISION.
+       WORKING-STORAGE SECTION.
+       01  prog        PIC 99 VALUE 0.
+
+       PROCEDURE       DIVISION.
+       prog.
+           CONTINUE
+           .
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:10: error: redefinition of 'prog'
+prog.cob:7: note: 'prog' previously defined here
+])
+AT_CHECK([$COMPILE_ONLY -fno-program-name-redefinition prog.cob], [1], [],
+[prog.cob:7: warning: redefinition of 'prog'
+prog.cob:3: note: 'prog' previously defined here
+prog.cob:10: error: redefinition of 'prog'
+prog.cob:3: note: 'prog' previously defined here
+])
+AT_CLEANUP
+
+
+AT_SETUP([PROCEDURE DIVISION RETURNING OMITTED: FUNCTION])
+AT_KEYWORDS([definition runmisc])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# Functions not implemented TODO
+# OMITTED not implemented TODO
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       FUNCTION-ID.     func.
+       PROCEDURE        DIVISION RETURNING OMITTED.
+           MOVE 42 TO RETURN-CODE
+           GOBACK.
+       END FUNCTION     func.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:4: error: RETURNING clause cannot be OMITTED for a FUNCTION
+])
+
+AT_CLEANUP
+
+
+AT_SETUP([Redefinition of label and variable names])
+AT_KEYWORDS([definition])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+
+# currently failing, see FR #260
+AT_XFAIL_IF(true)
+
+AT_DATA([prog.cob], [
+       identification division.
+       program-id. WORD.
+       data division.
+       working-storage section.
+      *-----------------------------------------------------------------
+       77 word pic 9.
+      *-----------------------------------------------------------------
+       PROCEDURE DIVISION.
+       main section.
+      *
+           move 0 to word
+           perform word
+      *
+           stop run returning word.
+      *-----------------------------------------------------------------
+       word section.
+           add 1 to word.
+])
+
+AT_CHECK([$COMPILE_ONLY -std=cobol2014 prog.cob], [1], [],
+[prog.cob: in section 'main':
+prog.cob:17: error: user-defined word re-used with different type does not conform to COBOL 2014
+prog.cob:17: error: redefinition of 'word' as label-name
+prog.cob:7: note: 'word' previously defined here as data-name
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([RETURNING in STOP RUN / GOBACK / EXIT PROGRAM])
+AT_KEYWORDS([definition RETURN-CODE])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# GNU -f
+
+AT_DATA([prog1.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog1.
+       PROCEDURE        DIVISION.
+           EXIT PROGRAM RETURNING -1.
+])
+
+AT_DATA([prog2.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog2.
+       PROCEDURE        DIVISION.
+           GOBACK GIVING 2.
+])
+
+AT_DATA([prog3.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog3.
+       PROCEDURE        DIVISION.
+           STOP RUN GIVING 0.
+])
+
+AT_DATA([prog4.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog4.
+       PROCEDURE        DIVISION.
+           MOVE 42 TO RETURN-CODE
+           GOBACK.
+])
+
+AT_DATA([prog5.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog5.
+       PROCEDURE        DIVISION.
+           GOBACK.
+])
+
+AT_CHECK([$COMPILE prog1.cob prog2.cob prog3.cob prog4.cob prog5.cob],
+[0], [], [])
+AT_CHECK([$COMPILE -fnot-register=return-code \
+prog1.cob prog2.cob prog3.cob prog4.cob prog5.cob], [1], [],
+[prog1.cob:5: error: RETURNING/GIVING not allowed for non-returning runtime elements
+prog2.cob:5: error: RETURNING/GIVING not allowed for non-returning runtime elements
+prog4.cob:5: error: 'RETURN-CODE' is not defined
+])
+
+AT_CLEANUP
+
+
+AT_SETUP([Invalid ENVIRONMENT DIVISION order])
+AT_KEYWORDS([definition])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# GNU -f
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SPECIAL-NAMES.
+           CONSOLE IS CRT
+           .
+       SPECIAL-NAMES.
+           DECIMAL-POINT IS COMMA
+           .
+       SOURCE-COMPUTER. a-computer.
+])
+
+AT_CHECK([$COMPILE_ONLY -fincorrect-conf-sec-order=error prog.cob], [1], [],
+[prog.cob:10: error: duplicate SPECIAL-NAMES
+prog.cob:13: error: SOURCE-COMPUTER incorrectly after SPECIAL-NAMES used
+])
+AT_CLEANUP
+
+
+AT_SETUP([PROGRAM COLLATING SEQUENCE])
+AT_KEYWORDS([definition ALPHABET])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# GNU -W
+
+# check that a reference on the bad alphabet does not break cobc
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SOURCE-COMPUTER. GNU-LINUX.
+       OBJECT-COMPUTER. GC-MACHINE,
+                        PROGRAM COLLATING SEQUENCE IS TESTME.
+       SPECIAL-NAMES.
+           ALPHABET TESTME IS
+                    x'00' thru x'05', 'A' THROUGH 'Z';
+                    x'41' ALSO x'42', ALSO x'00', x'C1' ALSO x'C2'.
+])
+
+AT_DATA([prog2.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog2.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SOURCE-COMPUTER. GNU-LINUX.
+       OBJECT-COMPUTER. GC-MACHINE,
+                        PROGRAM COLLATING SEQUENCE IS TESTNO.
+])
+
+AT_DATA([prog3.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog3.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SOURCE-COMPUTER. GNU-LINUX.
+       OBJECT-COMPUTER. GC-MACHINE,
+                        PROGRAM COLLATING SEQUENCE IS ALPHABET-1,
+                                                      ALPHABET-2.
+       SPECIAL-NAMES.
+           ALPHABET ALPHABET-1 IS
+                    'A' THROUGH 'Z', x'00' thru x'05'.
+           ALPHABET ALPHABET-2
+                    n'A' also n'B' ALSO n'f',
+                    n'g' also n'G', n'1' thru n'9'.
+       END PROGRAM prog3.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog3b.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SOURCE-COMPUTER. GNU-LINUX.
+       OBJECT-COMPUTER. GC-MACHINE,
+                        PROGRAM           SEQUENCE IS ALPHABET-1,
+                                                      ALPHABET-2.
+       SPECIAL-NAMES.
+           ALPHABET ALPHABET-1 IS
+                    'A' THROUGH 'Z', x'00' thru x'05'.
+           ALPHABET ALPHABET-2 IS
+                    n'A' ALSO n'f',
+                    n'g' also n'G'.
+       END PROGRAM prog3b.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog3c.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SOURCE-COMPUTER. GNU-LINUX.
+       OBJECT-COMPUTER. GC-MACHINE, SEQUENCE ALPHABET-1, ALPHABET-2.
+       SPECIAL-NAMES.
+           ALPHABET ALPHABET-1    x'00' thru x'05'.
+           ALPHABET ALPHABET-2 IS n'g' also n'G', n'1' thru n'9'.
+       END PROGRAM prog3c.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog3d.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SOURCE-COMPUTER. GNU-LINUX.
+       OBJECT-COMPUTER. GC-MACHINE, SEQUENCE ALPHABET-1, ALPHABET-2.
+       SPECIAL-NAMES.
+           ALPHABET ALPHABET-1 IS 'A' THROUGH 'Z'.
+           ALPHABET ALPHABET-2   n'A' also n'B', n'1' thru n'9'.
+       END PROGRAM prog3d.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog3e.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SOURCE-COMPUTER. GNU-LINUX.
+       OBJECT-COMPUTER. GC-MACHINE, SEQUENCE ALPHABET-1.
+       SPECIAL-NAMES.
+           ALPHABET ALPHABET-1 IS 'Z', x'00'.
+       END PROGRAM prog3e.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog3f.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SOURCE-COMPUTER. GNU-LINUX.
+       OBJECT-COMPUTER. GC-MACHINE,
+                        COLLATING SEQUENCE
+                          FOR ALPHANUMERIC IS ALPHABET-1.
+       SPECIAL-NAMES.
+           ALPHABET ALPHABET-1 IS
+                    'A' THROUGH 'Z', x'00', x'05'.
+       END PROGRAM prog3f.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog3g.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SOURCE-COMPUTER. GNU-LINUX.
+       OBJECT-COMPUTER. GC-MACHINE,
+                        SEQUENCE ALPHANUMERIC ALPHABET-1.
+       SPECIAL-NAMES.
+           ALPHABET ALPHABET-1 IS
+                    'A' THROUGH 'D'.
+       END PROGRAM prog3g.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog3h.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SOURCE-COMPUTER. GNU-LINUX.
+       OBJECT-COMPUTER. GC-MACHINE,
+                        COLLATING SEQUENCE
+                          FOR ALPHANUMERIC IS ALPHABET-1
+                              NATIONAL     IS ALPHABET-2.
+       SPECIAL-NAMES.
+           ALPHABET ALPHABET-1 IS
+                    'A', 'C', x'05'.
+           ALPHABET ALPHABET-2
+                    n'A', n'1' thru n'9'.
+       END PROGRAM prog3h.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog3i.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SOURCE-COMPUTER. GNU-LINUX.
+       OBJECT-COMPUTER. GC-MACHINE,
+                        COLLATING SEQUENCE
+                          NATIONAL     ALPHABET-2
+                          ALPHANUMERIC ALPHABET-1.
+       SPECIAL-NAMES.
+           ALPHABET ALPHABET-1 IS
+                    'a' THROUGH 'z'.
+           ALPHABET ALPHABET-2
+                    n'B', n'C'; n'g' also n'G'.
+       END PROGRAM prog3i.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog3j.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SOURCE-COMPUTER. GNU-LINUX.
+       OBJECT-COMPUTER. GC-MACHINE,
+                        COLLATING SEQUENCE
+                          NATIONAL     ALPHABET-2.
+       SPECIAL-NAMES.
+           ALPHABET ALPHABET-2
+                    n'B', n'C'; n'g' also n'G'.
+       END PROGRAM prog3j.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:10: error: duplicate character values in alphabet 'TESTME': x'00', A, B
+])
+AT_CHECK([$COMPILE_ONLY prog2.cob], [1], [],
+[prog2.cob:8: error: 'TESTNO' is not defined
+prog2.cob:8: error: 'TESTNO' is not an alphabet name
+])
+AT_CHECK([$COMPILE_ONLY -Wno-unfinished prog3.cob], [0], [],
+[prog3.cob:9: warning: NATIONAL COLLATING SEQUENCE is not implemented
+prog3.cob:25: warning: NATIONAL COLLATING SEQUENCE is not implemented
+prog3.cob:39: warning: NATIONAL COLLATING SEQUENCE is not implemented
+prog3.cob:50: warning: NATIONAL COLLATING SEQUENCE is not implemented
+prog3.cob:99: warning: NATIONAL COLLATING SEQUENCE is not implemented
+prog3.cob:114: warning: NATIONAL COLLATING SEQUENCE is not implemented
+prog3.cob:130: warning: NATIONAL COLLATING SEQUENCE is not implemented
+])
+AT_CLEANUP
+
+
+AT_SETUP([RENAMES of 01-, 66- and 77-level items])
+AT_KEYWORDS([definition 66 extensions])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# GNU -f
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  a PIC X.
+       66  renames-a RENAMES a.
+       66  renames-a2 RENAMES renames-a.
+
+       77  b PIC X.
+       66  renames-b RENAMES b.
+])
+
+AT_CHECK([$COMPILE_ONLY -std=cobol2014 prog.cob], [1], [],
+[prog.cob:7: error: RENAMES of 01-, 66- and 77-level items does not conform to COBOL 2014
+prog.cob:8: error: RENAMES of 01-, 66- and 77-level items does not conform to COBOL 2014
+prog.cob:11: error: RENAMES of 01-, 66- and 77-level items does not conform to COBOL 2014
+])
+AT_CHECK([$COMPILE_ONLY -frenames-uncommon-levels=ok prog.cob], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([TYPEDEF clause])
+AT_KEYWORDS([definition EXTERNAL GLOBAL TYPE USAGE listing symbols])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# GNU -f
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 AUSGABE-FILE-NAME-T          PIC X(50) IS TYPEDEF.
+       01 SOME-VERY-LONG-TYPEDEF-NAME  PIC 9999  IS TYPEDEF.
+       01 AUSGABE-FILE-NAME-2T         IS TYPEDEF.
+          05 FILLER    PIC 9999.
+          05 DETAIL-NO USAGE SOME-VERY-LONG-TYPEDEF-NAME.
+      *
+       01  MESSAGE-TEXT-2T IS TYPEDEF.
+         02 AUSGABE-FILE-NAME     USAGE AUSGABE-FILE-NAME-T.
+         02 FILLER REDEFINES AUSGABE-FILE-NAME.
+             05 FILLER PIC 9999.
+         02 AUSGABE-FILE-NAME-2   USAGE AUSGABE-FILE-NAME-2T.
+         02 FILLER                USAGE AUSGABE-FILE-NAME-T.
+      *
+       01  MESSAGE-TEXT-2 EXTERNAL USAGE MESSAGE-TEXT-2T.
+
+       77 OUTPUT-NAME USAGE SOME-VERY-LONG-TYPEDEF-NAME GLOBAL.
+
+       01 Z-MESSAGE-T2 USAGE AUSGABE-FILE-NAME-2T.
+       01 Z-MESSAGE-T3.
+          49 MT3                    USAGE MESSAGE-TEXT-2T.
+          49 MT3-REN  REDEFINES MT3 USAGE MESSAGE-TEXT-2T.
+
+       77 CALCULUS             PIC S9(15)V9(03) IS TYPEDEF.
+       01 USER-TYPE            IS TYPEDEF.
+          02 AMOUNT            USAGE CALCULUS.
+          02 FILLER            OCCURS 100.
+             05 GRP-AMOUNT     USAGE CALCULUS.
+       01 USER-VAR             USAGE USER-TYPE.
+
+       PROCEDURE DIVISION.
+           DISPLAY AUSGABE-FILE-NAME OF MESSAGE-TEXT-2
+           DISPLAY DETAIL-NO         OF Z-MESSAGE-T2
+           DISPLAY AUSGABE-FILE-NAME OF MT3
+           DISPLAY OUTPUT-NAME
+           MOVE -123.45 TO AMOUNT
+           MOVE AMOUNT  TO GRP-AMOUNT (1)
+           GOBACK.
+])
+
+AT_DATA([progstd.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 AUSGABE-FILE-NAME-T     PIC X(50) IS TYPEDEF.
+       01 DETAIL-NO-T             PIC 9999  IS TYPEDEF.
+       01 AUSGABE-FILE-NAME-2T              IS TYPEDEF.
+          05 FILLER    PIC 9999.
+          05 DETAIL-NO TYPE TO DETAIL-NO-T.
+      *
+       01  MESSAGE-TEXT-2T IS TYPEDEF.
+         02 AUSGABE-FILE-NAME     TYPE AUSGABE-FILE-NAME-T.
+         02 FILLER REDEFINES AUSGABE-FILE-NAME.
+             05 FILLER PIC 9999.
+         02 AUSGABE-FILE-NAME-2   TYPE AUSGABE-FILE-NAME-2T.
+         02 FILLER                TYPE AUSGABE-FILE-NAME-T.
+      *
+       01  MESSAGE-TEXT-2 EXTERNAL TYPE MESSAGE-TEXT-2T.
+
+       77 OUTPUT-NAME TYPE TO DETAIL-NO-T GLOBAL.
+
+       01 Z-MESSAGE-T2 TYPE AUSGABE-FILE-NAME-2T.
+       01 Z-MESSAGE-T3.
+          49 MT3                    TYPE MESSAGE-TEXT-2T.
+          49 MT3-REN  REDEFINES MT3 TYPE MESSAGE-TEXT-2T.
+
+       77 CALCULUS             PIC S9(15)V9(03) IS TYPEDEF.
+
+       01 SOME-STRUCT          IS TYPEDEF.
+          02 SOME-DATA         PIC 9.
+          02 SOME-VALUES       OCCURS 3.
+             03 OTHER-DATA     PIC X.
+             03 OTHER-VALUES   OCCURS 2 PIC 9.
+       77 SOME2-DATA           PIC 9.      *> temporary variant until solved...
+       01 SOME-STRUCT2         IS TYPEDEF.
+      *>  02 SOME2-DATA        PIC 9.      TODO!
+          02 SOME2-VALUES      OCCURS 1 TO 6 DEPENDING ON SOME2-DATA
+                               DESCENDING KEY SB SA
+                               INDEXED BY SOME2-INDEX.
+             05 SA             PIC X VALUE x'12'.
+             05 SB             PIC 9 VALUE 0.
+             05 SDATA          PIC X(12).
+
+       01 MY-TEST.
+          02 AMOUNT            TYPE CALCULUS.
+          02 FILLER            OCCURS 100.
+             05 GRP-AMOUNT     TYPE CALCULUS.
+          02 MY-NAME           TYPE SOME-STRUCT  OCCURS 5.
+          02 MY-NAME2          TYPE SOME-STRUCT2.
+       01 MY-TEST2             TYPE SOME-STRUCT2.
+       LINKAGE SECTION.
+       01 MY-STORE             TYPE CALCULUS.
+
+       PROCEDURE DIVISION USING MY-STORE.
+           DISPLAY AUSGABE-FILE-NAME OF MESSAGE-TEXT-2
+           DISPLAY DETAIL-NO         OF Z-MESSAGE-T2
+           DISPLAY AUSGABE-FILE-NAME OF MT3
+           DISPLAY OUTPUT-NAME
+           SET ADDRESS OF MY-STORE TO NULL
+           INITIALIZE MY-NAME(2) GRP-AMOUNT (99)
+           INITIALIZE OTHER-VALUES (2, 3, 2)
+           SEARCH ALL SOME2-VALUES OF MY-NAME2
+      *>     WHEN SA(SOME2-INDEX) = x'12'  CHECKME: Should work
+             WHEN SA OF MY-NAME2(SOME2-INDEX OF MY-NAME2) = x'12'
+                CONTINUE.
+           GOBACK.
+])
+
+AT_DATA([badprog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  MESSAGE-TEXT-2T IS TYPEDEF.
+         02 AUSGABE-FILE-NAME     PIC X(50).
+         02 F1      USAGE MESSAGE-TEXT-2T.
+       01 MT2 USAGE MESSAGE-TEXT-2T.
+             05 FILLER PIC 9999.
+       01 MT3 TYPE TO MESSAGE-TEXT-2T PIC X.
+       77 OUTPUT-NAME  TYPE TO MESSAGE-TEXT-2T.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [0], [], [])
+AT_CHECK([$COMPILE_ONLY -std=cobol2002 prog.cob], [1], [],
+[prog.cob:10: error: USAGE type-name does not conform to COBOL 2002
+prog.cob:13: error: USAGE type-name does not conform to COBOL 2002
+prog.cob:16: error: USAGE type-name does not conform to COBOL 2002
+prog.cob:17: error: USAGE type-name does not conform to COBOL 2002
+prog.cob:19: error: USAGE type-name does not conform to COBOL 2002
+prog.cob:21: error: USAGE type-name does not conform to COBOL 2002
+prog.cob:23: error: USAGE type-name does not conform to COBOL 2002
+prog.cob:25: error: USAGE type-name does not conform to COBOL 2002
+prog.cob:26: error: USAGE type-name does not conform to COBOL 2002
+prog.cob:30: error: USAGE type-name does not conform to COBOL 2002
+prog.cob:32: error: USAGE type-name does not conform to COBOL 2002
+prog.cob:33: error: USAGE type-name does not conform to COBOL 2002
+])
+AT_CHECK([$COMPILE_ONLY progstd.cob], [0], [], [])
+AT_CHECK([$COMPILE_ONLY -std=cobol2002 progstd.cob], [0], [], [])
+AT_CHECK([$COMPILE_ONLY badprog.cob], [1], [],
+[badprog.cob:8: error: item may not reference itself
+badprog.cob:10: error: entry following TYPE TO may not be subordinate to it
+badprog.cob:11: error: illegal combination of TYPE TO with other clauses
+badprog.cob:12: error: elementary item expected
+])
+
+AT_CAPTURE_FILE([symbols.lst])
+
+AT_DATA([prog.lst],
+[GnuCOBOL V.R.P               prog.cob                   DDD MMM dd HH:MM:SS YYYY
+
+SIZE  TYPE           LVL  NAME                           PICTURE
+
+      WORKING-STORAGE SECTION
+
+00050 ALPHANUMERIC   01   AUSGABE-FILE-NAME-T            X(50)
+
+00004 NUMERIC        01   SOME-VERY-LONG-TYPEDEF-NAME    9999
+
+00008 GROUP          01   AUSGABE-FILE-NAME-2T
+00004 NUMERIC        05   FILLER                         9999
+00004 NUMERIC        05   DETAIL-NO                      SOME-VERY-LONG-TYPEDE...
+
+00108 GROUP          01   MESSAGE-TEXT-2T
+00050 ALPHANUMERIC   02   AUSGABE-FILE-NAME              AUSGABE-FILE-NAME-T
+00004 GROUP          02   FILLER, REDEFINES AUSGABE-FILE-NAME
+00004 NUMERIC        05   FILLER                         9999
+00008 GROUP          02   AUSGABE-FILE-NAME-2            AUSGABE-FILE-NAME-2T
+00050 ALPHANUMERIC   02   FILLER                         AUSGABE-FILE-NAME-T
+
+00108 GROUP          01   MESSAGE-TEXT-2                 MESSAGE-TEXT-2T EXTERNAL
+
+00004 NUMERIC        77   OUTPUT-NAME                    SOME-VERY-LONG-TYPEDE... GLOBAL
+
+00008 GROUP          01   Z-MESSAGE-T2                   AUSGABE-FILE-NAME-2T
+
+00108 GROUP          01   Z-MESSAGE-T3
+00108 GROUP          49   MT3                            MESSAGE-TEXT-2T
+00108 GROUP          49   MT3-REN                        MESSAGE-TEXT-2T, REDEFINES MT3
+
+00018 NUMERIC        77   CALCULUS                       S9(15)V9(03)
+
+01818 GROUP          01   USER-TYPE
+00018 NUMERIC        02   AMOUNT                         CALCULUS
+01800 GROUP          02   FILLER                         OCCURS 100
+00018 NUMERIC        05   GRP-AMOUNT                     CALCULUS
+
+01818 GROUP          01   USER-VAR                       USER-TYPE
+
+
+])
+
+
+AT_CHECK([$UNIFY_LISTING symbols.lst symbols.lis once], [0], [], [])
+AT_CHECK([diff prog.lst symbols.lis], [0], [], [])
+
+
+
+
+AT_CLEANUP
+
+
+AT_SETUP([LIKE clause])
+AT_KEYWORDS([definition EXTERNAL GLOBAL])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+
+# work in progress
+AT_XFAIL_IF(true)
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  MESSAGE-TEXT-2 EXTERNAL.
+         02 AUSGABE-FILE-NAME     PIC X(50).
+         02 FILLER REDEFINES AUSGABE-FILE-NAME.
+             05 FILLER PIC 9999.
+         02 AUSGABE-FILE-NAME-2.
+             05 FILLER PIC 9999.
+             05 DETAIL-NO PIC 9999.
+         02 FILLER LIKE AUSGABE-FILE-NAME.
+
+       77 OUTPUT-VAL     LIKE DETAIL-NO GLOBAL.
+       77 OUTPUT-VAL-P1  LIKE DETAIL-NO (+1).
+       77 OUTPUT-VAL-P1b LIKE DETAIL-NO (1).
+       77 OUTPUT-VAL-M2  LIKE DETAIL-NO (-2).
+
+       01 Z-MESSAGE-T2 LIKE AUSGABE-FILE-NAME-2.
+       01 Z-MESSAGE-T3.
+          49 MT3      LIKE MESSAGE-TEXT-2.
+
+       PROCEDURE DIVISION.
+           DISPLAY AUSGABE-FILE-NAME OF MESSAGE-TEXT-2
+           DISPLAY Z-MESSAGE-T2 (55:LENGTH OF DETAIL-NO)
+           DISPLAY MT3 (1:LENGTH OF AUSGABE-FILE-NAME)
+           ADD OUTPUT-VAL TO DETAIL-NO
+           GOBACK.
+])
+
+# TODO add tests and syntax checks in cobc
+# AT_DATA([badprog.cob], [
+#        IDENTIFICATION   DIVISION.
+#        PROGRAM-ID.      prog.
+#        DATA             DIVISION.
+#        WORKING-STORAGE  SECTION.
+#
+# ])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([APPLY COMMIT clause])
+AT_KEYWORDS([definition I-O-CONTROL ROLLBACK])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# Gnu specific error code
+# TODO report missing data definition
+# ISO 2023 extension. TODO - later!
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.  *> taken from "commit and rollback example"
+                          *> from COBOL 202x draft
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT STCK-FILE
+              ASSIGN TO "STOCK"
+              ORGANIZATION IS INDEXED
+              ACCESS MODE IS RANDOM
+              FILE STATUS IS STCK-FILE-STATUS
+              RECORD KEY  IS APPLY
+              SHARING WITH ALL OTHER.
+
+           SELECT CHNG-FILE
+              ASSIGN TO "CHANGE"
+              ORGANIZATION IS SEQUENTIAL
+              ACCESS MODE IS SEQUENTIAL
+              FILE STATUS IS CHNG-FILE-STATUS
+              SHARING WITH ALL OTHER.
+
+           SELECT SORT-FILE
+              ASSIGN TO "SORT".
+
+       I-O-CONTROL.
+           APPLY COMMIT ON STCK-FILE CHNG-FILE STCK-FILE not-there
+                 SORT-FILE UPDATE-COUNT not-there-again BASED-STUFF
+                 RED-DATA SOME-DATA.
+
+       DATA DIVISION.
+       FILE SECTION.
+
+       FD  STCK-FILE.
+       01  STCK-REC.
+           03  APPLY                   PIC X(5).
+           03  STCK-QTY                PIC 9(5)V99.
+
+       SD  SORT-FILE.
+       01  SORT-REC                    PIC X(100).
+
+       FD  CHNG-FILE.
+       01  CHNG-REC.
+           03  CHNG-KEY                PIC X(5).
+           03  CHNG-QTY                PIC 9(5)V99.
+           03  CHNG-ACTION             PIC X.
+           03  CHNG-STATE              PIC X.
+
+       WORKING-STORAGE SECTION.
+
+       01  FILE-STATES.
+           03  STCK-FILE-STATUS        PIC XX.
+               88  STCK-FILE-OK                  VALUE "00".
+           03  CHNG-FILE-STATUS        PIC XX.
+               88  CHNG-FILE-OK                  VALUE "00".
+       77  UPDATE-COUNT  BINARY-LONG.
+       77  BASED-STUFF   PIC X BASED.
+       01  DATA-HERE.
+           03 SOME-DATA  PIC 9.
+       01  RED-DATA REDEFINES DATA-HERE PIC X.
+
+       PROCEDURE DIVISION.
+
+         MAIN SECTION.
+
+           PERFORM INITIALISATION
+           PERFORM TERMINATION
+           STOP RUN WITH NORMAL STATUS 0
+
+       . INITIALISATION SECTION.
+
+           OPEN I-O CHNG-FILE, STCK-FILE
+           IF NOT STCK-FILE-OK OR NOT CHNG-FILE-OK
+              PERFORM FATAL-ERROR
+           END-IF
+
+       . TERMINATION SECTION.
+
+           COMMIT
+           IF NOT STCK-FILE-OK OR NOT CHNG-FILE-OK
+              PERFORM FATAL-ERROR
+           END-IF
+
+       . FATAL-ERROR SECTION.
+
+           ROLLBACK
+           STOP RUN WITH ERROR STATUS 16.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:29: warning: APPLY COMMIT is not implemented
+prog.cob:27: error: 'not-there' is not defined
+prog.cob:28: error: 'not-there-again' is not defined
+prog.cob:27: error: duplicate APPLY COMMIT target: 'STCK-FILE'
+prog.cob:28: error: APPLY COMMIT statement invalid for SORT file
+prog.cob:29: error: 'RED-DATA' REDEFINES field not allowed here
+prog.cob:29: error: 'SOME-DATA' not level 01 or 77
+])
+
+AT_CLEANUP
+
+
+AT_SETUP([Screen section starts with 78-level])
+AT_KEYWORDS([screen definition])
+AT_XFAIL_IF([test "SCREEN" != "implemented"])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+
+       DATA DIVISION.
+       SCREEN SECTION.
+       78 const VALUE "x".
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [0], [],
+[prog.cob:6: syntax error at 'SCREEN'
+])
+AT_CLEANUP
+
+
+

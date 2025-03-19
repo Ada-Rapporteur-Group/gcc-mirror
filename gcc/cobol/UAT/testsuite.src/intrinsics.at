@@ -1,0 +1,38 @@
+AT_BANNER([GCOBOL Intrinsic Function Tests])
+
+AT_SETUP([Intrinsic Function ABS])
+AT_KEYWORDS([intrinsics abs])
+AT_DATA([prog.cob], [m4_include(intrinsic_abs.cob)])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([Intrinsic Function ACOS])
+AT_KEYWORDS([intrinsics acos])
+AT_DATA([prog.cob], [m4_include(intrinsic_acos.cob)])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([Intrinsic Function ANNUITY])
+AT_KEYWORDS([intrinsics annuity])
+AT_DATA([prog.cob], [m4_include(intrinsic_annuity.cob)])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([Intrinsic Function DATE-YYYYMMDD])
+AT_KEYWORDS([intrinsics date-time])
+AT_DATA([prog.cob], [m4_include(intrinsic_date-yyyymmdd.cob)])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([Intrinsic Function NUMVAL])
+AT_KEYWORDS([intrinsics numval])
+AT_DATA([prog.cob], [m4_include(intrinsic_numval.cob)])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0],
+[123.4000000000000000000000000000000049
+], [])
+AT_CLEANUP

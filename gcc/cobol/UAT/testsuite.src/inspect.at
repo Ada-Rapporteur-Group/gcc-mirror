@@ -1,0 +1,1571 @@
+## Copyright (C) 2024 cobolworx
+
+## INSPECT
+
+AT_SETUP([INSPECT REPLACING LEADING ZEROS BY SPACES])
+AT_KEYWORDS([INSPECT])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC X(4) VALUE "0001".
+       PROCEDURE        DIVISION.
+           INSPECT X REPLACING LEADING ZEROS BY SPACES.
+           IF X NOT = "   1"
+              DISPLAY "Should be '   1' but is '" X "'".
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([INSPECT No repeat conversion check])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC X(3) VALUE "BCA".
+       01 Y             PIC X(6) VALUE "   BCA".
+       PROCEDURE        DIVISION.
+           INSPECT X CONVERTING "ABC" TO "BCD".
+           IF X NOT = "CDB"
+              DISPLAY "X: " X.
+           INSPECT Y CONVERTING "ABC" TO "BCD".
+           IF Y NOT = "   CDB"
+              DISPLAY "Y: " Y.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([INSPECT CONVERTING TO figurative constant])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC X(3) VALUE "BCA".
+       PROCEDURE        DIVISION.
+           INSPECT X CONVERTING "ABC" TO SPACES.
+           IF X NOT = SPACES
+              DISPLAY X NO ADVANCING
+              END-DISPLAY
+           END-IF.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+AT_CLEANUP
+
+
+AT_SETUP([INSPECT CONVERTING NULL])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC X(3) VALUE LOW-VALUES.
+       PROCEDURE        DIVISION.
+           INSPECT X CONVERTING NULL TO "A".
+           IF X NOT = "AAA"
+              DISPLAY X NO ADVANCING
+              END-DISPLAY
+           END-IF.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+AT_CLEANUP
+
+
+AT_SETUP([INSPECT REPLACING figurative constant])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC X(3) VALUE "BCA".
+       PROCEDURE        DIVISION.
+           INSPECT X REPLACING ALL "BC" BY SPACE.
+           IF X NOT = "  A"
+              DISPLAY X NO ADVANCING
+              END-DISPLAY
+           END-IF.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([INSPECT TALLYING BEFORE])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC X(4) VALUE "ABC ".
+       01 TAL           PIC 999 VALUE 0.
+       PROCEDURE        DIVISION.
+           MOVE 0 TO TAL.
+           INSPECT X TALLYING TAL FOR CHARACTERS
+                     BEFORE INITIAL " ".
+           IF TAL NOT = 3
+              DISPLAY TAL NO ADVANCING
+              END-DISPLAY
+           END-IF.
+           MOVE 0 TO TAL.
+           MOVE " ABC" TO X.
+           INSPECT X TALLYING TAL FOR CHARACTERS
+                     BEFORE INITIAL " ".
+           IF TAL NOT = 0
+              DISPLAY TAL NO ADVANCING
+              END-DISPLAY
+           END-IF.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([INSPECT TALLYING AFTER])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC X(4) VALUE "ABC ".
+       01 TAL           PIC 999 VALUE 0.
+       PROCEDURE        DIVISION.
+           MOVE 0 TO TAL.
+           INSPECT X TALLYING TAL FOR CHARACTERS
+                     AFTER INITIAL " ".
+           IF TAL NOT = 0
+              DISPLAY TAL NO ADVANCING
+              END-DISPLAY
+           END-IF.
+           MOVE 0 TO TAL.
+           MOVE " ABC" TO X.
+           INSPECT X TALLYING TAL FOR CHARACTERS
+                     AFTER INITIAL " ".
+           IF TAL NOT = 3
+              DISPLAY TAL NO ADVANCING
+              END-DISPLAY
+           END-IF.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+AT_CLEANUP
+
+
+AT_SETUP([INSPECT TALLYING/REPLACING ISO Example])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+      *> Example from ISO/IEC 2023 page 1151
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. tests.
+        PROCEDURE DIVISION.
+        CALL "test1"
+        CALL "test2"
+        CALL "test3"
+        goback.
+        end program tests.
+
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. test1.
+        DATA DIVISION.
+        WORKING-STORAGE SECTION.
+        01 ITEM PIC X(14) VALUE "EFABDBCGABEFGG".
+        01 COUNT-0 PIC 99 VALUE 0.
+        01 COUNT-1 PIC 99 VALUE 0.
+        01 COUNT-2 PIC 99 VALUE 0.
+        01 COUNT-3 PIC 99 VALUE 0.
+        01 COUNT-4 PIC 99 VALUE 0.
+        PROCEDURE DIVISION.
+        INSPECT ITEM TALLYING
+        COUNT-0 FOR ALL "AB", ALL "D"
+        COUNT-1 FOR ALL "BC"
+        COUNT-2 FOR LEADING "EF"
+        COUNT-3 FOR LEADING "B"
+        COUNT-4 FOR CHARACTERS;
+        INSPECT ITEM REPLACING
+        ALL "AB" BY "XY", "D" BY "X"
+        ALL "BC" BY "VW"
+        LEADING "EF" BY "TU"
+        LEADING "B" BY "S"
+        FIRST "G" BY "R"
+        FIRST "G" BY "P"
+        CHARACTERS BY "Z"
+        DISPLAY "Counts are: "
+                COUNT-0 SPACE 
+                COUNT-1 SPACE
+                COUNT-2 SPACE
+                COUNT-3 SPACE
+                COUNT-4
+        DISPLAY "Should be:  "
+                "03" SPACE 
+                "01" SPACE
+                "01" SPACE
+                "00" SPACE
+                "05"
+        DISPLAY "Result is " """" ITEM """"
+        MOVE "TUXYXVWRXYZZPZ" TO  ITEM
+        DISPLAY "Should be " """" ITEM """"
+        GOBACK.
+        END PROGRAM test1.
+
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. test2.
+        DATA DIVISION.
+        WORKING-STORAGE SECTION.
+        01 ITEM PIC X(6) VALUE "BABABC".
+        01 COUNT-0 PIC 99 VALUE 0.
+        01 COUNT-1 PIC 99 VALUE 0.
+        01 COUNT-2 PIC 99 VALUE 0.
+        01 COUNT-3 PIC 99 VALUE 0.
+        01 COUNT-4 PIC 99 VALUE 0.
+        PROCEDURE DIVISION.
+        INSPECT ITEM TALLYING
+        COUNT-0 FOR ALL "AB", ALL "D"
+        COUNT-1 FOR ALL "BC"
+        COUNT-2 FOR LEADING "EF"
+        COUNT-3 FOR LEADING "B"
+        COUNT-4 FOR CHARACTERS;
+        INSPECT ITEM REPLACING
+        ALL "AB" BY "XY", "D" BY "X"
+        ALL "BC" BY "VW"
+        LEADING "EF" BY "TU"
+        LEADING "B" BY "S"
+        FIRST "G" BY "R"
+        FIRST "G" BY "P"
+        CHARACTERS BY "Z"
+        DISPLAY "Counts are: "
+                COUNT-0 SPACE 
+                COUNT-1 SPACE
+                COUNT-2 SPACE
+                COUNT-3 SPACE
+                COUNT-4
+        DISPLAY "Should be:  "
+                "02" SPACE 
+                "00" SPACE
+                "00" SPACE
+                "01" SPACE
+                "01"
+        DISPLAY "Result is " """" ITEM """"
+        MOVE "SXYXYZ" TO  ITEM
+        DISPLAY "Should be " """" ITEM """"
+        GOBACK.
+        END PROGRAM test2.
+
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. test3.
+        DATA DIVISION.
+        WORKING-STORAGE SECTION.
+        01 ITEM PIC X(4) VALUE "BBBC".
+        01 COUNT-0 PIC 99 VALUE 0.
+        01 COUNT-1 PIC 99 VALUE 0.
+        01 COUNT-2 PIC 99 VALUE 0.
+        01 COUNT-3 PIC 99 VALUE 0.
+        01 COUNT-4 PIC 99 VALUE 0.
+        PROCEDURE DIVISION.
+        INSPECT ITEM TALLYING
+        COUNT-0 FOR ALL "AB", ALL "D"
+        COUNT-1 FOR ALL "BC"
+        COUNT-2 FOR LEADING "EF"
+        COUNT-3 FOR LEADING "B"
+        COUNT-4 FOR CHARACTERS;
+        INSPECT ITEM REPLACING
+        ALL "AB" BY "XY", "D" BY "X"
+        ALL "BC" BY "VW"
+        LEADING "EF" BY "TU"
+        LEADING "B" BY "S"
+        FIRST "G" BY "R"
+        FIRST "G" BY "P"
+        CHARACTERS BY "Z"
+        DISPLAY "Counts are: "
+                COUNT-0 SPACE 
+                COUNT-1 SPACE
+                COUNT-2 SPACE
+                COUNT-3 SPACE
+                COUNT-4
+        DISPLAY "Should be:  "
+                "00" SPACE 
+                "01" SPACE
+                "00" SPACE
+                "02" SPACE
+                "00"
+        DISPLAY "Result is " """" ITEM """"
+        MOVE "SSVW" TO  ITEM
+        DISPLAY "Should be " """" ITEM """"
+        GOBACK.
+        END PROGRAM test3.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [Counts are: 03 01 01 00 05
+Should be:  03 01 01 00 05
+Result is "TUXYXVWRXYZZPZ"
+Should be "TUXYXVWRXYZZPZ"
+Counts are: 02 00 00 01 01
+Should be:  02 00 00 01 01
+Result is "SXYXYZ"
+Should be "SXYXYZ"
+Counts are: 00 01 00 02 00
+Should be:  00 01 00 02 00
+Result is "SSVW"
+Should be "SSVW"
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([INSPECT TRAILING])
+AT_KEYWORDS([INSPECT TRAILING])
+AT_DATA([prog.cob], [
+        identification      division.
+        program-id.         prog.
+        data                division.
+        working-storage     section.
+        01 the-text         pic x(30) value "    middle".
+        01 counter          pic 9999.
+        01 expected         pic 9999.
+        01 should-be        pic zzz9.
+        01 but-is           pic zzz9.
+        01 msg              pic x(100).
+        procedure           division.
+        
+        move "inspect for leading spaces" to msg
+        move zero to counter
+        inspect the-text tallying counter for leading spaces
+        move 4 to expected
+        perform result.
+        
+        move "inspect for trailing spaces with reverse" to msg
+        move zero to counter
+        inspect function reverse(the-text) tallying counter for leading spaces
+        move 20 to expected
+        perform result.
+
+        move "inspect for trailing spaces with reversed variable" to msg
+        move function reverse(the-text) to the-text
+        move zero to counter
+        inspect the-text tallying counter for leading spaces
+        move 20 to expected
+        perform result.
+
+        move "inspect for trailing spaces with INSPECT TRAILING extension" to msg
+        move function reverse(the-text) to the-text
+        move zero to counter
+        inspect the-text tallying counter for trailing spaces
+        move 20 to expected
+        perform result.
+
+        inspect the-text replacing trailing space by "X"
+        display the-text
+
+        stop run.
+
+        result.
+        display function trim(msg) ": " with no advancing
+        move expected to should-be
+        if counter equal to expected
+            display function trim(should-be)
+        else
+            move counter  to but-is
+            display "should be " function trim(should-be) 
+                    " but is " function trim(but-is)
+        end-if.
+])
+AT_CHECK([$COMPILE -dialect mf prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [inspect for leading spaces: 4
+inspect for trailing spaces with reverse: 20
+inspect for trailing spaces with reversed variable: 20
+inspect for trailing spaces with INSPECT TRAILING extension: 20
+    middleXXXXXXXXXXXXXXXXXXXX
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([INSPECT BACKWARD simple TALLYING])
+AT_KEYWORDS([INSPECT TRAILING])
+AT_DATA([prog.cob], [
+        program-id.         prog.
+        data                division.
+        working-storage     section.
+        01 item pic x(64).
+        01 counter pic 999.
+        procedure division.
+
+        move "AAXAAAYAAAAZAAAAA" to item
+        display function trim(item)
+        display "Forward:"
+
+        move zero to counter
+        inspect item tallying 
+            counter for all "A" 
+        display  "FOR ALL A                  " counter
+
+        move zero to counter
+        move "AAXAAAYAAAAZAAAAA" to item
+        inspect item tallying 
+            counter for all "A" after "X"
+        display  "FOR ALL A after X          " counter
+        
+        move zero to counter
+        move "AAXAAAYAAAAZAAAAA" to item
+        inspect item tallying 
+            counter for all "A" before "Z"
+        display  "FOR ALL A before Z         " counter
+
+        move zero to counter
+        move "AAXAAAYAAAAZAAAAA" to item
+        inspect item tallying 
+            counter for all "A" after "X" before "Z"
+        display  "FOR ALL A after X before Z " counter
+
+        move zero to counter
+        move "AAXAAAYAAAAZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" to item
+        inspect item tallying 
+            counter for trailing "A"
+        display  "FOR TRAILING A             " counter
+
+
+        display "Backward:"
+        move zero to counter
+        inspect backward item tallying 
+            counter for all "A" 
+        display  "FOR ALL A                  " counter
+
+        move zero to counter
+        move "AAXAAAYAAAAZAAAAA" to item
+        inspect backward item tallying 
+            counter for all "A" after "X"
+        display  "FOR ALL A after X          " counter
+        
+        move zero to counter
+        move "AAXAAAYAAAAZAAAAA" to item
+        inspect backward item tallying 
+            counter for all "A" before "Z"
+        display  "FOR ALL A before Z         " counter
+
+        move zero to counter
+        move "AAXAAAYAAAAZAAAAA" to item
+        inspect backward item tallying 
+            counter for all "A" after "Z" before "X"
+        display  "FOR ALL A after Z before X " counter
+
+        move zero to counter
+        move "AAXAAAYAAAAZAAAAA" to item
+        inspect backward item tallying 
+            counter for trailing "A"
+        display  "FOR TRAILING A             " counter
+
+        goback.
+        end program prog.
+])
+AT_CHECK([$COMPILE -dialect mf prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [AAXAAAYAAAAZAAAAA
+Forward:
+FOR ALL A                  014
+FOR ALL A after X          012
+FOR ALL A before Z         009
+FOR ALL A after X before Z 007
+FOR TRAILING A             052
+Backward:
+FOR ALL A                  061
+FOR ALL A after X          002
+FOR ALL A before Z         005
+FOR ALL A after Z before X 007
+FOR TRAILING A             002
+], [])
+AT_CLEANUP
+
+AT_SETUP([INSPECT BACKWARD simple REPLACING])
+AT_KEYWORDS([INSPECT TRAILING])
+AT_DATA([prog.cob], [
+        program-id.         prog.
+        data                division.
+        working-storage     section.
+        01 item pic x(64).
+        procedure division.
+
+        move "AbcAbcXAbcAbcAbcYAbcAbcAbcAbcZAbcAbcAbcAbcAbc" to item
+        display function trim(item)
+        inspect backward item replacing all "Abc" by "Qrs"
+        display function trim(item)
+
+        move "AbcAbcXAbcAbcAbcYAbcAbcAbcAbcZAbcAbcAbcAbcAbc" to item
+        display function trim(item)
+        inspect backward item replacing trailing "Abc" by "Qrs"
+        display function trim(item)
+
+        move "AbcAbcXAbcAbcAbcYAbcAbcAbcAbcZAbcAbcAbcAbcAbc" to item
+        display function trim(item)
+        inspect backward item replacing all "Abc" by "Qrs"
+                after "Z" before "Y"
+        display function trim(item)
+
+        goback.
+        end program prog.
+])
+AT_CHECK([$COMPILE -dialect mf prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [AbcAbcXAbcAbcAbcYAbcAbcAbcAbcZAbcAbcAbcAbcAbc
+QrsQrsXQrsQrsQrsYQrsQrsQrsQrsZQrsQrsQrsQrsQrs
+AbcAbcXAbcAbcAbcYAbcAbcAbcAbcZAbcAbcAbcAbcAbc
+QrsQrsXAbcAbcAbcYAbcAbcAbcAbcZAbcAbcAbcAbcAbc
+AbcAbcXAbcAbcAbcYAbcAbcAbcAbcZAbcAbcAbcAbcAbc
+AbcAbcXAbcAbcAbcYQrsQrsQrsQrsZAbcAbcAbcAbcAbc
+], [])
+AT_CLEANUP
+
+AT_SETUP([INSPECT BACKWARD simple CONVERTING])
+AT_KEYWORDS([INSPECT TRAILING])
+AT_DATA([prog.cob], [
+        program-id.         prog.
+        data                division.
+        working-storage     section.
+        01 item             pic x(64).
+        01 should-be        pic x(64).
+        procedure division.
+        display "Forward:"
+        move "the quick brown fox jumps over the lazy dog" to item
+        inspect item converting 
+                "abcdefghijklmnopqrstuvwxyz"
+            TO  "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        move "THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG" to should-be
+        perform reportt
+
+        move "the quick brown fox jumps over the lazy dog" to item
+        inspect item converting 
+                "abcdefghijklmnopqrstuvwxyz"
+            TO  "ABCDEFGHIJKLMNOPQRSTUVWXYZ" before "jumps"
+        move "THE QUICK BROWN FOX jumps over the lazy dog" to should-be
+        perform reportt
+
+        move "the quick brown fox jumps over the lazy dog" to item
+        inspect item converting 
+                "abcdefghijklmnopqrstuvwxyz"
+            TO  "ABCDEFGHIJKLMNOPQRSTUVWXYZ" before "nothing"
+        move "THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG" to should-be
+        perform reportt
+
+        move "the quick brown fox jumps over the lazy dog" to item
+        inspect item converting 
+                "abcdefghijklmnopqrstuvwxyz"
+            TO  "ABCDEFGHIJKLMNOPQRSTUVWXYZ" after "fox"
+        move "the quick brown fox JUMPS OVER THE LAZY DOG" to should-be
+        perform reportt
+
+        move "the quick brown fox jumps over the lazy dog" to item
+        inspect item converting 
+                "abcdefghijklmnopqrstuvwxyz"
+            TO  "ABCDEFGHIJKLMNOPQRSTUVWXYZ" after "fox" before "over"
+        move "the quick brown fox JUMPS over the lazy dog" to should-be
+        perform reportt
+
+        move "the quick brown fox jumps over the lazy dog" to item
+        inspect item converting 
+                "abcdefghijklmnopqrstuvwxyz"
+            TO  "ABCDEFGHIJKLMNOPQRSTUVWXYZ" after "fox" before "xyzzy"
+        move "the quick brown fox JUMPS OVER THE LAZY DOG" to should-be
+        perform reportt
+
+        display "Reverse:"
+
+        move "the quick brown fox jumps over the lazy dog" to item
+        inspect backward item converting 
+                "abcdefghijklmnopqrstuvwxyz"
+            TO  "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        move "THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG" to should-be
+        perform reportt
+
+        move "the quick brown fox jumps over the lazy dog" to item
+        inspect backward item converting 
+                "abcdefghijklmnopqrstuvwxyz"
+            TO  "ABCDEFGHIJKLMNOPQRSTUVWXYZ" before "jumps"
+        move "the quick brown fox jumps OVER THE LAZY DOG" to should-be
+        perform reportt
+
+        move "the quick brown fox jumps over the lazy dog" to item
+        inspect backward item converting 
+                "abcdefghijklmnopqrstuvwxyz"
+            TO  "ABCDEFGHIJKLMNOPQRSTUVWXYZ" before "nothing"
+        move "THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG" to should-be
+        perform reportt
+
+        move "the quick brown fox jumps over the lazy dog" to item
+        inspect backward item converting 
+                "abcdefghijklmnopqrstuvwxyz"
+            TO  "ABCDEFGHIJKLMNOPQRSTUVWXYZ" after "fox"
+        move "THE QUICK BROWN fox jumps over the lazy dog" to should-be
+        perform reportt
+
+        move "the quick brown fox jumps over the lazy dog" to item
+        inspect backward item converting 
+                "abcdefghijklmnopqrstuvwxyz"
+            TO  "ABCDEFGHIJKLMNOPQRSTUVWXYZ" before "fox" after "over"
+        move "the quick brown fox JUMPS over the lazy dog" to should-be
+        perform reportt
+
+        move "the quick brown fox jumps over the lazy dog" to item
+        inspect backward item converting 
+                "abcdefghijklmnopqrstuvwxyz"
+            TO  "ABCDEFGHIJKLMNOPQRSTUVWXYZ" before "xyzzy" after "over"
+        move "THE QUICK BROWN FOX JUMPS over the lazy dog" to should-be
+        perform reportt
+
+        goback.
+        reportt.
+            display "                 " function trim(item)
+        if item not equal to should-be
+            display "should have been " function trim(should-be)
+        end-if.
+        end program prog.
+])
+AT_CHECK([$COMPILE -dialect mf prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [Forward:
+                 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG
+                 THE QUICK BROWN FOX jumps over the lazy dog
+                 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG
+                 the quick brown fox JUMPS OVER THE LAZY DOG
+                 the quick brown fox JUMPS over the lazy dog
+                 the quick brown fox JUMPS OVER THE LAZY DOG
+Reverse:
+                 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG
+                 the quick brown fox jumps OVER THE LAZY DOG
+                 THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG
+                 THE QUICK BROWN fox jumps over the lazy dog
+                 the quick brown fox JUMPS over the lazy dog
+                 THE QUICK BROWN FOX JUMPS over the lazy dog
+], [])
+AT_CLEANUP
+
+AT_SETUP([INSPECT CONVERTING TO figurative constants])
+AT_KEYWORDS([INSPECT])
+AT_DATA([prog.cob], [
+        identification division.
+        program-id. clouseau.
+        data division.
+        working-storage section.
+        01 item pic x(12).
+        procedure division.
+        move all "abcd" to item
+        inspect item converting "abcd" to low-values
+        display "low-values " space """" item """"
+        move all "abcd" to item
+        inspect item converting "abcd" to spaces
+        display "spaces     " space """" item """"
+        move all "abcd" to item
+        inspect item converting "abcd" to zeros
+        display "zeros      " space """" item """"
+        move all "abcd" to item
+        inspect item converting "abcd" to quotes
+        display "quotes     " space """" item """"
+        move all "abcd" to item
+        inspect item converting "abcd" to high-values
+        display "high-values" space """" item """"
+        goback.
+        end program clouseau.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [low-values  ""
+spaces      "            "
+zeros       "000000000000"
+quotes      """"""""""""""
+high-values "ÿÿÿÿÿÿÿÿÿÿÿÿ"
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([INSPECT ISO Example 1])
+AT_KEYWORDS([INSPECT])
+AT_DATA([prog.cob], [        Identification Division.
+        Program-Id. Clouseau.
+        Data Division.
+        Working-Storage Section.
+        01 rows   pic 99 value 3.
+        01 counts pic 99 value 5.
+
+        01 rowlim pic 99.
+        01 ncount pic 99.
+
+        01 inputs.
+           05 row occurs  6 times indexed by counter.
+              10 star  PIC X.
+              10 input PIC X(20).
+              10 count PIC 99 occurs 5 times.
+              10 output PIC X(20).
+        77 len PIC 9(8).
+        Procedure Division.
+        *> Odd-numbered rows are "read only" and contain the inputs and expected
+        *> outputs.
+        *> Even-numbered rows are modified by the INSPECT statements and contain
+        *> the observed outputs
+        Move ' EFABDBCGABEFGG      0301010005TUXYXVWRXYZZPZ' to row(1).
+        Move ' BABABC              0200000101SXYXYZ'         to row(3).
+        Move ' BBBC                0001000200SSVW'           to row(5).
+`
+        compute rowlim = 2*rows - 1
+
+        Display '  INPUT                C0 C1 C2 C3 C4 OUTPUT'
+        Display '  -------------------- -- -- -- -- -- ----------------'
+        Perform Example-1 with test after
+            varying counter from 1 by 2 until counter >= rowlim.
+
+        Goback.
+
+        Inspection Section.
+        Example-1.
+        Move row(counter) to row(counter + 1)
+
+        perform varying ncount from 1 by 1 until ncount > counts
+            Move Zero to count(counter + 1 ncount)
+            end-perform
+
+        Move function length( function trim(input(counter)) ) to len.
+        MOVE INPUT(COUNTER) TO OUTPUT(COUNTER + 1)
+        INSPECT INPUT(COUNTER)(1:len) TALLYING
+            COUNT(counter + 1 1) FOR ALL "AB", ALL "D"
+            COUNT(counter + 1 2) FOR ALL "BC"
+            COUNT(counter + 1 3) FOR LEADING "EF"
+            COUNT(counter + 1 4) FOR LEADING "B"
+            COUNT(counter + 1 5) FOR CHARACTERS
+        INSPECT OUTPUT(COUNTER + 1)(1:len) REPLACING
+            ALL     "AB" BY "XY", "D" BY "X"
+            ALL     "BC" BY "VW"
+            LEADING "EF" BY "TU"
+            LEADING "B"  BY "S"
+            FIRST   "G"  BY "R"
+            FIRST   "G"  BY "P"
+            CHARACTERS BY "Z"
+
+        If row(counter) = row(counter + 1) then
+            Move '*' to star(counter + 1)
+        Else
+            Move '!' to star(counter + 1).
+
+        Display star(counter)     ' '
+                input(counter)   ' ' with no advancing
+        perform varying ncount from 1 by 1 until ncount > counts
+            Display count(counter ncount) ' ' with no advancing
+            end-perform
+        display function trim (output(counter))
+
+        Display  star(1 + counter)    ' '
+                input(1 + counter)   ' ' with no advancing
+        perform varying ncount from 1 by 1 until ncount > counts
+            Display count(1 + counter ncount) ' ' with no advancing
+            end-perform
+        display function trim (output(1 + counter))
+        continue.
+        end program Clouseau.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [  INPUT                C0 C1 C2 C3 C4 OUTPUT
+  -------------------- -- -- -- -- -- ----------------
+  EFABDBCGABEFGG       03 01 01 00 05 TUXYXVWRXYZZPZ
+* EFABDBCGABEFGG       03 01 01 00 05 TUXYXVWRXYZZPZ
+  BABABC               02 00 00 01 01 SXYXYZ
+* BABABC               02 00 00 01 01 SXYXYZ
+  BBBC                 00 01 00 02 00 SSVW
+* BBBC                 00 01 00 02 00 SSVW
+], [])
+AT_CLEANUP
+
+AT_SETUP([INSPECT ISO Example 2])
+AT_KEYWORDS([INSPECT])
+AT_DATA([prog.cob], [
+        Identification Division.
+        Program-Id. Clouseau.
+        Data Division.
+        Working-Storage Section.
+        01 rows   pic 99 value 2.
+        01 counts pic 99 value 2.
+
+        01 rowlim pic 99.
+        01 ncount pic 99.
+
+        01 inputs.
+           05 row occurs  4 times indexed by counter.
+              10 star  PIC X.
+              10 input PIC X(20).
+              10 count PIC 99 occurs 2 times.
+              10 output PIC X(20).
+        77 len PIC 9(8).
+        Procedure Division.
+        *> Odd-numbered rows are "read only" and contain the inputs and expected
+        *> outputs.
+        *> Even-numbered rows are modified by the INSPECT statements and contain
+        *> the observed outputs
+        Move ' BBB                 0300ZZZ' to row(1).
+        Move ' ABA                 0300ZZZ' to row(3).
+`
+        compute rowlim = 2*rows - 1
+
+        Display '  INPUT                C0 C1 OUTPUT'
+        Display '  -------------------- -- -- ----------------'
+        Perform Example-1 with test after
+            varying counter from 1 by 2 until counter >= rowlim.
+
+        Goback.
+
+        Inspection Section.
+        Example-1.
+        Move row(counter) to row(counter + 1)
+
+        perform varying ncount from 1 by 1 until ncount > counts
+            Move Zero to count(counter + 1 ncount)
+            end-perform
+
+        Move function length( function trim(input(counter)) ) to len.
+        MOVE INPUT(COUNTER) TO OUTPUT(COUNTER + 1)
+        INSPECT INPUT(COUNTER)(1:len) TALLYING
+            COUNT(counter + 1 1) FOR CHARACTERS
+            COUNT(counter + 1 2) FOR ALL "A";
+        INSPECT OUTPUT(COUNTER + 1)(1:len) REPLACING
+            CHARACTERS BY "Z"
+            ALL "A" BY "X"
+
+        If row(counter) = row(counter + 1) then
+            Move '*' to star(counter + 1)
+        Else
+            Move '!' to star(counter + 1).
+
+        Display star(counter)     ' '
+                input(counter)   ' ' with no advancing
+        perform varying ncount from 1 by 1 until ncount > counts
+            Display count(counter ncount) ' ' with no advancing
+            end-perform
+        display function trim(output(counter))
+
+        Display  star(1 + counter)    ' '
+                input(1 + counter)   ' ' with no advancing
+        perform varying ncount from 1 by 1 until ncount > counts
+            Display count(1 + counter ncount) ' ' with no advancing
+            end-perform
+        display function trim(output(1 + counter))
+        continue.
+        end program Clouseau.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [  INPUT                C0 C1 OUTPUT
+  -------------------- -- -- ----------------
+  BBB                  03 00 ZZZ
+* BBB                  03 00 ZZZ
+  ABA                  03 00 ZZZ
+* ABA                  03 00 ZZZ
+], [])
+AT_CLEANUP
+
+AT_SETUP([INSPECT ISO Example 3])
+AT_KEYWORDS([INSPECT])
+AT_DATA([prog.cob], [
+        Identification Division.
+        Program-Id. Clouseau.
+        Data Division.
+        Working-Storage Section.
+        01 inputs.
+           05 row occurs 10 times indexed by counter.
+              10 star  PIC X.
+              10 input PIC X(20).
+              10 count PIC 99 occurs 3 times.
+              10 output PIC X(20).
+        77 len PIC 9(8).
+
+        Procedure Division.
+        Move ' BBEABDABABBCABE     030002BBEXYZXYXYZCABV' to row(1).
+        Move ' ADDDDC              000004AZZZZC'  to row(3).
+        Move ' ADDDDA              000005AZZZZZ'  to row(5).
+        Move ' CDDDDC              000000CDDDDC'  to row(7).
+        Move ' BDBBBDB             000300BDWWWDB' to row(9).
+`
+        Display '  INPUT                C0 C1 C2 OUTPUT'
+        Display '  -------------------- -- -- -- --------------------'
+        Perform Example-3 with test after
+            varying counter from 1 by 2 until counter = 9.
+
+        Goback.
+
+        Inspection Section.
+        Example-3.
+        Move row(counter) to row(counter + 1)
+        Move input(counter) to output(counter)
+        Move Zero to count(counter 1)
+        Move Zero to count(counter 2)
+        Move Zero to count(counter 3)
+
+        Move function length( function trim(input(counter)) ) to len.
+        INSPECT OUTPUT(COUNTER)(1:len) TALLYING
+             COUNT(counter 1) FOR ALL "AB" BEFORE "BC"
+             COUNT(counter 2) FOR LEADING "B" AFTER "D"
+             COUNT(counter 3) FOR CHARACTERS AFTER "A" BEFORE "C";
+        INSPECT OUTPUT(COUNTER)(1:len) REPLACING
+             ALL "AB" BY "XY" BEFORE "BC"
+             LEADING "B" BY "W" AFTER "D"
+             FIRST "E" BY "V" AFTER "D"
+             CHARACTERS BY "Z" AFTER "A" BEFORE "C"
+
+       If row(counter) = row(counter + 1) then
+          Move '*' to star(counter + 1)
+       Else
+          Move '!' to star(counter + 1).
+
+       Display star(counter)   ' '
+                input(counter)   ' '
+                count(counter 1) ' '
+                count(counter 2) ' '
+                count(counter 3) ' '
+               function trim(output(counter))
+        Display star(1 + counter)   ' '
+                input(1 + counter)   ' '
+                count(1 + counter 1) ' '
+                count(1 + counter 2) ' '
+                count(1 + counter 3) ' '
+               function trim(output(1 + counter))
+        continue.
+        end program Clouseau.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [  INPUT                C0 C1 C2 OUTPUT
+  -------------------- -- -- -- --------------------
+  BBEABDABABBCABE      03 00 02 BBEXYZXYXYZCABV
+* BBEABDABABBCABE      03 00 02 BBEXYZXYXYZCABV
+  ADDDDC               00 00 04 AZZZZC
+* ADDDDC               00 00 04 AZZZZC
+  ADDDDA               00 00 05 AZZZZZ
+* ADDDDA               00 00 05 AZZZZZ
+  CDDDDC               00 00 00 CDDDDC
+* CDDDDC               00 00 00 CDDDDC
+  BDBBBDB              00 03 00 BDWWWDB
+* BDBBBDB              00 03 00 BDWWWDB
+], [])
+AT_CLEANUP
+
+AT_SETUP([INSPECT ISO Example 4])
+AT_KEYWORDS([INSPECT])
+AT_DATA([prog.cob], [
+        Identification Division.
+        Program-Id. Clouseau.
+        Data Division.
+        Working-Storage Section.
+        01 rows   pic 99 value 1.
+        01 counts pic 99 value 1.
+
+        01 rowlim pic 99.
+        01 ncount pic 99.
+
+        01 inputs.
+           05 row occurs  2 times indexed by counter.
+              10 star  PIC X.
+              10 input PIC X(20).
+              10 count PIC 99 occurs 1 times.
+              10 output PIC X(20).
+        77 len PIC 9(8).
+        Procedure Division.
+        *> Odd-numbered rows are "read only" and contain the inputs and expected
+        *> outputs.
+        *> Even-numbered rows are modified by the INSPECT statements and contain
+        *> the observed outputs
+        Move ' ABABABABC           01ABABXYABC' to row(1).
+`
+        compute rowlim = 2*rows - 1
+
+        Display '  INPUT                C0 C1 OUTPUT'
+        Display '  -------------------- -- -- ----------------'
+        Perform Example-1 with test after
+            varying counter from 1 by 2 until counter >= rowlim.
+
+        Goback.
+
+        Inspection Section.
+        Example-1.
+        Move row(counter) to row(counter + 1)
+
+        perform varying ncount from 1 by 1 until ncount > counts
+            Move Zero to count(counter + 1 ncount)
+            end-perform
+
+        Move function length( function trim(input(counter)) ) to len.
+        MOVE INPUT(COUNTER) TO OUTPUT(COUNTER + 1)
+        INSPECT INPUT(COUNTER)(1:len) TALLYING
+            COUNT(counter + 1 1) FOR ALL "AB" AFTER "BA" BEFORE "BC";
+        INSPECT OUTPUT(COUNTER + 1)(1:len) REPLACING
+            ALL "AB" BY "XY" AFTER "BA" BEFORE "BC"
+        If row(counter) = row(counter + 1) then
+            Move '*' to star(counter + 1)
+        Else
+            Move '!' to star(counter + 1).
+
+        Display star(counter)     ' '
+                input(counter)   ' ' with no advancing
+        perform varying ncount from 1 by 1 until ncount > counts
+            Display count(counter ncount) ' ' with no advancing
+            end-perform
+        display function trim(output(counter))
+
+        Display  star(1 + counter)    ' '
+                input(1 + counter)   ' ' with no advancing
+        perform varying ncount from 1 by 1 until ncount > counts
+            Display count(1 + counter ncount) ' ' with no advancing
+            end-perform
+        display function trim(output(1 + counter))
+        continue.
+        end program Clouseau.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [  INPUT                C0 C1 OUTPUT
+  -------------------- -- -- ----------------
+  ABABABABC            01 ABABXYABC
+* ABABABABC            01 ABABXYABC
+], [])
+AT_CLEANUP
+
+AT_SETUP([INSPECT ISO Example 5])
+AT_KEYWORDS([INSPECT])
+AT_DATA([prog.cob], [        Identification Division.
+        Program-Id. Clouseau.
+        *> Note:  Although modeled on Example-5 in Appendix D of the ISO 2023
+        *> specification, all six of the samples are incorrect.
+        *> This code executes the examples as written, and the test suite checks
+        *> For the answers believed to be correct
+        Data Division.
+        Working-Storage Section.
+        01 item-1 pic x(8) value "ABABBCAB".
+        01 item-2 pic x(7) value "ABDBABC".
+        01 item-3 pic x(8) value "BCABCABD".
+        01 count-0 pic 9 value zero.
+        01 count-1 pic 9 value zero.
+        01 count-2 pic 9 value zero.
+        Procedure Division.
+
+        initialize item-1 item-2 item-3 count-0 count-1 count-2 all value
+        display item-1 "   " with no advancing
+        INSPECT BACKWARD ITEM-1 TALLYING
+            COUNT-0 FOR ALL "AB" BEFORE "BC"
+            COUNT-1 FOR LEADING "B"
+            COUNT-2 FOR CHARACTERS AFTER "A" BEFORE "C"
+        INSPECT BACKWARD ITEM-1 REPLACING
+            ALL "AB" BY "XY" BEFORE "BC"
+            LEADING "B" BY "V" AFTER "D"
+        display count-0 space count-1 space count-2 space item-1
+
+        initialize item-1 item-2 item-3 count-0 count-1 count-2 all value
+        display item-2 "    " with no advancing
+        INSPECT BACKWARD ITEM-2 TALLYING
+            COUNT-0 FOR ALL "AB" BEFORE "BC"
+            COUNT-1 FOR LEADING "B"
+            COUNT-2 FOR CHARACTERS AFTER "A" BEFORE "C"
+        INSPECT BACKWARD ITEM-2 REPLACING
+            ALL "AB" BY "XY" BEFORE "BC"
+            LEADING "B" BY "V" AFTER "D"
+        display count-0 space count-1 space count-2 space item-2
+
+        initialize item-1 item-2 item-3 count-0 count-1 count-2 all value
+        display item-3 "   " with no advancing
+        INSPECT BACKWARD ITEM-3 TALLYING
+            COUNT-0 FOR ALL "AB" BEFORE "BC"
+            COUNT-1 FOR LEADING "B"
+            COUNT-2 FOR CHARACTERS AFTER "A" BEFORE "C"
+        INSPECT BACKWARD ITEM-3 REPLACING
+            ALL "AB" BY "XY" BEFORE "BC"
+            LEADING "B" BY "V" AFTER "D"
+        display count-0 space count-1 space count-2 space item-3
+
+        initialize item-1 item-2 item-3 count-0 count-1 count-2 all value
+        MOVE FUNCTION REVERSE (ITEM-1) TO ITEM-1
+        display item-1 "   " with no advancing
+        INSPECT ITEM-1 TALLYING
+        COUNT-0 FOR ALL "AB" BEFORE "BC"
+        COUNT-1 FOR LEADING "B"
+        COUNT-2 FOR CHARACTERS AFTER "A" BEFORE "C"
+        INSPECT BACKWARD ITEM-1 REPLACING
+        ALL "AB" BY "XY" BEFORE "BC"
+        LEADING "B" BY "V" AFTER "D"
+        display count-0 space count-1 space count-2 space item-1
+
+        initialize item-1 item-2 item-3 count-0 count-1 count-2 all value
+        MOVE FUNCTION REVERSE (ITEM-2) TO ITEM-2
+        display item-2 "    " with no advancing
+        INSPECT ITEM-2 TALLYING
+        COUNT-0 FOR ALL "AB" BEFORE "BC"
+        COUNT-1 FOR LEADING "B"
+        COUNT-2 FOR CHARACTERS AFTER "A" BEFORE "C"
+        INSPECT BACKWARD ITEM-2 REPLACING
+        ALL "AB" BY "XY" BEFORE "BC"
+        LEADING "B" BY "V" AFTER "D"
+        display count-0 space count-1 space count-2 space item-2
+
+        initialize item-1 item-2 item-3 count-0 count-1 count-2 all value
+        MOVE FUNCTION REVERSE (ITEM-3) TO ITEM-3
+        display item-3 "   " with no advancing
+        INSPECT ITEM-3 TALLYING
+        COUNT-0 FOR ALL "AB" BEFORE "BC"
+        COUNT-1 FOR LEADING "B"
+        COUNT-2 FOR CHARACTERS AFTER "A" BEFORE "C"
+        INSPECT BACKWARD ITEM-3 REPLACING
+        ALL "AB" BY "XY" BEFORE "BC"
+        LEADING "B" BY "V" AFTER "D"
+        display count-0 space count-1 space count-2 space item-3
+
+        goback.
+        end program Clouseau.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [ABABBCAB   0 1 0 ABABBCXY
+ABDBABC    0 0 0 AVDBABC
+BCABCABD   1 0 0 BCABCAVD
+BACBBABA   1 1 0 BACBBXYA
+CBABDBA    1 0 0 CBAVDBA
+DBACBACB   0 0 0 DBACBACB
+], [])
+AT_CLEANUP
+
+AT_SETUP([INSPECT ISO Example 5-f])
+AT_KEYWORDS([INSPECT])
+AT_DATA([prog.cob], [
+        Identification Division.
+        Program-Id. Clouseau.
+        *> Note:  Although modeled on Example-5 in Appendix D of the ISO 2023
+        *> specification, all three of the samples are incorrect.  This code
+        *> modifies the problem to make it somewhat more interesting, and, of
+        *> course, changes the answers so that they are correct for the problem.
+        Data Division.
+        Working-Storage Section.
+        01 rows   pic 99 value 3.
+        01 counts pic 99 value 3.
+
+        01 rowlim pic 99.
+        01 ncount pic 99.
+
+        01 inputs.
+           05 row occurs  6 times indexed by counter.
+              10 star  PIC X.
+              10 input PIC X(20).
+              10 count PIC 99 occurs 3 times.
+              10 output PIC X(20).
+        77 len PIC 9(8).
+        Procedure Division.
+        *> Odd-numbered rows are "read only" and contain the inputs and expected
+        *> outputs.
+        *> Even-numbered rows are modified by the INSPECT statements and contain
+        *> the observed outputs
+        Move ' ABABBCAB            000106ABABBCXY' to row(1).
+        Move ' ABDBABC             000001AVDBABC'  to row(3).
+        Move ' BCABCABD            010000BCABCAVD' to row(5).
+`
+        compute rowlim = 2*rows - 1
+
+        Display '  INPUT                C0 C1 C2 OUTPUT'
+        Display '  -------------------- -- -- -- ----------------'
+        Perform Example-1 with test after
+            varying counter from 1 by 2 until counter >= rowlim.
+
+        Goback.
+
+        Inspection Section.
+        Example-1.
+        Move row(counter) to row(counter + 1)
+        
+        perform varying ncount from 1 by 1 until ncount > counts
+            Move Zero to count(counter + 1 ncount)
+            end-perform
+
+        Move function length( function trim(input(counter)) ) to len.
+        MOVE INPUT(COUNTER) TO OUTPUT(COUNTER + 1)
+        INSPECT BACKWARD INPUT(COUNTER)(1:len) TALLYING
+            COUNT(counter + 1 1) FOR ALL "AB" BEFORE "BC"
+            COUNT(counter + 1 2) FOR LEADING "B"
+            COUNT(counter + 1 3) FOR CHARACTERS AFTER "A" BEFORE "D"
+        INSPECT BACKWARD OUTPUT(COUNTER + 1)(1:len) REPLACING
+            ALL "AB" BY "XY" BEFORE "BC"
+            LEADING "B" BY "V" AFTER "D"
+
+        If row(counter) = row(counter + 1) then
+            Move '*' to star(counter + 1)
+        Else
+            Move '!' to star(counter + 1).
+
+        Display star(counter)     ' '
+                input(counter)   ' ' with no advancing
+        perform varying ncount from 1 by 1 until ncount > counts
+            Display count(counter ncount) ' ' with no advancing
+            end-perform
+        display function trim(output(counter))
+
+        Display  star(1 + counter)    ' '
+                input(1 + counter)   ' ' with no advancing
+        perform varying ncount from 1 by 1 until ncount > counts
+            Display count(1 + counter ncount) ' ' with no advancing
+            end-perform
+        display function trim(output(1 + counter))
+        continue.
+        end program Clouseau.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [  INPUT                C0 C1 C2 OUTPUT
+  -------------------- -- -- -- ----------------
+  ABABBCAB             00 01 06 ABABBCXY
+* ABABBCAB             00 01 06 ABABBCXY
+  ABDBABC              00 00 01 AVDBABC
+* ABDBABC              00 00 01 AVDBABC
+  BCABCABD             01 00 00 BCABCAVD
+* BCABCABD             01 00 00 BCABCAVD
+], [])
+AT_CLEANUP
+
+AT_SETUP([INSPECT ISO Example 5-r])
+AT_KEYWORDS([INSPECT])
+AT_DATA([prog.cob], [
+        Identification Division.
+        Program-Id. Clouseau.
+        Data Division.
+        Working-Storage Section.
+        01 rows   pic 99 value 3.
+        01 counts pic 99 value 3.
+
+        01 rowlim pic 99.
+        01 ncount pic 99.
+
+        01 inputs.
+           05 row occurs  6 times indexed by counter.
+              10 star  PIC X.
+              10 input PIC X(20).
+              10 count PIC 99 occurs 3 times.
+              10 output PIC X(20).
+        77 len PIC 9(8).
+        Procedure Division.
+        *> Odd-numbered rows are "read only" and contain the inputs and expected
+        *> outputs.
+        *> Even-numbered rows are modified by the INSPECT statements and contain
+        *> the observed outputs
+        Move ' BACBBABA            000004BACBBXYA' to row(1).
+        Move ' CBABDBA             000005CBAVDBA'  to row(3).
+        Move ' DBACBACB            000100DBACBACB' to row(5).
+
+        compute rowlim = 2*rows - 1
+
+        Display '  INPUT                C0 C1 C2 C3 C4 OUTPUT'
+        Display '  -------------------- -- -- -- -- -- ----------------'
+        Perform Example-1 with test after
+            varying counter from 1 by 2 until counter >= rowlim.
+
+        Goback.
+
+        Inspection Section.
+        Example-1.
+        Move row(counter) to row(counter + 1)
+        
+        perform varying ncount from 1 by 1 until ncount > counts
+            Move Zero to count(counter + 1 ncount)
+            end-perform
+
+        Move function length( function trim(input(counter)) ) to len.
+        MOVE INPUT(COUNTER) TO OUTPUT(COUNTER + 1)
+        INSPECT BACKWARD INPUT(COUNTER)(1:len) TALLYING
+            COUNT(counter + 1 1) FOR ALL "AB" BEFORE "BC"
+            COUNT(counter + 1 2) FOR LEADING "B"
+            COUNT(counter + 1 3) FOR CHARACTERS AFTER "A" BEFORE "C"
+        INSPECT BACKWARD OUTPUT(COUNTER + 1)(1:len) REPLACING
+            ALL "AB" BY "XY" BEFORE "BC"
+            LEADING "B" BY "V" AFTER "D"
+
+        If row(counter) = row(counter + 1) then
+            Move '*' to star(counter + 1)
+        Else
+            Move '!' to star(counter + 1).
+
+        Display star(counter)     ' '
+                input(counter)   ' ' with no advancing
+        perform varying ncount from 1 by 1 until ncount > counts
+            Display count(counter ncount) ' ' with no advancing
+            end-perform
+        display function trim(output(counter))
+
+        Display  star(1 + counter)    ' '
+                input(1 + counter)   ' ' with no advancing
+        perform varying ncount from 1 by 1 until ncount > counts
+            Display count(1 + counter ncount) ' ' with no advancing
+            end-perform
+        display function trim(output(1 + counter))
+        continue.
+        end program Clouseau.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [  INPUT                C0 C1 C2 C3 C4 OUTPUT
+  -------------------- -- -- -- -- -- ----------------
+  BACBBABA             00 00 04 BACBBXYA
+* BACBBABA             00 00 04 BACBBXYA
+  CBABDBA              00 00 05 CBAVDBA
+* CBABDBA              00 00 05 CBAVDBA
+  DBACBACB             00 01 00 DBACBACB
+* DBACBACB             00 01 00 DBACBACB
+], [])
+AT_CLEANUP
+
+AT_SETUP([INSPECT ISO Example 6])
+AT_KEYWORDS([INSPECT])
+AT_DATA([prog.cob], [
+        Identification Division.
+        Program-Id. Clouseau.
+        Data Division.
+        Working-Storage Section.
+        01 rows   pic 99 value 1.
+
+        01 rowlim pic 99.
+        01 ncount pic 99.
+
+        01 inputs.
+           05 row occurs  6 times indexed by counter.
+              10 star  PIC X.
+              10 input PIC X(20).
+              10 output PIC X(20).
+        77 len PIC 9(8).
+        Procedure Division.
+        *> Odd-numbered rows are "read only" and contain the inputs and expected
+        *> outputs.
+        *> Even-numbered rows are modified by the INSPECT statements and contain
+        *> the observed outputs
+        Move ' AC"AEBDFBCD#AB"D    AC"XEYXFYZX#AB"D' to row(1).
+`
+        compute rowlim = 2*rows - 1
+
+        Display '  INPUT                OUTPUT'
+        Display '  -------------------- ----------------'
+        Perform Example-1 with test after
+            varying counter from 1 by 2 until counter >= rowlim.
+
+        Goback.
+
+        Inspection Section.
+        Example-1.
+        Move row(counter) to row(counter + 1)
+
+        Move function length( function trim(input(counter)) ) to len.
+        MOVE INPUT(COUNTER) TO OUTPUT(COUNTER + 1)
+        INSPECT OUTPUT(COUNTER + 1)(1:len) CONVERTING
+            "ABCD" TO "XYZX" AFTER QUOTE BEFORE "#".
+
+        If row(counter) = row(counter + 1) then
+            Move '*' to star(counter + 1)
+        Else
+            Move '!' to star(counter + 1).
+
+        Display star(counter)     ' '
+                input(counter)   ' ' with no advancing
+        display function trim(output(counter))
+
+        Display  star(1 + counter)    ' '
+                input(1 + counter)   ' ' with no advancing
+        display function trim(output(1 + counter))
+        continue.
+        end program Clouseau.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [  INPUT                OUTPUT
+  -------------------- ----------------
+  AC"AEBDFBCD#AB"D     AC"XEYXFYZX#AB"D
+* AC"AEBDFBCD#AB"D     AC"XEYXFYZX#AB"D
+], [])
+AT_CLEANUP
+
+####
+
+AT_SETUP([INSPECT ISO Example 7])
+AT_KEYWORDS([INSPECT])
+AT_DATA([prog.cob], [        Identification Division.
+        Program-Id. Clouseau.
+        Data Division.
+        Working-Storage Section.
+        01 rows   pic 99 value 3.
+
+        01 rowlim pic 99.
+        01 ncount pic 99.
+
+        01 inputs.
+           05 row occurs  6 times indexed by counter.
+              10 star  PIC X.
+              10 input PIC X(20).
+              10 output PIC X(20).
+        77 len PIC 9(8).
+        
+        Linkage Section.
+        77 result PIC 9(8) Value 0.
+        
+        Procedure Division returning result.
+        *> Odd-numbered rows are "read only" and contain the inputs and expected
+        *> outputs.
+        *> Even-numbered rows are modified by the INSPECT statements and contain
+        *> the observed outputs
+        Move ' 415-245-1212        415-245-1212' to row(1).
+        Move ' 415-CH5-1212        415-??5-1212' to row(3).
+        Move ' 20%Numeric          20%???????' to row(5).
+`
+        compute rowlim = 2*rows - 1
+
+        Display '  INPUT                OUTPUT'
+        Display '  -------------------- ----------------'
+        Perform Example-1 with test after
+            varying counter from 1 by 2 until counter >= rowlim.
+
+        Goback.
+
+        Inspection Section.
+        Example-1.
+        Move row(counter) to row(counter + 1)
+        
+        Move function length( function trim(input(counter)) ) to len.
+        MOVE INPUT(COUNTER) TO OUTPUT(COUNTER + 1)
+        INSPECT OUTPUT(COUNTER + 1)(1:len) CONVERTING
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+             TO ALL "?"
+
+        If row(counter) = row(counter + 1) then
+            Move '*' to star(counter + 1)
+        Else
+            Move 1 to result
+            Move '!' to star(counter + 1).
+
+        Display star(counter)     ' '
+                input(counter)   ' ' with no advancing
+        display function trim(output(counter))
+
+        Display  star(1 + counter)    ' '
+                input(1 + counter)   ' ' with no advancing
+        display function trim(output(1 + counter))
+        continue.
+        end program Clouseau.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [  INPUT                OUTPUT
+  -------------------- ----------------
+  415-245-1212         415-245-1212
+* 415-245-1212         415-245-1212
+  415-CH5-1212         415-??5-1212
+* 415-CH5-1212         415-??5-1212
+  20%Numeric           20%???????
+* 20%Numeric           20%???????
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([INSPECT BACKWARD REPLACING LEADING])
+AT_KEYWORDS([INSPECT])
+AT_DATA([prog.cob], [        identification  division.
+        program-id.     caller.
+        data            division.
+        working-storage section.
+        77 str          pic x(19) value "AAAAsomeABthingBBBB".
+        procedure division.
+        display "Starting with                                    " """" str """" "..."
+        
+        initialize str all value.
+        inspect str replacing all "A" by "X"
+        display "After inspect          replacing     ALL A by X: " """" str """" 
+
+        initialize str all value.
+        inspect str replacing leading "A" by "X"
+        display "After inspect          replacing LEADING A by X: " """" str """" 
+
+        initialize str all value.
+        inspect backward str replacing all "A" by "X"
+        display "After inspect backward replacing     ALL A by X: " """" str """" 
+
+        initialize str all value.
+        inspect backward str replacing leading "A" by "X"
+        display "After inspect backward replacing LEADING A by X: " """" str """" 
+
+        initialize str all value.
+        inspect str replacing all "B" by "X"
+        display "After inspect          replacing     ALL B by X: " """" str """" 
+
+        initialize str all value.
+        inspect str replacing leading "B" by "X"
+        display "After inspect          replacing LEADING B by X: " """" str """" 
+
+        initialize str all value.
+        inspect backward str replacing all "B" by "X"
+        display "After inspect backward replacing     ALL B by X: " """" str """" 
+
+        initialize str all value.
+        inspect backward str replacing leading "B" by "X"
+        display "After inspect backward replacing LEADING B by X: " """" str """" 
+        goback.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [Starting with                                    "AAAAsomeABthingBBBB"...
+After inspect          replacing     ALL A by X: "XXXXsomeXBthingBBBB"
+After inspect          replacing LEADING A by X: "XXXXsomeABthingBBBB"
+After inspect backward replacing     ALL A by X: "XXXXsomeXBthingBBBB"
+After inspect backward replacing LEADING A by X: "AAAAsomeABthingBBBB"
+After inspect          replacing     ALL B by X: "AAAAsomeAXthingXXXX"
+After inspect          replacing LEADING B by X: "AAAAsomeABthingBBBB"
+After inspect backward replacing     ALL B by X: "AAAAsomeAXthingXXXX"
+After inspect backward replacing LEADING B by X: "AAAAsomeABthingXXXX"
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([INSPECT BACKWARD REPLACING TRAILING])
+AT_KEYWORDS([INSPECT])
+AT_DATA([prog.cob], [        identification  division.
+        program-id.     caller.
+        data            division.
+        working-storage section.
+        77 str          pic x(19) value "AAAAsomeABthingBBBB".
+        procedure division.
+        display "Starting with                                     " """" str """" "..."
+        
+        initialize str all value.
+        inspect str replacing all "A" by "X"
+        display "After inspect          replacing      ALL A by X: " """" str """" 
+
+        initialize str all value.
+        inspect str replacing trailing "A" by "X"
+        display "After inspect          replacing TRAILING A by X: " """" str """" 
+
+        initialize str all value.
+        inspect backward str replacing all "A" by "X"
+        display "After inspect backward replacing      ALL A by X: " """" str """" 
+
+        initialize str all value.
+        inspect backward str replacing trailing "A" by "X"
+        display "After inspect backward replacing TRAILING A by X: " """" str """" 
+
+        initialize str all value.
+        inspect str replacing all "B" by "X"
+        display "After inspect          replacing      ALL B by X: " """" str """" 
+
+        initialize str all value.
+        inspect str replacing trailing "B" by "X"
+        display "After inspect          replacing TRAILING B by X: " """" str """" 
+
+        initialize str all value.
+        inspect backward str replacing all "B" by "X"
+        display "After inspect backward replacing      ALL B by X: " """" str """" 
+
+        initialize str all value.
+        inspect backward str replacing trailing "B" by "X"
+        display "After inspect backward replacing TRAILING B by X: " """" str """" 
+        goback.
+])
+AT_CHECK([$COMPILE -dialect mf prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [Starting with                                     "AAAAsomeABthingBBBB"...
+After inspect          replacing      ALL A by X: "XXXXsomeXBthingBBBB"
+After inspect          replacing TRAILING A by X: "AAAAsomeABthingBBBB"
+After inspect backward replacing      ALL A by X: "XXXXsomeXBthingBBBB"
+After inspect backward replacing TRAILING A by X: "XXXXsomeABthingBBBB"
+After inspect          replacing      ALL B by X: "AAAAsomeAXthingXXXX"
+After inspect          replacing TRAILING B by X: "AAAAsomeABthingXXXX"
+After inspect backward replacing      ALL B by X: "AAAAsomeAXthingXXXX"
+After inspect backward replacing TRAILING B by X: "AAAAsomeABthingBBBB"
+], [])
+AT_CLEANUP

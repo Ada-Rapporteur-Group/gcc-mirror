@@ -1,0 +1,12 @@
+  Top Ten Words In Document
+Pos   Occurs    Document Word
+and                 069
+will                042
+remote              030
+web                 029
+procedures          024
+services            021
+other               020
+with                018
+them                017
+from                016

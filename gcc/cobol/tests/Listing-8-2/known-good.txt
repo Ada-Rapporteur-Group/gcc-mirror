@@ -1,0 +1,5 @@
+Note that the "Error" on Shop ID0001 is intentional
+Total sales for shop ID006     $99.90
+Error on Shop: ID001 RCount = 00006 ACount = 00004
+Total sales for shop ID002     $33.25
+Total sales for shop ID003  $1,702.60

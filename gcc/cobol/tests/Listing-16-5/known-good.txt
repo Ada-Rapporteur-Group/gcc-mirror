@@ -1,0 +1,13 @@
+What is the capital of Alabama? Montgomery    
+That is correct
+ 
+What is the state code for Alaska? AJ            
+That is incorrect.  The code for Alaska is AK
+ 
+What is the population of Arizona? 06500000
+ Populations: 04875000 < 06553255 < 08125000
+That answer is close enough.  The actual population is  6,553,255
+ 
+Of what state is Little Rock the capital? Arkansas      
+That is correct
+ 

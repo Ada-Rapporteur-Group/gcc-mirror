@@ -1,0 +1,16 @@
+0000 is a Hex number
+0000 is not alphabetic
+0000 is not a real name
+ 
+FFFF is a Hex number
+FFFF is alphabetic
+FFFF is a real name
+ 
+AA11 is a Hex number
+AA11 is not alphabetic
+AA11 is not a real name
+ 
+FFFG is not a Hex number
+FFFG is alphabetic
+FFFG is a real name
+ 

@@ -1,0 +1,4 @@
+Please enter two single digit numbers 
+FirstNum is 5
+SecondNum is 8
+Result is = 13

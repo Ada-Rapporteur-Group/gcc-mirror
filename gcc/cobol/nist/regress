@@ -1,0 +1,34 @@
+#!/bin/bash
+set -e
+rm -fr XXXXX*
+find -name "*.rdone" -delete
+make extract
+make -f Makefile.regression $1 $2 $3 $4 $5 $6 $7 $8
+
+find -name "*.rdone" -delete
+
+if [[ "$1" =~ GROUP.* ]] ; then GROUPIC="$1"; fi
+if [[ "$2" =~ GROUP.* ]] ; then GROUPIC="$2"; fi
+if [[ "$3" =~ GROUP.* ]] ; then GROUPIC="$3"; fi
+if [[ "$4" =~ GROUP.* ]] ; then GROUPIC="$4"; fi
+if [[ "$5" =~ GROUP.* ]] ; then GROUPIC="$5"; fi
+if [[ "$6" =~ GROUP.* ]] ; then GROUPIC="$6"; fi
+if [[ "$7" =~ GROUP.* ]] ; then GROUPIC="$7"; fi
+if [[ "$8" =~ GROUP.* ]] ; then GROUPIC="$8"; fi
+
+if [[ $GROUPIC == "" ]]  ;  then GROUPIC="GROUP=IC" ; fi
+
+if [ "$GROUPIC" == "GROUP=IC" ] ; then
+    make -f Makefile ic-clean  $1 $2 $3 $4 $5 $6 $7 $8
+    make -f Makefile ic $1 $2 $3 $4 $5 $6 $7 $8
+    IC_FILES=$(grep -v "^\#.*" catalog | grep -v EXEC85 | grep "OK" | grep "IC" | sed 's|^\([^.]*\).*$|\1|g ')
+    for FILE in $IC_FILES;
+        do
+        make -f Makefile testic EXEC_FILE=IC/$FILE REPORTT=IC/$FILE.out $1 $2 $3 $4 $5 $6 $7 $8
+        if [ $? -ne 0 ] ; then
+            echo "                                      $FILE - ERROR"
+            exit 1
+            fi
+        done;
+    fi
+

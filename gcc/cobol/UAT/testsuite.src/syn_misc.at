@@ -1,0 +1,1138 @@
+## Copyright (C) 2007-2012, 2014-2020 Free Software Foundation, Inc.
+## Written by Keisuke Nishida, Roger While, Simon Sobisch, Edward Hart,
+## Ron Norman
+##
+## This file is part of GnuCOBOL.
+##
+## The GnuCOBOL compiler is free software: you can redistribute it
+## and/or modify it under the terms of the GNU General Public License
+## as published by the Free Software Foundation, either version 3 of the
+## License, or (at your option) any later version.
+##
+## GnuCOBOL is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with GnuCOBOL.  If not, see <https://www.gnu.org/licenses/>.
+
+### GnuCOBOL Test Suite
+
+
+AT_SETUP([tokens consisting of multiple words])
+# note: we actually do not check for all possible cases, but two are better than none...
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  test-var   pic xx.
+           88  endOfFile value '10'.
+       01  todo       pic xx.
+
+       PROCEDURE DIVISION.
+           if not endOfFile
+              display 'all fine'
+           end-if
+           if test-var greater or equal todo
+              display 'still fine'
+           end-if
+           .
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [0], [], [])
+AT_CLEANUP
+
+
+AT_SETUP([conditional / define directives (4)])
+AT_KEYWORDS([misc directive])
+
+# check for case-insensivity
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID.    prog.
+       PROCEDURE      DIVISION.
+       >>IF A IS DEFINED
+           CONTINUE
+           .
+       >>else
+           CONTINUE
+           .
+       >>eNd-If
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [0], [])
+AT_CLEANUP
+
+
+AT_SETUP([Invalid conditional expression (1)])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  CON          CONSTANT 10.
+       01  V            PIC 9.
+       78  C78          VALUE 'A'.
+       PROCEDURE        DIVISION.
+           IF FUNCTION TRIM (' ')
+              CONTINUE
+              CONTINUE
+           END-IF.
+           IF CON
+              CONTINUE
+              CONTINUE
+           END-IF.
+           IF V
+              CONTINUE
+              CONTINUE
+           END-IF.
+           IF C78
+              CONTINUE
+              CONTINUE
+           END-IF.
+           IF '2'
+              CONTINUE
+              CONTINUE
+           END-IF.
+           IF C78 OR V
+               CONTINUE
+               CONTINUE
+           END-IF.
+           EVALUATE TRUE
+              WHEN FUNCTION TRIM (' ')
+                 CONTINUE
+                 CONTINUE
+              WHEN CON
+                 CONTINUE
+                 CONTINUE
+              WHEN V
+                 CONTINUE
+                 CONTINUE
+              WHEN C78
+                 CONTINUE
+                 CONTINUE
+              WHEN '2'
+                 CONTINUE
+              WHEN OTHER
+                 CONTINUE
+           END-EVALUATE.
+           PERFORM VARYING V
+                   FROM 1 BY 1
+                   UNTIL FUNCTION TRIM (' ')
+              CONTINUE
+              CONTINUE
+           END-PERFORM.
+           PERFORM VARYING V
+                   FROM 1 BY 1
+                   UNTIL V
+              CONTINUE
+              CONTINUE
+           END-PERFORM.
+           PERFORM VARYING V
+                   FROM 1 BY 1
+                   UNTIL C78
+              CONTINUE
+              CONTINUE
+           END-PERFORM.
+           PERFORM VARYING V
+                   FROM 1 BY 1
+                   UNTIL '2'
+              CONTINUE
+              CONTINUE
+           END-PERFORM.
+           IF NOTDEFINED = 1 OR 2
+              CONTINUE
+           END-IF.
+
+           IF (V = 1) AND V
+              CONTINUE
+           END-IF
+
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY -dialect mf prog.cob], [1], [], ignore)
+# [prog.cob:10: syntax error at '''
+# prog.cob:10: error: invalid TRIM argument at ')'
+# prog.cob:15: syntax error: 1.00000000000000000000000000000000E+01 is not a Boolean expression at 'CONTINUE'
+# prog.cob:19: syntax error: V is not a Boolean expression at 'CONTINUE'
+# prog.cob:23: syntax error: A is not a Boolean expression at 'CONTINUE'
+# prog.cob:27: syntax error: 2 is not a Boolean expression at 'CONTINUE'
+# prog.cob:31: error: 'A' OR 'V' invalid because 'A' is not a condition at 'CONTINUE'
+# prog.cob:35: syntax error at '''
+# prog.cob:35: error: invalid TRIM argument at ')'
+# prog.cob:54: syntax error at '''
+# prog.cob:54: error: invalid TRIM argument at ')'
+# prog.cob:61: error: V is not a condition expression at 'CONTINUE'
+# prog.cob:67: error: A is not a condition expression at 'CONTINUE'
+# prog.cob:73: error: 2 is not a condition expression at 'CONTINUE'
+# prog.cob:76: error: symbol 'NOTDEFINED' not found at '='
+# prog.cob:81: error: _stack21 AND V invalid because LHS is not a relation condition at 'CONTINUE'
+# cobol1: error: failed compiling prog.cob
+# 
+#] 
+AT_CLEANUP
+
+AT_SETUP([INITIALIZE constant])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  CON          CONSTANT 10.
+       01  V            PIC 9.
+       78  C78          VALUE 'A'.
+       PROCEDURE DIVISION.
+           INITIALIZE CON.
+           INITIALIZE V.
+           INITIALIZE V, 9.
+           INITIALIZE C78, V.
+])
+AT_CHECK([$COMPILE_ONLY -dialect mf prog.cob], [1], [],
+[prog.cob:10:23: error: 10 is a literal
+   10 |            INITIALIZE CON.
+      |                       ^
+prog.cob:12:26: error: 9 is a literal
+   12 |            INITIALIZE V, 9.
+      |                          ^
+prog.cob:13:23: error: C78 is a constant
+   13 |            INITIALIZE C78, V.
+      |                       ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([INSPECT invalid target])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC X(8).
+       PROCEDURE        DIVISION.
+           INSPECT FUNCTION TRIM(X) REPLACING ALL "ABC" BY "DEF".
+           INSPECT FUNCTION TRIM(X) CONVERTING "ABC" TO "AAA".
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[[prog.cob:8:20: error: INSPECT cannot write to its argument
+    8 |            INSPECT FUNCTION TRIM(X) REPLACING ALL "ABC" BY "DEF".
+      |                    ^
+prog.cob:9:20: error: INSPECT cannot write to its argument
+    9 |            INSPECT FUNCTION TRIM(X) CONVERTING "ABC" TO "AAA".
+      |                    ^
+cobol1: error: failed compiling prog.cob
+]])
+AT_CLEANUP
+
+AT_SETUP([maximum data size])
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 SINGLE-ITEM   PIC X(999999999).
+       01 GROUP-ITEM1.
+          05 FILLER     PIC X(999999999).
+       01 GROUP-ITEM2.
+          05 FILLER     PIC X(199999999).
+          05 FILLER     PIC X(199999999).
+       PROCEDURE        DIVISION.
+           STOP RUN.
+
+])
+
+# cobc reports
+# prog.cob:6: error: 'SINGLE-ITEM' cannot be larger than 268435456 bytes
+#             268435456 => 268,435,456 requires only 28 of our 32 bits
+# prog.cob:8: error: 'FILLER 1' cannot be larger than 268435456 bytes
+# prog.cob:7: error: 'GROUP-ITEM1' cannot be larger than 268435456 bytes
+# prog.cob:9: error: 'GROUP-ITEM2' cannot be larger than 268435456 bytes
+#
+# The total size of GROUP-ITEM1 is 1399999997, requiring only 31 bits.
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [0], [],
+[])
+
+AT_CLEANUP
+
+
+AT_SETUP([missing newline in fixed-form / free-form])
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       PROCEDURE        DIVISION.
+           CONTINUE
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [0], [],
+[])
+# program is valid
+# cobc says: prog.cob:8: error: syntax error, unexpected end of file
+
+AT_CLEANUP
+
+
+
+AT_SETUP([Segmentation Module])
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       PROCEDURE        DIVISION.
+
+       DECLARATIVES.
+
+       DEC-1 SECTION 49.
+           CONTINUE.
+
+       DEC-2 SECTION 50.
+           CONTINUE.
+
+       END DECLARATIVES.
+
+       SEC-1 SECTION 00.
+           CONTINUE.
+
+       SEC-2 SECTION 01.
+           CONTINUE.
+
+       SEC-3 SECTION -00.
+           CONTINUE.
+
+       SEC-4 SECTION 100.
+           CONTINUE.
+
+       SEC-5 SECTION 49.
+           CONTINUE.
+
+       SEC-6 SECTION 50.
+           PERFORM SEC-1.
+
+       SEC-7 SECTION 99.
+           PERFORM SEC-1.
+
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:9:14: sorry, unimplemented: SECTION segment 49. was ignored
+    9 |        DEC-1 SECTION 49.
+      |              ^
+prog.cob:12:14: sorry, unimplemented: SECTION segment 50. was ignored
+   12 |        DEC-2 SECTION 50.
+      |              ^
+prog.cob:17:14: sorry, unimplemented: SECTION segment 00. was ignored
+   17 |        SEC-1 SECTION 00.
+      |              ^
+prog.cob:20:14: sorry, unimplemented: SECTION segment 01. was ignored
+   20 |        SEC-2 SECTION 01.
+      |              ^
+prog.cob:23:14: error: SECTION segment -00. is negative
+   23 |        SEC-3 SECTION -00.
+      |              ^
+prog.cob:26:14: sorry, unimplemented: SECTION segment 100. was ignored
+   26 |        SEC-4 SECTION 100.
+      |              ^
+prog.cob:29:14: sorry, unimplemented: SECTION segment 49. was ignored
+   29 |        SEC-5 SECTION 49.
+      |              ^
+prog.cob:32:14: sorry, unimplemented: SECTION segment 50. was ignored
+   32 |        SEC-6 SECTION 50.
+      |              ^
+prog.cob:35:14: sorry, unimplemented: SECTION segment 99. was ignored
+   35 |        SEC-7 SECTION 99.
+      |              ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+
+AT_SETUP([ACCEPT FROM ESCAPE KEY])
+AT_KEYWORDS([misc])
+
+# TODO: add function test to run_manual_screen.at
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       77 KEYNUM        PIC 9(04).
+       PROCEDURE        DIVISION.
+
+           ACCEPT KEYNUM FROM ESCAPE KEY
+           DISPLAY "Key pressed: " KEYNUM
+           ACCEPT KEYNUM FROM ESCAPE
+           DISPLAY "Key pressed: " KEYNUM
+           ACCEPT OMITTED
+
+           STOP RUN.
+])
+# cobc: compiles
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:9:31: error: no such environment mnemonic name: ESCAPE
+    9 |            ACCEPT KEYNUM FROM ESCAPE KEY
+      |                               ^
+prog.cob:11:31: error: no such environment mnemonic name: ESCAPE
+   11 |            ACCEPT KEYNUM FROM ESCAPE
+      |                               ^
+prog.cob:13:19: error: syntax error, unexpected OMITTED
+   13 |            ACCEPT OMITTED
+      |                   ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([floating-point literals])
+# Refer to Section 8.3.1.2.2.2 of COBOL 2014.
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       PROCEDURE        DIVISION.
+           *> Valid literals
+           DISPLAY 1.0E6144, +1.0E+3, +1.0E-6143, 123.E1,
+               +.123456789012345678901234567890123456E+0000
+           END-DISPLAY
+
+           *> invalid literals
+           DISPLAY 1.0D3 END-DISPLAY
+           DISPLAY 1E3 END-DISPLAY
+           DISPLAY '1.0E3'BLAH END-DISPLAY
+           DISPLAY 1.0E3.0 END-DISPLAY
+           DISPLAY -0.0E-0 END-DISPLAY
+           DISPLAY 1.0E00003 END-DISPLAY
+           DISPLAY .123456789012345678901234567890123456789E0
+           END-DISPLAY
+           DISPLAY 0.0E3 END-DISPLAY
+
+           *> Implementor-defined invalid literals
+           DISPLAY 1.0E6145 END-DISPLAY
+           DISPLAY 1.0E-6144 END-DISPLAY
+
+           STOP RUN.
+])
+
+AT_DATA([prog2.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog2.
+       ENVIRONMENT      DIVISION.
+       CONFIGURATION    SECTION.
+       SPECIAL-NAMES.
+            DECIMAL-POINT IS COMMA.
+       PROCEDURE        DIVISION.
+           *> Valid literals
+           DISPLAY 1,0E6144; +1,0E+3; +1,0E-6143; 123,E1;
+               +,123456789012345678901234567890123456E+0000
+           END-DISPLAY
+
+           *> invalid literals
+           DISPLAY 1,0D3 END-DISPLAY
+           DISPLAY 1E3 END-DISPLAY
+           DISPLAY 1,0E3BLAH END-DISPLAY
+           DISPLAY 1,0E3,0 END-DISPLAY
+           DISPLAY -0,0E-0 END-DISPLAY
+           DISPLAY 1,0E00003 END-DISPLAY
+           DISPLAY ,123456789012345678901234567890123456789E0
+           END-DISPLAY
+           DISPLAY 0,0E3 END-DISPLAY
+
+           *> Implementor-defined invalid literals
+           DISPLAY 1,0E6145 END-DISPLAY
+           DISPLAY 1,0E-6144 END-DISPLAY
+
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:11:23: error: DATA-ITEM 'D3' not found
+   11 |            DISPLAY 1.0D3 END-DISPLAY
+      |                       ^
+prog.cob:12:20: error: DATA-ITEM '1E3' not found
+   12 |            DISPLAY 1E3 END-DISPLAY
+      |                    ^
+prog.cob:13:27: error: DATA-ITEM 'BLAH' not found
+   13 |            DISPLAY '1.0E3'BLAH END-DISPLAY
+      |                           ^
+prog.cob:14:20: error: exponent includes decimal point
+   14 |            DISPLAY 1.0E3.0 END-DISPLAY
+      |                    ^
+prog.cob:15:20: error: zero significand of -0.0E-0 cannot be negative
+   15 |            DISPLAY -0.0E-0 END-DISPLAY
+      |                    ^
+prog.cob:16:20: error: exponent 00003 more than 4 digits
+   16 |            DISPLAY 1.0E00003 END-DISPLAY
+      |                    ^
+prog.cob:17:20: error: significand of .123456789012345678901234567890123456789E0 has more than 36 digits (39)
+   17 |            DISPLAY .123456789012345678901234567890123456789E0
+      |                    ^
+cobol1: error: failed compiling prog.cob
+])
+
+AT_CHECK([$COMPILE_ONLY prog2.cob], [1], [],
+[prog2.cob:15:23: error: DATA-ITEM 'D3' not found
+   15 |            DISPLAY 1,0D3 END-DISPLAY
+      |                       ^
+prog2.cob:16:20: error: DATA-ITEM '1E3' not found
+   16 |            DISPLAY 1E3 END-DISPLAY
+      |                    ^
+prog2.cob:17:25: error: DATA-ITEM 'BLAH' not found
+   17 |            DISPLAY 1,0E3BLAH END-DISPLAY
+      |                         ^
+prog2.cob:18:20: error: exponent includes decimal point
+   18 |            DISPLAY 1,0E3,0 END-DISPLAY
+      |                    ^
+prog2.cob:19:20: error: zero significand of -0,0E-0 cannot be negative
+   19 |            DISPLAY -0,0E-0 END-DISPLAY
+      |                    ^
+prog2.cob:20:20: error: exponent 00003 more than 4 digits
+   20 |            DISPLAY 1,0E00003 END-DISPLAY
+      |                    ^
+prog2.cob:21:20: error: significand of ,123456789012345678901234567890123456789E0 has more than 36 digits (39)
+   21 |            DISPLAY ,123456789012345678901234567890123456789E0
+      |                    ^
+cobol1: error: failed compiling prog2.cob
+])
+AT_CLEANUP
+
+
+AT_SETUP([ANY LENGTH item as formal parameter])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID.    prog.
+
+       DATA           DIVISION.
+       LINKAGE        SECTION.
+       01  str        ANY LENGTH PIC X.
+
+       PROCEDURE DIVISION USING str.
+           GOBACK
+           .
+])
+AT_DATA([prog2.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID.    prog2.
+
+       DATA           DIVISION.
+       LINKAGE        SECTION.
+       01  str        ANY LENGTH PIC X.
+
+       PROCEDURE DIVISION.
+           GOBACK
+           .
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [], 
+[prog.cob:7:23: error: ANY LENGTH valid only for 01 in LINKAGE SECTION of a function or contained program
+    7 |        01  str        ANY LENGTH PIC X.
+      |                       ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CHECK([$COMPILE_ONLY prog2.cob], [1], [], 
+[prog2.cob:7:23: error: ANY LENGTH valid only for 01 in LINKAGE SECTION of a function or contained program
+    7 |        01  str        ANY LENGTH PIC X.
+      |                       ^
+cobol1: error: failed compiling prog2.cob
+])
+AT_CLEANUP
+
+AT_SETUP([ANY LENGTH item as BY VALUE formal parameter])
+AT_KEYWORDS([misc BY VALUE])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID.    prog.
+
+       DATA           DIVISION.
+       LINKAGE        SECTION.
+       01  str        ANY LENGTH PIC X.
+
+       PROCEDURE DIVISION USING VALUE str.
+           GOBACK
+           .
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:7:23: error: ANY LENGTH valid only for 01 in LINKAGE SECTION of a function or contained program
+    7 |        01  str        ANY LENGTH PIC X.
+      |                       ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([wrong dialect hints])
+AT_KEYWORDS([misc configuration reserved])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  x PIC X.
+
+       PROCEDURE DIVISION.
+           DISPLAY x CONVERSION.
+           TRANSFORM x
+           .
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:10:22: error: DATA-ITEM 'CONVERSION' not found
+   10 |            DISPLAY x CONVERSION.
+      |                      ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([EVALUATE statement with invalid syntax])
+AT_KEYWORDS([misc expression])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  a-variable PIC 9.
+       PROCEDURE DIVISION.
+           EVALUATE a-variable
+              ALSO true
+              WHEN 1
+              ALSO a-variable
+                 CONTINUE
+              WHEN 1 OR 2
+                 CONTINUE
+           END-EVALUATE.
+           EVALUATE a-variable
+              ALSO true
+              WHEN 3
+                 CONTINUE
+              WHEN 5
+                 CONTINUE
+           END-EVALUATE.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:11:20: error: subject _stack2, type Conditional, cannot be compared a-variable, type NumericDisplay
+   11 |               ALSO a-variable
+      |                    ^
+prog.cob:13:19: error: WHEN clause incomplete, 1 of 2 evaluated
+   13 |               WHEN 1 OR 2
+      |                   ^
+prog.cob:18:19: error: WHEN clause incomplete, 1 of 2 evaluated
+   18 |               WHEN 3
+      |                   ^
+prog.cob:20:19: error: WHEN clause incomplete, 1 of 2 evaluated
+   20 |               WHEN 5
+      |                   ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([UNSTRING COUNT clause])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION  DIVISION.
+       PROGRAM-ID.     prog.
+
+       DATA            DIVISION.
+       WORKING-STORAGE SECTION.
+       01  valid-1       PIC 9.
+       01  valid-2       BINARY-LONG.
+       01  valid-3       PIC 99 COMP-3.
+
+       01  invalid-1     PIC 99V99.
+       01  invalid-2     FLOAT-LONG.
+       01  invalid-3     PIC 99PP.
+       01  invalid-4     PIC VPP99.
+       01  invalid-5     PIC X(30).
+           88  invalid-6 VALUE "abc".
+
+       01  x             PIC X(9).
+       01  y             PIC X(9).
+
+       PROCEDURE       DIVISION.
+           UNSTRING x INTO y COUNT valid-1
+           UNSTRING x INTO y COUNT valid-2
+           UNSTRING x INTO y COUNT valid-3
+
+           UNSTRING x INTO y COUNT invalid-1
+           UNSTRING x INTO y COUNT invalid-2
+           UNSTRING x INTO y COUNT invalid-3
+           UNSTRING x INTO y COUNT invalid-4
+           UNSTRING x INTO y COUNT invalid-5
+           UNSTRING x INTO y COUNT invalid-6
+           .
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:26:36: error: COUNT invalid-1 must be integer type
+   26 |            UNSTRING x INTO y COUNT invalid-1
+      |                                    ^
+prog.cob:28:36: error: COUNT invalid-3 must be integer type
+   28 |            UNSTRING x INTO y COUNT invalid-3
+      |                                    ^
+prog.cob:28:36: error: COUNT invalid-3 may not be P scaled
+prog.cob:29:36: error: COUNT invalid-4 must be integer type
+   29 |            UNSTRING x INTO y COUNT invalid-4
+      |                                    ^
+prog.cob:29:36: error: COUNT invalid-4 may not be P scaled
+prog.cob:30:36: error: COUNT invalid-5 must be integer type
+   30 |            UNSTRING x INTO y COUNT invalid-5
+      |                                    ^
+prog.cob:31:36: error: syntax error, unexpected Level 88 NAME
+   31 |            UNSTRING x INTO y COUNT invalid-6
+      |                                    ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([SIGN clause checks])
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION  DIVISION.
+       PROGRAM-ID.     prog.
+
+       DATA            DIVISION.
+       WORKING-STORAGE SECTION.
+       01  valid-1     SIGN TRAILING.
+           03  x       PIC S999.
+           03  y       PIC S999.
+       01  valid-2     PIC S99.
+
+       01  invalid-1   PIC 99 SIGN LEADING.
+       01  invalid-2   PIC S99 SIGN TRAILING, USAGE BINARY.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:12:8: error: invalid-1 must be signed for SIGN IS
+   12 |        01  invalid-1   PIC 99 SIGN LEADING.
+      |        ^
+prog.cob:13:47: error: invalid-2 is binary NUMERIC type, incompatible with SIGN IS
+   13 |        01  invalid-2   PIC S99 SIGN TRAILING, USAGE BINARY.
+      |                                               ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([EQUALS in expressions])
+AT_KEYWORDS([misc])
+# EQUALS is not ISO, changed to EQUAL
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  num PIC 99 VALUE 0.
+       PROCEDURE DIVISION.
+           IF num LESS OR EQUALS 0
+               CONTINUE
+           END-IF
+           IF num GREATER THAN OR EQUAL 1
+               CONTINUE
+           END-IF
+           IF num EQUALS TO 0
+               CONTINUE
+           END-IF
+           .
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CLEANUP
+
+
+AT_SETUP([Invalid parentheses around condition])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  num PIC 99 VALUE 0.
+       PROCEDURE DIVISION.
+           IF num NOT (LESS OR EQUALS) 0
+               CONTINUE
+           END-IF
+           .
+])
+AT_CHECK([$COMPILE prog.cob], [1], [],
+[prog.cob:9:23: error: syntax error, unexpected '[(]', expecting class name or OMITTED
+    9 |            IF num NOT (LESS OR EQUALS) 0
+      |                       ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+# "The implementor defines the stage of processing for this directive."
+# cobc says >>DISPLAY is controlled by >>IF, so outputs "OK" only.
+# gcobol says CDF conditional compilation does not control CDF directives.
+# Also, gcobol >>DISPLAY writes to stderr.
+AT_SETUP([conditional / define directives (3)])
+AT_KEYWORDS([misc directive])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID.    prog.
+       PROCEDURE      DIVISION.
+       >>IF A IS DEFINED
+       >>IF B IS DEFINED
+           CONTINUE
+       >> DISPLAY "NOT OK (not both definitions)"
+           .
+       >>ELSE
+           CONTINUE
+       >> DISPLAY "NOT OK (no definitions)"
+           .
+       >>END-IF
+       >>ELSE
+           CONTINUE
+       >> DISPLAY "OK"
+           .
+       >>END-IF
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [0], [], [OK
+])
+AT_CLEANUP
+
+AT_SETUP([error handling in conditional directives])
+AT_KEYWORDS([misc directive])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID.    prog.
+       PROCEDURE      DIVISION.
+       >> IF BANANA
+         >>DISPLAY "Who throws bananas?"
+       >> ELSE
+         >> DISPLAY "No BANANA here."
+         >> DEFINE X 1
+       >> END-IF
+           CONTINUE
+           .
+])
+AT_CHECK([$COMPILE_ONLY -D X prog.cob], [1], [], [prog.cob:5:14: error: CDF error: no such variable 'BANANA'
+    5 |        >> IF BANANA
+      |              ^
+No BANANA here.
+prog.cob:9:20: error: name already in dictionary: X
+    9 |          >> DEFINE X 1
+      |                    ^
+prog.cob:9:20: error: X was defined on the command line
+prog.cob:10:1: error: syntax error, unexpected invalid token
+   10 |        >> END-IF
+      | ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([swapped SOURCE- and OBJECT-COMPUTER])
+AT_KEYWORDS([misc extensions])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID.    prog.
+
+       ENVIRONMENT    DIVISION.
+       CONFIGURATION  SECTION.
+       OBJECT-COMPUTER. a.
+       SOURCE-COMPUTER. b.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [0], [], [])
+AT_CLEANUP
+
+
+AT_SETUP([Repeated program-id])
+AT_KEYWORDS([bugs])
+AT_DATA([prog.cob], [
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. prog.
+        PROCEDURE DIVISION.
+        DISPLAY "Hi.".
+        END PROGRAM prog.
+
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. prog.
+        PROCEDURE DIVISION.
+        DISPLAY "Bye.".
+        END PROGRAM prog.
+])
+AT_CHECK([$COMPILE prog.cob], [1], [],
+[prog.cob:9:21: error: PROGRAM-ID prog already defined on line 4
+    9 |         PROGRAM-ID. prog.
+      |                     ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([Repeated variable name should be an error])
+AT_KEYWORDS([bugs])
+AT_DATA([prog.cob], [
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. prog.
+        DATA DIVISION.
+        WORKING-STORAGE SECTION.
+        01 redundant PIC 9.
+        01 redundant PIC 9.
+        PROCEDURE DIVISION.
+        DISPLAY redundant
+        DISPLAY "Hi".
+        END PROGRAM prog.
+])
+AT_CHECK([$COMPILE prog.cob], [1], [],
+[prog.cob:10:9: error: redundant is not a unique reference
+   10 |         DISPLAY "Hi".
+      |         ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+
+AT_SETUP([Empty VALUE])
+AT_KEYWORDS([bugs])
+AT_DATA([prog.cob], [IDENTIFICATION DIVISION.
+PROGRAM-ID. routine_128_cobol.
+DATA DIVISION.
+LINKAGE SECTION.
+01  var1 pic 9(30) VALUE .
+01  var2 pic 9(30) VALUE .
+PROCEDURE DIVISION USING var1 RETURNING var2.
+    DISPLAY "      I am COBOL routine_128_cobol".
+    DISPLAY var1
+    MOVE var1 TO var2.
+    END PROGRAM routine_c.
+])
+AT_CHECK([$COMPILE prog.cob], [1], [],
+[prog.cob:5:26: error: syntax error, unexpected '.'
+    5 | 01  var1 pic 9(30) VALUE .
+      |                          ^
+prog.cob:5:26: error: no valid VALUE supplied
+prog.cob:6:26: error: syntax error, unexpected '.'
+    6 | 01  var2 pic 9(30) VALUE .
+      |                          ^
+prog.cob:6:26: error: no valid VALUE supplied
+prog.cob:11:5: error: END PROGRAM 'routine_c' does not match PROGRAM-ID 'routine_128_cobol'
+   11 |     END PROGRAM routine_c.
+      |     ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([LENGTH OF -- various constructions])
+AT_KEYWORDS([bugs])
+AT_DATA([prog.cob], [
+        identification division.
+        program-id. prog.
+        data division.
+        working-storage section.
+        77 pointer-value COMP PIC S9(8) VALUE ZERO.
+        77 point-at      REDEFINES pointer-value USAGE POINTER.
+        77 vstring       PIC X(64).
+        77 vnum          PIC 999.
+        procedure division.
+        move length of vstring to vnum
+        display vnum
+      *>  move length of vstring(12:34) to vnum      *> refmod not valid, per IBM
+        move function length(vstring(12:34)) to vnum *> but ok for LENGTH function
+        display vnum
+        display length of vstring
+      *>  call "prog2" using by content length of vstring
+        call "prog3" using by value length of vstring
+        call "prog3" using by value 4 * 16
+        goback.
+        end program prog.
+
+        identification division.
+        program-id. prog2.
+        data division.
+        linkage section.
+        01 parm binary pic 9(9).
+        procedure division using parm.
+        display "prog2: parm is " parm
+        goback.
+        end program prog2.
+
+        identification division.
+        program-id. prog3.
+        data division.
+        linkage section.
+        01 parm binary pic 9(9).
+        procedure division using by value parm.
+        display "prog3: parm is " parm
+        goback.
+        end program prog3.
+])
+AT_CHECK([$COMPILE -dialect ibm prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [064
+034
+64
+prog3: parm is 000000064
+prog3: parm is 000000064
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([Invalid X literals])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID.    prog.
+       PROCEDURE      DIVISION.
+           *> Valid form
+           DISPLAY X"0123456789ABCDEF"
+
+           *> invalid form
+           DISPLAY X"GH"
+                   X"1"
+           END-DISPLAY.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [], [prog.cob:9:20: error: syntax error, unexpected invalid token
+    9 |            DISPLAY X"GH"
+      |                    ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+
+AT_SETUP([Multiple programs -fcobol-exceptions=EC-ALL])
+AT_KEYWORDS([exceptions])
+AT_DATA([prog.cob], [
+        identification division.
+        program-id. wrapper.
+        procedure division.
+        goback.
+        end program wrapper.
+
+        identification division.
+        function-id. dummy.
+        data division.
+        linkage section.
+        77 output-value    pic 9(8) comp-5.
+        procedure division returning output-value.
+        goback.
+        end function dummy.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+## At one time the followeing compilation failed.
+AT_CHECK([$COMPILE -fcobol-exceptions=EC-ALL prog.cob], [0], [], [])
+AT_CLEANUP
+
+
+AT_SETUP([CALL program-table value])
+AT_KEYWORDS([Simon program-table])
+AT_DATA([prog.cob], [
+        identification division.
+        program-id. prog.
+        data division.
+        working-storage section.
+        01  program-table.
+         05 prgm pic x(32) occurs 5 times.
+        procedure division.
+        call prgm(2)
+        goback.
+        end program prog.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([LEVEL78 Constants])
+AT_KEYWORDS([LEVEL78 Constants])
+AT_DATA([prog.cob], [
+        program-id. prog.
+        data division.
+        working-storage section.
+        78  Z-ZAE-MAX               VALUE 255.
+        78  T02-IND-MAX             VALUE Z-ZAE-MAX.
+        01  T02-TEXT-STRING.
+           05 T02-TEXT           PIC X(T02-IND-MAX) VALUE SPACE.
+           05 T02-TEXT-R         REDEFINES T02-TEXT.
+              10 T02-CHAR        OCCURS T02-IND-MAX  PIC X(01).
+           05 T02-IND                   PIC 9(08) COMP-5 VALUE 0.
+        procedure division.
+        display length of T02-TEXT 
+        display length of T02-TEXT-R
+        goback.
+        end program prog.
+])
+AT_CHECK([$COMPILE -dialect mf prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [255
+255
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([Function with no -main entry])
+AT_KEYWORDS([function -main])
+AT_DATA([prog.cob], [        identification division.
+        function-id. func.
+        data division.
+        linkage section.
+        01 n binary-char unsigned.
+        01 f-n binary-long unsigned.
+        procedure division using n returning f-n.
+           goback .
+        identification division.
+        program-id prog.
+        procedure division.
+           goback .
+        end program prog.
+        end function func.
+])
+AT_CHECK([$COMPILE prog.cob], [1], [], stderr)
+AT_CHECK([sed -e "s/^.*\(in function\).*$/\1/g" -e "s/^.*\(undefined reference to \`main'\).*$/\1/g" stderr], [0], 
+[in function
+undefined reference to `main'
+collect2: error: ld returned 1 exit status
+], [])
+AT_CLEANUP
+
+AT_SETUP([DECLARATIVES with following SECTION])
+AT_KEYWORDS([DECLARATIVES])
+AT_DATA([prog.cob], [        identification      division.
+        program-id.         prog.
+        procedure division.
+        DECLARATIVES.
+        declaratives-ec-all section.
+            use after exception condition ec-all.
+                display "      declarative for ec-all".
+           end declaratives.
+        display "hello".
+        end program         prog.
+])
+AT_CHECK([$COMPILE prog.cob], [1], [], [prog.cob:9:9: error: Per ISO a program with DECLARATIVES must begin with a SECTION, requires -dialect ibm
+    9 |         display "hello".
+      |         ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CHECK([$COMPILE -dialect ibm prog.cob], [0], [], [])
+AT_CLEANUP
+
+
+AT_SETUP([Maximum Length names full of hyphens])
+AT_DATA([prog.cob], [        identification          division.
+        program-id.             a-------------------------------------------------------------b.
+        procedure               division.
+        C-------------------------------------------------------------D section.
+        0-------------------------------------------------------------1.
+        display "Whatta world".
+        end program             a-------------------------------------------------------------b.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [Whatta world
+], [])
+AT_CLEANUP
+

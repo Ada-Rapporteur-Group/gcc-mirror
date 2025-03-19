@@ -1,0 +1,48 @@
+### Part of the test suite for COBOL for GCC (gcobol)
+### Copyright (c) 2022, COBOLworx, a subsidiary of Symas Corp.
+###
+### Developed by Marty Heyman
+### *****
+### COMPILE v COMPILE_FIXED exist to handle intentionally FIXED format tests
+### *****
+### To run against cobol1 in a built tree, set the GCOBOL,
+### GCOBOL_FLAGS, GCOBOL_LDFLAGS environment variables.
+### *****
+
+## Currently defaulting to fixed format as the GnuCOBOL testsuite is all in that format
+## It can be disabled on a per-test basis within an autotest source file:
+##     AT_CHECK([export COB_FIXED=]),[0],[],[])
+## and vice versa.
+
+## By default, we invoke the system-installed gcobol executable.  To instead use
+## a development build, set the GCOBOL_BUILD_DIR environment variable to the
+## folder wherein "configure" and "make" were executed
+## repository:
+
+if [ "$GCOBOL_BUILD_DIR" ]
+then
+    ## Use the specified build location to specify the gcobol executable and
+    ## associated library files created by the gcc-cobol "make" process:
+    GCOBOL="${GCOBOL_BUILD_DIR}/gcc/gcobol"
+    GCOBOL_ARCH=$($GCOBOL -v 2>&1 | grep "Target:" | sed 's/^.*[ ]\(.*\)$/\1/g')
+    GCOBOL_FLAGS="-B ${GCOBOL_BUILD_DIR}/gcc"
+    GCOBOL_LDFLAGS="-L $GCOBOL_BUILD_DIR/$GCOBOL_ARCH/libgcobol/.libs/ \
+    -L $GCOBOL_BUILD_DIR/$GCOBOL_ARCH/libstdc++-v3/src/.libs           \
+    -Wl,-rpath=$GCOBOL_BUILD_DIR/$GCOBOL_ARCH/libgcobol/.libs/         \
+    -Wl,-rpath=$GCOBOL_BUILD_DIR/$GCOBOL_ARCH/libstdc++-v3/src/.libs"
+else
+    ## Assume there is a system 'gcobol' installed:
+    GCOBOL="${GCOBOL:-/usr/bin/env gcobol}"
+    GCOBOL_LDFLAGS="${GCOBOL_LDFLAGS:--Wl,-rpath=/usr/local/gcc-cobol/lib64}"
+    GCOBOL_ARCH=${GCOBOL_ARCH:-x86_64-linux-gnu}
+fi
+
+COB_FIXED="-ffixed-form"
+
+COMPILE_FIXED="$GCOBOL $GCOPTIONS $GCOBOL_FLAGS $COB_FIXED $GCOBOL_LDFLAGS"
+COMPILE="$GCOBOL  $GCOPTIONS $GCOBOL_FLAGS $GCOBOL_LDFLAGS"
+COMPILE_MODULE="$GCOBOL  $GCOPTIONS --shared -fPIC $GCOBOL_FLAGS $GCOBOL_LDFLAGS"
+COMPILE_ONLY="$GCOBOL $GCOPTIONS -c $GCOBOL_FLAGS"
+CC=gcc
+
+UBUNTU20=$(cat /etc/os-release | grep PRETTY_NAME| sed 's/.*Ubuntu \([0-9][0-9]\).*$/\1/g')

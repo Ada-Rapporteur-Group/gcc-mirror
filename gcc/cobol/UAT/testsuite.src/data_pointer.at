@@ -1,0 +1,87 @@
+## Copyright (C) 2003-2012, 2014-2016 Free Software Foundation, Inc.
+## Written by Keisuke Nishida, Roger While, Simon Sobisch
+##
+## This file is part of GnuCOBOL.
+##
+## The GnuCOBOL compiler is free software: you can redistribute it
+## and/or modify it under the terms of the GNU General Public License
+## as published by the Free Software Foundation, either version 3 of the
+## License, or (at your option) any later version.
+##
+## GnuCOBOL is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with GnuCOBOL.  If not, see <https://www.gnu.org/licenses/>.
+
+### GnuCOBOL Test Suite
+
+AT_SETUP([POINTER: display])
+AT_KEYWORDS([pointer 64bit])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 PTR           USAGE POINTER VALUE NULL.
+       PROCEDURE        DIVISION.
+           DISPLAY PTR
+           END-DISPLAY.
+           SET PTR UP BY 1
+           DISPLAY PTR
+           SET PTR DOWN BY 1
+           DISPLAY PTR
+           END-DISPLAY.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [0x0000000000000000
+0x0000000000000001
+0x0000000000000000
+])
+AT_CLEANUP
+
+AT_SETUP([IBM dialect COMP redefined by POINTER as 64-bit])
+AT_KEYWORDS([pointer 64bit])
+AT_DATA([prog.cob], [
+        identification division.
+        program-id. prog.
+        data division.
+        working-storage section.
+      *> This is a test of the "-dialect ibm" special interpretation of a common
+      *> construction in IBM mainframe code.  That machine is a 32-bit
+      *> big-endian architecture.  We are assuming a 64-bit little-endian
+      *> x86_64 architecture.  So, the COMP PIC S8(8) would usually be an 32-bit
+      *> big-endian value.  But "-dialect ibm" means that the following
+      *> REDEFINES USAGE POINTER causes the prior "COMP" to actually be defined
+      *> as a 64-bit little-endian binary value.
+        77 pointer-value COMP PIC S9(8) VALUE ZERO.
+        77 point-at      REDEFINES pointer-value USAGE POINTER.
+        procedure division.
+      *> The following value is 0x123456789
+        move 4886718345 to pointer-value
+        display point-at " should be 0x0000000123456789"
+        set point-at down by 4886718345
+        display point-at " should be 0x0000000000000000"
+        set point-at down by 4886718345
+        display point-at " should be 0xfffffffedcba9877"
+        set point-at up by 4886718345
+        display point-at " should be 0x0000000000000000"
+        subtract 1 from pointer-value
+        display point-at " should be 0xffffffffffffffff"
+        add 1 to pointer-value
+        display point-at " should be 0x0000000000000000"
+        goback.
+        end program prog.
+])
+AT_CHECK([$COMPILE -dialect ibm prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [0x0000000123456789 should be 0x0000000123456789
+0x0000000000000000 should be 0x0000000000000000
+0xfffffffedcba9877 should be 0xfffffffedcba9877
+0x0000000000000000 should be 0x0000000000000000
+0xffffffffffffffff should be 0xffffffffffffffff
+0x0000000000000000 should be 0x0000000000000000
+])
+AT_CLEANUP

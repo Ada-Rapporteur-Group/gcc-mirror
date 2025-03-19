@@ -1,0 +1,7 @@
+Enter a name - UnstrPtr after first UNSTRING 08
+StrPtr after first STRING 04
+UnstrPtr after second UNSTRING 15
+StrPtr after first STRING 07
+UnstrPtr after second UNSTRING 81
+StrPtr after second STRING 27
+Processed name = R. J. Dubner                  

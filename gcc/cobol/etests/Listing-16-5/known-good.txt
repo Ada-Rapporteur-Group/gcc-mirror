@@ -1,0 +1,51 @@
+Of what state is Des Moines the capital? Iowa          
+That is correct
+ 
+What is the population of Delaware? 00100000
+ Populations: 00075000 < 00917092 < 00125000
+That is incorrect.  The population of Delaware is    917,092
+ 
+Of what state is Atlanta the capital? Georgia       
+That is correct
+ 
+What is the state code for Florida? FL            
+That is correct
+ 
+What is the state code for Delaware? DE            
+That is correct
+ 
+Of what state is Jefferson City the capital? Missouri      
+That is correct
+ 
+Of what state is Indianapolis the capital? Indiana       
+That is correct
+ 
+What is the population of Idaho? 01500000
+ Populations: 01125000 < 01595728 < 01875000
+That answer is close enough.  The actual population is  1,595,728
+ 
+What is the state code for New Hampshire? nh            
+That is correct
+ 
+What is the population of Colorado? 10000000
+ Populations: 07500000 < 05187582 < 12500000
+That is incorrect.  The population of Colorado is  5,187,582
+ 
+Of what state is Concord the capital? New Hampshirex
+That is incorrect.  The state for Concord is New Hampshire 
+ 
+What is the capital of Arizona? Phoenixx      
+That is incorrect.  The capital of Arizona is Phoenix       
+ 
+What is the capital of New York? Albanyx       
+That is incorrect.  The capital of New York is Albany        
+ 
+What is the capital of Oregon? Salemx        
+That is incorrect.  The capital of Oregon is Salem         
+ 
+What is the state code for Missouri? MX            
+That is incorrect.  The code for Missouri is MO
+ 
+Of what state is Bismarck the capital? North Dakotax 
+That is incorrect.  The state for Bismarck is North Dakota  
+ 

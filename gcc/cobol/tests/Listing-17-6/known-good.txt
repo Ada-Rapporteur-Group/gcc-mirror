@@ -1,0 +1,14 @@
+Please enter the director surname :- Entered Jackson             
+009 Jackson              8805075 Lord of the Rings:Return of the King    
+009 Jackson              8805091 Lord of the Rings:Fellowship of the Ring
+009 Jackson              8805164 Lord of the Rings:The Two Towers        
+009 Jackson              8805253 Heavenly Creatures                      
+Please enter the director surname :- Entered xxx                 
+-DF ERROR Status = 23
+Please enter the director surname :- Entered Scorsese            
+033 Scorsese             8805288 Cape Fear                               
+Please enter the director surname :- Entered Spielberg           
+005 Spielberg            8805326 The Color Purple                        
+005 Spielberg            8805121 Jaws                                    
+005 Spielberg            8805229 Saving Private Ryan                     
+005 Spielberg            8805245 Catch Me If You Can                     

@@ -1,0 +1,67 @@
+## Copyright (C) 2003-2012, 2017-2018 Free Software Foundation, Inc.
+## Written by Keisuke Nishida, Roger While, Simon Sobisch
+##
+## This file is part of GnuCOBOL.
+##
+## The GnuCOBOL compiler is free software: you can redistribute it
+## and/or modify it under the terms of the GNU General Public License
+## as published by the Free Software Foundation, either version 3 of the
+## License, or (at your option) any later version.
+##
+## GnuCOBOL is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with GnuCOBOL.  If not, see <https://www.gnu.org/licenses/>.
+
+### GnuCOBOL Test Suite
+
+### ISO+IEC+1989-2002 13.16.61 VALUE clause
+
+## 13.16.61.1 General format
+
+# Format 1 (data-item): DONE
+
+# Format 2 (table): TODO
+
+# Format 3 (condition-name): TODO
+
+# Format 4 (report-section): TODO
+
+# Format 5 (content-validation-entry): TODO
+
+## 13.16.61.2 Syntax rules
+
+
+# 1) TODO
+
+
+# 2) TODO
+
+AT_SETUP([Implicit picture from value])
+AT_KEYWORDS([value])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# GNU -f
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 IMPHEAD.
+          05 IMPPIC     VALUE " abc".
+       PROCEDURE        DIVISION.
+           DISPLAY IMPPIC END-DISPLAY
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_ONLY -frelax-syntax-checks prog.cob], [0], [],
+[prog.cob:7: warning: defining implicit picture size 4 for 'IMPPIC'
+])
+
+AT_CHECK([$COMPILE_ONLY -frelax-syntax-checks -w prog.cob], [0], [], [])
+
+AT_CLEANUP

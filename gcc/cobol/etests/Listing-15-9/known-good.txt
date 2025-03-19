@@ -1,0 +1,29 @@
+eg1. The character in position 231 is = W
+ 
+eg2. My name is Mike
+ 
+eg3. The ordinal position of A is = 94
+ 
+eg4. The sixth letter of the alphabet is F
+ 
+eg5. Highest character in the list is at pos 03
+ 
+eg6. Lowest character in the list is at pos 05
+ 
+eg7. Highest value in the table is at pos 16
+ 
+eg8. Highest value in the table = 88
+ 
+eg9.
+TopPos 1 = 88
+TopPos 2 = 85
+TopPos 3 = 74
+ 
+eg10. The length of xString is 45 characters
+ 
+This string is 33 characters long            
+eg11. The length of text in xString is 33 characters
+ 
+eg12.
+abcdef     is not a palindrome
+abcdcba    is a palindrome

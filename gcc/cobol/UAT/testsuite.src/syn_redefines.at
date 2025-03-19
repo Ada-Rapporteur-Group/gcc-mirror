@@ -1,0 +1,403 @@
+## Copyright (C) 2003-2012, 2016-2017, 2020 Free Software Foundation, Inc.
+## Written by Keisuke Nishida, Roger While
+##
+## This file is part of GnuCOBOL.
+##
+## The GnuCOBOL compiler is free software: you can redistribute it
+## and/or modify it under the terms of the GNU General Public License
+## as published by the Free Software Foundation, either version 3 of the
+## License, or (at your option) any later version.
+##
+## GnuCOBOL is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with GnuCOBOL.  If not, see <https://www.gnu.org/licenses/>.
+
+### GnuCOBOL Test Suite
+
+### ISO+IEC+1989-2002 13.16.42 REDEFINES clause
+
+## 13.16.42.2 Syntax rules
+
+
+# 1) DONE
+
+AT_SETUP([REDEFINES: not following entry-name])
+AT_KEYWORDS([redefines])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC X.
+       01 Y             PIC 9 REDEFINES X.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:7:31: error: REDEFINES must appear immediately after LEVEL and NAME
+    7 |        01 Y             PIC 9 REDEFINES X.
+      |                               ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([REDEFINES: within REDEFINES])
+AT_KEYWORDS([redefines])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC X.
+       01 G             REDEFINES X.
+         02 A           PIC X.
+         02 B           REDEFINES A PIC 9.
+       PROCEDURE        DIVISION.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [0], [], [])
+
+AT_CLEANUP
+
+AT_SETUP([REDEFINES: level 02 by 01])
+AT_KEYWORDS([redefines])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 G.
+         02 X           PIC X.
+       01 Y             REDEFINES X PIC 9.
+       PROCEDURE        DIVISION.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:8:35: error: cannot redefine 02 X as 01 Y because they have different levels
+    8 |        01 Y             REDEFINES X PIC 9.
+      |                                   ^
+prog.cob:8:35: error: cannot redefine 02 X as 01 Y because they have different levels
+prog.cob:8:25: error: Y invalid REDEFINES
+    8 |        01 Y             REDEFINES X PIC 9.
+      |                         ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([REDEFINES: level 03 by 02])
+AT_KEYWORDS([redefines])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 G1.
+         02 G2.
+           03 X         PIC X.
+         02 Y           REDEFINES X PIC 9.
+       PROCEDURE        DIVISION.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:9:35: error: cannot redefine 03 X as 02 Y because they have different levels
+    9 |          02 Y           REDEFINES X PIC 9.
+      |                                   ^
+prog.cob:9:35: error: cannot redefine 03 X as 02 Y because they have different levels
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([REDEFINES: lower level number])
+AT_KEYWORDS([redefines])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 G1.
+         02 G2.
+           03 X         PIC X.
+         02 G3.
+           03 A         REDEFINES X PIC 9.
+       PROCEDURE        DIVISION.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:10:35: error: 02 G3 on line 9 lies between X and A
+   10 |            03 A         REDEFINES X PIC 9.
+      |                                   ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+
+# 6) DONE
+
+AT_SETUP([REDEFINES: with OCCURS])
+AT_KEYWORDS([redefines])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 G.
+         02 X           PIC X OCCURS 2.
+         02 Y           REDEFINES X PIC XX.
+       PROCEDURE        DIVISION.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:8:35: error: cannot redefine table 02 X
+    8 |          02 Y           REDEFINES X PIC XX.
+      |                                   ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([REDEFINES: with variable occurrence])
+AT_KEYWORDS([redefines])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 G1.
+         02 X           PIC XX.
+         02 Y           REDEFINES X PIC X OCCURS 1 TO 2 DEPENDING ON I.
+       01 G2.
+         02 X           PIC XX.
+         02 Y           REDEFINES X.
+           03 A         PIC X OCCURS 1 TO 2 DEPENDING ON I.
+       01 G3.
+         02 X.
+           03 A         PIC X OCCURS 1 TO 2 DEPENDING ON I.
+         02 Y           REDEFINES X PIC X.
+       01 I             PIC 9.
+       PROCEDURE        DIVISION.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:8:10: error: data item 02 Y cannot use REDEFINES and OCCURS DEPENDING ON
+    8 |          02 Y           REDEFINES X PIC X OCCURS 1 TO 2 DEPENDING ON I.
+      |          ^
+prog.cob:16:35: error: redefined data item 02 X has OCCURS DEPENDING ON
+   16 |          02 Y           REDEFINES X PIC X.
+      |                                   ^
+prog.cob:11:10: error: line 11: REDEFINES field Y cannot be variable length
+   11 |          02 Y           REDEFINES X.
+      |          ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([REDEFINES: multiple redefinition])
+AT_KEYWORDS([redefines])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 G1.
+         02 X           PIC X.
+         02 A           REDEFINES X PIC 9.
+         02 B           REDEFINES X PIC 9.
+         02 C           REDEFINES B PIC 9.
+       PROCEDURE        DIVISION.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:10:35: error: C may not REDEFINE B, which redefines X
+   10 |          02 C           REDEFINES B PIC 9.
+      |                                   ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+
+# 9) DONE
+
+AT_SETUP([REDEFINES: size exceeds])
+AT_KEYWORDS([redefines])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 G1.
+         02 X           PIC X.
+         02 A           REDEFINES X PIC 99.
+       01 G2.
+         02 X           PIC X.
+         02 A           REDEFINES X PIC 9 OCCURS 2.
+       01 WRK-X         PIC X.
+       01 WRK-X-REDEF   REDEFINES WRK-X PIC 99.
+       01 EXT-X         PIC X EXTERNAL.
+       01 EXT-X-REDEF   REDEFINES EXT-X PIC 99.
+       PROCEDURE        DIVISION.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [], [prog.cob:8:10: error: A (NumericDisplay size 2) larger than REDEFINES X (Alphanumeric size 1)
+    8 |          02 A           REDEFINES X PIC 99.
+      |          ^
+prog.cob:11:10: error: A (NumericDisplay size 2) larger than REDEFINES X (Alphanumeric size 1)
+   11 |          02 A           REDEFINES X PIC 9 OCCURS 2.
+      |          ^
+prog.cob:15:8: error: EXT-X-REDEF (NumericDisplay size 2) larger than REDEFINES EXT-X (Alphanumeric size 1)
+   15 |        01 EXT-X-REDEF   REDEFINES EXT-X PIC 99.
+      |        ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([REDEFINES: with intervention])
+AT_KEYWORDS([redefines])
+# "No entry having a level-number numerically lower than the
+#  level-number of data-name-2 may occur between the data description
+#  entries of data-name-2 and the subject of the entry."
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC X.
+       01 Y             PIC X.
+       01 A             REDEFINES X PIC X.
+       01 G.
+         02 G-X         PIC X.
+         02 G-Y         PIC X.
+         02 G-A         REDEFINES G-X PIC X.
+       PROCEDURE        DIVISION.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:8:35: error: cannot redefine 01 X as 01 A because 01 Y intervenes
+    8 |        01 A             REDEFINES X PIC X.
+      |                                   ^
+prog.cob:12:35: error: cannot redefine 02 G-X as 02 G-A because 02 G-Y intervenes
+   12 |          02 G-A         REDEFINES G-X PIC X.
+      |                                   ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+
+AT_SETUP([REDEFINES: LEVELS 01 and 77])
+AT_KEYWORDS([redefines])
+# Okay, so this should be in run_redefines.at.  That doesn't exist, and I didn't
+# feel like creating it today.  Sue me.
+AT_DATA([prog.cob], [        identification          division.
+        program-id.             prog.
+        data                    division.
+        working-storage         section.
+        01  p1.
+         02 p1d                 binary-double.
+         02 p1p redefines p1d   pointer.
+        01  p2.
+         02 p2d                 binary-double.
+         02 p2p redefines p2d   pointer.
+        01 pdiff                binary-double.
+        01  var01                  picture x(64).
+        01  varp01 redefines var01 pointer.
+        77  var77                  picture x(64).
+        77  varp77 redefines var77 pointer.
+        procedure               division.
+        set p1p to address of var01
+        set p2p to address of varp01
+        compute pdiff = p2d - p1d
+        display "difference in LEVEL01 pointers is " pdiff
+        set p1p to address of var77
+        set p2p to address of varp77
+        compute pdiff = p2d - p1d
+        display "difference in LEVEL77 pointers is " pdiff
+        goback.
+        end program             prog.
+])
+AT_CHECK([$COMPILE -o prog prog.cob], [0], [], [])
+AT_CHECK([./prog], [0], [difference in LEVEL01 pointers is +0000000000000000000
+difference in LEVEL77 pointers is +0000000000000000000
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([REDEFINES: LEVEL 05 in linkage section])
+AT_KEYWORDS([redefines])
+AT_DATA([prog.cob], [        identification          division.
+        program-id.             prog1.
+        data                    division.
+        working-storage         section.
+        01 xyzy                 picture x(4) value "xyzy".
+        01 var01 binary-double value 16.
+        01 var77 binary-double value 32.
+        procedure               division.
+        call                    "prog2" using xyzy
+        goback.
+        end program             prog1.
+
+        identification          division.
+        program-id.             prog2.
+        data                    division.
+        working-storage         section.
+        linkage                 section.
+        01  xyzzy.
+         05 x                   picture x(1).
+         05 y1                  picture x(1).
+         05 z1                  picture x(1).
+         05 z2 redefines z1     picture x(1).
+         05 y2                  picture x(1).
+        procedure               division using xyzzy.
+        display x   with no advancing
+        display y1  with no advancing
+        display z1  with no advancing
+        display z2  with no advancing
+        display y2
+        goback.
+        end program             prog2.
+])
+AT_CHECK([$COMPILE -o prog prog.cob], [0], [], [])
+AT_CHECK([./prog], [0], [xyzzy
+], [])
+AT_CLEANUP
+
+
+
+AT_SETUP([REDEFINES: linkage BY VALUE])
+AT_KEYWORDS([redefines])
+AT_DATA([prog.cob], [        identification          division.
+        program-id.             prog1.
+        data                    division.
+        working-storage         section.
+        01 var01 binary-double value 16.
+        01 var77 binary-double value 32.
+        procedure               division.
+        call                    "prog2" using by value var01 by value var77
+        goback.
+        end program             prog1.
+
+        identification          division.
+        program-id.             prog2.
+        data                    division.
+        working-storage         section.
+        linkage                 section.
+        01  var01                       binary-double.
+        01  var01p redefines var01      pointer.
+        77  var77                       binary-double.
+        77  var77p redefines var77      pointer.
+        procedure  division using by value var01 by value var77.
+        display var01
+        display var01p
+        display var77
+        display var77p
+        goback.
+        end program             prog2.
+])
+AT_CHECK([$COMPILE -o prog prog.cob], [0], [], [])
+AT_CHECK([./prog], [0], [+0000000000000000016
+0x0000000000000010
++0000000000000000032
+0x0000000000000020
+], [])
+AT_CLEANUP

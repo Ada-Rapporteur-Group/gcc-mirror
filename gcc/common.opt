@@ -1617,6 +1617,10 @@ fdump-passes
 Common Var(flag_dump_passes) Init(0)
 Dump optimization passes.
 
+fdump-generic-nodes
+Common Var(flag_dump_generic_nodes) Init(0)
+Dump GENERIC trees for each function in three files: <funcname>.nodes, <funcname>.nodes.html, and <funcname>.nodes.html
+
 fdump-unnumbered
 Common Var(flag_dump_unnumbered)
 Suppress output of instruction numbers, line number notes and addresses in debugging dumps.

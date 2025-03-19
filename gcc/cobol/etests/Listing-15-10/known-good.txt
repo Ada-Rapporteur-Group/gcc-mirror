@@ -1,0 +1,20 @@
+Are we testing? (y/N)
+eg1 - get the current date
+Current Date is 02/27/1953
+Current Time is 12:35:55
+The local time is - GMT -05:00
+ 
+eg2 - find the difference between two dates
+Enter the date of the bill (yyyymmdd) - DaysOverDue is +001
+This bill is overdue.
+ 
+eg3 - find the date x days from now
+Enter the number of days - The date in 001 days time will be 02/28/1953
+aspicx  128623   
+aspicxr    128623
+asbin   000128623
+aspic9  000128623
+asne    000128623.0
+ 
+eg4 - validate the date
+Enter a valid date (yyyymmdd) - Thank you! 20000229 is a valid date.

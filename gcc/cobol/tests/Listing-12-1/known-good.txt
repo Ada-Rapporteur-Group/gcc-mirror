@@ -1,0 +1,41 @@
+
+ Aromamora Base Oils Summary Sales Report
+
+Cust Id  Customer Name         ValueOfSales
+
+ 12332   SCENTIMENTS              $4,947.50
+
+ 12344   AROMANTICS               $4,035.50
+
+ 12350   EATS OF EDEN               $760.75
+
+ 12352   OILS FOR ALL             $3,272.00
+
+ 22342   SCENTS OF SMELL          $1,937.50
+
+ 22346   AROMANIACS                 $500.25
+
+ 22354   COMMON SCENTS            $3,400.00
+
+ 32348   HEAVEN SCENT             $3,552.50
+
+ 32350   OILS WELL THAT ENDS         $25.00
+
+ 32358   SCENTS OF DECORUM        $5,282.50
+
+ 42346   OIL IN GOOD TIME           $105.00
+
+ 42348   SCENTS OF FOREBODING       $122.00
+
+ 52332   MAKING SCENTS OF IT         $77.25
+
+ 52336   SCENTSUALITY               $161.00
+
+ 52338   ODOURS OF SANCTITY          $44.75
+
+ 52346   OILS FAYRE IN LOVE           $1.85
+
+ 52348   PERFECT SCENTS           $3,362.50
+
+
+************** End of Report **************

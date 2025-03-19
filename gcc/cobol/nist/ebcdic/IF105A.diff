@@ -1,0 +1,34 @@
+--- ../../nist/IF/IF105A.cbl	2024-03-18 14:57:54.578537729 -0400
++++ playpen.cbl	2024-03-18 15:57:16.493415050 -0400
+@@ -33,10 +33,10 @@
+ 003200***********************************************************       IF1054.2
+ 003300* Variables specific to the Intrinsic Function Test IF105A*       IF1054.2
+ 003400***********************************************************       IF1054.2
+-003500 01  B                   PIC S9(10)     VALUE 37.                 IF1054.2
++003500 01  B                   PIC S9(10)     VALUE 92.                 IF1054.2
+ 003600 01  C                   PIC S9(10)     VALUE 2.                  IF1054.2
+-003700 01  D                   PIC S9(10)     VALUE 100.                IF1054.2
+-003800 01  ARR                 VALUE "066037100070044".                 IF1054.2
++003700 01  D                   PIC S9(10)     VALUE 132.                IF1054.2
++003800 01  ARR                 VALUE "066092100070079".                 IF1054.2
+ 003900     02 IND OCCURS 5 TIMES PIC 9(3).                              IF1054.2
+ 004000 01  TEMP                PIC S9(5)V9(5).                          IF1054.2
+ 004100 01  WS-ANUM          PIC X.                                      IF1054.2
+@@ -349,7 +349,7 @@
+ 034800 F-CHAR-01.                                                       IF1054.2
+ 034900     MOVE SPACE TO WS-ANUM.                                       IF1054.2
+ 035000 F-CHAR-TEST-01.                                                  IF1054.2
+-035100     MOVE FUNCTION CHAR(37) TO WS-ANUM.                           IF1054.2
++035100     MOVE FUNCTION CHAR(92) TO WS-ANUM.                           IF1054.2
+ 035200     IF WS-ANUM = "$" THEN                                        IF1054.2
+ 035300                        PERFORM PASS                              IF1054.2
+ 035400     ELSE                                                         IF1054.2
+@@ -416,7 +416,7 @@
+ 041500 F-CHAR-05.                                                       IF1054.2
+ 041600     MOVE SPACE TO WS-ANUM.                                       IF1054.2
+ 041700 F-CHAR-TEST-05.                                                  IF1054.2
+-041800     MOVE FUNCTION CHAR(87) TO WS-ANUM.                           IF1054.2
++041800     MOVE FUNCTION CHAR(230) TO WS-ANUM.                          IF1054.2
+ 041900     IF WS-ANUM = "V" THEN                                        IF1054.2
+ 042000                        PERFORM PASS                              IF1054.2
+ 042100     ELSE                                                         IF1054.2

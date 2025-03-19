@@ -1,0 +1,11 @@
+ 
+Search by StateCode (1), StateName (2), StateCaptial (3), STOP (4) - Enter the two letter State Code - State Name    = New York      
+State Capital = Albany        
+ 
+Search by StateCode (1), StateName (2), StateCaptial (3), STOP (4) - Enter the State Name - State Code    = OK
+State Capital = Oklahoma City 
+ 
+Search by StateCode (1), StateName (2), StateCaptial (3), STOP (4) - Enter the State Capital - State Code = ND
+State Name = North Dakota  
+ 
+Search by StateCode (1), StateName (2), StateCaptial (3), STOP (4) - 

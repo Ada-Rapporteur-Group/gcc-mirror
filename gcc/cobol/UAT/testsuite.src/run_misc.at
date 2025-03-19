@@ -1,0 +1,5078 @@
+## Copyright (C) 2003-2012, 2014-2020 Free Software Foundation, Inc.
+## Written by Keisuke Nishida, Roger While, Simon Sobisch, Edward Hart,
+## Ron Norman
+##
+## This file is part of GnuCOBOL.
+##
+## The GnuCOBOL compiler is free software: you can redistribute it
+## and/or modify it under the terms of the GNU General Public License
+## as published by the Free Software Foundation, either version 3 of the
+## License, or (at your option) any later version.
+##
+## GnuCOBOL is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with GnuCOBOL.  If not, see <https://www.gnu.org/licenses/>.
+
+### GnuCOBOL Test Suite
+
+
+AT_SETUP([Level 01 subscripts])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC X OCCURS 10.
+       PROCEDURE        DIVISION.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:6:31: error: 01 X: invalid LEVEL for OCCURS
+    6 |        01 X             PIC X OCCURS 10.
+      |                               ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+## Expressions
+
+AT_SETUP([Non-numeric data in numeric items (1)])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X.
+          03 X-NUM      PIC 9(06) VALUE 123.
+       77 NUM           PIC 9(06).
+       PROCEDURE        DIVISION.
+           MOVE x"0000" TO X (2:2)
+           IF X-NUM NUMERIC
+              DISPLAY "low-value is numeric" UPON SYSERR
+              END-DISPLAY
+           END-IF
+           MOVE x"01" TO X (3:1)
+           IF X-NUM NUMERIC
+              DISPLAY "SOH is numeric" UPON SYSERR
+              END-DISPLAY
+           END-IF
+           MOVE X-NUM TO NUM
+           DISPLAY "test over"
+           END-DISPLAY
+      *
+           GOBACK.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0],
+[test over
+], [])
+AT_CLEANUP
+
+AT_SETUP([Non-numeric data in numeric items (2)])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog2.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X.
+          03 X-NUM      PIC 9(06) PACKED-DECIMAL VALUE 123.
+       77 NUM           PIC 9(06).
+       PROCEDURE        DIVISION.
+           MOVE x"0A" TO X (2:1)
+           IF X-NUM NUMERIC
+              DISPLAY "bad prog"
+              END-DISPLAY
+           END-IF
+           MOVE X-NUM TO NUM
+           DISPLAY "test over"
+           END-DISPLAY
+      *
+           GOBACK.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0],
+[test over
+], [])
+AT_CLEANUP
+
+AT_SETUP([CALL STATIC C from COBOL])
+AT_KEYWORDS([misc])
+AT_DATA([caller.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      caller.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 P1            PIC X VALUE "A".
+       01 P2            PIC X(7).
+       77 P2-COB        PIC X(7).
+       PROCEDURE        DIVISION.
+      *>     CALL STATIC 'callee' USING P1 P2
+           CALL 'callee' USING P1 P2
+           IF P1 NOT EQUAL "B"
+              DISPLAY 'NOT A: ' P1
+              END-DISPLAY
+           END-IF
+           UNSTRING P2 DELIMITED BY LOW-VALUE
+              INTO P2-COB
+           END-UNSTRING
+           EVALUATE TRUE
+              WHEN P2-COB NOT EQUAL "FROM C"
+                 DISPLAY P2-COB '-' P2
+                 END-DISPLAY
+              WHEN RETURN-CODE NOT = 3
+                 DISPLAY RETURN-CODE
+                 END-DISPLAY
+              WHEN OTHER
+                 DISPLAY 'OK'  WITH NO ADVANCING
+                 END-DISPLAY
+                 MOVE 0  TO RETURN-CODE
+           END-EVALUATE
+           EXIT PROGRAM.
+])
+AT_DATA([callee.c], [[
+#include <string.h>
+int
+callee (char *p1, char *p2)
+  {
+  if (p1[0] == 'A')
+    {
+    p1[0] = 'B';
+    }
+   memcpy (p2, "FROM C", 6);
+   return 3;
+  }
+]])
+AT_CHECK([gcc -c -o callee.o callee.c], [0], [], [])
+AT_CHECK([$COMPILE -o caller caller.cob callee.o], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./caller], [0], [OK], [])
+AT_CLEANUP
+
+AT_SETUP([Static CALL with ON EXCEPTION])
+AT_KEYWORDS([misc])
+# AT_XFAIL_IF(true)
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      caller.
+       PROCEDURE        DIVISION.
+           CALL "callee1" ON EXCEPTION
+              CALL "callee2" ON EXCEPTION
+                  DISPLAY "neither callee1 nor callee2 found"
+              END-CALL
+           END-CALL
+           GOBACK.
+       END PROGRAM caller.
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      callee2.
+       PROCEDURE        DIVISION.
+           DISPLAY "this is callee2" NO ADVANCING
+           GOBACK.
+])
+AT_CHECK([$COMPILE -c -o prog.o -main prog.cob], [0], [], [])
+AT_CHECK([$COMPILE prog.o], [1], [], ignore)
+AT_CLEANUP
+
+AT_SETUP([Static CALL with ON EXCEPTION (with -fno-static-call)])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      caller.
+       PROCEDURE        DIVISION.
+           CALL "callee1" ON EXCEPTION
+              CALL "callee2" ON EXCEPTION
+                  DISPLAY "neither callee1 nor callee2 found"
+              END-CALL
+           END-CALL
+           GOBACK.
+       END PROGRAM caller.
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      callee2.
+       PROCEDURE        DIVISION.
+           DISPLAY "this is callee2" NO ADVANCING
+           GOBACK.
+])
+AT_CHECK([$COMPILE -fno-static-call prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [this is callee2], [])
+AT_CLEANUP
+
+
+AT_SETUP([CALL m1. CALL m2. CALL m1.])
+AT_KEYWORDS([misc])
+AT_DATA([m1.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      m1.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC 9(4).
+       PROCEDURE        DIVISION.
+           COMPUTE X = 1 + 2
+           END-COMPUTE.
+           IF X NOT = 3
+              DISPLAY X
+              END-DISPLAY
+           END-IF.
+])
+AT_DATA([m2.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      m2.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC 9(4).
+       PROCEDURE        DIVISION.
+           COMPUTE X = 3 + 4
+           END-COMPUTE.
+           IF X NOT = 7
+              DISPLAY X
+              END-DISPLAY
+           END-IF.
+])
+AT_DATA([caller.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      caller.
+       PROCEDURE        DIVISION.
+           CALL "m1"
+           END-CALL.
+           CALL "m2"
+           END-CALL.
+           CALL "m1"
+           END-CALL.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE -fno-static-call caller.cob m1.cob m2.cob])
+AT_CHECK([./a.out], [0], [], [])
+AT_CLEANUP
+
+## TODO: Check if the following DECIMAL-POINT tests are really all extensions.
+
+AT_SETUP([DECIMAL-POINT is COMMA (1)])
+AT_KEYWORDS([misc extensions])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT      DIVISION.
+       CONFIGURATION    SECTION.
+       SPECIAL-NAMES.
+           DECIMAL-POINT    IS COMMA.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  X            PIC 99V99.
+       PROCEDURE        DIVISION.
+           MOVE FUNCTION MIN (3,,,,,,5) TO X.
+           DISPLAY X
+           END-DISPLAY.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0],
+[00,50
+])
+
+AT_CLEANUP
+
+
+AT_SETUP([DECIMAL-POINT is COMMA (2)])
+AT_KEYWORDS([misc extensions])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT      DIVISION.
+       CONFIGURATION    SECTION.
+       SPECIAL-NAMES.
+           DECIMAL-POINT    IS COMMA.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  X            PIC 99V99.
+       PROCEDURE        DIVISION.
+           MOVE FUNCTION MIN (3,,,,,, 5) TO X.
+           DISPLAY X
+           END-DISPLAY.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0],
+[03,00
+])
+
+AT_CLEANUP
+
+
+AT_SETUP([DECIMAL-POINT is COMMA (3)])
+AT_KEYWORDS([misc extensions])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT      DIVISION.
+       CONFIGURATION    SECTION.
+       SPECIAL-NAMES.
+           DECIMAL-POINT    IS COMMA.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  X            PIC 99V99.
+       PROCEDURE        DIVISION.
+           MOVE FUNCTION MIN (3,,,,,, 1,5) TO X.
+           DISPLAY X
+           END-DISPLAY.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0],
+[01,50
+])
+
+AT_CLEANUP
+
+
+AT_SETUP([DECIMAL-POINT is COMMA (4)])
+AT_KEYWORDS([misc extensions])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT      DIVISION.
+       CONFIGURATION    SECTION.
+       SPECIAL-NAMES.
+           DECIMAL-POINT    IS COMMA.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  X            PIC 99V99.
+       PROCEDURE        DIVISION.
+           MOVE FUNCTION MIN (3, 1,5) TO X.
+           DISPLAY X
+           END-DISPLAY.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0],
+[01,50
+])
+
+AT_CLEANUP
+
+
+AT_SETUP([DECIMAL-POINT is COMMA (5)])
+AT_KEYWORDS([misc extensions])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT      DIVISION.
+       CONFIGURATION    SECTION.
+       SPECIAL-NAMES.
+           DECIMAL-POINT    IS COMMA.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  X            PIC 99V99.
+       PROCEDURE        DIVISION.
+           COMPUTE X=1 + ,1
+           END-COMPUTE
+           DISPLAY X
+           END-DISPLAY.
+           COMPUTE X=1*,1
+           END-COMPUTE
+           DISPLAY X
+           END-DISPLAY.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0],
+[01,10
+00,10
+])
+
+AT_CLEANUP
+
+
+AT_SETUP([CURRENCY SIGN])
+AT_KEYWORDS([misc fundamental])
+
+AT_DATA([prog.cob], [
+       PROGRAM-ID.   prog.
+
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SPECIAL-NAMES.
+           CURRENCY SIGN IS "Y".
+
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       77  amount    pic Y(6)9.99.
+
+       PROCEDURE DIVISION.
+           Move 1512.34 to Amount
+           Display "Amount is #" Amount '#' with no advancing.
+
+           GOBACK
+           .
+       END PROGRAM prog.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0],
+[Amount is #  Y1512.34#])
+
+AT_CLEANUP
+
+
+AT_SETUP([CURRENCY SIGN WITH PICTURE SYMBOL])
+AT_KEYWORDS([misc fundamental])
+
+AT_DATA([prog.cob], [
+       PROGRAM-ID.   prog.
+
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SPECIAL-NAMES.
+           *> note the space after EUR / before ct.
+           CURRENCY SIGN IS "EUR "      WITH PICTURE SYMBOL "U",
+           CURRENCY SIGN IS " ct (EUR)" WITH PICTURE SYMBOL "c",
+           Currency Sign is "$US" with Picture Symbol "$".
+
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       77  EUROS    PIC U99v99.
+       77  cents    PIC 9,999c.
+       77  DOLLARS  Pic $$,$$9.99.
+
+       PROCEDURE DIVISION.
+           MOVE 12.34 TO EUROS
+           MULTIPLY euros BY 100 GIVING cents.
+           DISPLAY "#" EUROS "# equal #" cents '#'.
+           Move 1500 to DOLLARS
+           Display "Invoice amount #1 is " DOLLARS '.'.
+           Move 12.34 to DOLLARS
+           Display "Invoice amount #2 is " DOLLARS '.'.
+
+           GOBACK
+           .
+       END PROGRAM prog.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0],
+[#EUR 12.34# equal #1,234 ct (EUR)#
+Invoice amount #1 is $US1,500.00.
+Invoice amount #2 is    $US12.34.
+])
+
+AT_CLEANUP
+
+AT_SETUP([Fixed continuation indicator])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC X(333) VALUE
+           '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWX
+      -    'YZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUV
+      -    'WXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRST
+      -    'UVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQR
+      -    'STUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP
+      -             'QRSTUVWXYZ'.
+       PROCEDURE        DIVISION.
+           DISPLAY X NO ADVANCING
+           END-DISPLAY.
+           DISPLAY '_'
+           END-DISPLAY.
+           MOVE
+           "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01234567
+      -    "89abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ012345
+      -    "6789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123
+      -    "456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ01
+      -     "23456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXY
+      -                                                               "Z
+      -             "0123456789" TO X.
+           DISPLAY X NO ADVANCING
+           END-DISPLAY.
+           DISPLAY '_'
+           END-DISPLAY.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ                       _
+abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789                       _
+])
+
+AT_CLEANUP
+
+
+AT_SETUP([Concatenation operator])
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       77 STR           PIC X(05).
+       PROCEDURE        DIVISION.
+           MOVE "OK" & " "
+            & "OK"
+             TO STR
+           DISPLAY STR NO ADVANCING
+           END-DISPLAY
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [OK OK])
+AT_CLEANUP
+
+
+AT_SETUP([SOURCE FIXED/FREE directives])
+AT_KEYWORDS([misc SOURCEFORMAT FIXED FREE])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       >>SOURCE FREE
+   DATA             DIVISION.
+   WORKING-STORAGE  SECTION.
+   >>SOURCE FIXED
+       PROCEDURE        DIVISION.                                       FIXED
+             DISPLAY "OK" NO ADVANCING
+             END-DISPLAY.
+       >>SOURCE FREE
+                                                                        DISPLAY
+   "OK"
+ NO ADVANCING
+   END-DISPLAY.
+      >>SOURCE FORMAT FIXED
+             DISPLAY "OK" NO ADVANCING                                  FIXED
+             END-DISPLAY.
+       >>SOURCE FORMAT IS FREE
+                                                                        DISPLAY
+   "OK"
+ NO ADVANCING
+   END-DISPLAY.
+             STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0],
+[OKOKOKOK])
+AT_CLEANUP
+
+AT_SETUP([Index and parenthesized expression])
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 G.
+         02 X           PIC X OCCURS 1 INDEXED BY I.
+       PROCEDURE        DIVISION.
+         IF I < (I + 2)
+           DISPLAY "OK" NO ADVANCING
+           END-DISPLAY
+         END-IF.
+         STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [OK], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([Alphanumeric and binary numeric])
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X-X           PIC XXXX VALUE "0001".
+       01 X-9           PIC 9999 COMP VALUE 1.
+       PROCEDURE        DIVISION.
+         IF X-X = X-9
+            STOP RUN
+         END-IF.
+         DISPLAY "NG" NO ADVANCING
+         END-DISPLAY
+         STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+AT_CLEANUP
+
+## PERFORM
+AT_SETUP([258 Nested PERFORM])
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       PROCEDURE        DIVISION.
+           PERFORM 2 TIMES
+             DISPLAY "X" NO ADVANCING
+             END-DISPLAY
+             PERFORM 2 TIMES
+               DISPLAY "Y" NO ADVANCING
+               END-DISPLAY
+             END-PERFORM
+           END-PERFORM.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [XYYXYY])
+
+AT_CLEANUP
+
+
+AT_SETUP([259 PERFORM VARYING BY -0.2])
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+          77 X             PIC 9v9.
+       PROCEDURE        DIVISION.
+           PERFORM VARYING X FROM 0.8 BY -0.2
+                   UNTIL   X < 0.4
+             DISPLAY "X" NO ADVANCING
+             END-DISPLAY
+           END-PERFORM.
+       IF X NOT = 0.2
+         DISPLAY "WRONG X: " X END-DISPLAY
+       END-IF
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [XXX])
+
+AT_CLEANUP
+
+
+## EXIT PERFORM  see ISO/IEC 1989:2002(E) 14.8.13 Format 5
+
+AT_SETUP([EXIT PERFORM])
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       PROCEDURE        DIVISION.
+           PERFORM 2 TIMES
+             DISPLAY "OK" NO ADVANCING
+             END-DISPLAY
+             EXIT PERFORM
+             DISPLAY "NOT OK"
+             END-DISPLAY
+           END-PERFORM
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [OK], [])
+
+AT_CLEANUP
+
+
+## EXIT PERFORM  see ISO/IEC 1989:2002(E) 14.8.13 Format 5
+
+AT_SETUP([EXIT PERFORM CYCLE])
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       PROCEDURE        DIVISION.
+           PERFORM 2 TIMES
+             DISPLAY "OK" NO ADVANCING
+             END-DISPLAY
+             EXIT PERFORM CYCLE
+             DISPLAY "NOT OK"
+             END-DISPLAY
+           END-PERFORM
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [OKOK])
+
+AT_CLEANUP
+
+
+## EXIT PARAGRAPH  see ISO/IEC 1989:2002(E) 14.8.13 Format 6
+
+AT_SETUP([EXIT PARAGRAPH])
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 INDVAL        PIC 9(4).
+       PROCEDURE        DIVISION.
+       A01.
+           PERFORM VARYING INDVAL FROM 1 BY 1 UNTIL INDVAL > 10
+            IF INDVAL > 2
+               EXIT PARAGRAPH
+            END-IF
+           END-PERFORM.
+       A02.
+           IF INDVAL NOT = 3
+              DISPLAY INDVAL NO ADVANCING
+              END-DISPLAY
+           END-IF.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+
+AT_CLEANUP
+
+
+## EXIT SECTION  see ISO/IEC 1989:2002(E) 14.8.13 Format 6
+
+AT_SETUP([EXIT SECTION])
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 INDVAL        PIC 9(4).
+       PROCEDURE        DIVISION.
+       A01 SECTION.
+       A011.
+           PERFORM VARYING INDVAL FROM 1 BY 1 UNTIL INDVAL > 10
+            IF INDVAL > 2
+               EXIT SECTION
+            END-IF
+           END-PERFORM.
+       A012.
+           DISPLAY INDVAL NO ADVANCING
+           END-DISPLAY.
+       A02 SECTION.
+           IF INDVAL NOT = 3
+              DISPLAY INDVAL NO ADVANCING
+              END-DISPLAY
+           END-IF.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([Non-overflow after overflow])
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  X            PIC 9(2) VALUE 0.
+       01  Y            PIC 9(2) VALUE 0.
+       PROCEDURE        DIVISION.
+           COMPUTE X = 100
+           END-COMPUTE.
+           COMPUTE Y = 99
+           END-COMPUTE.
+           IF Y NOT = 99
+              DISPLAY Y NO ADVANCING
+              END-DISPLAY
+           END-IF.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+
+AT_CLEANUP
+
+
+## PERFORM statement
+
+AT_SETUP([PERFORM ... CONTINUE])
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       PROCEDURE        DIVISION.
+           PERFORM 2 TIMES
+             CONTINUE
+           END-PERFORM.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([STRING with subscript reference])
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  G.
+           02 X         PIC X(3) OCCURS 3.
+       PROCEDURE        DIVISION.
+           MOVE   SPACES TO G.
+           STRING "abc" INTO X(2)
+           END-STRING.
+           IF G NOT = "   abc   "
+              DISPLAY X(1) NO ADVANCING
+              END-DISPLAY
+           END-IF.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([STRING / UNSTRING [NOT] ON OVERFLOW])
+AT_KEYWORDS([misc string unstring exceptions])
+
+AT_DATA([prog.cob], [
+       identification division.
+       program-id. prog.
+       data division.
+       working-storage section.
+       77 simple-str     pic x(20).
+       77 err-str        pic x(50).
+      *-----------------------------------------------------------------
+       procedure division.
+      *    STRING test
+           move spaces to simple-str
+           string 'data'
+             delimited by size
+             into simple-str
+             on overflow
+               move spaces to err-str
+               string 'STRING OVERFLOW'
+                  delimited by size
+                  into err-str
+               end-string
+               display err-str upon syserr
+               end-display
+               display '1 failed'
+               end-display
+             not on overflow
+               display '1 passed'
+               end-display
+           end-string
+           if simple-str not = 'data'
+             display 'STRING ERROR (1): "' simple-str '"'
+             end-display
+           end-if
+      *
+           move spaces to simple-str
+           string 'data is too big here...'
+             delimited by size
+             into simple-str
+             on overflow
+               display '2 passed'
+               end-display
+             not on overflow
+               display '2 failed'
+               end-display
+               move spaces to err-str
+               string 'missing OVERFLOW'
+                  delimited by size
+                  into err-str
+               end-string
+               display err-str upon syserr
+               end-display
+           end-string
+           if simple-str not = 'data is too big here'
+             display 'STRING ERROR (2): "' simple-str '"'
+             end-display
+           end-if
+      *
+      *    UNSTRING test
+           move spaces to simple-str
+           unstring 'data'
+             into simple-str
+             on overflow
+               move spaces to err-str
+               unstring 'UNSTRING OVERFLOW'
+                  into err-str
+               end-unstring
+               display err-str upon syserr
+               end-display
+               display '3 failed'
+               end-display
+             not on overflow
+               display '3 passed'
+               end-display
+           end-unstring
+           if simple-str not = 'data'
+             display 'UNSTRING ERROR (1): "' simple-str '"'
+             end-display
+           end-if
+      *
+           move spaces to simple-str
+           unstring 'data is too big here...'
+             into simple-str
+             on overflow
+               display '4 passed'
+               end-display
+             not on overflow
+               display '4 failed'
+               end-display
+               move spaces to err-str
+               string 'missing OVERFLOW'
+                  delimited by size
+                  into err-str
+               end-string
+               display err-str upon syserr
+               end-display
+           end-unstring
+           if simple-str not = 'data is too big here'
+             display 'UNSTRING ERROR (2): "' simple-str '"'
+             end-display
+           end-if
+      *
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0],
+[1 passed
+2 passed
+3 passed
+4 passed
+], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([UNSTRING DELIMITED ALL LOW-VALUE])
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  G.
+           03 FILLER    PIC XXX VALUE "ABC".
+           03 FILLER    PIC XX  VALUE LOW-VALUE.
+           03 FILLER    PIC XXX VALUE "DEF".
+       01  A            PIC XXX.
+       01  B            PIC XXX.
+       PROCEDURE        DIVISION.
+           UNSTRING G DELIMITED BY ALL LOW-VALUE
+                      INTO A B
+           END-UNSTRING.
+           IF A NOT = "ABC"
+              DISPLAY "A is " """" A """"
+              END-DISPLAY
+           END-IF.
+           IF B NOT = "DEF"
+              DISPLAY "B is " """" B """"
+              END-DISPLAY
+           END-IF.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([UNSTRING DELIMITED ALL SPACE-2])
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION  DIVISION.
+       PROGRAM-ID.     prog.
+       ENVIRONMENT     DIVISION.
+       DATA            DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-RECORD.
+           02 VALUE SPACE           PIC X(04).
+           02 VALUE "ABC AND DE"    PIC X(10).
+           02 VALUE SPACE           PIC X(07).
+           02 VALUE "FG AND HIJ"    PIC X(10).
+           02 VALUE SPACE           PIC X(08).
+       01  SPACE-2                  PIC X(02) VALUE SPACE.
+       01  WS-DUMMY                 PIC X(15).
+       01  WS-POINTER               PIC 99.
+       PROCEDURE       DIVISION.
+           MOVE 1 TO WS-POINTER.
+      *
+           PERFORM 0001-SUB.
+           IF WS-DUMMY NOT = SPACE
+              DISPLAY "Expected space - Got " WS-DUMMY
+              END-DISPLAY
+           END-IF.
+           IF WS-POINTER NOT = 5
+              DISPLAY "Expected 5 - Got " WS-POINTER
+              END-DISPLAY
+           END-IF.
+      *
+           PERFORM 0001-SUB.
+           IF WS-DUMMY NOT = "ABC AND DE"
+              DISPLAY "Expected ABC AND DE - Got " WS-DUMMY
+              END-DISPLAY
+           END-IF.
+           IF WS-POINTER NOT = 21
+              DISPLAY "Expected 21 - Got " WS-POINTER
+              END-DISPLAY
+           END-IF.
+      *
+           PERFORM 0001-SUB.
+           IF WS-DUMMY NOT = " FG AND HIJ"
+              DISPLAY "Expected  FG AND HIJ - Got " WS-DUMMY
+              END-DISPLAY
+           END-IF.
+           IF WS-POINTER NOT = 40
+              DISPLAY "Expected 40 - Got " WS-POINTER
+              END-DISPLAY
+           END-IF.
+           STOP RUN.
+       0001-SUB.
+           UNSTRING WS-RECORD
+                    DELIMITED BY ALL SPACE-2
+              INTO WS-DUMMY
+              POINTER WS-POINTER
+           END-UNSTRING.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([UNSTRING DELIMITED POINTER])
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION  DIVISION.
+       PROGRAM-ID.     prog.
+       ENVIRONMENT     DIVISION.
+       DATA            DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WS-LAY-RECORD            PIC X(66).
+       01  WS-DUMMY                 PIC X(50).
+       01  WS-KEYWORD               PIC X(32).
+       01  WS-POINTER               PIC 99.
+       PROCEDURE       DIVISION.
+           MOVE
+       '        10  AF-RECORD-TYPE-SEQUENCE-04     PIC   9(05) COMP-3.'
+                  TO WS-LAY-RECORD.
+           MOVE 1 TO WS-POINTER.
+           PERFORM 0001-SUB.
+           IF WS-POINTER NOT = 48
+              DISPLAY "Expected 48 - Got " WS-POINTER
+              END-DISPLAY
+           END-IF.
+           ADD 7  TO WS-POINTER
+           END-ADD.
+           PERFORM 0001-SUB.
+           IF WS-POINTER NOT = 62
+              DISPLAY "Expected 62 - Got " WS-POINTER
+              END-DISPLAY
+           END-IF.
+           PERFORM 0001-SUB.
+           IF WS-POINTER NOT = 63
+              DISPLAY "Expected 63 - Got " WS-POINTER
+              END-DISPLAY
+           END-IF.
+           STOP RUN.
+       0001-SUB.
+           UNSTRING WS-LAY-RECORD
+                    DELIMITED
+                    BY ' PIC '
+                    OR ' COMP-3'
+                    OR '.'
+              INTO WS-DUMMY
+              DELIMITER WS-KEYWORD
+              POINTER WS-POINTER
+           END-UNSTRING.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([UNSTRING with FUNCTION / literal])
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       DATA  DIVISION.
+       WORKING-STORAGE SECTION.
+       01  FILLER.
+         05  TSTUNS PIC X(479).
+         05  PRM    PIC X(16) OCCURS 4 TIMES.
+       PROCEDURE DIVISION.
+           MOVE "The,Quick,Brown,Fox" TO TSTUNS.
+           UNSTRING TSTUNS DELIMITED BY ','
+              INTO  PRM(1), PRM(2), PRM(3), PRM(4).
+           DISPLAY "PRM(1) is " PRM(1) ":".
+           DISPLAY "PRM(2) is " PRM(2) ":".
+           DISPLAY "PRM(3) is " PRM(3) ":".
+           DISPLAY "PRM(4) is " PRM(4) ":".
+           UNSTRING FUNCTION UPPER-CASE(TSTUNS) DELIMITED BY ','
+              INTO  PRM(1), PRM(2), PRM(3), PRM(4).
+           DISPLAY "Now using UPPER-CASE"
+           DISPLAY "PRM(1) is " PRM(1) ":".
+           DISPLAY "PRM(2) is " PRM(2) ":".
+           DISPLAY "PRM(3) is " PRM(3) ":".
+           DISPLAY "PRM(4) is " PRM(4) ":".
+           UNSTRING "Daddy,was,a,Rolling stone" DELIMITED BY ','
+              INTO  PRM(1), PRM(2), PRM(3), PRM(4).
+           DISPLAY "Now using Literal"
+           DISPLAY "PRM(1) is " PRM(1) ":".
+           DISPLAY "PRM(2) is " PRM(2) ":".
+           DISPLAY "PRM(3) is " PRM(3) ":".
+           DISPLAY "PRM(4) is " PRM(4) ":".
+           UNSTRING FUNCTION LOWER-CASE("Daddy,was,a,Rolling stone")
+                DELIMITED BY ','
+              INTO  PRM(1), PRM(2), PRM(3), PRM(4).
+           DISPLAY "Now using Literal + LOWER-CASE"
+           DISPLAY "PRM(1) is " PRM(1) ":".
+           DISPLAY "PRM(2) is " PRM(2) ":".
+           DISPLAY "PRM(3) is " PRM(3) ":".
+           DISPLAY "PRM(4) is " PRM(4) ":".
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0],
+[PRM(1) is The             :
+PRM(2) is Quick           :
+PRM(3) is Brown           :
+PRM(4) is Fox             :
+Now using UPPER-CASE
+PRM(1) is THE             :
+PRM(2) is QUICK           :
+PRM(3) is BROWN           :
+PRM(4) is FOX             :
+Now using Literal
+PRM(1) is Daddy           :
+PRM(2) is was             :
+PRM(3) is a               :
+PRM(4) is Rolling stone   :
+Now using Literal + LOWER-CASE
+PRM(1) is daddy           :
+PRM(2) is was             :
+PRM(3) is a               :
+PRM(4) is rolling stone   :
+], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([SORT: table sort])
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 G             VALUE "d4b2e1a3c5".
+         02 TBL         OCCURS 5.
+           03 X         PIC X.
+           03 Y         PIC 9.
+       PROCEDURE        DIVISION.
+           SORT TBL ASCENDING KEY X.
+           IF G NOT = "a3b2c5d4e1"
+              DISPLAY G
+              END-DISPLAY
+           END-IF.
+           SORT TBL DESCENDING KEY Y.
+           IF G NOT = "c5d4a3b2e1"
+              DISPLAY G
+              END-DISPLAY
+           END-IF.
+           SORT TBL ASCENDING KEY TBL.
+           IF G NOT = "a3b2c5d4e1"
+              DISPLAY G
+              END-DISPLAY
+           END-IF.
+           SORT TBL DESCENDING KEY.
+           IF G NOT = "e1d4c5b2a3"
+              DISPLAY G
+              END-DISPLAY
+           END-IF.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([SORT: table sort (2)])
+AT_KEYWORDS([misc table sort])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       ENVIRONMENT DIVISION.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 K                 PIC 9(2).
+
+       01 CNT1              PIC 9(9) COMP-5 VALUE 4.
+       01 TAB1.
+          05 ROW1 OCCURS 1 TO 4 DEPENDING CNT1
+                                 DESCENDING TAB1-NR.
+             10 TAB1-NR     PIC 99.
+
+       01 TAB2.
+          05 CNT2           PIC 9(9) COMP-5 VALUE 4.
+          05 ROW2 OCCURS 1 TO 4 DEPENDING CNT2
+                                 DESCENDING TAB2-NR.
+             10 TAB2-NR PIC 99.
+
+       01 TAB3.
+          05 CNT3           PIC 9(9) COMP-5 VALUE 10.
+          05 ROW3 OCCURS 1 TO 10 DEPENDING CNT3
+                                  DESCENDING TAB3-NR
+                                  ASCENDING TAB3-DATA.
+             10 TAB3-NR     PIC 99.
+             10 FILLER      PIC X(2).
+             10 TAB3-DATA   PIC X(5).
+             10 FILLER      PIC X(2).
+             10 TAB3-DATA2  PIC X(5).
+
+
+       PROCEDURE DIVISION.
+       A.
+           PERFORM VARYING K FROM 1 BY 1 UNTIL K > 4
+             MOVE K TO TAB1-NR(K), TAB2-NR(K)
+           END-PERFORM
+
+           MOVE 1 TO TAB3-NR(1).
+           MOVE 1 TO TAB3-NR(8).
+           MOVE 1 TO TAB3-NR(4).
+           MOVE 6 TO TAB3-NR(2).
+           MOVE 5 TO TAB3-NR(3).
+           MOVE 5 TO TAB3-NR(9).
+           MOVE 2 TO TAB3-NR(5).
+           MOVE 2 TO TAB3-NR(10).
+           MOVE 4 TO TAB3-NR(6).
+           MOVE 3 TO TAB3-NR(7).
+
+           MOVE "abcde" TO TAB3-DATA(1).
+           MOVE "AbCde" TO TAB3-DATA(2).
+           MOVE "abcde" TO TAB3-DATA(3).
+           MOVE "zyx" TO TAB3-DATA(4).
+           MOVE "12345" TO TAB3-DATA(5).
+           MOVE "zyx" TO TAB3-DATA(6).
+           MOVE "abcde" TO TAB3-DATA(7).
+           MOVE "AbCde" TO TAB3-DATA(8).
+           MOVE "abc" TO TAB3-DATA(9).
+           MOVE "12346" TO TAB3-DATA(10).
+
+           MOVE "day" TO TAB3-DATA2(1).
+           MOVE "The" TO TAB3-DATA2(2).
+           MOVE "eats" TO TAB3-DATA2(3).
+           MOVE "." TO TAB3-DATA2(4).
+           MOVE "mooos" TO TAB3-DATA2(5).
+           MOVE "grass" TO TAB3-DATA2(6).
+           MOVE "and" TO TAB3-DATA2(7).
+           MOVE "whole" TO TAB3-DATA2(8).
+           MOVE "cow" TO TAB3-DATA2(9).
+           MOVE "the" TO TAB3-DATA2(10).
+
+           SORT ROW1 DESCENDING TAB1-NR
+           SORT ROW2 DESCENDING TAB2-NR
+
+           DISPLAY "SINGLE TABLE" END-DISPLAY
+           PERFORM VARYING K FROM 1 BY 1 UNTIL K > 4
+             DISPLAY TAB1-NR(K) END-DISPLAY
+           END-PERFORM
+
+           DISPLAY "LOWER LEVEL TABLE" END-DISPLAY
+           PERFORM VARYING K FROM 1 BY 1 UNTIL K > 4
+             DISPLAY  TAB2-NR(K) END-DISPLAY
+           END-PERFORM
+
+           SORT ROW3 DESCENDING TAB3-NR ASCENDING TAB3-DATA
+
+           DISPLAY "MULTY KEY SORT" END-DISPLAY
+           PERFORM VARYING K FROM 1 BY 1 UNTIL K > 10
+             DISPLAY  FUNCTION TRIM(ROW3(K))
+             END-DISPLAY
+           END-PERFORM
+
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [SINGLE TABLE
+04
+03
+02
+01
+LOWER LEVEL TABLE
+04
+03
+02
+01
+MULTY KEY SORT
+06  AbCde  The
+05  abc    cow
+05  abcde  eats
+04  zyx    grass
+03  abcde  and
+02  12345  mooos
+02  12346  the
+01  AbCde  whole
+01  abcde  day
+01  zyx    .
+], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([PIC ZZZ-, ZZZ+])
+AT_KEYWORDS([misc editing])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  X-ZZZN                    PIC ZZZ-.
+       01  XZN-RED REDEFINES X-ZZZN  PIC X(4).
+       01  X-ZZZP                    PIC ZZZ+.
+       01  XZP-RED REDEFINES X-ZZZP  PIC X(4).
+       PROCEDURE        DIVISION.
+           MOVE -1 TO X-ZZZN.
+           IF XZN-RED NOT = "  1-"
+              DISPLAY "(" X-ZZZN ")"
+              END-DISPLAY
+           END-IF.
+           MOVE  0 TO X-ZZZN.
+           IF XZN-RED NOT = "    "
+              DISPLAY "(" X-ZZZN ")"
+              END-DISPLAY
+           END-IF.
+           MOVE +1 TO X-ZZZN.
+           IF XZN-RED NOT = "  1 "
+              DISPLAY "(" X-ZZZN ")"
+              END-DISPLAY
+           END-IF.
+
+           MOVE -1 TO X-ZZZP.
+           IF XZP-RED NOT = "  1-"
+              DISPLAY "(" X-ZZZP ")"
+              END-DISPLAY
+           END-IF.
+           MOVE  0 TO X-ZZZP.
+           IF XZP-RED NOT = "    "
+              DISPLAY "(" X-ZZZP ")"
+              END-DISPLAY
+           END-IF.
+           MOVE +1 TO X-ZZZP.
+           IF XZP-RED NOT = "  1+"
+              DISPLAY "(" X-ZZZP ")"
+              END-DISPLAY
+           END-IF.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([STOP RUN WITH NORMAL STATUS])
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       PROCEDURE        DIVISION.
+           STOP RUN WITH NORMAL STATUS.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([STOP RUN WITH ERROR STATUS])
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       PROCEDURE        DIVISION.
+           STOP RUN WITH ERROR STATUS.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [1])
+
+AT_CLEANUP
+
+
+AT_SETUP([OCCURS clause with 1 entry])
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  D1.
+           03  FILLER   OCCURS 1.
+               05 D1-ENTRY   PIC X(03) value '123'.
+       01  D2.
+           03  D2-ENTRY   PIC X(03)  value 'ABC'  OCCURS 1.
+       01  D1TOR.
+           03  FILLER   PIC X(03) value '456'.
+       01  D1-R         REDEFINES D1TOR.
+           03  FILLER   OCCURS 1.
+               05 D1-R-ENTRY   PIC X(03).
+       01  D2TOR.
+           03  FILLER   PIC X(03) value 'DEF'.
+       01  D2-R         REDEFINES D2TOR.
+           03  D2-R-ENTRY   PIC X(03)   OCCURS 1.
+
+       PROCEDURE        DIVISION.
+           IF D1-ENTRY (1) NOT = "123"
+              DISPLAY D1-ENTRY (1)
+              END-DISPLAY
+           END-IF.
+           IF D2-ENTRY (1) NOT = "ABC"
+              DISPLAY D2-ENTRY (1)
+              END-DISPLAY
+           END-IF.
+           IF D1-R-ENTRY (1) NOT = "456"
+              DISPLAY D1-R-ENTRY (1)
+              END-DISPLAY
+           END-IF.
+           IF D2-R-ENTRY (1) NOT = "DEF"
+              DISPLAY D2-R-ENTRY (1)
+              END-DISPLAY
+           END-IF.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([Figurative constants to numeric field])
+AT_KEYWORDS([misc Numeric])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       DATA  DIVISION.
+       WORKING-STORAGE SECTION.
+       01  NUM9    PIC 9(6).
+       01  NUM9P   REDEFINES NUM9 USAGE POINTER.
+       PROCEDURE DIVISION.
+      *> Moving SPACE to NUMERIC is expressly forbidden in ISO 2014
+      *> See 14.9.24.2 paragraph 5)
+      *>     MOVE SPACES TO NUM9
+      *>     DISPLAY "NUM9 value SPACES is " NUM9 "." UPON SYSOUT
+           MOVE LOW-VALUES TO NUM9
+           DISPLAY NUM9P
+           IF NUM9 = LOW-VALUES
+              DISPLAY "9(6) tests OK for LOW-VALUES" UPON SYSOUT
+           ELSE
+              DISPLAY "9(6) Does NOT test OK for LOW-VALUES"
+                 UPON SYSOUT
+              IF NUM9 = ZERO
+                 DISPLAY "9(6) tests as ZERO instead of LOW-VALUES"
+                    UPON SYSOUT
+              END-IF
+           END-IF.
+           MOVE HIGH-VALUES TO NUM9
+           DISPLAY NUM9P
+           IF NUM9 = HIGH-VALUES
+              DISPLAY "9(6) tests OK for HIGH-VALUES" UPON SYSOUT
+           ELSE
+              DISPLAY "9(6) Does NOT test OK for HIGH-VALUES"
+                 UPON SYSOUT
+              IF NUM9 = ZERO
+                 DISPLAY "9(6) tests as ZERO instead of HIGH-VALUES"
+                    UPON SYSOUT
+              END-IF
+           END-IF.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [1], [],
+[prog.cob:13:17: error: cannot MOVE LOW_VALUES to numeric receiving field NUM9
+   13 |            MOVE LOW-VALUES TO NUM9
+      |                 ^
+prog.cob:25:17: error: cannot MOVE HIGH_VALUES to numeric receiving field NUM9
+   25 |            MOVE HIGH-VALUES TO NUM9
+      |                 ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+
+AT_SETUP([338 Default Arithmetic (1)])
+AT_KEYWORDS([misc])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 NUM-A   PIC 9(3) VALUE 399.
+       01 NUM-B   PIC 9(3) VALUE 211.
+       01 NUM-C   PIC 9(3)V99 VALUE 212.34.
+       01 NUMV1   PIC 9(3)V9.
+       01 PICX    PIC X VALUE 'A'.
+       01 RSLT    PIC 9(3).
+       01 RSLTV1  PIC 9(3).9.
+       01 RSLTV2  PIC 9(3).99.
+      *
+       PROCEDURE DIVISION.
+       MAIN.
+           COMPUTE RSLT = NUM-A + 1.1.
+           DISPLAY 'Simple Compute  RSLT IS ' RSLT
+           COMPUTE RSLT = ((NUM-A / 100) - (NUM-B / 100)) * 100
+           DISPLAY 'Single Variable RSLT IS ' RSLT
+           COMPUTE RSLTV2, RSLT = ((NUM-A / 100) - (NUM-B / 100)) * 100
+           DISPLAY 'Compute  RSLT    IS ' RSLT
+           DISPLAY 'Compute  RSLTv99 IS ' RSLTV2
+           COMPUTE RSLTV1, RSLT = ((NUM-A / 100) - (NUM-B / 100)) * 100
+           DISPLAY 'Compute  RSLT    IS ' RSLT
+           DISPLAY 'Compute  RSLTv9  IS ' RSLTV1
+           MOVE 0 TO RSLT
+           ADD NUM-C TO RSLT.
+           DISPLAY 'Add      RSLT    IS ' RSLT.
+           MOVE 0 TO RSLT
+           ADD NUM-A NUM-C 10 TO RSLT.
+           DISPLAY 'Add      RSLT    IS ' RSLT.
+           SUBTRACT NUM-C FROM RSLT.
+           DISPLAY 'Subtract RSLT    IS ' RSLT.
+           SUBTRACT NUM-A -10 FROM RSLT.
+           DISPLAY 'Subtract RSLT    IS ' RSLT.
+           MOVE 0 TO RSLT
+           ADD NUM-A NUM-C TO RSLT GIVING RSLTV1.
+           DISPLAY 'Add      RSLTv9  IS ' RSLTV1
+           MULTIPLY NUM-A BY NUM-C GIVING RSLT.
+           DISPLAY 'Multiply RSLT    IS ' RSLT.
+           MULTIPLY RSLT BY NUM-C.
+           DISPLAY 'Multiply RSLT    IS ' RSLT.
+           DIVIDE NUM-A BY 10 GIVING RSLT.
+           DISPLAY 'Divide   RSLT    IS ' RSLT.
+           DIVIDE RSLT BY 4 GIVING RSLTV1.
+           DISPLAY 'Divide   RSLTv9  IS ' RSLTV1.
+           DIVIDE RSLT BY 4 GIVING RSLT.
+           DISPLAY 'Divide   RSLT    IS ' RSLT.
+
+           COMPUTE RSLTV1, RSLT = ((NUM-A / 100) - (NUM-B / 100)) * 100
+           DISPLAY 'Simple   RSLT    IS ' RSLT
+                           ' RSLTv9  IS ' RSLTV1.
+
+           COMPUTE RSLTV1, RSLT = ((NUM-A / (100.55 + -0.550))
+                                -  (NUM-B / (10.11 * 10 - 1.1)))
+                                  * (220 / 2.2)
+           DISPLAY 'Complex  RSLT    IS ' RSLT
+                           ' RSLTv9  IS ' RSLTV1.
+
+           COMPUTE RSLTV1, RSLT = ((NUM-A / (101 - 1))
+                                -  (NUM-B / (10 * 10))) * (200 / 2)
+           DISPLAY 'Reduced  RSLT    IS ' RSLT
+                           ' RSLTv9  IS ' RSLTV1.
+           MOVE NUM-A TO NUMV1.
+           IF ((NUMV1 / (101 - 1))
+              -  (NUM-B / (10 * 10))) * (200 / 2) EQUAL 188
+              DISPLAY "Not Using ARITHMETIC-OSVS"
+           ELSE
+              DISPLAY "Using ARITHMETIC-OSVS"
+           END-IF.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0],
+[Simple Compute  RSLT IS 400
+Single Variable RSLT IS 188
+Compute  RSLT    IS 188
+Compute  RSLTv99 IS 188.00
+Compute  RSLT    IS 188
+Compute  RSLTv9  IS 188.0
+Add      RSLT    IS 212
+Add      RSLT    IS 621
+Subtract RSLT    IS 408
+Subtract RSLT    IS 019
+Add      RSLTv9  IS 611.3
+Multiply RSLT    IS 723
+Multiply RSLT    IS 723
+Divide   RSLT    IS 039
+Divide   RSLTv9  IS 009.7
+Divide   RSLT    IS 009
+Simple   RSLT    IS 188 RSLTv9  IS 188.0
+Complex  RSLT    IS 188 RSLTv9  IS 188.0
+Reduced  RSLT    IS 188 RSLTv9  IS 188.0
+Not Using ARITHMETIC-OSVS
+], [])
+
+AT_CLEANUP
+
+AT_SETUP([SORT: table sort (3A)])
+AT_KEYWORDS([misc table sort])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       ENVIRONMENT DIVISION.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 K                 PIC 9(2).
+
+       01 CNT1              PIC 9(9) COMP-5 VALUE 4.
+       01 TAB1.
+          05 ROW1 OCCURS 1 TO 4 DEPENDING CNT1
+                                  DESCENDING TAB1-NR.
+             10 TAB1-NR     PIC 99.
+             10 TAB-DATA    PIC X(5).
+       01 TAB2.
+          05 ROW2 OCCURS 1 TO 4 DEPENDING CNT1
+                                  ASCENDING ROW2.
+             10 TAB2-NR     PIC 99.
+             10 TAB2-DATA   PIC X(5).
+
+       PROCEDURE DIVISION.
+       A.
+           PERFORM VARYING K FROM 1 BY 1 UNTIL K > 4
+             MOVE K     TO TAB1-NR (K)
+             MOVE 'BLA' TO TAB-DATA(K)
+           END-PERFORM
+
+           SORT ROW1
+
+           DISPLAY "After SORT [DESCENDING] ROW1"
+           PERFORM VARYING K FROM 1 BY 1 UNTIL K > 4
+             DISPLAY TAB1-NR(K) NO ADVANCING END-DISPLAY
+           END-PERFORM
+           DISPLAY ""
+
+           MOVE TAB1 TO TAB2
+           SORT ROW2
+
+           DISPLAY "After SORT [ASCENDING] ROW2"
+           PERFORM VARYING K FROM 1 BY 1 UNTIL K > 4
+             DISPLAY TAB2-NR(K) NO ADVANCING END-DISPLAY
+           END-PERFORM
+           DISPLAY ""
+
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [After SORT [DESCENDING] ROW1
+04030201
+After SORT [ASCENDING] ROW2
+01020304
+], [])
+AT_CLEANUP
+
+AT_SETUP([SORT: table sort (3B)])
+AT_KEYWORDS([misc table sort])
+AT_DATA([prog2.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog2.
+       ENVIRONMENT DIVISION.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 K                 PIC 9(2).
+
+       01 CNT1              PIC 9(9) COMP-5 VALUE 4.
+       01 TAB1.
+          05 ROW1 OCCURS 5        DESCENDING TAB1-NR.
+             10 TAB1-NR     PIC 99 VALUE ZERO.
+             10 TAB-DATA    PIC X(5).
+       01 TAB2.
+          05 ROW1 OCCURS 1 TO 4 DEPENDING CNT1
+                                  DESCENDING TAB1-NR.
+             10 TAB1-NR     PIC 99.
+             10 TAB-DATA    PIC X(5).
+
+       PROCEDURE DIVISION.
+       A.
+           PERFORM VARYING K FROM 1 BY 1 UNTIL K > 4
+             MOVE K     TO TAB1-NR  OF TAB2(K)
+             MOVE 'BLA' TO TAB-DATA OF TAB2(K)
+           END-PERFORM
+
+           DISPLAY "Before sort"
+           PERFORM VARYING K FROM 1 BY 1 UNTIL K > 4
+             DISPLAY TAB1-NR OF TAB2(K) NO ADVANCING END-DISPLAY
+           END-PERFORM
+           DISPLAY ""
+
+           SORT ROW1 OF TAB2.
+
+           DISPLAY "After descending sort"
+           PERFORM VARYING K FROM 1 BY 1 UNTIL K > 4
+             DISPLAY TAB1-NR OF TAB2(K) NO ADVANCING END-DISPLAY
+           END-PERFORM
+           DISPLAY ""
+
+           STOP RUN.
+])
+AT_CHECK([$COMPILE -o a.out2 prog2.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out2], [0], [Before sort
+01020304
+After descending sort
+04030201
+], [])
+AT_CLEANUP
+
+AT_SETUP([SORT: EBCDIC table sort (1)])
+AT_KEYWORDS([misc ALPHABET OBJECT-COMPUTER])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SPECIAL-NAMES.
+           ALPHABET ALPHA IS EBCDIC.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 Z  PIC X(10)  VALUE "d4b2e1a3c5".
+       01 G.
+         02 TBL         OCCURS 10.
+           03 X         PIC X.
+       PROCEDURE        DIVISION.
+           MOVE Z TO G.
+           SORT TBL ASCENDING KEY X SEQUENCE ALPHA.
+           IF G NOT = "abcde12345"
+              DISPLAY G
+              END-DISPLAY
+           END-IF.
+           MOVE Z TO G.
+           SORT TBL DESCENDING KEY X SEQUENCE ALPHA.
+           IF G NOT = "54321edcba"
+              DISPLAY G
+              END-DISPLAY
+           END-IF.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([SORT: EBCDIC table sort (2)])
+AT_KEYWORDS([misc ALPHABET OBJECT-COMPUTER])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+           OBJECT-COMPUTER.
+             x86 PROGRAM COLLATING SEQUENCE IS EBCDIC-CODE.
+       SPECIAL-NAMES.
+           ALPHABET EBCDIC-CODE IS EBCDIC.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 Z  PIC X(10)  VALUE "d4b2e1a3c5".
+       01 G.
+         02 TBL         OCCURS 10.
+           03 X         PIC X.
+       PROCEDURE        DIVISION.
+           MOVE Z TO G.
+           SORT TBL ASCENDING KEY X.
+           IF G NOT = "abcde12345"
+              DISPLAY G.
+           MOVE Z TO G.
+           SORT TBL DESCENDING KEY X.
+           IF G NOT = "54321edcba"
+              DISPLAY G.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([CALL RETURNING])
+AT_KEYWORDS([misc GIVING RETURN-CODE])
+AT_DATA([callee.cob], [
+        IDENTIFICATION   DIVISION.
+        PROGRAM-ID.      callee.
+        PROCEDURE        DIVISION.
+        MOVE 43 TO RETURN-CODE
+        EXIT PROGRAM.
+        END PROGRAM callee.
+])
+AT_DATA([caller.cob], [
+        IDENTIFICATION   DIVISION.
+        PROGRAM-ID.      caller.
+        DATA             DIVISION.
+        WORKING-STORAGE  SECTION.
+        77 my-display-return   PIC 99.
+        77 my-binary-return    USAGE BINARY-LONG.
+        PROCEDURE        DIVISION.
+        CALL "callee" RETURNING my-display-return
+        END-CALL
+        DISPLAY "RETURN-CODE should be zero.  It is " RETURN-CODE
+        DISPLAY "my-display-return should be 43. It is " my-display-return
+        STOP RUN.
+        END PROGRAM caller.
+])
+AT_CHECK([$COMPILE -c callee.cob], [0], [], [])
+AT_CHECK([$COMPILE -o caller caller.cob callee.o], [0], [], [])
+AT_CHECK([./caller], [0], [RETURN-CODE should be zero.  It is 0000
+my-display-return should be 43. It is 43
+], [])
+AT_CLEANUP
+
+
+## CALL statement
+AT_SETUP([Dynamic CALL with ON EXCEPTION])
+AT_KEYWORDS([misc])
+AT_DATA([caller.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      caller.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       77 callee1 PIC X(32) value "callee1".
+       77 callee2 PIC X(32) value "callee2".
+       PROCEDURE        DIVISION.
+           CALL callee1 ON EXCEPTION
+              CALL callee2 ON EXCEPTION
+                  DISPLAY "neither callee1 nor callee2 found"
+              END-CALL
+           END-CALL
+           GOBACK.
+       END PROGRAM caller.
+])
+AT_DATA([callee2.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      callee2.
+       PROCEDURE        DIVISION.
+           DISPLAY "this is callee2" NO ADVANCING
+           GOBACK.
+       END PROGRAM callee2.
+])
+AT_CHECK([$COMPILE -c callee2.cob], [0], [], [])
+AT_CHECK([$COMPILE -o caller caller.cob callee2.o], [0], [], [])
+AT_CHECK([./caller], [0],
+[this is callee2], [])
+AT_CLEANUP
+
+AT_SETUP([EXTERNAL data item])
+AT_KEYWORDS([misc])
+# AT_SKIP_IF(true)
+# TODO ASK: is EXTERNAL implemented?
+# Gnu MODULE converted to static linked executable 4/23/23 (MH)
+AT_DATA([callee.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      callee.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 EXT-VAR       PIC X(5) EXTERNAL.
+       PROCEDURE        DIVISION.
+           IF EXT-VAR NOT = "Hello"
+              DISPLAY EXT-VAR
+              END-DISPLAY
+           END-IF.
+           MOVE "World" TO EXT-VAR.
+           EXIT PROGRAM.
+])
+AT_DATA([caller.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      caller.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 EXT-VAR       PIC X(5) EXTERNAL.
+       PROCEDURE        DIVISION.
+           MOVE "Hello" TO EXT-VAR.
+           CALL "callee"
+           END-CALL.
+           IF EXT-VAR NOT = "World"
+              DISPLAY EXT-VAR
+              END-DISPLAY
+           END-IF.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE caller.cob callee.cob -o caller], [0], [], [])
+AT_CHECK([./caller], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([C-TO-COBOL LINKAGE both directions])
+AT_KEYWORDS([linkage])
+AT_DATA([hello_cobol.cob],[
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. hello_cobol.
+        DATA DIVISION.
+        LINKAGE SECTION.
+          01   HELLO.
+            05 CMD PIC A(4).
+            05 MSG PIC A(16).
+        PROCEDURE DIVISION USING HELLO.
+        DISPLAY "GREETINGS '" CMD "' '" MSG "' EARTHMAN".
+        CALL "hello" USING HELLO.
+        DISPLAY "GOODBYE   '" CMD "' '" MSG "' EARTHMAN".
+        END PROGRAM hello_cobol.
+])
+AT_DATA([hello.c], [
+#include <stdio.h>
+struct hello_t
+  {
+  char cmd[[4]];
+  char msg[[16]];
+  } sacho = { "123", "ain't she sweet" };
+void hello( struct hello_t * hello )
+  {
+  fprintf(stdout, "ECHOING   '%s' '%s'\n",
+          hello->cmd,
+          hello->msg);
+  // This next fflush is necessary because the data sent to the write function
+  // used by GCOBOL is not buffered, while data sent to the stdout stream is
+  // buffered.  The result:  when the program is run, the terminal output looks
+  // like this:
+  //
+  //    GREETINGS
+  //    ECHOING
+  //    GOODBYE
+  //
+  // But when captured with a 1>file.txt, the results in the file are
+  //
+  //    GREETINGS
+  //    GOODBYE
+  //    ECHOING
+  //
+  // The fflush() fixes that.
+  fflush(stdout);
+  }
+void hello_cobol( struct hello_t * );
+int main(int argc, char *argv[[]])
+  {
+  hello_cobol( &sacho );
+  return 0;
+  }
+])
+AT_CHECK([$COMPILE -c hello_cobol.cob], [0], [], [])
+AT_CHECK([gcc -c hello.c], [0], [], [])
+AT_CHECK([$COMPILE hello.o hello_cobol.o], [0], [], [])
+AT_CHECK([./a.out], [0], [GREETINGS '123' 'ain't she sweet' EARTHMAN
+ECHOING   '123' 'ain't she sweet'
+GOODBYE   '123' 'ain't she sweet' EARTHMAN
+], [])
+AT_CLEANUP
+
+AT_SETUP([COB_LOAD_CASE=UPPER test])
+AT_KEYWORDS([misc])
+AT_DATA([CALLEE.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      callee.
+       PROCEDURE        DIVISION.
+           EXIT PROGRAM.
+])
+AT_DATA([caller.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      caller.
+       PROCEDURE        DIVISION.
+           CALL "callee"
+           END-CALL.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE caller.cob CALLEE.cob], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([ALLOCATE / FREE with BASED item (1)])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       LINKAGE          SECTION.
+       01  MYFLD        PIC X(6) BASED VALUE "ABCDEF".
+       PROCEDURE        DIVISION.
+       ASTART SECTION.
+       A01.
+           ALLOCATE MYFLD INITIALIZED.
+           IF MYFLD NOT = "ABCDEF"
+              DISPLAY MYFLD
+              END-DISPLAY
+           END-IF.
+           FREE ADDRESS OF MYFLD.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+AT_CLEANUP
+
+
+AT_SETUP([ALLOCATE / FREE with BASED item (2)])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 MYFLD         BASED.
+             03 MYFLDX  PIC X.
+             03 MYFLD9  PIC 9.
+       PROCEDURE        DIVISION.
+           IF ADDRESS OF MYFLD NOT = NULL
+              DISPLAY "BASED ITEM WITH ADDRESS ON START"
+              END-DISPLAY
+           END-IF.
+           FREE MYFLD.
+           ALLOCATE MYFLD.
+           IF ADDRESS OF MYFLD = NULL
+              DISPLAY "BASED ITEM WITHOUT ADDRESS AFTER ALLOCATE"
+              END-DISPLAY
+           END-IF.
+           INITIALIZE MYFLD.
+           IF MYFLD NOT = " 0"
+              DISPLAY "BASED ITEM INITIALIZED WRONG: "
+                 WITH NO ADVANCING
+              END-DISPLAY
+              DISPLAY MYFLD
+              END-DISPLAY
+           END-IF.
+
+           FREE ADDRESS OF MYFLD.
+           IF ADDRESS OF MYFLD NOT = NULL
+              DISPLAY "BASED ITEM WITH ADDRESS AFTER FREE"
+              END-DISPLAY
+           END-IF.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([ALLOCATE / FREE basic default versions])
+AT_KEYWORDS([ALLOCATE])
+AT_DATA([prog.cob], [
+        program-id.         prog.
+        data                division.
+        working-storage     section.
+        01 based-var        pic x(100) based.
+        01 mem-pointer      pointer.
+        01 mem-size         pic 999 value 100.
+        01 counter          pic 99 value zero.
+        procedure division.
+        allocate 100        characters returning mem-pointer.
+            if mem-pointer equal NULL
+                display "allocate 100 should not be NULL (1)"
+            else
+                add 1 to counter.
+        free mem-pointer
+            if mem-pointer not equal NULL
+                display "mem-pointer should be NULL again (1)"
+            else
+                add 1 to counter.
+
+        allocate mem-size   characters returning mem-pointer.
+            if mem-pointer equal null
+                display "allocate mem-size should not be NULL (2)"
+            else
+                add 1 to counter.
+        free mem-pointer
+            if mem-pointer not equal null
+                display "mem-pointer should be NULL again (2)"
+            else
+                add 1 to counter.
+
+        allocate based-var
+            if address of based-var equal NULL
+                display "address of based-var should not be NULL (1)"
+            else
+                add 1 to counter
+        free based-var
+            if address of based-var not equal NULL
+                display "address of based-var be NULL (1)"
+            else
+                add 1 to counter.
+
+        allocate based-var
+            if address of based-var equal NULL
+                display "address of based-var should not be NULL (2)"
+            else
+                add 1 to counter.
+        free address of based-var
+            if address of based-var not equal NULL
+                display "address of based-var be NULL (2)"
+            else
+                add 1 to counter.
+
+        allocate based-var returning mem-pointer.
+        if address of based-var equal NULL
+            display "address of based-var should not be NULL (3)"
+        else
+            add 1 to counter.
+        if mem-pointer equal NULL
+            display "address of mem-pointer should not be NULL (3)"
+        else
+            add 1 to counter.
+        if address of based-var not equal mem-pointer
+            display "address of mem-pointer should be equal to mem-pointer (3)"
+        else
+            add 1 to counter.
+
+        display "There were " counter " successful tests; should be 11."
+        goback.
+        end program prog.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [There were 11 successful tests; should be 11.
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([CALL with OMITTED parameter])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+        IDENTIFICATION   DIVISION.
+        PROGRAM-ID.      caller.
+        DATA             DIVISION.
+        WORKING-STORAGE  SECTION.
+        01 P1            PIC X    VALUE "A".
+        01 P2            PIC X    VALUE "B".
+        PROCEDURE        DIVISION.
+            DISPLAY "Should see AB"
+            CALL "callee" USING P1 P2
+            DISPLAY "Should see A"
+            CALL "callee" USING P1
+            END-CALL.
+            DISPLAY "Should see A"
+            CALL "callee" USING P1 OMITTED
+            END-CALL.
+            STOP RUN.
+        END PROGRAM caller.
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      callee.
+       DATA             DIVISION.
+       LINKAGE          SECTION.
+       01 P1            PIC X.
+       01 P2            PIC X.
+       PROCEDURE        DIVISION USING P1 OPTIONAL P2.
+           DISPLAY """" P1 WITH NO ADVANCING
+           IF P2 NOT OMITTED
+              DISPLAY P2 """"
+              END-DISPLAY
+           ELSE
+              DISPLAY """"
+              END-DISPLAY
+           END-IF.
+           EXIT PROGRAM.
+        END PROGRAM callee.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [Should see AB
+"AB"
+Should see A
+"A"
+Should see A
+"A"
+], [])
+AT_CLEANUP
+
+AT_SETUP([ANY LENGTH (1)])
+AT_KEYWORDS([misc CALL])
+AT_DATA([prog.cob], [
+        IDENTIFICATION   DIVISION.
+        PROGRAM-ID.      caller.
+        DATA             DIVISION.
+        WORKING-STORAGE  SECTION.
+        01 P1            PIC X(6) VALUE "OKOKOK".
+        PROCEDURE        DIVISION.
+            CALL "callee" USING P1
+            END-CALL.
+            STOP RUN.
+        IDENTIFICATION   DIVISION.
+        PROGRAM-ID.      callee.
+        DATA             DIVISION.
+        WORKING-STORAGE  SECTION.
+        01 P2            PIC 99.
+        LINKAGE          SECTION.
+        01 P1            PIC X ANY LENGTH.
+        PROCEDURE        DIVISION USING P1.
+            MOVE FUNCTION LENGTH (P1) TO P2.
+            DISPLAY "The incoming ANY LENGTH is " P2
+            DISPLAY "The incoming ANY LENGTH variable is " """" P1 """"
+            EXIT PROGRAM.
+        END PROGRAM callee.
+        END PROGRAM caller.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [The incoming ANY LENGTH is 06
+The incoming ANY LENGTH variable is "OKOKOK"
+], [])
+AT_CLEANUP
+
+AT_SETUP([ANY LENGTH (2)])
+AT_KEYWORDS([misc CALL])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      caller.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 P1            PIC X(2) VALUE "OK".
+       PROCEDURE        DIVISION.
+           CALL "callee" USING P1
+           END-CALL.
+           DISPLAY "On return, P1 is " """" P1 """"
+           STOP RUN.
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      callee.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 P2            PIC XXX.
+       LINKAGE          SECTION.
+       01 P1            PIC X ANY LENGTH.
+       PROCEDURE        DIVISION USING P1.
+           MOVE P1 TO P2.
+           DISPLAY "P1 is " """" P1 """"
+           DISPLAY "P2 is " """" P2 """"
+           IF P2 NOT = "OK "
+              DISPLAY P2
+              END-DISPLAY
+           END-IF.
+           MOVE SPACE TO P1.
+           EXIT PROGRAM.
+       END PROGRAM callee.
+       END PROGRAM caller.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [P1 is "OK"
+P2 is "OK "
+On return, P1 is "  "
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([ANY LENGTH (3)])
+AT_KEYWORDS([misc CALL])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 str PIC X(20) VALUE ALL "X".
+       PROCEDURE DIVISION.
+           CALL "subprog" USING str.
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. subprog.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 str PIC X ANY LENGTH.
+       PROCEDURE DIVISION USING str.
+           MOVE "abcd" TO str
+           DISPLAY FUNCTION TRIM (str)
+           MOVE "abcd" TO str (5:)
+           DISPLAY FUNCTION TRIM (str)
+           MOVE ALL "a" TO str
+           DISPLAY FUNCTION TRIM (str).
+       END PROGRAM subprog.
+       END PROGRAM prog.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0],
+[abcd
+abcdabcd
+aaaaaaaaaaaaaaaaaaaa
+])
+AT_CLEANUP
+
+AT_SETUP([ANY LENGTH (4)])
+AT_KEYWORDS([misc IF CALL])
+
+# comparision of any length was done only for first character - see bug 511
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 str PIC X(20) VALUE ALL "X".
+
+       PROCEDURE DIVISION.
+           CALL "subprog" USING str
+           move '   45'   to str
+           CALL "subprog" USING str
+           .
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. subprog.
+
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 str PIC X ANY LENGTH.
+
+       PROCEDURE DIVISION USING str.
+           IF str = 'X'
+             DISPLAY 'X is X'
+           END-IF
+           IF str = space
+             DISPLAY 'X is space'
+           END-IF
+           .
+       END PROGRAM subprog.
+       END PROGRAM prog.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+AT_CLEANUP
+
+
+AT_SETUP([ANY LENGTH (5)])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       PROCEDURE DIVISION.
+       CALL "subprog"
+       GOBACK.
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. subprog.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 str1 PIC X ANY LENGTH.
+       01 str2 PIC X ANY LENGTH.
+       PROCEDURE DIVISION USING optional str1 optional str2.
+       DISPLAY 'IN' WITH NO ADVANCING.
+       END PROGRAM subprog.
+       END PROGRAM prog.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [IN], [])
+AT_CLEANUP
+
+
+AT_SETUP([access to BASED item without allocation])
+AT_KEYWORDS([misc BASED])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC X(4) BASED.
+       PROCEDURE        DIVISION.
+           DISPLAY X NO ADVANCING
+           END-DISPLAY.
+           STOP RUN.
+])
+AT_DATA([prog2.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog2.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             BASED.
+          05 Y          PIC X(4).
+       PROCEDURE        DIVISION.
+           DISPLAY Y NO ADVANCING
+           END-DISPLAY.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COMPILE -o a.out2 prog2.cob], [0], [], [])
+AT_CHECK([./a.out], [134], [], ignore)
+AT_CHECK([./a.out2], [134], [], ignore)
+AT_CLEANUP
+
+
+AT_SETUP([access to OPTIONAL LINKAGE item not passed])
+AT_KEYWORDS([misc])
+#AT_XFAIL_IF(true)
+AT_DATA([caller.cob], [
+        identification   division.
+        program-id.      caller.
+        data             division.
+        working-storage  section.
+        01 x             pic x(4) value '9876'.
+        procedure        division.
+           call 'callee' using x
+           end-call
+           call 'callee' using omitted
+           end-call
+           stop run.
+           end program caller.
+
+        identification   division.
+        program-id.      callee.
+        data             division.
+        working-storage  section.
+        01 py pointer.
+        linkage          section.
+        01 x.
+          05 y          pic x(4).
+        procedure        division using optional x.
+        set py to address of x.
+        if py is not equal to zero
+            display y
+        else
+            display "parameter omitted"
+        end-if.
+        goback.
+        end program callee.
+])
+AT_CHECK([$COMPILE caller.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [9876
+parameter omitted
+], [])
+AT_CLEANUP
+
+AT_SETUP([REDEFINES values on FILLER and INITIALIZE])
+AT_KEYWORDS([misc INITIALIZE])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       DATA  DIVISION.
+       WORKING-STORAGE SECTION.
+       01  TSRDF.
+           05  WS-ASK-ID-DATE                PIC X(10).
+           05  WS-ASK-ID-DATE-R              REDEFINES WS-ASK-ID-DATE.
+               10  WS-ASK-ID-DATE-YYYY       PIC 9(4) VALUE 2017.
+               10  FILLER                    PIC X VALUE '-'.
+               10  WS-ASK-ID-DATE-MM         PIC 9(2).
+               10  FILLER                    PIC X VALUE '-'.
+               10  WS-ASK-ID-DATE-DD         PIC 9(2).
+       PROCEDURE DIVISION.
+           MOVE ALL '*' TO WS-ASK-ID-DATE
+           MOVE 2015 TO WS-ASK-ID-DATE-YYYY
+           MOVE 08 TO WS-ASK-ID-DATE-MM
+           MOVE 21 TO WS-ASK-ID-DATE-DD
+           DISPLAY "The date is " WS-ASK-ID-DATE " Compiled".
+
+           INITIALIZE WS-ASK-ID-DATE-R.
+           MOVE 08 TO WS-ASK-ID-DATE-MM
+           MOVE 21 TO WS-ASK-ID-DATE-DD
+           DISPLAY "The date is " WS-ASK-ID-DATE " INITIALIZE".
+
+           INITIALIZE WS-ASK-ID-DATE-R WITH FILLER.
+           MOVE 08 TO WS-ASK-ID-DATE-MM
+           MOVE 21 TO WS-ASK-ID-DATE-DD
+           DISPLAY "The date is " WS-ASK-ID-DATE " WITH FILLER".
+
+           INITIALIZE WS-ASK-ID-DATE-R WITH FILLER ALL TO VALUE.
+           MOVE 08 TO WS-ASK-ID-DATE-MM
+           MOVE 21 TO WS-ASK-ID-DATE-DD
+           DISPLAY "The date is " WS-ASK-ID-DATE " ALL TO VALUE".
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0],
+[The date is 2015*08*21 Compiled
+The date is 0000*08*21 INITIALIZE
+The date is 0000 08 21 WITH FILLER
+The date is 2017-08-21 ALL TO VALUE
+], [])
+AT_CLEANUP
+
+AT_SETUP([Quote marks in comment paragraphs])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID.    prog.
+       DATE-written.  hello'".
+      *> Written is intentionally lowercase.
+      *> extra " to fix syntax highlighting
+       PROCEDURE      DIVISION.
+           DISPLAY "Hello, world!".
+])
+AT_CHECK([$COMPILE -o prog prog.cob], [0], [],
+[])
+AT_CHECK([$COBCRUN_DIRECT ./prog], [0],
+[Hello, world!
+])
+AT_CLEANUP
+
+AT_SETUP([ZERO unsigned and negative binary subscript])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       DATA  DIVISION.
+       WORKING-STORAGE SECTION.
+       77  UBIN        PIC  9(8) BINARY.
+       77  SBIN        PIC S9(8) BINARY.
+       77  UNUP        PIC  9(8).
+       77  SNUP        PIC S9(8).
+       01  TSTREC.
+           05  TSTX PIC X(4) OCCURS 3 TIMES.
+           05  TSTY PIC X(4) OCCURS 3 TIMES.
+       PROCEDURE DIVISION.
+            DECLARATIVES.
+            DECL1 SECTION.
+            USE AFTER EXCEPTION CONDITION EC-BOUND-SUBSCRIPT.
+                DISPLAY "      Detected EC-BOUND-SUBSCRIPT exception".
+                DISPLAY "      " """" FUNCTION EXCEPTION-LOCATION """".
+                RESUME NEXT STATEMENT.
+            END DECLARATIVES.
+           MANDATORY-SECTION SECTION.
+           MOVE ALL 'A' TO TSTX(1).
+           MOVE ALL 'B' TO TSTX(2).
+           MOVE ALL 'C' TO TSTX(3).
+           MOVE ALL '1' TO TSTY(1).
+           MOVE ALL '2' TO TSTY(2).
+           MOVE ALL '3' TO TSTY(3).
+           DEMO-SECTION SECTION.
+           DEMO-PARAGRAPH.
+           >>TURN EC-ALL CHECKING ON
+           MOVE 0  TO UNUP.
+           DISPLAY "UNUP: " UNUP " is :" TSTY(UNUP) ":" UPON CONSOLE.
+           MOVE 0  TO SNUP.
+           DISPLAY "SNUP: " SNUP " is :" TSTY(SNUP) ":" UPON CONSOLE.
+           MOVE 0  TO SBIN.
+           DISPLAY "SBIN: " SBIN " is :" TSTY(SBIN) ":" UPON CONSOLE.
+           MOVE -1 TO SBIN.
+           DISPLAY "SBIN: " SBIN " is :" TSTY(SBIN) ":" UPON CONSOLE.
+           MOVE 'xxx'   TO TSTY(SBIN).
+           DISPLAY "SBIN: " SBIN " is :" TSTY(SBIN) ":" UPON CONSOLE.
+      * The following would often core dump
+           MOVE 0 TO UBIN.
+           DISPLAY "UBIN: " UBIN " is :" TSTY(UBIN) ":" UPON CONSOLE.
+           MOVE 'xxx'   TO TSTY(UBIN).
+           MOVE 1 TO UBIN.
+           DISPLAY "UBIN: " UBIN " is :" TSTY(UBIN) ":" UPON CONSOLE.
+           STOP RUN.
+])
+# Safe run with runtime checks
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0],
+[UNUP: 00000000 is :1111:
+      Detected EC-BOUND-SUBSCRIPT exception
+      "prog; DEMO-PARAGRAPH OF DEMO-SECTION; prog.cob:32 "
+SNUP: +00000000 is :1111:
+      Detected EC-BOUND-SUBSCRIPT exception
+      "prog; DEMO-PARAGRAPH OF DEMO-SECTION; prog.cob:34 "
+SBIN: +00000000 is :1111:
+      Detected EC-BOUND-SUBSCRIPT exception
+      "prog; DEMO-PARAGRAPH OF DEMO-SECTION; prog.cob:36 "
+SBIN: -00000001 is :1111:
+      Detected EC-BOUND-SUBSCRIPT exception
+      "prog; DEMO-PARAGRAPH OF DEMO-SECTION; prog.cob:38 "
+      Detected EC-BOUND-SUBSCRIPT exception
+      "prog; DEMO-PARAGRAPH OF DEMO-SECTION; prog.cob:39 "
+SBIN: -00000001 is :xxx :
+      Detected EC-BOUND-SUBSCRIPT exception
+      "prog; DEMO-PARAGRAPH OF DEMO-SECTION; prog.cob:40 "
+UBIN: 00000000 is :xxx :
+      Detected EC-BOUND-SUBSCRIPT exception
+      "prog; DEMO-PARAGRAPH OF DEMO-SECTION; prog.cob:43 "
+      Detected EC-BOUND-SUBSCRIPT exception
+      "prog; DEMO-PARAGRAPH OF DEMO-SECTION; prog.cob:44 "
+UBIN: 00000001 is :xxx :
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([FLOAT-SHORT / FLOAT-LONG w/o SIZE ERROR])
+AT_KEYWORDS([Numeric misc COMP-1 COMP-2 DISPLAY COMPUTE])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  CMP1                        COMP-1.
+       01  SV1                         COMP-1.
+       01  CMP2                        COMP-2.
+       01  SV2                         COMP-2.
+
+       PROCEDURE DIVISION.
+       CND-000.
+
+           DISPLAY "--- COMP-1 ---"
+           COMPUTE CMP1 = (((1.0E7 / 2.1E0) / 3.1E0) - 5.0E-1) * 6.0E0
+           DISPLAY "A: " CMP1
+           COMPUTE CMP1 = (((1.0E7 / 2.9E0) / 3.9E0) - 5.0E-1) * 6.0E0
+           DISPLAY "B: " CMP1
+           MOVE ZERO TO CMP1.
+           COMPUTE CMP1 = 1.0E3 / 2.1E0
+                   ON SIZE ERROR DISPLAY "Z: " CMP1 " SIZE ERROR"
+               NOT ON SIZE ERROR DISPLAY "Z: " CMP1 " IS OK"
+           END-COMPUTE.
+
+           DISPLAY "    ..."
+           DISPLAY "--- COMP-2 ---"
+           COMPUTE CMP2 = (((1.0E7 / 2.1E0) / 3.1E0) - 5.0E-1) * 6.0E0
+      *>   because of possible rounding of intermediates and different
+      *>   precision depending on math library / version: plain DISPLAY
+           IF CMP2 >= 9216586.86175114 AND <= 9216586.86175116
+             DISPLAY "A ~ 9216586.86175115"
+           ELSE
+             DISPLAY "A: " CMP2
+           END-IF
+           COMPUTE CMP2 = (((1.0E7 / 2.9E0) / 3.9E0) - 5.0E-1) * 6.0E0
+           IF CMP2 >= 5305036.7877983 AND <= 5305036.7877985
+             DISPLAY "B ~ 5305036.787798408"
+           ELSE
+             DISPLAY "B: " CMP2
+           END-IF
+           MOVE ZERO TO CMP2.
+           COMPUTE CMP2 = 1.0E3 / 2.1E0
+                   ON SIZE ERROR DISPLAY "Z: " CMP2 " SIZE ERROR"
+               NOT ON SIZE ERROR
+      *>        see note above
+                IF CMP2 >= 476.1904761904760 AND <= 476.1904761904763
+                  DISPLAY "Z ~ 476.1904761904761 IS OK"
+                ELSE
+                  DISPLAY "Z: " CMP2 " IS OK"
+                END-IF
+           END-COMPUTE.
+
+           DISPLAY "    ..."
+           DISPLAY "--- 99 + 1 / 3 ---"
+           MOVE -1 TO CMP1, CMP2.
+           COMPUTE CMP1 = 99 + 1 / 3
+                   ON SIZE ERROR DISPLAY "CMP1: " CMP1 " SIZE ERROR"
+               NOT ON SIZE ERROR DISPLAY "CMP1: " CMP1 " IS OK"
+           END-COMPUTE.
+           COMPUTE CMP2 = 99 + 1 / 3
+                   ON SIZE ERROR DISPLAY "CMP2: " CMP2 " SIZE ERROR"
+               NOT ON SIZE ERROR DISPLAY "CMP2: " CMP2 " IS OK"
+           END-COMPUTE.
+
+           DISPLAY "    ..."
+           DISPLAY "--- 99 ---"
+           MOVE -1 TO CMP1, CMP2.
+           COMPUTE CMP1 = 99
+                   ON SIZE ERROR DISPLAY "CMP1: " CMP1 " SIZE ERROR"
+               NOT ON SIZE ERROR DISPLAY "CMP1: " CMP1 " IS OK"
+           END-COMPUTE.
+           COMPUTE CMP2 = 99
+                   ON SIZE ERROR DISPLAY "CMP2: " CMP2 " SIZE ERROR"
+               NOT ON SIZE ERROR DISPLAY "CMP2: " CMP2 " IS OK"
+           END-COMPUTE.
+
+       CND-100-OK.
+           DISPLAY "    ..."
+           DISPLAY "--- Test overflow ---"
+
+           MOVE 990000 TO CMP1.
+           PERFORM 6500 TIMES
+             MOVE CMP1 TO SV1
+             COMPUTE CMP1 = CMP1 * 10
+                    ON SIZE ERROR GO TO CND-350-ERR
+             END-COMPUTE
+             IF CMP1 < 9.0
+               GO TO CND-350-ERR
+             END-IF
+           END-PERFORM.
+           DISPLAY "CMP1: " CMP1 " IS OK".
+           GO TO CND-350-OK.
+       CND-350-ERR.
+           DISPLAY "CMP1: after " SV1 " SIZE ERROR".
+
+       CND-350-OK.
+           MOVE 9900000000 TO CMP2.
+           PERFORM 6500 TIMES
+             MOVE CMP2 TO SV2
+             COMPUTE CMP2 = CMP2 * 10
+                    ON SIZE ERROR GO TO CND-380-ERR
+             END-COMPUTE
+             IF CMP2 < 9.0
+               GO TO CND-380-ERR
+             END-IF
+           END-PERFORM.
+           DISPLAY "CMP2: " CMP2 " IS OK".
+           GO TO CND-500-OK.
+       CND-380-ERR.
+      *>   because of possible rounding of intermediates and different
+      *>   precision depending on math library / version: plain DISPLAY
+           IF SV2 >= 9.899999999999E+307 AND
+                  <= 9.900000000001E+307
+             DISPLAY "CMP2: after ~ 9.899999999999781E+307 SIZE ERROR"
+           ELSE
+             DISPLAY "CMP2: after " SV2 " SIZE ERROR"
+           END-IF
+           .
+
+       CND-500-OK.
+           MOVE 0.000000099 TO CMP1.
+           PERFORM 350 TIMES
+             MOVE CMP1 TO SV1
+             COMPUTE CMP1 = CMP1 / 10.0
+                    ON SIZE ERROR GO TO CND-500-ERR
+             END-COMPUTE
+             IF CMP1 = 0.0
+               GO TO CND-500-ERR
+             END-IF
+           END-PERFORM.
+           DISPLAY "CMP1: " CMP1 " IS OK".
+           GO TO CND-600-OK.
+       CND-500-ERR.
+           DISPLAY "CMP1: after " SV1 " SIZE ERROR".
+
+       CND-600-OK.
+           MOVE 0.000000099 TO CMP2.
+           PERFORM 350 TIMES
+             MOVE CMP2 TO SV2
+             COMPUTE CMP2 = CMP2 / 10.0
+                    ON SIZE ERROR GO TO CND-600-ERR
+             END-COMPUTE
+             IF CMP2 = 0.0
+               GO TO CND-600-ERR
+             END-IF
+           END-PERFORM.
+           DISPLAY "CMP2: " CMP2 " IS OK".
+           GO TO CND-600-XIT.
+       CND-600-ERR.
+           IF SV2 >= 9.8813129168249E-324 AND <= 9.881312916825E-324
+             DISPLAY "CMP2: after ~ 9.881312916824931E-324 SIZE ERROR"
+           ELSE
+             DISPLAY "CMP2: after " SV2 " SIZE ERROR"
+           END-IF
+           .
+       CND-600-XIT.
+
+       CND-999.
+           STOP RUN.
+       END PROGRAM prog.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0],
+[--- COMP-1 ---
+A: 9.216587E+06
+B: 5.305037E+06
+Z: 476.1904907 IS OK
+    ...
+--- COMP-2 ---
+A ~ 9216586.86175115
+B ~ 5305036.787798408
+Z ~ 476.1904761904761 IS OK
+    ...
+--- 99 + 1 / 3 ---
+CMP1: 99.33333588 IS OK
+CMP2: 99.3333333333333286 IS OK
+    ...
+--- 99 ---
+CMP1: 99 IS OK
+CMP2: 99 IS OK
+    ...
+--- Test overflow ---
+CMP1: after 9.899998274E+37 SIZE ERROR
+CMP2: after ~ 9.899999999999781E+307 SIZE ERROR
+CMP1: after 1.401298464E-45 SIZE ERROR
+CMP2: after ~ 9.881312916824931E-324 SIZE ERROR
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([FLOAT-SHORT with SIZE ERROR])
+AT_KEYWORDS([misc COMP-1])
+AT_DATA([prog.cob], [
+       identification division.
+       program-id. prog.
+
+       data division.
+       working-storage section.
+      *------------------------
+       77 counter             pic s9(4) binary value zero.
+      * FLOAT-SHORT (if binary-comp-1 is not active)
+       77 floatValue          COMP-1  value 2.
+       77 lastFloatValue      COMP-1.
+
+      ******************************************************************
+       procedure division.
+       main section.
+           perform varying counter from 1 by 1 until
+                           counter > 130
+      *>      display 'counter: ' counter ', value: ' floatValue
+              compute floatValue = floatValue * 2
+                   ON SIZE ERROR
+                      display 'SIZE ERROR, last value = ' floatValue
+                      exit perform
+               not ON SIZE ERROR
+                      if floatValue > lastFloatValue
+                         move floatValue to lastFloatValue
+                      else
+                         display 'math ERROR, last value > current: '
+                                 lastFloatValue ' > ' floatValue
+                         exit perform
+                      end-if
+              end-compute
+           end-perform
+           if counter not = 127
+              display 'counter is ' counter
+           end-if
+
+           goback.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0],
+[SIZE ERROR, last value = 1.701411835E+38
+], [])
+AT_CLEANUP
+
+AT_SETUP([FLOAT-LONG with SIZE ERROR])
+AT_KEYWORDS([misc COMP-2])
+AT_DATA([prog.cob], [
+       identification division.
+       program-id. prog.
+       data division.
+       working-storage section.
+      *------------------------
+       77 counter             pic s9(4) binary value zero.
+      * FLOAT-LONG
+       77 doubleValue         COMP-2 value 2.
+       77 lastDoubleValue     COMP-2.
+      ******************************************************************
+       procedure division.
+       main section.
+           perform varying counter from 1 by 1 until
+                           counter > 1060
+      *>      display 'counter: ' counter ', value: ' doubleValue
+              compute doubleValue = doubleValue * 2
+                   ON SIZE ERROR
+                      display 'SIZE ERROR raised'
+                      end-display
+                      display 'SIZE ERROR, last value = ' doubleValue
+                      end-display
+                      exit perform
+               not ON SIZE ERROR
+                      if doubleValue > lastdoubleValue
+                         move doubleValue to lastdoubleValue
+                      else
+                         display 'math ERROR, last value > current: '
+                                 lastdoubleValue ' > ' doubleValue
+                         end-display
+                         exit perform
+                      end-if
+              end-compute
+           end-perform
+           display "counter is " counter
+           if not (counter >= 1023 and <=1025)
+              display ' '
+              display 'counter is ' counter
+           end-if
+           goback.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [SIZE ERROR raised
+SIZE ERROR, last value = 8.98846567431157954E+307
+counter is +1023
+], [])
+AT_CLEANUP
+
+AT_SETUP([EC-SIZE-ZERO-DIVIDE; fixed and float])
+AT_KEYWORDS([misc fundamental exceptions
+DIVIDE COMPUTE EXCEPTION-STATUS])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  x PIC 9 VALUE 0.
+       01  y PIC 9 VALUE 0.
+       01  fx comp-2 VALUE 0.
+       01  fy comp-2 VALUE 0.
+       PROCEDURE DIVISION.
+           DISPLAY "Fixed-point divide by zero:"
+           DIVIDE x BY y GIVING y
+           DISPLAY "1 - """ FUNCTION TRIM(FUNCTION EXCEPTION-STATUS) """"
+           IF FUNCTION TRIM(FUNCTION EXCEPTION-STATUS)
+           NOT = 'EC-SIZE-ZERO-DIVIDE'
+              DISPLAY '1 Wrong/missing exception: '
+                      FUNCTION EXCEPTION-STATUS
+              END-DISPLAY
+           END-IF
+           SET LAST EXCEPTION TO OFF
+           DISPLAY "2 - """ FUNCTION TRIM(FUNCTION EXCEPTION-STATUS) """"
+           IF FUNCTION EXCEPTION-STATUS NOT = SPACES
+              DISPLAY '2 Exception is not empty after reset: '
+                      FUNCTION EXCEPTION-STATUS
+              END-DISPLAY
+           END-IF
+           MOVE 0 TO y
+           COMPUTE y = x - 1 / y + 6.5
+           DISPLAY "3 - """ FUNCTION TRIM(FUNCTION EXCEPTION-STATUS) """"
+           IF FUNCTION TRIM(FUNCTION EXCEPTION-STATUS)
+           NOT = 'EC-SIZE-ZERO-DIVIDE'
+              DISPLAY '3 Wrong/missing exception: '
+                      FUNCTION EXCEPTION-STATUS
+              END-DISPLAY
+           END-IF.
+           SET LAST EXCEPTION TO OFF
+           DISPLAY "Floating-point divide by zero:"
+           DIVIDE fx BY fy GIVING fy
+           DISPLAY "4 - """ FUNCTION TRIM(FUNCTION EXCEPTION-STATUS) """"
+           IF FUNCTION TRIM(FUNCTION EXCEPTION-STATUS)
+           NOT = 'EC-SIZE-ZERO-DIVIDE'
+              DISPLAY '4 Wrong/missing exception: '
+                      FUNCTION EXCEPTION-STATUS
+              END-DISPLAY
+           END-IF
+           SET LAST EXCEPTION TO OFF
+           DISPLAY "5 - """ FUNCTION TRIM(FUNCTION EXCEPTION-STATUS) """"
+           IF FUNCTION EXCEPTION-STATUS NOT = SPACES
+              DISPLAY '5 Exception is not empty after reset: '
+                      FUNCTION EXCEPTION-STATUS
+              END-DISPLAY
+           END-IF
+           MOVE 0 TO fy
+           COMPUTE fy = fx - 1 / fy + 6.5
+           DISPLAY "6 - """ FUNCTION TRIM(FUNCTION EXCEPTION-STATUS) """"
+           IF FUNCTION TRIM(FUNCTION EXCEPTION-STATUS)
+           NOT = 'EC-SIZE-ZERO-DIVIDE'
+              DISPLAY '6 Wrong/missing exception: '
+                      FUNCTION EXCEPTION-STATUS
+              END-DISPLAY
+           END-IF.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [Fixed-point divide by zero:
+1 - "EC-SIZE-ZERO-DIVIDE"
+2 - ""
+3 - "EC-SIZE-ZERO-DIVIDE"
+Floating-point divide by zero:
+4 - "EC-SIZE-ZERO-DIVIDE"
+5 - ""
+6 - "EC-SIZE-ZERO-DIVIDE"
+], [])
+AT_CLEANUP
+
+AT_SETUP([EC-SIZE-TRUNCATION/EC-SIZE-OVERFLOW])
+AT_KEYWORDS([misc fundamental exceptions])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  x PIC 9 VALUE 1.
+       01  y PIC 9.
+       01  a     COMP-1 VALUE 1.E20.
+       01  b     COMP-1 VALUE 1.E20.
+       PROCEDURE DIVISION.
+           DIVIDE x BY 0.1 GIVING y
+           DISPLAY FUNCTION TRIM(FUNCTION EXCEPTION-STATUS)
+           IF FUNCTION TRIM(FUNCTION EXCEPTION-STATUS)
+           NOT = 'EC-SIZE-TRUNCATION'
+              DISPLAY 'Wrong/missing exception: '
+                      FUNCTION EXCEPTION-STATUS
+              END-DISPLAY
+           END-IF.
+        SET LAST EXCEPTION TO OFF
+           MULTIPLY a BY b GIVING b
+           DISPLAY FUNCTION TRIM(FUNCTION EXCEPTION-STATUS)
+           IF FUNCTION TRIM(FUNCTION EXCEPTION-STATUS)
+           NOT = 'EC-SIZE-OVERFLOW'
+              DISPLAY 'Wrong/missing exception: '
+                      FUNCTION EXCEPTION-STATUS
+              END-DISPLAY
+           END-IF.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [EC-SIZE-TRUNCATION
+EC-SIZE-OVERFLOW
+], [])
+AT_CLEANUP
+
+AT_SETUP([Class check with reference modification])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC X(6) VALUE "123   ".
+       PROCEDURE        DIVISION.
+           IF X(1:3) NUMERIC
+              STOP RUN
+           END-IF.
+           DISPLAY "NG" NO ADVANCING
+           END-DISPLAY.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([PROGRAM-ID / CALL literal/variable with spaces])
+AT_KEYWORDS([misc CALL])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  MYRTN  PIC X(9) VALUE " SUB  ".
+       PROCEDURE DIVISION.
+           CALL " SUB " USING BY VALUE 'X'.
+           MOVE x'00' TO MYRTN (6:1).
+           CALL MYRTN   USING BY VALUE 'Y'.
+           CALL "SUB"   USING BY VALUE 'Z'.
+           CALL "S U B" USING BY VALUE 'A'.
+           MOVE " S U B" TO MYRTN.
+           CALL MYRTN   USING BY VALUE 'B'.
+           STOP RUN.
+       END PROGRAM prog.
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. "SUB ".
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01  x  PIC X.
+       PROCEDURE DIVISION USING x.
+            DISPLAY "SUB GOT " X
+            END-DISPLAY.
+       END PROGRAM " SUB".
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. "S U B".
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01  x  PIC X.
+       PROCEDURE DIVISION USING x.
+            DISPLAY "S U B  GOT " X
+            END-DISPLAY.
+       END PROGRAM "S U B".
+])
+AT_CHECK([$COMPILE prog.cob], [1], [],
+[prog.cob:18:20: error: literal 'SUB ' must be a COBOL or C identifier
+   18 |        PROGRAM-ID. "SUB ".
+      |                    ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([OSVS Arithmetic Test (2)])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID. prog.
+       ENVIRONMENT      DIVISION.
+       DATA             DIVISION.
+       WORKING-STORAGE SECTION.
+       01  VAL                 PIC S9(7)V99 COMP-3 VALUE 20500.
+       01  DIV1                PIC S9(7)V99 COMP-3 VALUE 0.9.
+       01  DIV2                PIC S9(7)V99 COMP-3 VALUE 33.45.
+       01  DIV3                PIC S9(7)V99 COMP-3 VALUE 9.
+       01  MUL1                PIC S9(7)V99 COMP-3 VALUE 10.
+       01  MUL2                PIC S9(7)V99 COMP-3 VALUE 5.
+       01  MUL3                PIC S9(7)V99 COMP-3 VALUE 2.
+       01  RES                 PIC S9(7)V99 COMP-3.
+       PROCEDURE        DIVISION.
+           COMPUTE RES = VAL / DIV1 / DIV2.
+           DISPLAY 'RES = ' RES.
+           COMPUTE RES ROUNDED = VAL / DIV1 / DIV2.
+           DISPLAY 'RES ROUNDED = ' RES.
+           COMPUTE RES = VAL * MUL1 / DIV3 / DIV2.
+           DISPLAY 'RES MULT1 = ' RES.
+           COMPUTE RES = VAL * MUL2 * MUL3 / DIV3 / DIV2.
+           DISPLAY 'RES MULT2 = ' RES.
+           COMPUTE RES = VAL / DIV1.
+           DISPLAY 'RES 1 = ' RES.
+           COMPUTE RES = RES / DIV2.
+           DISPLAY 'RES F = ' RES.
+           COMPUTE RES  =
+                VAL / DIV1 / DIV2.
+           DISPLAY 'RES NOT ROUNDED = ' RES.
+           COMPUTE RES ROUNDED MODE NEAREST-AWAY-FROM-ZERO =
+                VAL / DIV1 / DIV2.
+           DISPLAY 'RES ROUNDED NEAREST-AWAY = ' RES.
+           COMPUTE RES ROUNDED MODE AWAY-FROM-ZERO =
+                VAL / DIV1 / DIV2.
+           DISPLAY 'RES ROUNDED AWAY = ' RES.
+           STOP RUN.
+])
+AT_CHECK([($COMPILE prog.cob)], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0],
+[RES = +0000680.95
+RES ROUNDED = +0000680.95
+RES MULT1 = +0000680.95
+RES MULT2 = +0000680.95
+RES 1 = +0022777.77
+RES F = +0000680.94
+RES NOT ROUNDED = +0000680.95
+RES ROUNDED NEAREST-AWAY = +0000680.95
+RES ROUNDED AWAY = +0000680.96
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([LOCAL-STORAGE (1)])
+AT_KEYWORDS([misc])
+AT_DATA([callee.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      callee.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 WRK-X         PIC XXX VALUE "abc".
+       LOCAL-STORAGE    SECTION.
+       01 LCL-X         PIC XXX VALUE "abc".
+       PROCEDURE        DIVISION.
+           DISPLAY WRK-X LCL-X NO ADVANCING
+           END-DISPLAY.
+           MOVE ZERO TO WRK-X LCL-X.
+           EXIT PROGRAM.
+])
+AT_DATA([caller.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      caller.
+       PROCEDURE        DIVISION.
+           CALL "callee"
+           END-CALL.
+           CALL "callee"
+           END-CALL.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE -c callee.cob], [0], [], [])
+AT_CHECK([$COMPILE -o prog caller.cob callee.o], [0], [], [])
+AT_CHECK([./prog], [0], [abcabc000abc], [])
+AT_CLEANUP
+
+
+AT_SETUP([LOCAL-STORAGE (2)])
+AT_KEYWORDS([misc])
+AT_DATA([callee2.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      callee2.
+       DATA             DIVISION.
+       LINKAGE          SECTION.
+       01 LNK-X         PIC XXX.
+       PROCEDURE        DIVISION USING LNK-X.
+           DISPLAY LNK-X NO ADVANCING
+           END-DISPLAY.
+           EXIT PROGRAM.
+])
+AT_DATA([callee.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      callee.
+       DATA             DIVISION.
+       LOCAL-STORAGE    SECTION.
+       01 LCL-X.
+          05 FILLER     PIC XXX VALUE "abc".
+       PROCEDURE        DIVISION.
+           CALL "callee2" USING LCL-X
+           END-CALL.
+           MOVE ZERO TO LCL-X.
+           CALL "callee2" USING LCL-X
+           END-CALL.
+           EXIT PROGRAM.
+])
+AT_DATA([caller.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      caller.
+       PROCEDURE        DIVISION.
+           CALL "callee"
+           END-CALL.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE -c callee.cob], [0], [], [])
+AT_CHECK([$COMPILE -c callee2.cob], [0], [], [])
+AT_CHECK([$COMPILE -o prog caller.cob callee.o callee2.o], [0], [], [])
+AT_CHECK([./prog], [0], [abc000], [])
+AT_CLEANUP
+
+AT_SETUP([LOCAL-STORAGE (3) with recursive PROGRAM-ID])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+        IDENTIFICATION   DIVISION.
+        PROGRAM-ID.      caller.
+        PROCEDURE        DIVISION.
+           CALL "callee"
+           END-CALL.
+           STOP RUN.
+           end program caller.
+
+        IDENTIFICATION   DIVISION.
+        PROGRAM-ID.      callee.
+        DATA             DIVISION.
+        WORKING-STORAGE  SECTION.
+        01 WRK-X         PIC 999 VALUE 5.
+        LOCAL-STORAGE    SECTION.
+        01 LCL-X         PIC 999 .
+        PROCEDURE        DIVISION.
+            display "On entry: " wrk-x
+            move wrk-x to lcl-x
+            subtract 1 from wrk-x
+            if wrk-x > 0
+                call "callee".
+            display "On exit: " lcl-x
+            goback.
+            end program callee.
+])
+AT_CHECK([$COMPILE -o prog prog.cob], [0], [], [])
+AT_CHECK([./prog], [0], [On entry: 005
+On entry: 004
+On entry: 003
+On entry: 002
+On entry: 001
+On exit: 001
+On exit: 002
+On exit: 003
+On exit: 004
+On exit: 005
+], [])
+AT_CLEANUP
+
+AT_SETUP([LOCAL-STORAGE (4) with recursive PROGRAM-ID ... USING])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+        IDENTIFICATION   DIVISION.
+        PROGRAM-ID.      caller.
+        PROCEDURE        DIVISION.
+           CALL "callee"
+           END-CALL.
+           STOP RUN.
+           end program caller.
+
+        IDENTIFICATION   DIVISION.
+        PROGRAM-ID.      callee.
+        DATA             DIVISION.
+        WORKING-STORAGE  SECTION.
+        01 WRK-X         PIC 999 VALUE 5.
+        LOCAL-STORAGE    SECTION.
+        01 LCL-X         PIC 999 .
+        PROCEDURE        DIVISION.
+            display "On entry: " wrk-x
+            move wrk-x to lcl-x
+            subtract 1 from wrk-x
+            if wrk-x > 0
+                call "callee".
+            display "On exit: " lcl-x
+            goback.
+            end program callee.
+])
+AT_CHECK([$COMPILE -o prog prog.cob], [0], [], [])
+AT_CHECK([./prog], [0], [On entry: 005
+On entry: 004
+On entry: 003
+On entry: 002
+On entry: 001
+On exit: 001
+On exit: 002
+On exit: 003
+On exit: 004
+On exit: 005
+], [])
+AT_CLEANUP
+
+AT_SETUP([Recursive CALL of RECURSIVE program])
+AT_KEYWORDS([misc CANCEL EXTERNAL])
+AT_DATA([caller.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      caller IS RECURSIVE.
+       ENVIRONMENT      DIVISION.
+       CONFIGURATION    SECTION.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       77  STOPPER      PIC S9 EXTERNAL.
+       PROCEDURE        DIVISION.
+           MOVE 0 TO STOPPER
+           CALL "callee"
+           DISPLAY 'OK' NO ADVANCING END-DISPLAY
+      *> FIXME: CANCEL broken on special environments
+      *>   CANCEL "callee" , "callee2"
+           DISPLAY ' + FINE' NO ADVANCING END-DISPLAY
+           STOP RUN.
+])
+AT_DATA([callee.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      callee IS RECURSIVE.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       77  STOPPER      PIC S9 EXTERNAL.
+       PROCEDURE        DIVISION.
+           IF STOPPER = 9
+              MOVE -1 TO STOPPER
+           ELSE
+              ADD   1 TO STOPPER
+              CALL "callee2"
+           END-IF
+           GOBACK.
+])
+AT_DATA([callee2.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      callee2 IS RECURSIVE.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       77  STOPPER      PIC S9 EXTERNAL.
+       PROCEDURE        DIVISION.
+           IF STOPPER NOT EQUAL -1
+             CALL "callee"
+           END-IF
+           GOBACK.
+])
+
+AT_CHECK([$COMPILE -c callee.cob], [0], [], [])
+AT_CHECK([$COMPILE -c callee2.cob], [0], [], [])
+AT_CHECK([$COMPILE -o caller caller.cob callee.o callee2.o], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./caller], [0], [OK + FINE], [])
+AT_CLEANUP
+
+
+AT_SETUP([Recursive CALL of INITIAL program])
+AT_KEYWORDS([misc])
+AT_DATA([caller.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      caller.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       77  STOPPER      PIC 9 EXTERNAL.
+       PROCEDURE        DIVISION.
+           MOVE 0 TO STOPPER
+           CALL "callee" END-CALL.
+           GOBACK.
+])
+AT_DATA([callee.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      callee IS INITIAL.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       77  STOPPER      PIC 9 EXTERNAL.
+       PROCEDURE        DIVISION.
+           IF STOPPER = 1
+              DISPLAY 'INITIAL prog was called RECURSIVE'
+              END-DISPLAY
+      *       Following statement not ISO, corrected below
+      *       STOP RUN RETURNING 1
+              MOVE 1 TO RETURN-CODE
+              STOP RUN
+           ELSE
+              MOVE 1 TO STOPPER
+              CALL "callee2" END-CALL
+           END-IF.
+           GOBACK.
+])
+AT_DATA([callee2.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      callee2.
+       PROCEDURE        DIVISION.
+           CALL "callee" END-CALL.
+           GOBACK.
+])
+AT_CHECK([$COMPILE -c callee.cob], [0], [], [])
+AT_CHECK([$COMPILE -c callee2.cob], [0], [], [])
+AT_CHECK([$COMPILE -o caller caller.cob callee.o callee2.o], [0], [], [])
+AT_CHECK([./caller], [1], [INITIAL prog was called RECURSIVE
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([Recursive CALL with RECURSIVE assumed])
+AT_KEYWORDS([misc])
+AT_DATA([caller.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      caller.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       77  STOPPER      PIC 9 EXTERNAL.
+       PROCEDURE        DIVISION.
+           MOVE 0 TO STOPPER
+           CALL "callee" END-CALL.
+           GOBACK.
+])
+AT_DATA([callee.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      callee IS INITIAL.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       77  STOPPER      PIC 9 EXTERNAL.
+       PROCEDURE        DIVISION.
+           IF STOPPER = 8
+              DISPLAY 'OK' NO ADVANCING END-DISPLAY.
+           IF STOPPER NOT = 9
+              ADD  1 TO STOPPER END-ADD
+              CALL "callee2" END-CALL.
+           GOBACK.
+])
+AT_DATA([callee2.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      callee2.
+       PROCEDURE        DIVISION.
+           CALL "callee" END-CALL.
+           GOBACK.
+])
+AT_CHECK([$COMPILE -c callee.cob], [0], [], [])
+AT_CHECK([$COMPILE -c callee2.cob], [0], [], [])
+AT_CHECK([$COMPILE -o caller caller.cob callee.o callee2.o], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./caller], [0], [OK], [])
+AT_CLEANUP
+
+AT_SETUP([Recursive PERFORM paragraph])
+AT_KEYWORDS([recursive recursion])
+AT_DATA([prog.cob], [        identification      division.
+        program-id.         prog.
+        data                division.
+        working-storage     section.
+        77 n binary-double unsigned.
+        77 f binary-double unsigned.
+        procedure           division.
+        move 20 to n
+        move 1 to f
+        display "compute " n " factorial".
+        fact.
+            compute f = f * n
+            subtract 1 from n
+            if n not equal to zero then 
+                perform fact
+            end-if.
+        end-fact.
+        display f.
+        end program         prog.
+])
+AT_CHECK([$COMPILE -o prog prog.cob], [0], [], [])
+AT_CHECK([./prog], [0], [compute 0000000000000000020 factorial
+2432902008176640000
+], [])
+AT_CLEANUP
+
+AT_SETUP([PERFORM inline (1)])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  INDVAL       PIC 9(4).
+       PROCEDURE        DIVISION.
+           PERFORM VARYING INDVAL FROM 1
+            BY 1 UNTIL INDVAL > 2
+           CONTINUE
+           END-PERFORM
+           IF INDVAL NOT = 3
+              DISPLAY INDVAL NO ADVANCING
+              END-DISPLAY
+           END-IF
+           STOP RUN
+           .
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+AT_CLEANUP
+
+
+AT_SETUP([PERFORM inline (2)])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  INDVAL       PIC 9(4).
+       PROCEDURE        DIVISION.
+           PERFORM VARYING INDVAL FROM 1
+            BY 1 UNTIL INDVAL > 2
+            CONTINUE
+            END-PERFORM
+           IF INDVAL NOT = 3
+              DISPLAY INDVAL NO ADVANCING
+              END-DISPLAY
+           END-IF
+           .
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+AT_CLEANUP
+
+
+AT_SETUP([UNSTRING DELIMITER IN])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT      DIVISION.
+       DATA             DIVISION.
+       WORKING-STORAGE SECTION.
+       01  WK-CMD       PIC X(8) VALUE "WWADDBCC".
+       01  WK-SIGNS     PIC XX   VALUE "AB".
+       01  WKS REDEFINES WK-SIGNS.
+           03 WK-SIGN   PIC X OCCURS 2.
+       01  .
+         02 WK-DELIM     PIC X OCCURS 2.
+       01  .
+         02 WK-DATA      PIC X(2) OCCURS 3.
+       PROCEDURE        DIVISION.
+           UNSTRING WK-CMD DELIMITED BY WK-SIGN(1) OR WK-SIGN(2)
+           INTO WK-DATA(1) DELIMITER IN WK-DELIM(1)
+                WK-DATA(2) DELIMITER IN WK-DELIM(2)
+                WK-DATA(3)
+           END-UNSTRING
+           IF  WK-DATA(1)   NOT = "WW"
+            OR WK-DATA(2)   NOT = "DD"
+            OR WK-DATA(3)   NOT = "CC"
+            OR WK-DELIM(1)  NOT = "A"
+            OR WK-DELIM(2)  NOT = "B"
+               DISPLAY """" WK-DATA(1)
+                       WK-DATA(2)
+                       WK-DATA(3)
+                       WK-DELIM(1)
+                       WK-DELIM(2) """"
+               END-DISPLAY
+           END-IF.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+AT_CLEANUP
+
+
+AT_SETUP([PERFORM type OSVS])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  MYOCC        PIC 9(8) COMP VALUE 0.
+       PROCEDURE        DIVISION.
+       ASTART SECTION.
+       A01.
+           PERFORM BTEST.
+           IF MYOCC NOT = 2
+              DISPLAY MYOCC
+              END-DISPLAY
+           END-IF.
+           STOP RUN.
+       BTEST SECTION.
+       B01.
+           PERFORM B02 VARYING MYOCC FROM 1 BY 1
+                   UNTIL MYOCC > 5.
+           GO TO B99.
+       B02.
+           IF MYOCC > 1
+              GO TO B99
+           END-IF.
+       B99.
+           EXIT.
+])
+AT_CHECK([$COMPILE  prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+AT_CLEANUP
+
+
+AT_SETUP([Sticky LINKAGE])
+AT_KEYWORDS([misc])
+AT_DATA([callee.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      callee.
+       DATA             DIVISION.
+       LINKAGE          SECTION.
+       01 P1            PIC X.
+       01 P2            PIC X(6).
+       01 P3            PIC X(6).
+       PROCEDURE        DIVISION USING P1 P2.
+           IF P1 = "A"
+              SET ADDRESS OF P3 TO ADDRESS OF P2
+           ELSE
+              IF P3 NOT = "OKOKOK"
+                 DISPLAY P3
+                 END-DISPLAY
+              END-IF
+           END-IF.
+           EXIT PROGRAM.
+])
+AT_DATA([caller.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      caller.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 P1            PIC X    VALUE "A".
+       01 P2            PIC X(6) VALUE "NOT OK".
+       PROCEDURE        DIVISION.
+           CALL "callee" USING P1 P2
+           END-CALL.
+           MOVE "B"      TO P1.
+           MOVE "OKOKOK" TO P2.
+           CALL "callee" USING P1
+           END-CALL.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE -c callee.cob], [0], [], [])
+AT_CHECK([$COMPILE -o caller caller.cob callee.o], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./caller], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([-static compilation])
+AT_SKIP_IF( test "$UBUNTU20" = "20" )
+AT_KEYWORDS([compilation])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       PROCEDURE DIVISION.
+       DISPLAY "hello, world".
+       end program prog.
+])
+AT_CHECK([$COMPILE -static prog.cob], [0], [], ignore)
+AT_CHECK([./a.out], [0], [hello, world
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([bubblesort with STANDARD-1 collating sequence])
+AT_KEYWORDS([collating ascii])
+AT_DATA([prog.cob], [
+        identification division.
+        program-id. alfabet.
+        environment division.
+        configuration section.
+        special-names.
+            alphabet alfa-name is standard-1.
+        object-computer.
+            linux-system program collating sequence is alfa-name.
+        data division.
+        working-storage section.
+        77 initial-string pic x(80) value
+            "98765edcbajihgfonmLKTSRQPZYXWVUEDCBAJIHGFONMlktsrqpzyxwvu01234~}\{".
+        77 sort-me      pic x(80).
+        *> These are used by bubble-sort
+        77 nspaces      pic 999.
+        77 slength      pic 999.
+        77 ileft        pic 999.
+        77 iright       pic 999.
+        77 loops        pic 999.
+        77 swap         pic x.
+        procedure division.
+        display "bubblesort the string with STANDARD-1 collating sequence"
+        display function trim(initial-string)
+        move initial-string to sort-me
+        perform bubble-sort
+        display function trim(sort-me)
+        goback.
+        bubble-sort.
+            *> Calculate the length of sort-me before the final spaces
+            inspect function reverse(sort-me)
+                tallying nspaces
+                for leading " ".
+            compute slength = function length(sort-me) - nspaces
+            move zero to loops
+            perform until loops is equal to slength
+                compute iright = slength - loops
+                move 1 to ileft
+                perform until ileft is equal to iright
+                    if sort-me(ileft:1) > sort-me(iright:1)
+                        move sort-me(iright:1) to swap
+                        move sort-me(ileft:1) to sort-me(iright:1)
+                        move swap to sort-me(ileft:1) 
+                        end-if
+                    add 1 to ileft
+                    end-perform
+                add 1 to loops
+                end-perform.
+        end program alfabet.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [bubblesort the string with STANDARD-1 collating sequence
+98765edcbajihgfonmLKTSRQPZYXWVUEDCBAJIHGFONMlktsrqpzyxwvu01234~}\{
+0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ\abcdefghijklmnopqrstuvwxyz{}~
+], [])
+AT_CHECK([$COMPILE -finternal-ebcdic prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [bubblesort the string with STANDARD-1 collating sequence
+98765edcbajihgfonmLKTSRQPZYXWVUEDCBAJIHGFONMlktsrqpzyxwvu01234~}\{
+0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ\abcdefghijklmnopqrstuvwxyz{}~
+], [])
+AT_CLEANUP
+
+AT_SETUP([bubblesort with EBCDIC collating sequence])
+AT_KEYWORDS([collating ebcdic])
+AT_DATA([prog.cob], [
+        identification division.
+        program-id. alfabet.
+        environment division.
+        configuration section.
+        special-names.
+            alphabet alfa-name is ebcdic.
+        object-computer.
+            linux-system program collating sequence is alfa-name.
+        data division.
+        working-storage section.
+        77 initial-string pic x(80) value
+            "98765edcbajihgfonmLKTSRQPZYXWVUEDCBAJIHGFONMlktsrqpzyxwvu01234~}\{".
+        77 sort-me      pic x(80).
+        *> These are used by bubble-sort
+        77 nspaces      pic 999.
+        77 slength      pic 999.
+        77 ileft        pic 999.
+        77 iright       pic 999.
+        77 loops        pic 999.
+        77 swap         pic x.
+        procedure division.
+        display "bubblesort the string with EBCDIC collating sequence"
+        display function trim(initial-string)
+        move initial-string to sort-me
+        perform bubble-sort
+        display function trim(sort-me)
+        goback.
+        bubble-sort.
+            *> Calculate the length of sort-me before the final spaces
+            inspect function reverse(sort-me)
+                tallying nspaces
+                for leading " ".
+            compute slength = function length(sort-me) - nspaces
+            move zero to loops
+            perform until loops is equal to slength
+                compute iright = slength - loops
+                move 1 to ileft
+                perform until ileft is equal to iright
+                    if sort-me(ileft:1) > sort-me(iright:1)
+                        move sort-me(iright:1) to swap
+                        move sort-me(ileft:1) to sort-me(iright:1)
+                        move swap to sort-me(ileft:1) 
+                        end-if
+                    add 1 to ileft
+                    end-perform
+                add 1 to loops
+                end-perform.
+        end program alfabet.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [bubblesort the string with EBCDIC collating sequence
+98765edcbajihgfonmLKTSRQPZYXWVUEDCBAJIHGFONMlktsrqpzyxwvu01234~}\{
+abcdefghijklmnopqr~stuvwxyz{ABCDEFGHI}JKLMNOPQR\STUVWXYZ0123456789
+], [])
+AT_CHECK([$COMPILE -finternal-ebcdic prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [bubblesort the string with EBCDIC collating sequence
+98765edcbajihgfonmLKTSRQPZYXWVUEDCBAJIHGFONMlktsrqpzyxwvu01234~}\{
+abcdefghijklmnopqr~stuvwxyz{ABCDEFGHI}JKLMNOPQR\STUVWXYZ0123456789
+], [])
+AT_CLEANUP
+
+AT_SETUP([Assorted calls])
+AT_KEYWORDS([call calls])
+AT_DATA([prog.cob], [        
+        identification      division.
+        program-id.         outer.
+        data                division.
+        working-storage     section.
+        77 inner_name       pic x(32)       value "inner_name".
+        77 inner-dash-name  pic x(32)       value "inner-dash-name".
+        77 outer_name       pic x(32)       value "outer_name".
+        77 outer-dash-name  pic x(32)       value "outer-dash-name".
+        77 cannot_be_found  pic x(32)       value "cannot_be_found".
+        procedure           division.
+        display "calling         inner_name"
+        call    "inner_name"
+        display "calling         inner_name"
+        call     inner_name
+        display "calling         inner-dash-name"
+        call    "inner-dash-name"
+        display "calling         inner-dash-name"
+        call     inner-dash-name
+        display "calling         outer_name"
+        call    "outer_name"
+        display "calling         outer_name"
+        call     outer_name
+        display "calling         outer-dash-name"
+        call    "outer-dash-name"
+        display "calling         outer-dash-name"
+        call     outer-dash-name
+                 not exception 
+                    display "   Good call to outer-dash-name"
+                 end-call
+        call     cannot_be_found
+                 exception 
+                    display "   proper CALL EXCEPTION for " 
+                            function trim(cannot_be_found)
+                 end-call
+        goback.
+        
+        identification      division.
+        program-id.         inner_name_common common.
+        procedure           division.
+        display "  I am program-id inner_name_common"
+        goback.
+        end program         inner_name_common.
+
+        identification      division.
+        program-id.         inner-dash-name-common common.
+        procedure           division.
+        display "  I am program-id inner-dash-name-common"
+        goback.
+        end program         inner-dash-name-common.
+
+
+        identification      division.
+        program-id.         inner_name.
+        procedure           division.
+        display "I am program-id inner_name"
+        goback.
+        end program         inner_name.
+
+        identification      division.
+        program-id.         inner-dash-name.
+        data                division.
+        working-storage     section.
+        77 inner_name_common       
+                            pic x(32)       value "inner_name_common".
+        77 inner-dash-name-common  
+                            pic x(32)       value "inner-dash-name-common".
+        procedure           division.
+        display "I am program-id inner-dash-name"
+
+        display "  calling         inner_name_common"
+        call "inner_name_common"
+        display "  calling         inner_name_common"
+        call inner_name_common
+        display "  calling         inner-dash-name-common"
+        call "inner-dash-name-common"
+        display "  calling         inner-dash-name-common"
+        call inner-dash-name-common
+    
+        goback.
+        end program         inner-dash-name.
+
+        end program         outer.
+
+        identification      division.
+        program-id.         outer_name.
+        procedure           division.
+        display "I am program-id outer_name"
+        goback.
+        end program         outer_name.
+
+        identification      division.
+        program-id.         outer-dash-name.
+        procedure           division.
+        display "I am program-id outer-dash-name"
+        goback.
+        end program         outer-dash-name.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [calling         inner_name
+I am program-id inner_name
+calling         inner_name
+I am program-id inner_name
+calling         inner-dash-name
+I am program-id inner-dash-name
+  calling         inner_name_common
+  I am program-id inner_name_common
+  calling         inner_name_common
+  I am program-id inner_name_common
+  calling         inner-dash-name-common
+  I am program-id inner-dash-name-common
+  calling         inner-dash-name-common
+  I am program-id inner-dash-name-common
+calling         inner-dash-name
+I am program-id inner-dash-name
+  calling         inner_name_common
+  I am program-id inner_name_common
+  calling         inner_name_common
+  I am program-id inner_name_common
+  calling         inner-dash-name-common
+  I am program-id inner-dash-name-common
+  calling         inner-dash-name-common
+  I am program-id inner-dash-name-common
+calling         outer_name
+I am program-id outer_name
+calling         outer_name
+I am program-id outer_name
+calling         outer-dash-name
+I am program-id outer-dash-name
+calling         outer-dash-name
+I am program-id outer-dash-name
+   Good call to outer-dash-name
+   proper CALL EXCEPTION for cannot_be_found
+], [])
+
+AT_CHECK([$COMPILE -finternal-ebcdic prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [calling         inner_name
+I am program-id inner_name
+calling         inner_name
+I am program-id inner_name
+calling         inner-dash-name
+I am program-id inner-dash-name
+  calling         inner_name_common
+  I am program-id inner_name_common
+  calling         inner_name_common
+  I am program-id inner_name_common
+  calling         inner-dash-name-common
+  I am program-id inner-dash-name-common
+  calling         inner-dash-name-common
+  I am program-id inner-dash-name-common
+calling         inner-dash-name
+I am program-id inner-dash-name
+  calling         inner_name_common
+  I am program-id inner_name_common
+  calling         inner_name_common
+  I am program-id inner_name_common
+  calling         inner-dash-name-common
+  I am program-id inner-dash-name-common
+  calling         inner-dash-name-common
+  I am program-id inner-dash-name-common
+calling         outer_name
+I am program-id outer_name
+calling         outer_name
+I am program-id outer_name
+calling         outer-dash-name
+I am program-id outer-dash-name
+calling         outer-dash-name
+I am program-id outer-dash-name
+   Good call to outer-dash-name
+   proper CALL EXCEPTION for cannot_be_found
+], [])
+
+AT_CHECK([$COMPILE -fno-static-call prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [calling         inner_name
+I am program-id inner_name
+calling         inner_name
+I am program-id inner_name
+calling         inner-dash-name
+I am program-id inner-dash-name
+  calling         inner_name_common
+  I am program-id inner_name_common
+  calling         inner_name_common
+  I am program-id inner_name_common
+  calling         inner-dash-name-common
+  I am program-id inner-dash-name-common
+  calling         inner-dash-name-common
+  I am program-id inner-dash-name-common
+calling         inner-dash-name
+I am program-id inner-dash-name
+  calling         inner_name_common
+  I am program-id inner_name_common
+  calling         inner_name_common
+  I am program-id inner_name_common
+  calling         inner-dash-name-common
+  I am program-id inner-dash-name-common
+  calling         inner-dash-name-common
+  I am program-id inner-dash-name-common
+calling         outer_name
+I am program-id outer_name
+calling         outer_name
+I am program-id outer_name
+calling         outer-dash-name
+I am program-id outer-dash-name
+calling         outer-dash-name
+I am program-id outer-dash-name
+   Good call to outer-dash-name
+   proper CALL EXCEPTION for cannot_be_found
+], [])
+
+AT_CHECK([$COMPILE -fno-static-call -finternal-ebcdic prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [calling         inner_name
+I am program-id inner_name
+calling         inner_name
+I am program-id inner_name
+calling         inner-dash-name
+I am program-id inner-dash-name
+  calling         inner_name_common
+  I am program-id inner_name_common
+  calling         inner_name_common
+  I am program-id inner_name_common
+  calling         inner-dash-name-common
+  I am program-id inner-dash-name-common
+  calling         inner-dash-name-common
+  I am program-id inner-dash-name-common
+calling         inner-dash-name
+I am program-id inner-dash-name
+  calling         inner_name_common
+  I am program-id inner_name_common
+  calling         inner_name_common
+  I am program-id inner_name_common
+  calling         inner-dash-name-common
+  I am program-id inner-dash-name-common
+  calling         inner-dash-name-common
+  I am program-id inner-dash-name-common
+calling         outer_name
+I am program-id outer_name
+calling         outer_name
+I am program-id outer_name
+calling         outer-dash-name
+I am program-id outer-dash-name
+calling         outer-dash-name
+I am program-id outer-dash-name
+   Good call to outer-dash-name
+   proper CALL EXCEPTION for cannot_be_found
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([Complex IF])
+AT_KEYWORDS([complex if])
+AT_DATA([prog.cob], [        identification division.
+        program-id. phonebook.
+        data division.
+        working-storage section.
+        01 name1 pic x(10) value "one".
+        01 name2 pic x(10) value "two".
+        01 flag  pic x     value 'a'.
+        procedure division.
+        move 'l' to flag
+        perform checkit
+        goback.
+        checkit.
+            if (name1 = name2 and flag = "F" or "f" )
+                or flag = "L" or "l"
+            then
+               display "the test is TRUE"
+            else
+               display "the test is FALSE"
+            end-if.
+        end program phonebook.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [the test is TRUE
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([LENGTH OF omnibus])
+AT_KEYWORDS([extensions length])
+AT_DATA([prog.cob], [
+        program-id. prog.
+        data division.
+        working-storage section.
+        01      desc1.
+         05     desc1-entry pic x(5) occurs 10.
+
+        01      desc2.
+         05     desc2-table occurs 10 times.
+          10    desc2-entry pic x(5).
+
+        01      desc3.
+         05     desc3-outer occurs 1 to 5 times depending on desc3-lim.
+          10    desc3-outer-txt   pic x(7).
+          10    desc3-inner occurs 11 times.
+           15   desc3-inner-text  pic x(13).
+        77 desc3-lim binary-long.
+
+        77      msg pic x(64).
+        77      should-be pic zzzz9.
+        77      but-is    pic zzzz9.
+
+        procedure division.
+
+        display "using LENGTH OF"
+
+        move    "Length of desc1" to msg
+        move    50 to should-be
+        move    length of desc1 to but-is
+        perform result-is
+
+        move    "Length of desc1-entry" to msg
+        move    5 to should-be
+        move    length of desc1-entry to but-is
+        perform result-is
+
+        move    "Length of desc1-entry(1)" to msg
+        move    5 to should-be
+        move    length of desc1-entry(1) to but-is
+        perform result-is
+
+        move    "Length of desc2" to msg
+        move    50 to should-be
+        move    length of desc2 to but-is
+        perform result-is
+
+        move    "Length of desc2-table" to msg
+        move    5 to should-be
+        move    length of desc2-table to but-is
+        perform result-is
+
+        move    "Length of desc2-entry" to msg
+        move    5 to should-be
+        move    length of desc2-entry to but-is
+        perform result-is
+
+        move    "Length of desc2-entry(1)" to msg
+        move    5 to should-be
+        move    length of desc2-entry(1) to but-is
+        perform result-is
+
+        move    5 to desc3-lim
+
+        move    "Length of desc3" to msg
+        move    750 to should-be
+        move    length of desc3 to but-is
+        perform result-is
+
+        move    "Length of desc3-outer" to msg
+        move    150 to should-be
+        move    length of desc3-outer to but-is
+        perform result-is
+
+        move    "Length of desc3-outer(1)" to msg
+        move    150 to should-be
+        move    length of desc3-outer(1) to but-is
+        perform result-is
+
+        move    "Length of desc3-outer-txt" to msg
+        move    7 to should-be
+        move    length of desc3-outer-txt to but-is
+        perform result-is
+
+        move    "Length of desc3-inner" to msg
+        move    13 to should-be
+        move    length of desc3-inner to but-is
+        perform result-is
+
+        move    "Length of desc3-inner(1)" to msg
+        move    13 to should-be
+        move    length of desc3-inner(1) to but-is
+        perform result-is
+
+        goback.
+        result-is.
+        display function trim(msg) ": " with no advancing
+        if but-is equal to should-be
+            display function trim(but-is)
+        else
+            display "should be " function trim(should-be)
+                    " but is "   function trim(but-is)
+        end-if.
+        end program prog.
+])
+AT_CHECK([$COMPILE -dialect ibm prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0],
+[using LENGTH OF
+Length of desc1: 50
+Length of desc1-entry: 5
+Length of desc1-entry(1): 5
+Length of desc2: 50
+Length of desc2-table: 5
+Length of desc2-entry: 5
+Length of desc2-entry(1): 5
+Length of desc3: 750
+Length of desc3-outer: 150
+Length of desc3-outer(1): 150
+Length of desc3-outer-txt: 7
+Length of desc3-inner: 13
+Length of desc3-inner(1): 13
+])
+AT_CLEANUP
+
+AT_SETUP([CONTINUE AFTER 1 SECONDS])
+AT_KEYWORDS([CONTINUE AFTER])
+AT_DATA([prog.cob], [
+        program-id. prog.
+        data division.
+        working-storage section.
+        01 tod pic x(64).
+        01 tstart pic 9999.
+        01 tend   pic 9999.
+        01 tspan  pic 9999.
+        procedure division.
+        accept tod from time
+        move tod(5:) to tstart
+        continue after 1.0 seconds.
+        accept tod from time
+        move tod(5:) to tend
+        if tend < tstart 
+            compute tend = tend + 6000
+        end-if
+        compute tspan = tend - tstart
+        if tspan >= 75 and tspan <= 125
+            display "Looks good"
+        else
+            display "Looks bad! " tstart space tend space tspan
+        end-if
+        goback.
+        end program prog.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [Looks good
+], [])
+AT_CLEANUP
+
+AT_SETUP([ALLOCATE Rules 6 through 9 (without OPTION INITIALIZE)])
+AT_KEYWORDS([ALLOCATE])
+AT_DATA([prog.cob], [
+        identification          division.
+        program-id.             prog.
+        *> options. initialize working-storage X"35".
+        data                    division.
+        working-storage         section.
+        01   based-var          based.
+         02  based-x            pic x(24) value "I am I, Don Quixote".
+         02  based-9            pic 999   value 123.
+         02  based-p            pointer   value NULL.
+        01   allocated-pointer  pointer.
+         
+        procedure division.
+        *> Do a sanity check of the FREE operation:
+        allocate    based-var
+        free        based-var
+        if address of based-var not equal NULL
+            display "based-var should be NULL"
+            end-if
+        if address of based-x not equal NULL
+            display "based-x should be NULL"
+            end-if
+        if address of based-9 not equal NULL
+            display "based-9 should be NULL"
+            end-if
+        if address of based-p not equal NULL
+            display "based-p should be NULL"
+            end-if
+
+        display     "allocate characters INITIALIZED (ISO 2023 Rule 6: defaultbyte if specified, else zero)"
+        allocate 35 characters initialized returning allocated-pointer
+        set address of based-var to allocated-pointer
+        perform     reportt
+
+        display     "allocate based-var initialized (ISO 2023 Rule 7: ALL TO VALUE)"
+        allocate    based-var initialized
+        perform     reportt
+        free        based-var
+
+        display     "allocate characters  (ISO 2023 Rule 8: OPT_INIT if specified, otherwise defaultbyte, otherwise zero)"
+        allocate 35 characters returning allocated-pointer
+        set address of based-var to allocated-pointer
+        perform     reportt
+        free        allocated-pointer
+
+        display     "allocate based-var (ISO 2023 Rule 9: pointers NULL, otherwise OPT_INIT)"
+        allocate    based-var 
+        perform     reportt
+        free        based-var
+
+        goback.
+
+        reportt.
+            display "   (1) as allocated" 
+            perform reportt2
+            display "   (2) after ""initialize based-var""" 
+            initialize based-var
+            perform reportt2
+            display "   (3) after ""initialize based-var all to value""" 
+            initialize based-var all to value
+            perform reportt2
+            continue.
+        reportt2.
+            display "       " """" based-x """" with no advancing
+            display space     """" based-9 """" with no advancing
+            display space       based-p.
+            continue.
+        end program             prog.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [allocate characters INITIALIZED (ISO 2023 Rule 6: defaultbyte if specified, else zero)
+   (1) as allocated
+       "" "" 0x0000000000000000
+   (2) after "initialize based-var"
+       "                        " "000" 0x0000000000000000
+   (3) after "initialize based-var all to value"
+       "I am I, Don Quixote     " "123" 0x0000000000000000
+allocate based-var initialized (ISO 2023 Rule 7: ALL TO VALUE)
+   (1) as allocated
+       "I am I, Don Quixote     " "123" 0x0000000000000000
+   (2) after "initialize based-var"
+       "                        " "000" 0x0000000000000000
+   (3) after "initialize based-var all to value"
+       "I am I, Don Quixote     " "123" 0x0000000000000000
+allocate characters  (ISO 2023 Rule 8: OPT_INIT if specified, otherwise defaultbyte, otherwise zero)
+   (1) as allocated
+       "" "" 0x0000000000000000
+   (2) after "initialize based-var"
+       "                        " "000" 0x0000000000000000
+   (3) after "initialize based-var all to value"
+       "I am I, Don Quixote     " "123" 0x0000000000000000
+allocate based-var (ISO 2023 Rule 9: pointers NULL, otherwise OPT_INIT)
+   (1) as allocated
+       "" "" 0x0000000000000000
+   (2) after "initialize based-var"
+       "                        " "000" 0x0000000000000000
+   (3) after "initialize based-var all to value"
+       "I am I, Don Quixote     " "123" 0x0000000000000000
+], [])
+AT_CHECK([$COMPILE -fdefaultbyte 51 prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [allocate characters INITIALIZED (ISO 2023 Rule 6: defaultbyte if specified, else zero)
+   (1) as allocated
+       "333333333333333333333333" "333" 0x3333333333333333
+   (2) after "initialize based-var"
+       "                        " "000" 0x3333333333333333
+   (3) after "initialize based-var all to value"
+       "I am I, Don Quixote     " "123" 0x0000000000000000
+allocate based-var initialized (ISO 2023 Rule 7: ALL TO VALUE)
+   (1) as allocated
+       "I am I, Don Quixote     " "123" 0x0000000000000000
+   (2) after "initialize based-var"
+       "                        " "000" 0x3333333333333333
+   (3) after "initialize based-var all to value"
+       "I am I, Don Quixote     " "123" 0x0000000000000000
+allocate characters  (ISO 2023 Rule 8: OPT_INIT if specified, otherwise defaultbyte, otherwise zero)
+   (1) as allocated
+       "333333333333333333333333" "333" 0x3333333333333333
+   (2) after "initialize based-var"
+       "                        " "000" 0x3333333333333333
+   (3) after "initialize based-var all to value"
+       "I am I, Don Quixote     " "123" 0x0000000000000000
+allocate based-var (ISO 2023 Rule 9: pointers NULL, otherwise OPT_INIT)
+   (1) as allocated
+       "333333333333333333333333" "333" 0x0000000000000000
+   (2) after "initialize based-var"
+       "                        " "000" 0x3333333333333333
+   (3) after "initialize based-var all to value"
+       "I am I, Don Quixote     " "123" 0x0000000000000000
+], [])
+AT_CLEANUP
+
+AT_SETUP([ALLOCATE Rules 6 through 9 (with OPTION INITIALIZE)])
+AT_KEYWORDS([ALLOCATE])
+AT_DATA([prog.cob], [
+        identification          division.
+        program-id.             prog.
+        options. initialize working-storage X"35".
+        data                    division.
+        working-storage         section.
+        01   based-var          based.
+         02  based-x            pic x(24) value "I am I, Don Quixote".
+         02  based-9            pic 999   value 123.
+         02  based-p            pointer   value NULL.
+        01   allocated-pointer  pointer.
+         
+        procedure division.
+        *> Do a sanity check of the FREE operation:
+        allocate    based-var
+        free        based-var
+        if address of based-var not equal NULL
+            display "based-var should be NULL"
+            end-if
+        if address of based-x not equal NULL
+            display "based-x should be NULL"
+            end-if
+        if address of based-9 not equal NULL
+            display "based-9 should be NULL"
+            end-if
+        if address of based-p not equal NULL
+            display "based-p should be NULL"
+            end-if
+
+        display     "allocate characters INITIALIZED (ISO 2023 Rule 6: defaultbyte if specified, else zero)"
+        allocate 35 characters initialized returning allocated-pointer
+        set address of based-var to allocated-pointer
+        perform     reportt
+
+        display     "allocate based-var initialized (ISO 2023 Rule 7: ALL TO VALUE)"
+        allocate    based-var initialized
+        perform     reportt
+        free        based-var
+
+        display     "allocate characters  (ISO 2023 Rule 8: OPT_INIT if specified, otherwise defaultbyte, otherwise zero)"
+        allocate 35 characters returning allocated-pointer
+        set address of based-var to allocated-pointer
+        perform     reportt
+        free        allocated-pointer
+
+        display     "allocate based-var (ISO 2023 Rule 9: pointers NULL, otherwise OPT_INIT)"
+        allocate    based-var 
+        perform     reportt
+        free        based-var
+
+        goback.
+
+        reportt.
+            display "   (1) as allocated" 
+            perform reportt2
+            display "   (2) after ""initialize based-var""" 
+            initialize based-var
+            perform reportt2
+            display "   (3) after ""initialize based-var all to value""" 
+            initialize based-var all to value
+            perform reportt2
+            continue.
+        reportt2.
+            display "       " """" based-x """" with no advancing
+            display space     """" based-9 """" with no advancing
+            display space       based-p.
+            continue.
+        end program             prog.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [allocate characters INITIALIZED (ISO 2023 Rule 6: defaultbyte if specified, else zero)
+   (1) as allocated
+       "" "" 0x0000000000000000
+   (2) after "initialize based-var"
+       "                        " "000" 0x0000000000000000
+   (3) after "initialize based-var all to value"
+       "I am I, Don Quixote     " "123" 0x0000000000000000
+allocate based-var initialized (ISO 2023 Rule 7: ALL TO VALUE)
+   (1) as allocated
+       "I am I, Don Quixote     " "123" 0x0000000000000000
+   (2) after "initialize based-var"
+       "                        " "000" 0x0000000000000000
+   (3) after "initialize based-var all to value"
+       "I am I, Don Quixote     " "123" 0x0000000000000000
+allocate characters  (ISO 2023 Rule 8: OPT_INIT if specified, otherwise defaultbyte, otherwise zero)
+   (1) as allocated
+       "555555555555555555555555" "555" 0x3535353535353535
+   (2) after "initialize based-var"
+       "                        " "000" 0x0000000000000000
+   (3) after "initialize based-var all to value"
+       "I am I, Don Quixote     " "123" 0x0000000000000000
+allocate based-var (ISO 2023 Rule 9: pointers NULL, otherwise OPT_INIT)
+   (1) as allocated
+       "555555555555555555555555" "555" 0x0000000000000000
+   (2) after "initialize based-var"
+       "                        " "000" 0x0000000000000000
+   (3) after "initialize based-var all to value"
+       "I am I, Don Quixote     " "123" 0x0000000000000000
+], [])
+AT_CHECK([$COMPILE -fdefaultbyte 51 prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [allocate characters INITIALIZED (ISO 2023 Rule 6: defaultbyte if specified, else zero)
+   (1) as allocated
+       "333333333333333333333333" "333" 0x3333333333333333
+   (2) after "initialize based-var"
+       "                        " "000" 0x3333333333333333
+   (3) after "initialize based-var all to value"
+       "I am I, Don Quixote     " "123" 0x0000000000000000
+allocate based-var initialized (ISO 2023 Rule 7: ALL TO VALUE)
+   (1) as allocated
+       "I am I, Don Quixote     " "123" 0x0000000000000000
+   (2) after "initialize based-var"
+       "                        " "000" 0x3333333333333333
+   (3) after "initialize based-var all to value"
+       "I am I, Don Quixote     " "123" 0x0000000000000000
+allocate characters  (ISO 2023 Rule 8: OPT_INIT if specified, otherwise defaultbyte, otherwise zero)
+   (1) as allocated
+       "555555555555555555555555" "555" 0x3535353535353535
+   (2) after "initialize based-var"
+       "                        " "000" 0x3333333333333333
+   (3) after "initialize based-var all to value"
+       "I am I, Don Quixote     " "123" 0x0000000000000000
+allocate based-var (ISO 2023 Rule 9: pointers NULL, otherwise OPT_INIT)
+   (1) as allocated
+       "555555555555555555555555" "555" 0x0000000000000000
+   (2) after "initialize based-var"
+       "                        " "000" 0x3333333333333333
+   (3) after "initialize based-var all to value"
+       "I am I, Don Quixote     " "123" 0x0000000000000000
+], [])
+AT_CLEANUP
+
+AT_SETUP([ALLOCATE Rule 8 OPTION INITIALIZE with figconst])
+AT_KEYWORDS([ALLOCATE])
+AT_DATA([prog.cob], [
+        identification          division.
+        program-id.             prog.
+        procedure               division.
+        display "initialize zeroes"
+            call                    "prog-zeroes"
+        display "initialize low-value"
+            call                    "prog-low"
+        display "initialize spaces"
+            call                    "prog-space"
+        display "initialize high-value"
+            call                    "prog-high"
+        continue.
+        end program             prog.
+
+        identification          division.
+        program-id.             prog-space.
+        options. initialize working-storage spaces.
+        data                    division.
+        working-storage         section.
+        01   based-var          based.
+         02  based-x            pic x(24) value "I am I, Don Quixote".
+         02  based-9            pic 999   value 123.
+         02  based-p            pointer   value NULL.
+        01   allocated-pointer  pointer.
+        procedure division.
+        display     "allocate characters  (ISO 2023 Rule 8: OPT_INIT if specified, otherwise defaultbyte, otherwise zero)"
+        allocate 35 characters returning allocated-pointer
+        set address of based-var to allocated-pointer
+        call        "reporter" using based-var
+        free        allocated-pointer
+        goback.
+        end program             prog-space.
+
+        identification          division.
+        program-id.             prog-low.
+        options. initialize working-storage low-values.
+        data                    division.
+        working-storage         section.
+        01   based-var          based.
+         02  based-x            pic x(24) value "I am I, Don Quixote".
+         02  based-9            pic 999   value 123.
+         02  based-p            pointer   value NULL.
+        01   allocated-pointer  pointer.
+        procedure division.
+        display     "allocate characters  (ISO 2023 Rule 8: OPT_INIT if specified, otherwise defaultbyte, otherwise zero)"
+        allocate 35 characters returning allocated-pointer
+        set address of based-var to allocated-pointer
+        call        "reporter" using based-var
+        free        allocated-pointer
+        goback.
+        end program             prog-low.
+
+        identification          division.
+        program-id.             prog-zeroes.
+        options. initialize working-storage binary zeroes.
+        data                    division.
+        working-storage         section.
+        01   based-var          based.
+         02  based-x            pic x(24) value "I am I, Don Quixote".
+         02  based-9            pic 999   value 123.
+         02  based-p            pointer   value NULL.
+        01   allocated-pointer  pointer.
+        procedure division.
+        display     "allocate characters  (ISO 2023 Rule 8: OPT_INIT if specified, otherwise defaultbyte, otherwise zero)"
+        allocate 35 characters returning allocated-pointer
+        set address of based-var to allocated-pointer
+        call        "reporter" using based-var
+        free        allocated-pointer
+        goback.
+        end program             prog-zeroes.
+
+        identification          division.
+        program-id.             prog-high.
+        options. initialize working-storage high-values.
+        data                    division.
+        working-storage         section.
+        01   based-var          based.
+         02  based-x            pic x(24) value "I am I, Don Quixote".
+         02  based-9            pic 999   value 123.
+         02  based-p            pointer   value NULL.
+        01   allocated-pointer  pointer.
+        procedure division.
+        display     "allocate characters  (ISO 2023 Rule 8: OPT_INIT if specified, otherwise defaultbyte, otherwise zero)"
+        allocate 35 characters returning allocated-pointer
+        set address of based-var to allocated-pointer
+        call        "reporter" using based-var
+        free        allocated-pointer
+        goback.
+        end program             prog-high.
+
+        identification          division.
+        program-id.             reporter.
+        data                    division.
+        linkage                 section.
+        01   based-var          based.
+         02  based-x            pic x(24).
+         02  based-9            pic 999  .
+         02  based-p            pointer  .
+        procedure division      using based-var.
+        reportt.
+            display "   (1) as allocated"
+            perform reportt2
+            goback.
+        reportt2.
+            display "       " """" based-x """" with no advancing
+            display space     """" based-9 """" with no advancing
+            display space       based-p.
+            continue.
+        end program             reporter.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [initialize zeroes
+allocate characters  (ISO 2023 Rule 8: OPT_INIT if specified, otherwise defaultbyte, otherwise zero)
+   (1) as allocated
+       "" "" 0x0000000000000000
+initialize low-value
+allocate characters  (ISO 2023 Rule 8: OPT_INIT if specified, otherwise defaultbyte, otherwise zero)
+   (1) as allocated
+       "" "" 0x0000000000000000
+initialize spaces
+allocate characters  (ISO 2023 Rule 8: OPT_INIT if specified, otherwise defaultbyte, otherwise zero)
+   (1) as allocated
+       "                        " "   " 0x2020202020202020
+initialize high-value
+allocate characters  (ISO 2023 Rule 8: OPT_INIT if specified, otherwise defaultbyte, otherwise zero)
+   (1) as allocated
+       "ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ" "¿¿¿" 0xffffffffffffffff
+], [])
+AT_CLEANUP
+
+AT_SETUP([command-line parameters from main(argc, argv)])
+AT_KEYWORDS([main command])
+AT_DATA([prog.cob], [        identification  division.
+        program-id.     main.
+        data            division.
+        working-storage section.
+        01 i index.
+        linkage         section.
+        01   argc       pic 999.
+        01   argv.
+         02  argv-table   occurs 1 to 100 times depending on argc.
+          03 argv-element pointer.
+        01   argv-string  pic x(100) .
+        procedure       division using by value argc by reference argv.
+        display "Demonstrates command-line handling with a main() entry point"
+        perform varying i from 1 by 1 until i > argc
+            set address of argv-string to argv-element(i)
+            display "argument " i " is " """"argv-string""""
+            end-perform
+        continue.
+        end program     main.
+])
+AT_CHECK([$COMPILE -nomain -o prog prog.cob], [0], [], [])
+AT_CHECK([./prog Yngvi is a louse!], [0],
+[Demonstrates command-line handling with a main() entry point
+argument 1 is "./prog"
+argument 2 is "Yngvi"
+argument 3 is "is"
+argument 4 is "a"
+argument 5 is "louse!"
+], [])
+AT_CLEANUP
+
+AT_SETUP([Demonstrate main(argc, argv)])
+AT_KEYWORDS([main command command-line])
+AT_DATA([prog.cob], [        identification  division.
+        program-id.     main.
+        data            division.
+        working-storage section.
+        01 i index.
+        linkage         section.
+        01   argc       pic 999.
+        01   argv.
+         02  argv-table   occurs 1 to 100 times depending on argc.
+          03 argv-element pointer.
+        01   argv-string  pic x(100) .
+        procedure       division using by value argc by reference argv.
+        display "Demonstrates command-line handling with a main() entry point"
+        perform varying i from 1 by 1 until i > argc
+            set address of argv-string to argv-element(i)
+            display "argument " i " is " """"argv-string""""
+            end-perform
+        continue.
+        end program     main.
+])
+AT_CHECK([$COMPILE -nomain -o prog prog.cob], [0], [], [])
+AT_CHECK([./prog Yngvi is a louse!], [0],
+[Demonstrates command-line handling with a main() entry point
+argument 1 is "./prog"
+argument 2 is "Yngvi"
+argument 3 is "is"
+argument 4 is "a"
+argument 5 is "louse!"
+], [])
+AT_CLEANUP
+
+AT_SETUP([command-line parameters from main(argc, argv)])
+AT_KEYWORDS([main command])
+AT_DATA([prog.cob], [        identification  division.
+        program-id.     main.
+        data            division.
+        working-storage section.
+        01 i index.
+        linkage         section.
+        01   argc       pic 999.
+        01   argv.
+         02  argv-table   occurs 1 to 100 times depending on argc.
+          03 argv-element pointer.
+        01   argv-string  pic x(100) .
+        procedure       division using by value argc by reference argv.
+        display "Demonstrates command-line handling with a main() entry point"
+        perform varying i from 1 by 1 until i > argc
+            set address of argv-string to argv-element(i)
+            display "argument " i " is " """"argv-string""""
+            end-perform
+        continue.
+        end program     main.
+])
+AT_CHECK([$COMPILE -nomain -o prog prog.cob], [0], [], [])
+AT_CHECK([./prog Yngvi is a louse!], [0],
+[Demonstrates command-line handling with a main() entry point
+argument 1 is "./prog"
+argument 2 is "Yngvi"
+argument 3 is "is"
+argument 4 is "a"
+argument 5 is "louse!"
+], [])
+AT_CLEANUP
+
+AT_SETUP([command-line parameter via GCOBOL accept])
+AT_KEYWORDS([main command command-line])
+AT_DATA([prog.cob], [        identification  division.
+        program-id.     prog.
+        data            division.
+        working-storage section.
+        01 i index.
+        01 argc pic 999.
+        01 argv pic X(100).
+        procedure       division.
+        display "Demonstrate reading the command line using GCOBOL ACCEPT"
+        accept argv from command-line
+        display "Entire command line is " """" function trim(argv) """"
+        accept argc from command-line-count
+        display "argc is " argc
+        perform varying i from 1 by 1 until i > argc
+            accept argv from command-line(i)
+            display "argument " i " is " """" function trim(argv) """"
+            end-perform
+        continue.
+        end program     prog.
+])
+AT_CHECK([$COMPILE -o prog prog.cob], [0], [], [])
+AT_CHECK([./prog Yngvi is a louse!], [0],
+[Demonstrate reading the command line using GCOBOL ACCEPT
+Entire command line is "Yngvi is a louse!"
+argc is 005
+argument 1 is "./prog"
+argument 2 is "Yngvi"
+argument 3 is "is"
+argument 4 is "a"
+argument 5 is "louse!"
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([command-line GCOBOL accept via proc/pid/cmdline])
+AT_KEYWORDS([main command command-line])
+AT_DATA([main.c], [
+extern void cobol();
+int main()
+  {
+  cobol();
+  }
+])
+AT_DATA([prog.cob], [        identification  division.
+        program-id.     cobol.
+        data            division.
+        working-storage section.
+        01 i index.
+        01 argc pic 999.
+        01 argv pic X(100).
+        procedure       division.
+        display "Demonstrate reading the command line using GCOBOL ACCEPT"
+        accept argv from command-line
+        display "Entire command line is " """" function trim(argv) """"
+        accept argc from command-line-count
+        display "argc is " argc
+        perform varying i from 1 by 1 until i > argc
+            accept argv from command-line(i)
+            display "argument " i " is " """" function trim(argv) """"
+            end-perform
+        continue.
+        end program     cobol.
+])
+AT_CHECK([gcc -c main.c])
+AT_CHECK([$COMPILE -nomain -o prog prog.cob main.o], [0], [], [])
+AT_CHECK([./prog Yngvi is a louse!], [0],
+[Demonstrate reading the command line using GCOBOL ACCEPT
+Entire command line is "Yngvi is a louse!"
+argc is 005
+argument 1 is "./prog"
+argument 2 is "Yngvi"
+argument 3 is "is"
+argument 4 is "a"
+argument 5 is "louse!"
+], [])
+AT_CLEANUP
+
+AT_SETUP([command-line via parameters passed to -main function])
+AT_KEYWORDS([main command command-line])
+AT_DATA([prog.cob], [        identification  division.
+        program-id.     prog.
+        data            division.
+        working-storage section.
+        01 i index.
+        linkage         section.
+        01   argc       pic 999.
+        01   argv.
+         02  argv-table   occurs 1 to 100 times depending on argc.
+          03 argv-element pointer.
+        01   argv-string  pic x(100) .
+        procedure       division using by value argc by reference argv.
+        display "Demonstrates command-line handling with -main entry point"
+        set i to argc
+        if i = 1
+            display "There is 1 argument"
+        else
+            display "There are " i " arguments"
+            end-if
+        perform varying i from 1 by 1 until i > argc
+            set address of argv-string to argv-element(i)
+            display "argument " i " is " """"argv-string""""
+            end-perform
+        continue.
+        end program     prog.
+])
+AT_CHECK([$COMPILE -o prog prog.cob], [0], [], [])
+AT_CHECK([./prog Yngvi is a louse!], [0],
+[Demonstrates command-line handling with -main entry point
+There are 5 arguments
+argument 1 is "./prog"
+argument 2 is "Yngvi"
+argument 3 is "is"
+argument 4 is "a"
+argument 5 is "louse!"
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([ACCEPT COMMAND-LINE with ON EXCEPTION])
+AT_KEYWORDS([main command command-line])
+AT_DATA([prog.cob], [        identification      division.
+        program-id.         prog.
+        data                division.
+        working-storage     section.
+        01 var1 pic x(100).
+        procedure           division.
+        display "test1"
+        move "Not touched" to var1
+        accept var1 from command-line(1)
+            end-accept
+        display "   " """" function trim(var1) """"
+        if function trim(function exception-status) not equal to space
+            display "   Exception: " """" function trim(function exception-status) """"
+            SET LAST EXCEPTION TO OFF
+            end-if
+
+        display "test2"
+        move "Not touched" to var1
+        accept var1 from command-line(1)
+            on exception     display "      Exception improperly"
+            end-accept
+        display "   " """" function trim(var1) """"
+        if function trim(function exception-status) not equal to space
+            display "   Exception: " """" function trim(function exception-status) """"
+            SET LAST EXCEPTION TO OFF
+            end-if
+
+        display "test3"
+        move "Not touched" to var1
+        accept var1 from command-line(1)
+            not on exception display "   No exception properly"
+            end-accept
+        display "   " """" function trim(var1) """"
+        if function trim(function exception-status) not equal to space
+            display "   Exception: " """" function trim(function exception-status) """"
+            SET LAST EXCEPTION TO OFF
+            end-if
+
+        display "test4"
+        move "Not touched" to var1
+        accept var1 from command-line(1)
+            on exception     display "      Exception ERROR!!"
+            not on exception display "   No exception properly"
+            end-accept
+        display "   " """" function trim(var1) """"
+        if function trim(function exception-status) not equal to space
+            display "   Exception: " """" function trim(function exception-status) """"
+            SET LAST EXCEPTION TO OFF
+            end-if
+
+        display "test11"
+        move "Not touched" to var1
+        accept var1 from command-line(2)
+            end-accept
+        display "   " """" function trim(var1) """"
+        if function trim(function exception-status) not equal to space
+            display "   Exception: " """" function trim(function exception-status) """"
+            SET LAST EXCEPTION TO OFF
+            end-if
+
+        display "test12"
+        move "Not touched" to var1
+        accept var1 from command-line(2)
+            on exception     display "   Exception properly"
+            end-accept
+        display "   " """" function trim(var1) """"
+        if function trim(function exception-status) not equal to space
+            display "   Exception: " """" function trim(function exception-status) """"
+            SET LAST EXCEPTION TO OFF
+            end-if
+
+        display "test13"
+        move "Not touched" to var1
+        accept var1 from command-line(2)
+            not on exception display "   No exception improperly"
+            end-accept
+        display "   " """" function trim(var1) """"
+        if function trim(function exception-status) not equal to space
+            display "   Exception: " """" function trim(function exception-status) """"
+            SET LAST EXCEPTION TO OFF
+            end-if
+
+        display "test14"
+        move "Not touched" to var1
+        accept var1 from command-line(2)
+            on exception     display "   Exception properly"
+            not on exception display "   No exception improperly"
+            end-accept
+        display "   " """" function trim(var1) """"
+        if function trim(function exception-status) not equal to space
+            display "   Exception: " """" function trim(function exception-status) """"
+            SET LAST EXCEPTION TO OFF
+            end-if
+
+        goback.
+        end program         prog.
+])
+AT_CHECK([$COMPILE -o prog prog.cob], [0], [], [])
+AT_CHECK([./prog], [0], [test1
+   "./prog"
+test2
+   "./prog"
+test3
+   No exception properly 
+   "./prog"
+test4
+   No exception properly
+   "./prog"
+test11
+   "Not touched"
+   Exception: "EC-ARGUMENT-IMP-COMMAND"
+test12
+   Exception properly
+   "Not touched"
+   Exception: "EC-ARGUMENT-IMP-COMMAND"
+test13
+   "Not touched"
+   Exception: "EC-ARGUMENT-IMP-COMMAND"
+test14
+   Exception properly
+   "Not touched"
+   Exception: "EC-ARGUMENT-IMP-COMMAND"
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([ACCEPT ENVIRONMENT with ON EXCEPTION])
+AT_KEYWORDS([main command command-line])
+AT_DATA([prog.cob], [        identification      division.
+        program-id.         prog.
+        data                division.
+        working-storage     section.
+        01 envar            pic x(100).
+        procedure           division.
+
+        display "test1"
+        move "should have been replaced" to envar
+        accept envar from environment "USER"
+            end-accept
+        display "   " "USER is " """" function trim(envar) """"
+        if function exception-status not equal to space
+            display "   " "exception-status is " function trim (function exception-status)
+            set last exception to off
+            end-if
+
+        display "test2"
+        move "should have been replaced" to envar
+        accept envar from environment "USER"
+            not on exception display "   " "No exception (properly)"
+            end-accept
+        display "   " "USER is " """" function trim(envar) """"
+        if function exception-status not equal to space
+            display "   " "exception-status is " function trim (function exception-status)
+            set last exception to off
+            end-if
+
+        display "test3"
+        move "should have been replaced" to envar
+        accept envar from environment "USER"
+            on exception display "   " "Exception ERROR improperly"
+            end-accept
+        display "   " "USER is " """" function trim(envar) """"
+        if function exception-status not equal to space
+            display "   " "exception-status is " function trim (function exception-status)
+            set last exception to off
+            end-if
+
+        display "test4"
+        move "should have been replaced" to envar
+        accept envar from environment "USER"
+            not on exception display "   " "No exception (properly)"
+            on exception display "   " "Exception ERROR improperly"
+            end-accept
+        display "   " "USER is " """" function trim(envar) """"
+        if function exception-status not equal to space
+            display "   " "exception-status is " function trim (function exception-status)
+            set last exception to off
+            end-if
+
+
+        display "test11"
+        move "Properly untouched" to envar
+        accept envar from environment "MUGWUMP"
+            end-accept
+        display "   " "MUGWUMP is " """" function trim(envar) """"
+        if function exception-status not equal to space
+            display "   " "exception-status is " function trim (function exception-status)
+            set last exception to off
+            end-if
+
+        display "test12"
+        move "Properly untouched" to envar
+        accept envar from environment "MUGWUMP"
+            not on exception display "   " "No exception ERROR improperly"
+            end-accept
+        display "   " "MUGWUMP is " """" function trim(envar) """"
+        if function exception-status not equal to space
+            display "   " "exception-status is " function trim (function exception-status)
+            set last exception to off
+            end-if
+
+        display "test13"
+        move "Properly untouched" to envar
+        accept envar from environment "MUGWUMP"
+            on exception display "   " "Exception (properly)"
+            end-accept
+        display "   " "MUGWUMP is " """" function trim(envar) """"
+        if function exception-status not equal to space
+            display "   " "exception-status is " function trim (function exception-status)
+            set last exception to off
+            end-if
+
+        display "test14"
+        move "Properly untouched" to envar
+        accept envar from environment "MUGWUMP"
+            not on exception display "   " "No exception ERROR improperly"
+            on exception display "   " "Exception (properly)"
+            end-accept
+        display "   " "MUGWUMP is " """" function trim(envar) """"
+        if function exception-status not equal to space
+            display "   " "exception-status is " function trim (function exception-status)
+            set last exception to off
+            end-if
+
+        continue.
+        quit.
+        goback.
+        end program         prog.
+])
+AT_CHECK([$COMPILE -o prog prog.cob], [0], [], [])
+AT_CHECK([USER=fred ./prog], [0], [test1
+   USER is "fred"
+test2
+   No exception (properly)
+   USER is "fred"
+test3
+   USER is "fred"
+test4
+   No exception (properly)
+   USER is "fred"
+test11
+   MUGWUMP is "Properly untouched"
+   exception-status is EC-ARGUMENT-IMP-ENVIRONMENT
+test12
+   MUGWUMP is "Properly untouched"
+   exception-status is EC-ARGUMENT-IMP-ENVIRONMENT
+test13
+   Exception (properly)
+   MUGWUMP is "Properly untouched"
+   exception-status is EC-ARGUMENT-IMP-ENVIRONMENT
+test14
+   Exception (properly)
+   MUGWUMP is "Properly untouched"
+   exception-status is EC-ARGUMENT-IMP-ENVIRONMENT
+], [])
+AT_CLEANUP

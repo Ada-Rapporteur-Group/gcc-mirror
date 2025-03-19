@@ -1,0 +1,5446 @@
+## Copyright (C) 2003-2012, 2014-2019 Free Software Foundation, Inc.
+## Copyright (C) 2020-2023 COBOLworx.
+## Written by Keisuke Nishida, Roger While, Simon Sobisch, Ron Norman,
+##    Marty Heyman, Nick Mower
+##
+## This file was copied from GnuCOBOL and modified for use with COBOL.
+## for GCC (gcobol).
+## The COBOL for GCC compiler is free software: you can redistribute it
+## and/or modify it under the terms of the Symas Open Licence. A copy
+## of that license is in the LICENSE file included in the distribution.
+##
+
+### COBOL for GCC Test Suite
+
+AT_SETUP([30. DELETE FILE (invalid instruction))])
+AT_KEYWORDS([runfile FILE OPEN I-O OPTIONAL])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# Looks like this got munged since "importing" TODO
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT  OPTIONAL      FILE-OPT
+                   ASSIGN        TO "testfile"
+                   ORGANIZATION  IS SEQUENTIAL
+                   FILE STATUS   IS WSFS.
+       DATA DIVISION.
+       FILE SECTION.
+       FD  FILE-OPT.
+       01  FOREC             PIC X(80).
+       WORKING-STORAGE SECTION.
+       01  WSFS              PIC X(2).
+       PROCEDURE DIVISION.
+      *
+      *>   DELETE FILE FILE-OPT
+      *>    ON EXCEPTION
+      *>     DISPLAY "STATUS DELETE FILE (missing) - EXCEPTION:" WSFS
+      *>     END-DISPLAY
+      *>    NOT ON EXCEPTION
+      *>      IF WSFS NOT = "05"
+      *>         DISPLAY "STATUS DELETE FILE (missing):" WSFS
+      *>      END-IF
+      *>   END-DELETE
+           OPEN I-O FILE-OPT
+           IF WSFS NOT = "05"
+              DISPLAY "STATUS I-O, missing optional file:" WSFS.
+           CLOSE FILE-OPT
+           IF WSFS NOT = "00"
+              DISPLAY "STATUS CLOSE:" WSFS.
+           OPEN I-O FILE-OPT
+           IF WSFS NOT = "00"
+              DISPLAY "STATUS I-O, empty file:" WSFS.
+           DELETE FILE FILE-OPT
+      *>     ON EXCEPTION
+              IF WSFS NOT = "41"
+                 DISPLAY "STATUS DELETE FILE (OPENED):" WSFS
+              END-IF
+      *>    NOT ON EXCEPTION
+      *>     DISPLAY "STATUS DELETE FILE (OPENED) - NO EXCEPTION:" WSFS
+      *>   END-DELETE
+           CLOSE FILE-OPT
+           IF WSFS NOT = "00"
+              DISPLAY "STATUS CLOSE #2:" WSFS.
+           DELETE FILE FILE-OPT
+      *>     ON EXCEPTION
+      *>      DISPLAY "STATUS DELETE FILE (closed) - EXCEPTION:" WSFS
+      *>      END-DISPLAY
+      *>     NOT ON EXCEPTION
+              IF WSFS NOT = "00"
+                 DISPLAY "STATUS DELETE FILE (closed):" WSFS
+              END-IF
+      *>   END-DELETE
+      *
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_FIXED prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [], [])
+AT_CLEANUP
+
+
+AT_SETUP([33. DELETE FILE, INDEXED])
+AT_KEYWORDS([runfile FILE OPEN I-O OPTIONAL])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# Not sure about parts commented out. RESEARCH TODO
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT  OPTIONAL      FILE-OPT
+                   ASSIGN        TO "testfile"
+                   ORGANIZATION  IS INDEXED
+                   RECORD KEY    IS FOREC
+                   FILE STATUS   IS WSFS.
+       DATA DIVISION.
+       FILE SECTION.
+       FD  FILE-OPT.
+       01  FOREC             PIC X(80).
+       WORKING-STORAGE SECTION.
+       01  WSFS              PIC X(2).
+       PROCEDURE DIVISION.
+      *
+      *>   DELETE FILE FILE-OPT
+      *>    ON EXCEPTION
+      *>     DISPLAY "STATUS DELETE FILE (missing) - EXCEPTION: " WSFS
+      *>     END-DISPLAY
+      *>    NOT ON EXCEPTION
+      *>      IF WSFS NOT = "05"
+      *>         DISPLAY "STATUS DELETE FILE (missing): " WSFS
+      *>      END-IF
+      *>   END-DELETE
+           OPEN I-O FILE-OPT
+           IF WSFS NOT = "05"
+              DISPLAY "STATUS I-O, missing optional file: " WSFS.
+           CLOSE FILE-OPT
+           IF WSFS NOT = "00"
+              DISPLAY "STATUS CLOSE: " WSFS.
+           OPEN I-O FILE-OPT
+           IF WSFS NOT = "00"
+              DISPLAY "STATUS I-O, empty file: " WSFS.
+           DELETE FILE FILE-OPT
+      *>     ON EXCEPTION
+              IF WSFS NOT = "41"
+                 DISPLAY "STATUS DELETE FILE (opened): " WSFS
+              END-IF
+      *>    NOT ON EXCEPTION
+      *>     DISPLAY "STATUS DELETE FILE (opened) - NO EXCEPTION: " WSFS
+      *>   END-DELETE
+           CLOSE FILE-OPT
+           IF WSFS NOT = "00"
+              DISPLAY "STATUS CLOSE #2: " WSFS.
+           DELETE FILE FILE-OPT
+      *>     ON EXCEPTION
+      *>      DISPLAY "STATUS DELETE FILE (closed) - EXCEPTION: " WSFS
+      *>      END-DISPLAY
+      *>     NOT ON EXCEPTION
+              IF WSFS NOT = "00"
+                 DISPLAY "STATUS DELETE FILE (closed): " WSFS
+              END-IF
+      *>   END-DELETE
+      *
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_FIXED prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([42. LINAGE and LINAGE-COUNTER sample])
+AT_KEYWORDS([runfile optional file status READ WRITE END-OF-PAGE LINE SEQUENTIAL configuration COB_CURRENT_DATE])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# REPORTWRITER not implemented. LINAGE is RW feature TODO
+
+# modified version of GC-FAQ: Example of LINAGE File Descriptor
+# Author: Brian Tiffin, Date:   10-July-2008
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           select optional data-file assign to 'prog.cob'
+               organization is line sequential
+               file status is data-file-status.
+           select mini-report assign to "mini-report".
+
+       DATA DIVISION.
+       FILE SECTION.
+       FD  data-file.
+       01  data-record.
+           88 endofdata        value high-values.
+           02 data-line        pic x(80).
+       FD  mini-report
+           linage is 16 lines
+               with footing at 15
+               lines at top 2
+               lines at bottom 2.
+       01  report-line         pic x(80).
+
+       WORKING-STORAGE SECTION.
+       01  command-arguments   pic x(1024).
+       01  file-name           pic x(160).
+       01  data-file-status    pic xx.
+       01  lc                  pic 99.
+       01  report-line-blank.
+           02 filler           pic x(18) value all "*".
+           02 filler           pic x(05) value spaces.
+           02 filler           pic x(34)
+               VALUE "THIS PAGE INTENTIONALLY LEFT BLANK".
+           02 filler           pic x(05) value spaces.
+           02 filler           pic x(18) value all "*".
+       01  report-line-data.
+           02 body-tag         pic 9(6).
+           02 line-3           pic x(74).
+       01  report-line-header.
+           02 filler           pic x(6) VALUE "PAGE: ".
+           02 page-no          pic 9999.
+           02 filler           pic x(24).
+           02 filler           pic x(5) VALUE " LC: ".
+           02 header-tag       pic 9(6).
+           02 filler           pic x(23).
+           02 filler           pic x(6) VALUE "DATE: ".
+           02 page-date        pic x(6).
+
+       01  page-count          pic 9999.
+
+       PROCEDURE DIVISION.
+
+       open input data-file.
+       read data-file
+           at end
+               display "File open error: " data-file-status
+               stop run
+       end-read.
+
+       open output mini-report.
+
+       write report-line
+           from report-line-blank
+       end-write.
+
+       move 1 to page-count.
+       accept page-date from date end-accept.
+       move page-count to page-no.
+       write report-line
+           from report-line-header
+           after advancing page
+       end-write.
+
+       perform readwrite-loop until endofdata.
+
+       display
+           "Normal termination, ending status: "
+           data-file-status
+       close mini-report.
+
+       close data-file.
+       stop run.
+
+      ****************************************************************
+       readwrite-loop.
+       move data-record to report-line-data
+       move linage-counter to body-tag
+       write report-line from report-line-data
+           end-of-page
+               add 1 to page-count end-add
+               move page-count to page-no
+               move linage-counter to header-tag
+               write report-line from report-line-header
+                   after advancing page
+               end-write
+       end-write
+       read data-file
+           at end set endofdata to true
+       end-read
+       .
+])
+
+AT_CAPTURE_FILE([mini-report])
+AT_DATA([reference-report], [
+
+******************     THIS PAGE INTENTIONALLY LEFT BLANK     ******************
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+PAGE: 0001                         LC: 000000                       DATE: 150206
+000001
+000002 IDENTIFICATION DIVISION.
+000003 PROGRAM-ID. prog.
+000004 ENVIRONMENT DIVISION.
+000005 INPUT-OUTPUT SECTION.
+000006 FILE-CONTROL.
+000007     select optional data-file assign to 'prog.cob'
+000008         organization is line sequential
+000009         file status is data-file-status.
+000010     select mini-report assign to "mini-report".
+000011
+000012 DATA DIVISION.
+000013 FILE SECTION.
+000014 FD  data-file.
+
+
+
+
+
+PAGE: 0002                         LC: 000015                       DATE: 150206
+000001 01  data-record.
+000002     88 endofdata        value high-values.
+000003     02 data-line        pic x(80).
+000004 FD  mini-report
+000005     linage is 16 lines
+000006         with footing at 15
+000007         lines at top 2
+000008         lines at bottom 2.
+000009 01  report-line         pic x(80).
+000010
+000011 WORKING-STORAGE SECTION.
+000012 01  command-arguments   pic x(1024).
+000013 01  file-name           pic x(160).
+000014 01  data-file-status    pic xx.
+
+
+
+
+
+PAGE: 0003                         LC: 000015                       DATE: 150206
+000001 01  lc                  pic 99.
+000002 01  report-line-blank.
+000003     02 filler           pic x(18) value all "*".
+000004     02 filler           pic x(05) value spaces.
+000005     02 filler           pic x(34)
+000006         VALUE "THIS PAGE INTENTIONALLY LEFT BLANK".
+000007     02 filler           pic x(05) value spaces.
+000008     02 filler           pic x(18) value all "*".
+000009 01  report-line-data.
+000010     02 body-tag         pic 9(6).
+000011     02 line-3           pic x(74).
+000012 01  report-line-header.
+000013     02 filler           pic x(6) VALUE "PAGE: ".
+000014     02 page-no          pic 9999.
+
+
+
+
+
+PAGE: 0004                         LC: 000015                       DATE: 150206
+000001     02 filler           pic x(24).
+000002     02 filler           pic x(5) VALUE " LC: ".
+000003     02 header-tag       pic 9(6).
+000004     02 filler           pic x(23).
+000005     02 filler           pic x(6) VALUE "DATE: ".
+000006     02 page-date        pic x(6).
+000007
+000008 01  page-count          pic 9999.
+000009
+000010 PROCEDURE DIVISION.
+000011
+000012 open input data-file.
+000013 read data-file
+000014     at end
+
+
+
+
+
+PAGE: 0005                         LC: 000015                       DATE: 150206
+000001         display "File open error: " data-file-status
+000002         stop run
+000003 end-read.
+000004
+000005 open output mini-report.
+000006
+000007 write report-line
+000008     from report-line-blank
+000009 end-write.
+000010
+000011 move 1 to page-count.
+000012 accept page-date from date end-accept.
+000013 move page-count to page-no.
+000014 write report-line
+
+
+
+
+
+PAGE: 0006                         LC: 000015                       DATE: 150206
+000001     from report-line-header
+000002     after advancing page
+000003 end-write.
+000004
+000005 perform readwrite-loop until endofdata.
+000006
+000007 display
+000008     "Normal termination, ending status: "
+000009     data-file-status
+000010 close mini-report.
+000011
+000012 close data-file.
+000013 stop run.
+000014
+
+
+
+
+
+PAGE: 0007                         LC: 000015                       DATE: 150206
+000001****************************************************************
+000002 readwrite-loop.
+000003 move data-record to report-line-data
+000004 move linage-counter to body-tag
+000005 write report-line from report-line-data
+000006     end-of-page
+000007         add 1 to page-count end-add
+000008         move page-count to page-no
+000009         move linage-counter to header-tag
+000010         write report-line from report-line-header
+000011             after advancing page
+000012         end-write
+000013 end-write
+000014 read data-file
+
+
+
+
+
+PAGE: 0008                         LC: 000015                       DATE: 150206
+000001     at end set endofdata to true
+000002 end-read
+000003 .
+])
+
+AT_CHECK([$COMPILE_FIXED prog.cob], [0], [], [])
+AT_CHECK([COB_CURRENT_DATE="2015/02/06 16:40:52" ./a.out], [0],
+[Normal termination, ending status: 10
+], [])
+AT_CHECK([diff mini-report reference-report], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([49. ASSIGN DYNAMIC and EXTERNAL])
+AT_KEYWORDS([extensions runfile])
+# Commented out skip and Gnu CHECKs
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# EXTENSION
+# GNU -f
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT f ASSIGN whatever
+               ORGANIZATION LINE SEQUENTIAL.
+
+       DATA DIVISION.
+       FILE SECTION.
+       FD  f.
+       01  f-rec PIC XXX.
+
+       WORKING-STORAGE SECTION.
+       01  whatever PIC X(10) VALUE "out.txt".
+
+       PROCEDURE DIVISION.
+           OPEN OUTPUT f
+           WRITE f-rec FROM "hi"
+           CLOSE f
+           .
+])
+
+AT_CHECK([$COMPILE_FIXED -fassign-clause=external prog.cob], [0], [], [])
+AT_CAPTURE_FILE(./whatever)
+AT_CHECK([./a.out], [0], [], [])
+AT_DATA([reference],
+[hi
+])
+AT_CHECK([diff reference whatever], [0], [], [])
+
+AT_CHECK([$COMPILE_FIXED prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [], [])
+AT_CHECK([diff reference whatever], [0], [], [])
+
+# AT_CHECK([$COMPILE_FIXED -fassign-clause=external prog.cob], [0], [], [])
+# AT_CAPTURE_FILE(./whatever)
+# AT_CHECK([./a.out], [0], [], [])
+# AT_DATA([reference],
+# [hi
+# ])
+# AT_CHECK([diff reference whatever], [0], [], [])
+#
+# AT_CHECK([$COMPILE_FIXED -fassign-clause=dynamic prog.cob], [0], [], [])
+# AT_CAPTURE_FILE(./out.txt)
+# AT_CHECK([./a.out], [0], [], [])
+# AT_CHECK([diff reference out.txt], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([50. ASSIGN EXTERNAL parsing])
+AT_KEYWORDS([extensions runfile])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# Was a test for a GnuCOBOL warning message. SHOULD have failed
+# the second CHECK
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT      DIVISION.
+       INPUT-OUTPUT     SECTION.
+       FILE-CONTROL.
+           SELECT TEST-FILE ASSIGN DA-S-FILENAME.
+           SELECT TESTFILE2 ASSIGN TESTFILE2.
+       DATA             DIVISION.
+       FILE             SECTION.
+       FD TEST-FILE.
+       01 TEST-REC      PIC X(4).
+       FD TESTFILE2.
+       01 TESTREC2      PIC X(4).
+       PROCEDURE        DIVISION.
+           OPEN OUTPUT TEST-FILE.
+           CLOSE TEST-FILE.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_FIXED prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [], [])
+AT_CHECK([test -f FILENAME], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([51. ASSIGN directive])
+AT_KEYWORDS([extensions runfile])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# GNU -f
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT f ASSIGN whatever
+               ORGANIZATION LINE SEQUENTIAL.
+      $SET ASSIGN "EXTERNAL"
+           SELECT g ASSIGN whatever
+               ORGANIZATION LINE SEQUENTIAL.
+
+       DATA DIVISION.
+       FILE SECTION.
+       FD  f.
+       01  f-rec PIC XXX.
+       FD  g.
+       01  g-rec PIC XXX.
+
+       PROCEDURE DIVISION.
+           MOVE "out.txt" TO whatever
+
+           OPEN OUTPUT f
+           WRITE f-rec FROM "hi"
+           CLOSE f
+
+           OPEN OUTPUT g
+           WRITE g-rec FROM "hi"
+           CLOSE g
+           .
+       END PROGRAM prog.
+])
+
+AT_CHECK([$COMPILE_FIXED -fassign-clause=dynamic prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([52. ASSIGNfilename expansion])
+AT_KEYWORDS([extensions runfile])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# GNU -f
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT      DIVISION.
+       INPUT-OUTPUT     SECTION.
+       FILE-CONTROL.
+       SELECT TEST-FILE ASSIGN "$DIR/FILENAME".
+       DATA             DIVISION.
+       FILE             SECTION.
+       FD TEST-FILE.
+       01 TEST-REC      PIC X(4).
+       PROCEDURE        DIVISION.
+           OPEN OUTPUT TEST-FILE.
+           CLOSE TEST-FILE.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_FIXED -ffilename-mapping prog.cob], [0], [], [])
+AT_CHECK([DIR="." ./a.out], [0], [], [])
+AT_CHECK([test -f "./FILENAME" && rm -f "./FILENAME"], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([53. ASSIGN filename mapping])
+AT_KEYWORDS([extensions runfile optional])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# GNU -f
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT      DIVISION.
+       INPUT-OUTPUT     SECTION.
+       FILE-CONTROL.
+       SELECT TEST-FILE ASSIGN "FILENAME".
+       DATA             DIVISION.
+       FILE             SECTION.
+       FD TEST-FILE.
+       01 TEST-REC      PIC X(4).
+       PROCEDURE        DIVISION.
+           OPEN OUTPUT TEST-FILE.
+           CLOSE TEST-FILE.
+           STOP RUN.
+])
+
+AT_DATA([prog2.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog2.
+       ENVIRONMENT      DIVISION.
+       INPUT-OUTPUT     SECTION.
+       FILE-CONTROL.
+       SELECT TEST-FILE ASSIGN "FILENAME2".
+       DATA             DIVISION.
+       FILE             SECTION.
+       FD TEST-FILE.
+       01 TEST-REC      PIC X(4).
+       PROCEDURE        DIVISION.
+           OPEN OUTPUT TEST-FILE.
+           CLOSE TEST-FILE.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_FIXED -fno-filename-mapping prog.cob], [0], [], [])
+AT_CHECK([DD_FILENAME="x" ./a.out], [0], [], [])
+AT_CHECK([test -f "x"], [1])
+AT_CHECK([test -f "FILENAME"], [0], [], [])
+
+AT_CHECK([$COMPILE_FIXED -ffilename-mapping prog2.cob], [0], [], [])
+AT_CHECK([DD_FILENAME2="x" ./a.out2], [0], [], [])
+AT_CHECK([test -f "FILENAME2"], [1])
+AT_CHECK([test -f "x"], [0], [], [])
+AT_CHECK([dd_FILENAME2="y" ./a.out2], [0], [], [])
+AT_CHECK([test -f "y"], [0], [], [])
+AT_CHECK([FILENAME2="z" ./a.out2], [0], [], [])
+AT_CHECK([test -f "z"], [0], [], [])
+AT_CHECK([./a.out2], [0], [], [])
+AT_CHECK([test -f "FILENAME2"], [0], [], [])
+
+AT_DATA([prog3.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog3.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT OPTIONAL INFILE ASSIGN TO "MYFILE"
+                ORGANIZATION IS RELATIVE
+                ACCESS IS SEQUENTIAL
+                FILE STATUS IS WSFS.
+       DATA DIVISION.
+       FILE SECTION.
+       FD  INFILE.
+       01  INREC             PIC X(80).
+       WORKING-STORAGE SECTION.
+       01  WSFS              PIC X(2).
+       PROCEDURE DIVISION.
+      *
+      *    open missing file
+           OPEN INPUT INFILE
+           DISPLAY "STATUS OPENI " WSFS
+           CLOSE INFILE
+      *
+      *    create missing file
+           OPEN OUTPUT INFILE
+           DISPLAY "STATUS OPENO " WSFS
+           CLOSE INFILE
+      *
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_FIXED prog3.cob], [0], [], [])
+
+AT_CHECK([./a.out3], [0],
+[STATUS OPENI 05
+STATUS OPENO 00
+], [])
+AT_CHECK([test -f "MYFILE"], [0], [], [])
+
+AT_CHECK([./a.out3], [0],
+[STATUS OPENI 00
+STATUS OPENO 00
+], [])
+
+AT_CHECK([MYFILE="TSTFILE" ./a.out3], [0],
+[STATUS OPENI 05
+STATUS OPENO 00
+], [])
+AT_CHECK([test -f "TSTFILE"], [0], [], [])
+
+AT_CHECK([dd_MYFILE="TSTFILE2" ./a.out3], [0],
+[STATUS OPENI 05
+STATUS OPENO 00
+], [])
+AT_CHECK([test -f "TSTFILE2"], [0], [], [])
+
+AT_CHECK([DD_MYFILE="TSTFILE3" ./a.out3], [0],
+[STATUS OPENI 05
+STATUS OPENO 00
+], [])
+AT_CHECK([test -f "TSTFILE3"], [0], [], [])
+
+AT_CHECK([DD_MYFILE="./nosubhere/TSTFILE" ./a.out3], [0],
+[STATUS OPENI 05
+STATUS OPENO 30
+], [])
+
+AT_DATA([prog4.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog4.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT  FILE0 ASSIGN  TO "./nosubhere/MYFILE0"
+                   ORGANIZATION  IS LINE SEQUENTIAL
+                   FILE STATUS   IS WSFS.
+           SELECT  FILE1 ASSIGN  TO "MYFILE1"
+                   ORGANIZATION  IS LINE SEQUENTIAL
+                   FILE STATUS   IS WSFS.
+           SELECT  FILE2 ASSIGN  TO FILENAME
+                   ORGANIZATION  IS LINE SEQUENTIAL
+                   FILE STATUS   IS WSFS.
+       DATA DIVISION.
+       FILE SECTION.
+       FD  FILE0.
+       01  F0REC             PIC X(80).
+       FD  FILE1.
+       01  F1REC             PIC X(80).
+       FD  FILE2.
+       01  F2REC             PIC X(80).
+       WORKING-STORAGE SECTION.
+       77  FILENAME          PIC X(80) VALUE "MYFILE2".
+       01  WSFS              PIC X(2).
+       PROCEDURE DIVISION.
+      *
+           OPEN OUTPUT FILE0
+           DISPLAY "STATUS OPENO 0 " WSFS
+           OPEN OUTPUT FILE1
+           DISPLAY "STATUS OPENO 1 " WSFS
+           OPEN OUTPUT FILE2
+           DISPLAY "STATUS OPENO 2 " WSFS
+      *
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_FIXED prog4.cob], [0], [], [])
+
+AT_CHECK([DD_MYFILE1="./nosubhere/NOFILE1" DD_MYFILE2="./nosubhere/NOFILE2" \
+./a.out4], [0],
+[STATUS OPENO 0 30
+STATUS OPENO 1 30
+STATUS OPENO 2 30
+], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([54. ASSIGN with COB_FILE_PATH])
+AT_KEYWORDS([extensions runfile])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# GNU -f
+# TOREVIEW
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT      DIVISION.
+       INPUT-OUTPUT     SECTION.
+       FILE-CONTROL.
+       SELECT TEST-FILE ASSIGN "FILENAMEX".
+       DATA             DIVISION.
+       FILE             SECTION.
+       FD TEST-FILE.
+       01 TEST-REC      PIC X(4).
+       PROCEDURE        DIVISION.
+           OPEN OUTPUT TEST-FILE.
+           CLOSE TEST-FILE.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_FIXED -ffilename-mapping prog.cob], [0], [], [])
+AT_CHECK([rm -rf "tstdir" && mkdir "tstdir"], [0], [], [])
+AT_CHECK([COB_FILE_PATH="tstdir" ./a.out], [0], [], [])
+AT_CHECK([test -f "tstdir/FILENAMEX" && rm -f "tstdir/FILENAMEX"], [0], [], [])
+AT_CHECK([COB_FILE_PATH="tstdir/" ./a.out], [0], [], [])
+AT_CHECK([test -f "tstdir/FILENAMEX"], [0], [], [])
+
+# FIXME: on OPEN we should also output the full filename (if any) leading to the error
+AT_CHECK([COB_FILE_PATH="./nosubhere" ./a.out 2>prog.err], [1], [], [])
+# workaround for testing windows-builds...
+AT_CHECK([cat prog.err | tr '\\' '/'], [0],
+[libcob: prog.cob:13: error: permanent file error (status = 30) for file TEST-FILE ('FILENAMEX' => ./nosubhere/FILENAMEX) on OPEN
+], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([57. ASSIGN DYNAMIC with BASED data item])
+AT_KEYWORDS([runfile status])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# BASED not implemented TODO
+
+AT_DATA([TEST-FILE],
+[hello
+])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT      DIVISION.
+       INPUT-OUTPUT     SECTION.
+       FILE-CONTROL.
+       SELECT test-file ASSIGN path
+                        ORGANIZATION LINE SEQUENTIAL.
+       DATA             DIVISION.
+       FILE	            SECTION.
+       FD  test-file.
+       01  test-rec     PIC X(5).
+       WORKING-STORAGE  SECTION.
+       01  path         BASED PIC X(10).
+       01  x            PIC X.
+       PROCEDURE        DIVISION CHAINING x.
+           IF x NOT = SPACES
+              ALLOCATE path
+              MOVE "TEST-FILE" TO path
+              OPEN INPUT test-file
+              FREE path
+           ELSE
+              OPEN INPUT test-file
+           END-IF
+           READ test-file   END-READ
+           IF test-rec NOT = "hello"
+              DISPLAY test-rec END-DISPLAY
+           END-IF
+           CLOSE test-file
+           STOP RUN.
+])
+
+AT_DATA([prog2.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog2.
+       ENVIRONMENT      DIVISION.
+       INPUT-OUTPUT     SECTION.
+       FILE-CONTROL.
+       SELECT test-file ASSIGN path
+                        ORGANIZATION LINE SEQUENTIAL
+                        FILE STATUS TEST-STAT.
+       DATA             DIVISION.
+       FILE	            SECTION.
+       FD  test-file.
+       01  test-rec     PIC X(5).
+       WORKING-STORAGE  SECTION.
+       01  path         BASED PIC X(10).
+       01  test-stat    PIC X(2) VALUE "XX".
+       PROCEDURE        DIVISION.
+           OPEN INPUT test-file
+           IF TEST-STAT NOT = '31'
+              DISPLAY 'BAD OPEN, STATUS "' test-stat '"' END-DISPLAY
+           END-IF
+           READ test-file   END-READ
+           IF TEST-STAT NOT = '47'
+              DISPLAY 'BAD READ, STATUS "' test-stat '"' END-DISPLAY
+           END-IF
+           CLOSE test-file
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_FIXED prog.cob])
+AT_CHECK([./a.out X], [0], [], [])
+AT_CHECK([./a.out], [1], [],
+[libcob: prog.cob:23: error: inconsistent file name (status = 31) for file test-file ('field with NULL address') on OPEN
+])
+
+AT_CHECK([$COMPILE_FIXED prog2.cob])
+AT_CHECK([./a.out], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([58. ASSIGN DYNAMIC with data item in LINKAGE])
+AT_KEYWORDS([runfile-CONTROL file status])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# cobcrun parameter X makes a difference? TODO RESEARCH
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+
+       ENVIRONMENT DIVISION.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  f-path     PIC X(80) VALUE "fooasg.txt".
+       01  x-path     PIC X(80) VALUE "foxasg.txt".
+       01  y-path     PIC X(80) VALUE "foyasg.txt".
+       01  REC1       PIC 9(4) VALUE 1.
+       01  REC2       PIC 9(4) VALUE 2.
+       01  CUST-STAT  PIC X(2) VALUE "XX".
+
+       PROCEDURE DIVISION.
+           CALL "TSTOPN"  USING OMITTED.
+           CALL "TSTOPN"  USING y-path.
+           CALL "TSTOPEN" USING f-path  REC1 CUST-STAT.
+           CALL "TSTOPEN" USING x-path  REC1 CUST-STAT.
+           CALL "TSTOPEN" USING OMITTED REC1 CUST-STAT.
+           CALL "TSTOPEN" USING f-path  REC2 CUST-STAT.
+           CALL "TSTOPEN" USING x-path  REC2 CUST-STAT.
+           STOP RUN.
+           END PROGRAM prog.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. TSTOPEN.
+
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT f ASSIGN s-path
+           ORGANIZATION RELATIVE
+           ACCESS IS RANDOM
+           RELATIVE KEY IS REC-NUM
+           FILE STATUS IS CUST-STAT.
+
+       DATA DIVISION.
+       FILE SECTION.
+       FD  f.
+       01  f-line PIC X(79).
+
+       WORKING-STORAGE SECTION.
+       01  z-path   PIC X(80) VALUE "foozzz.txt".
+
+       LINKAGE SECTION.
+       01  s-path     PIC X(80).
+       01  REC-NUM    PIC 9(4).
+       01  CUST-STAT  PIC X(2).
+
+       PROCEDURE DIVISION USING s-path, REC-NUM, CUST-STAT.
+           IF ADDRESS OF s-path = NULL
+              SET ADDRESS OF s-path TO ADDRESS OF z-path
+           END-IF.
+           IF REC-NUM > 1
+              OPEN I-O f
+              DISPLAY "Extend file: " s-path(1:10)
+                   " - " CUST-STAT " #" REC-NUM "."
+           ELSE
+              OPEN OUTPUT f
+              DISPLAY "Output file: " s-path(1:10)
+                   " - " CUST-STAT " #" REC-NUM "."
+           END-IF.
+           IF CUST-STAT NOT = "00"
+               DISPLAY "Opened error: " CUST-STAT "."
+               GOBACK
+           END-IF.
+           MOVE "Hello World" TO f-line.
+           MOVE REC-NUM       TO f-line (20:4).
+           WRITE f-line.
+           IF CUST-STAT NOT = "00"
+               DISPLAY "WRITE error: " CUST-STAT "."
+           END-IF.
+           CLOSE f.
+           GOBACK.
+       END PROGRAM TSTOPEN.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. TSTOPN.
+
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT f ASSIGN s-path
+           ORGANIZATION LINE SEQUENTIAL
+           FILE STATUS IS IO-STS.
+
+       DATA DIVISION.
+       FILE SECTION.
+       FD  f.
+       01  f-line PIC X(80).
+
+       WORKING-STORAGE SECTION.
+       01  IO-STS   PIC X(2) VALUE "00".
+
+       LINKAGE SECTION.
+       01  s-path   PIC X(80).
+
+       PROCEDURE DIVISION USING s-path.
+           OPEN OUTPUT f
+           IF IO-STS NOT = "00"
+               DISPLAY "Opened error: " IO-STS "."
+               GOBACK
+           END-IF.
+           DISPLAY "Opened file: " s-path(1:10) ".".
+           MOVE "Hello World" TO f-line.
+           WRITE f-line.
+           CLOSE f.
+           GOBACK.
+       END PROGRAM TSTOPN.
+])
+
+AT_DATA([prog2.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog2.
+
+       ENVIRONMENT DIVISION.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+
+       PROCEDURE DIVISION.
+           CALL "TSTOPEN" USING OMITTED.
+           STOP RUN.
+           END PROGRAM prog2.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. TSTOPEN.
+
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT f ASSIGN s-path
+           ORGANIZATION SEQUENTIAL.
+
+       DATA DIVISION.
+       FILE SECTION.
+       FD  f.
+       01  f-line PIC X(79).
+
+       LINKAGE SECTION.
+       01  s-path     PIC X(80).
+
+       PROCEDURE DIVISION USING s-path.
+           OPEN OUTPUT f
+           GOBACK.
+       END PROGRAM TSTOPEN.
+])
+
+AT_CHECK([$COMPILE_FIXED prog.cob], [0], [], [])
+
+AT_CHECK([./a.out], [0],
+[Opened error: 31.
+Opened file: foyasg.txt.
+Output file: fooasg.txt - 00 #0001.
+Output file: foxasg.txt - 00 #0001.
+Output file: foozzz.txt - 00 #0001.
+Extend file: fooasg.txt - 00 #0002.
+Extend file: foxasg.txt - 00 #0002.
+], [])
+
+AT_CHECK([$COMPILE_FIXED prog2.cob], [0], [], [])
+
+AT_CHECK([./a.out2], [1], [],
+[libcob: prog2.cob:32: error: inconsistent file name (status = 31) for file f ('field with NULL address') on OPEN
+])
+
+AT_CLEANUP
+
+
+AT_SETUP([59. ASSIGN DYNAMIC with empty data item])
+AT_KEYWORDS([runfile status])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# cobcrun parameter X makes a difference? TODO RESEARCH
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT      DIVISION.
+       INPUT-OUTPUT     SECTION.
+       FILE-CONTROL.
+       SELECT test-file ASSIGN path
+                        ORGANIZATION LINE SEQUENTIAL.
+       DATA             DIVISION.
+       FILE	            SECTION.
+       FD  test-file.
+       01  test-rec     PIC X(5).
+       WORKING-STORAGE  SECTION.
+       01  path         PIC X(10).
+       01  x            PIC X.
+       PROCEDURE        DIVISION CHAINING x.
+           IF X = SPACE
+              MOVE SPACES     TO path
+           ELSE
+              MOVE LOW-VALUES TO path
+           END-IF
+           OPEN INPUT test-file
+           DISPLAY "Hello"
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_FIXED prog.cob], [0], [], [])
+AT_CHECK([./a.out], [1], [],
+[libcob: prog.cob:22: error: inconsistent file name (status = 31) for file test-file ('') on OPEN
+])
+AT_CHECK([./a.out X], [1], [],
+[libcob: prog.cob:22: error: inconsistent file name (status = 31) for file test-file ('') on OPEN
+])
+
+AT_CLEANUP
+
+
+AT_SETUP([60. ASSIGN DYNAMIC with unset implicit data item])
+AT_KEYWORDS([runfile status])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# cobcrun parameter X makes a difference? TODO RESEARCH
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT      DIVISION.
+       INPUT-OUTPUT     SECTION.
+       FILE-CONTROL.
+       SELECT test-file ASSIGN fpath
+                        ORGANIZATION LINE SEQUENTIAL.
+       DATA             DIVISION.
+       FILE	            SECTION.
+       FD  test-file.
+       01  test-rec     PIC X(5).
+       PROCEDURE        DIVISION.
+           OPEN INPUT test-file
+           DISPLAY "Hello"
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_FIXED prog.cob], [0], [], [])
+AT_CHECK([./a.out], [1], [],
+[libcob: prog.cob:14: error: file does not exist (status = 35) for file test-file ('fpath') on OPEN
+])
+AT_CHECK([fpath="not.there" ./a.out X], [1], [],
+[libcob: prog.cob:14: error: file does not exist (status = 35) for file test-file ('fpath' => not.there) on OPEN
+])
+
+AT_CLEANUP
+
+
+AT_SETUP([61. INDEXED file key-name])
+AT_KEYWORDS([runfile split key])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# "RECORD KEY IS KEY01 = QQINDEX", the "= QQINDEX" not in 2014. DIALECT
+
+# FIXME: separate both test parts
+
+AT_SKIP_IF([test "$COB_HAS_ISAM" = "no"])
+AT_SKIP_IF(false)
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. "test".
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT TEST-FILE ASSIGN "FILE"
+               ORGANIZATION IS INDEXED
+               ACCESS IS DYNAMIC
+               RECORD KEY IS KEY01 = QQINDEX.
+       DATA DIVISION.
+       FILE SECTION.
+       FD TEST-FILE.
+       01 TEST-REC.
+          03 QQDATA     PIC X(80).
+          03 QQINDEX    PIC XXX9999.
+          03 QQSEQUENCE PIC 9999.
+       PROCEDURE DIVISION.
+           OPEN OUTPUT TEST-FILE
+           MOVE 'TEST DATA 1' TO QQDATA
+           MOVE 'ABC0001'     TO QQINDEX
+           WRITE TEST-REC
+           MOVE 'TEST DATA 2' TO QQDATA
+           MOVE 'ABC0002'     TO QQINDEX
+           WRITE TEST-REC
+           CLOSE TEST-FILE
+           DISPLAY 'FINE' WITH NO ADVANCING
+           GOBACK.
+])
+AT_CHECK([$COMPILE_FIXED prog.cob], [0], [], [])
+
+AT_CHECK([./a.out], [0], [FINE], [])
+AT_CLEANUP
+
+
+AT_SETUP([61. INDEXED file key-name])
+AT_KEYWORDS([runfile split key])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# "RECORD KEY IS KEY01 = QQINDEX", the "= QQINDEX" not in 2014. DIALECT
+
+# FIXME: separate both test parts
+
+AT_SKIP_IF([test "$COB_HAS_ISAM" = "no"])
+AT_SKIP_IF(false)
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. "test".
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT TEST-FILE ASSIGN "FILE"
+               ORGANIZATION IS INDEXED
+               ACCESS IS DYNAMIC
+               RECORD KEY IS KEY01 = QQINDEX.
+       DATA DIVISION.
+       FILE SECTION.
+       FD TEST-FILE.
+       01 TEST-REC.
+          03 QQDATA     PIC X(80).
+          03 QQINDEX    PIC XXX9999.
+          03 QQSEQUENCE PIC 9999.
+       PROCEDURE DIVISION.
+           OPEN OUTPUT TEST-FILE
+           MOVE 'TEST DATA 1' TO QQDATA
+           MOVE 'ABC0001'     TO QQINDEX
+           WRITE TEST-REC
+           MOVE 'TEST DATA 2' TO QQDATA
+           MOVE 'ABC0002'     TO QQINDEX
+           WRITE TEST-REC
+           CLOSE TEST-FILE
+           DISPLAY 'FINE' WITH NO ADVANCING
+           GOBACK.
+])
+AT_CHECK([$COMPILE_FIXED prog.cob], [0], [], [])
+
+AT_CHECK([./a.out], [0], [FINE], [])
+AT_CLEANUP
+
+
+AT_SETUP([62. INDEXED file sparse/split keys (skipped because of SUPPRESS)])
+AT_KEYWORDS([runfile split key sparse SUPPRESS])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+
+       PROGRAM-ID. prog.
+
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT TSPFILE
+           ASSIGN TO "testisam"
+           ORGANIZATION INDEXED ACCESS DYNAMIC
+           RECORD KEY IS PRIME-KEY
+           SOURCE IS CM-CUST-NUM, CM-COMPANY
+
+           ALTERNATE RECORD KEY IS SPLIT-KEY2
+           SOURCE IS CM-TELEPHONE,CM-MACHINE WITH DUPLICATES
+
+           ALTERNATE RECORD KEY IS SPLIT-KEY3
+           SOURCE IS CM-DISK,CM-TAPE WITH DUPLICATES
+                SUPPRESS WHEN ALL "*"
+           FILE STATUS IS CUST-STAT
+           .
+
+       DATA  DIVISION.
+       FILE SECTION.
+       FD  TSPFILE
+           BLOCK CONTAINS 5 RECORDS.
+
+       01  TSPFL-RECORD.
+           05  TSPFL-REC.
+           10  CM-CUST-NUM                     PICTURE X(8).
+           10  CM-STATUS                       PICTURE X.
+           10  CM-COMPANY                      PICTURE X(25).
+           10  CM-ADDRESS-1                    PICTURE X(25).
+           10  CM-ADDRESS-2                    PICTURE X(25).
+           10  CM-ADDRESS-3                    PICTURE X(25).
+           10  CM-TELEPHONE                    PICTURE 9(10).
+           10  CM-DP-MGR                       PICTURE X(25).
+           10  CM-MACHINE                      PICTURE X(8).
+           10  CM-MEMORY                       PICTURE X(4).
+           10  CM-DISK                         PICTURE X(8).
+           10  CM-TAPE                         PICTURE X(8).
+           10  CM-NO-TERMINALS                 PICTURE 9(5).
+
+       WORKING-STORAGE SECTION.
+
+       01  CUST-STAT.
+           05  STAT-1 PICTURE 9(4) COMP SYNC.
+           05  FILLER REDEFINES STAT-1.
+               10  STAT-X1 PIC 9 BINARY.
+               10  STAT-X2 PIC 9 BINARY.
+       77  BYTE-1  PICTURE 9(3).
+       77  BYTE-2  PICTURE 9(3).
+       77  MAX-SUB           VALUE  16         PICTURE 9(5) COMP SYNC.
+
+       01  TEST-DATA.
+
+         02  DATA-CUST-NUM-TBL.
+
+           05  FILLER PIC X(8) VALUE "ALP00000".
+           05  FILLER PIC X(8) VALUE "BET00000".
+           05  FILLER PIC X(8) VALUE "GAM00000".
+           05  FILLER PIC X(8) VALUE "DEL00000".
+           05  FILLER PIC X(8) VALUE "EPS00000".
+           05  FILLER PIC X(8) VALUE "FOR00000".
+           05  FILLER PIC X(8) VALUE "GIB00000".
+           05  FILLER PIC X(8) VALUE "H&J00000".
+           05  FILLER PIC X(8) VALUE "INC00000".
+           05  FILLER PIC X(8) VALUE "JOH00000".
+           05  FILLER PIC X(8) VALUE "KON00000".
+           05  FILLER PIC X(8) VALUE "LEW00000".
+           05  FILLER PIC X(8) VALUE "MOR00000".
+           05  FILLER PIC X(8) VALUE "NEW00000".
+           05  FILLER PIC X(8) VALUE "OLD00000".
+           05  FILLER PIC X(8) VALUE "PRE00000".
+
+         02  DATA-CUST-NUM REDEFINES DATA-CUST-NUM-TBL
+                                       PIC X(8) OCCURS 16.
+         02  DATA-COMPANY-TBL.
+
+           05  FILLER PIC X(25) VALUE "ALPHA ELECTRICAL CO. LTD.".
+           05  FILLER PIC X(25) VALUE "BETA SHOE MFG. INC.      ".
+           05  FILLER PIC X(25) VALUE "GAMMA X-RAY TECHNOLOGY   ".
+           05  FILLER PIC X(25) VALUE "DELTA LUGGAGE REPAIRS    ".
+           05  FILLER PIC X(25) VALUE "EPSILON EQUIPMENT SUPPLY ".
+           05  FILLER PIC X(25) VALUE "FORTUNE COOKIE COMPANY   ".
+           05  FILLER PIC X(25) VALUE "GIBRALTER LIFE INSURANCE ".
+           05  FILLER PIC X(25) VALUE "H & J PLUMBING SUPPLIES  ".
+           05  FILLER PIC X(25) VALUE "INCREMENTAL BACKUP CORP. ".
+           05  FILLER PIC X(25) VALUE "JOHNSON BOATING SUPPLIES ".
+           05  FILLER PIC X(25) VALUE "KONFLAB PLASTIC PRODUCTS.".
+           05  FILLER PIC X(25) VALUE "LEWISTON GRAPHICS LTD.   ".
+           05  FILLER PIC X(25) VALUE "MORNINGSIDE CARPENTRY.   ".
+           05  FILLER PIC X(25) VALUE "NEW WAVE SURF SHOPS INC. ".
+           05  FILLER PIC X(25) VALUE "OLD TYME PIZZA MFG. CO.  ".
+           05  FILLER PIC X(25) VALUE "PRESTIGE OFFICE FURNITURE".
+
+         02  DATA-COMPANY  REDEFINES DATA-COMPANY-TBL
+                                       PIC X(25) OCCURS 16.
+         02  DATA-ADDRESS-1-TBL.
+
+           05  FILLER PIC X(25) VALUE "123 MAIN STREET          ".
+           05  FILLER PIC X(25) VALUE "1090 2ND AVE. WEST       ".
+           05  FILLER PIC X(25) VALUE "1401 JEFFERSON BLVD.     ".
+           05  FILLER PIC X(25) VALUE "1620 ARIZONA WAY         ".
+           05  FILLER PIC X(25) VALUE "1184 EAST FIRST STREET   ".
+           05  FILLER PIC X(25) VALUE "114 JOHN F. KENNEDY AVE. ".
+           05  FILLER PIC X(25) VALUE "650 LIBERTY CRESCENT     ".
+           05  FILLER PIC X(25) VALUE "77 SUNSET BLVD.          ".
+           05  FILLER PIC X(25) VALUE "10908 SANTA MONICA BLVD. ".
+           05  FILLER PIC X(25) VALUE "1134 PARIS ROAD          ".
+           05  FILLER PIC X(25) VALUE "808 NORTHWEST MAIN ST.   ".
+           05  FILLER PIC X(25) VALUE "9904 QUEEN STREET        ".
+           05  FILLER PIC X(25) VALUE "1709 DUNDAS CRESCENT W.  ".
+           05  FILLER PIC X(25) VALUE "3240 MARIS AVENUE        ".
+           05  FILLER PIC X(25) VALUE "1705 WISCONSIN ROAD      ".
+           05  FILLER PIC X(25) VALUE "114A MAPLE GROVE         ".
+
+         02  DATA-ADDRESS-1 REDEFINES DATA-ADDRESS-1-TBL
+                                       PIC X(25) OCCURS 16.
+         02  DATA-ADDRESS-2-TBL.
+
+           05  FILLER PIC X(10) VALUE "NEW YORK  ".
+           05  FILLER PIC X(10) VALUE "ATLANTA   ".
+           05  FILLER PIC X(10) VALUE "WASHINGTON".
+           05  FILLER PIC X(10) VALUE "TORONTO   ".
+           05  FILLER PIC X(10) VALUE "CALGARY   ".
+           05  FILLER PIC X(10) VALUE "SAN DIEGO ".
+           05  FILLER PIC X(10) VALUE "LOS RIOS  ".
+           05  FILLER PIC X(10) VALUE "MADISON   ".
+           05  FILLER PIC X(10) VALUE "WILBUR    ".
+           05  FILLER PIC X(10) VALUE "TOPEKA    ".
+           05  FILLER PIC X(10) VALUE "SEATTLE   ".
+           05  FILLER PIC X(10) VALUE "NEW JERSEY".
+           05  FILLER PIC X(10) VALUE "FORT WAYNE".
+           05  FILLER PIC X(10) VALUE "COLUMBUS  ".
+           05  FILLER PIC X(10) VALUE "RICHMOND  ".
+           05  FILLER PIC X(10) VALUE "WHITEPLAIN".
+
+         02  DATA-ADDRESS-2 REDEFINES DATA-ADDRESS-2-TBL
+                                       PIC X(10) OCCURS 16.
+         02  DATA-ADDRESS-3-TBL.
+
+           05  FILLER PIC X(10) VALUE "N.Y.      ".
+           05  FILLER PIC X(10) VALUE "GEORGIA   ".
+           05  FILLER PIC X(10) VALUE "D.C.      ".
+           05  FILLER PIC X(10) VALUE "CANADA    ".
+           05  FILLER PIC X(10) VALUE "CANADA    ".
+           05  FILLER PIC X(10) VALUE "CALIFORNIA".
+           05  FILLER PIC X(10) VALUE "NEW MEXICO".
+           05  FILLER PIC X(10) VALUE "WISCONSIN ".
+           05  FILLER PIC X(10) VALUE "DELAWARE  ".
+           05  FILLER PIC X(10) VALUE "KANSAS    ".
+           05  FILLER PIC X(10) VALUE "WASHINGTON".
+           05  FILLER PIC X(10) VALUE "N.J.      ".
+           05  FILLER PIC X(10) VALUE "COLORADO  ".
+           05  FILLER PIC X(10) VALUE "OHIO      ".
+           05  FILLER PIC X(10) VALUE "VIRGINIA  ".
+           05  FILLER PIC X(10) VALUE "N.Y.      ".
+
+         02  DATA-ADDRESS-3 REDEFINES DATA-ADDRESS-3-TBL
+                                       PIC X(10) OCCURS 16.
+         02  DATA-TELEPHONE-TBL.
+
+           05  FILLER PIC 9(10) VALUE 3131234432.
+           05  FILLER PIC 9(10) VALUE 4082938498.
+           05  FILLER PIC 9(10) VALUE 8372487274.
+           05  FILLER PIC 9(10) VALUE 4169898509.
+           05  FILLER PIC 9(10) VALUE 5292398745.
+           05  FILLER PIC 9(10) VALUE 8009329492.
+           05  FILLER PIC 9(10) VALUE 6456445643.
+           05  FILLER PIC 9(10) VALUE 6546456333.
+           05  FILLER PIC 9(10) VALUE 3455445444.
+           05  FILLER PIC 9(10) VALUE 6456445643.
+           05  FILLER PIC 9(10) VALUE 7456434355.
+           05  FILLER PIC 9(10) VALUE 6554456433.
+           05  FILLER PIC 9(10) VALUE 4169898509.
+           05  FILLER PIC 9(10) VALUE 7534587453.
+           05  FILLER PIC 9(10) VALUE 8787458374.
+           05  FILLER PIC 9(10) VALUE 4169898509.
+
+         02  DATA-TELEPHONE REDEFINES DATA-TELEPHONE-TBL
+                                       PIC 9(10) OCCURS 16.
+         02  DATA-DP-MGR-TBL.
+
+           05  FILLER PIC X(20) VALUE "MR. DAVE HARRIS     ".
+           05  FILLER PIC X(20) VALUE "MS. JANICE SILCOX   ".
+           05  FILLER PIC X(20) VALUE "MR. ALLAN JONES     ".
+           05  FILLER PIC X(20) VALUE "MR. PETER MACKAY    ".
+           05  FILLER PIC X(20) VALUE "MRS. DONNA BREWER   ".
+           05  FILLER PIC X(20) VALUE "MR. MICHAEL SMYTHE  ".
+           05  FILLER PIC X(20) VALUE "MR. D.A. MORRISON   ".
+           05  FILLER PIC X(20) VALUE "MR. BRIAN PATTERSON ".
+           05  FILLER PIC X(20) VALUE "MR. DARRYL TOWNSEND ".
+           05  FILLER PIC X(20) VALUE "MS. VALERIE HARPER  ".
+           05  FILLER PIC X(20) VALUE "MR. FRED MILLER     ".
+           05  FILLER PIC X(20) VALUE "MR. DONALD FISCHER  ".
+           05  FILLER PIC X(20) VALUE "MR. STEVEN YOURDIN  ".
+           05  FILLER PIC X(20) VALUE "MS. Goldie Hawn     ".
+           05  FILLER PIC X(20) VALUE "MS. ALICE WINSTON   ".
+           05  FILLER PIC X(20) VALUE "MR. THOMAS JEFFERSON".
+
+         02  DATA-DP-MGR    REDEFINES DATA-DP-MGR-TBL
+                                       PIC X(20) OCCURS 16.
+         02  DATA-MACHINE-TBL.
+
+           05  FILLER PIC X(8) VALUE "UNI-9030".
+           05  FILLER PIC X(8) VALUE "UNI-9040".
+           05  FILLER PIC X(8) VALUE "UNI-80/3".
+           05  FILLER PIC X(8) VALUE "UNI-80/5".
+           05  FILLER PIC X(8) VALUE "UNI-80/6".
+           05  FILLER PIC X(8) VALUE "UNI-80/6".
+           05  FILLER PIC X(8) VALUE "UNI-80/6".
+           05  FILLER PIC X(8) VALUE "UNI-80/8".
+           05  FILLER PIC X(8) VALUE "UNI-80/8".
+           05  FILLER PIC X(8) VALUE "UNI-80/8".
+           05  FILLER PIC X(8) VALUE "UNI-80/8".
+           05  FILLER PIC X(8) VALUE "UNI-80/8".
+           05  FILLER PIC X(8) VALUE "UNI-80/8".
+           05  FILLER PIC X(8) VALUE "UNI-80/8".
+           05  FILLER PIC X(8) VALUE "UNI-9040".
+           05  FILLER PIC X(8) VALUE "UNI-9040".
+
+         02  DATA-MACHINE   REDEFINES DATA-MACHINE-TBL
+                                       PIC X(8) OCCURS 16.
+         02  DATA-NO-TERMINALS-TBL.
+
+           05  FILLER PIC 9(3) COMP-3 VALUE 85.
+           05  FILLER PIC 9(3) COMP-3 VALUE 34.
+           05  FILLER PIC 9(3) COMP-3 VALUE 75.
+           05  FILLER PIC 9(3) COMP-3 VALUE 45.
+           05  FILLER PIC 9(3) COMP-3 VALUE 90.
+           05  FILLER PIC 9(3) COMP-3 VALUE 107.
+           05  FILLER PIC 9(3) COMP-3 VALUE 67.
+           05  FILLER PIC 9(3) COMP-3 VALUE 32.
+           05  FILLER PIC 9(3) COMP-3 VALUE 16.
+           05  FILLER PIC 9(3) COMP-3 VALUE 34.
+           05  FILLER PIC 9(3) COMP-3 VALUE 128.
+           05  FILLER PIC 9(3) COMP-3 VALUE 64.
+           05  FILLER PIC 9(3) COMP-3 VALUE 110.
+           05  FILLER PIC 9(3) COMP-3 VALUE 324.
+           05  FILLER PIC 9(3) COMP-3 VALUE 124.
+           05  FILLER PIC 9(3) COMP-3 VALUE 86.
+
+         02  DATA-NO-TERMINALS REDEFINES DATA-NO-TERMINALS-TBL
+                                       PIC 9(3) COMP-3 OCCURS 16.
+
+       01  WORK-AREA.
+           05  REC-NUM                         PICTURE 9(6) VALUE 0.
+           05  REC-MAX                         PICTURE 9(6) VALUE 10.
+           05  SUB                             PICTURE 9(4) COMP SYNC.
+               88  ODD-RECORD                  VALUE 1 3 5 7 9 10 11.
+               88  NULL-KEY                    VALUE 4 5 8 12 14.
+
+           05  TSPFL-KEY                       PICTURE X(8).
+
+       PROCEDURE DIVISION.
+
+       MAINFILE.
+           PERFORM LOADFILE.
+           PERFORM LISTFILE.
+           STOP RUN.
+
+       LOADFILE.
+           DISPLAY "Loading sample data file."
+                            UPON CONSOLE.
+
+           OPEN OUTPUT TSPFILE
+           IF CUST-STAT NOT = "00"
+               DIVIDE STAT-1 BY 256 GIVING BYTE-1 REMAINDER BYTE-2
+               DISPLAY "Error " CUST-STAT " " BYTE-1 " " BYTE-2
+               " opening 'testisam' file"
+                                UPON CONSOLE
+               STOP RUN
+           END-IF.
+
+           PERFORM 1000-LOAD-RECORD
+                        VARYING SUB FROM 1 BY 1
+                          UNTIL SUB > MAX-SUB.
+
+           DISPLAY "Sample data file load complete."
+                            UPON CONSOLE.
+           CLOSE TSPFILE.
+
+      *---------------------------------------------------------------*
+      *         LOAD A RECORD FROM DATA TABLES                        *
+      *---------------------------------------------------------------*
+
+       1000-LOAD-RECORD.
+
+           MOVE SPACES                       TO TSPFL-RECORD.
+           MOVE DATA-CUST-NUM      (SUB)     TO CM-CUST-NUM.
+           MOVE CM-CUST-NUM                  TO TSPFL-KEY.
+           MOVE DATA-COMPANY       (SUB)     TO CM-COMPANY.
+           MOVE DATA-ADDRESS-1     (SUB)     TO CM-ADDRESS-1.
+           MOVE DATA-ADDRESS-2     (SUB)     TO CM-ADDRESS-2.
+           MOVE DATA-ADDRESS-3     (SUB)     TO CM-ADDRESS-3.
+           MOVE DATA-TELEPHONE     (SUB)     TO CM-TELEPHONE.
+           MOVE DATA-DP-MGR        (SUB)     TO CM-DP-MGR.
+           MOVE DATA-MACHINE       (SUB)     TO CM-MACHINE.
+           MOVE DATA-NO-TERMINALS  (SUB)     TO CM-NO-TERMINALS.
+
+           IF  ODD-RECORD
+               MOVE "8417"                   TO CM-DISK
+               MOVE "1600 BPI"               TO CM-TAPE
+               MOVE "1MEG"                   TO CM-MEMORY
+           ELSE
+               MOVE "8470"                   TO CM-DISK
+               MOVE "6250 BPI"               TO CM-TAPE
+               MOVE "3MEG"                   TO CM-MEMORY.
+           IF  NULL-KEY
+               MOVE ALL "*"                  TO CM-DISK
+               MOVE ALL "*"                  TO CM-TAPE.
+
+           WRITE TSPFL-RECORD.
+           IF CUST-STAT NOT = "00"
+           AND CUST-STAT NOT = "02"
+               DISPLAY "Key: " TSPFL-KEY ", Status: " CUST-STAT
+                                 UPON CONSOLE.
+
+       LISTFILE.
+           DISPLAY "LIST SAMPLE FILE" UPON CONSOLE.
+           MOVE ZERO TO REC-NUM
+           OPEN INPUT TSPFILE
+           IF CUST-STAT NOT = "00"
+               DISPLAY "ERROR " CUST-STAT " OPENING INPUT FILE "
+                                             UPON CONSOLE
+               IF CUST-STAT (1:1) = "9"
+                   DISPLAY "Sub Error " STAT-X2 UPON CONSOLE
+               END-IF
+               STOP RUN
+           END-IF.
+           MOVE SPACES                       TO TSPFL-RECORD.
+           START TSPFILE KEY GREATER THAN PRIME-KEY
+           IF CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " starting file"
+                                UPON CONSOLE
+               IF CUST-STAT (1:1) = "9"
+                   DISPLAY "Sub Error " STAT-X2 UPON CONSOLE
+               END-IF
+               STOP RUN
+           END-IF.
+      *>     READ  TSPFILE NEXT RECORD WITH NO LOCK
+           READ  TSPFILE NEXT RECORD
+           IF CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " on 1st read of file"
+                                UPON CONSOLE
+               IF CUST-STAT (1:1) = "9"
+                   DISPLAY "Sub Error " STAT-X2 UPON CONSOLE
+               END-IF
+               STOP RUN
+           END-IF.
+           PERFORM UNTIL CUST-STAT NOT = "00"
+                      OR REC-NUM > REC-MAX
+               DISPLAY "Key: " CM-CUST-NUM " is " CM-COMPANY
+                        " Disk=" CM-DISK ":"
+                         UPON CONSOLE
+               READ TSPFILE NEXT RECORD
+                    AT END
+                        MOVE "99" TO CUST-STAT
+                END-READ
+                ADD 1 TO REC-NUM
+           END-PERFORM
+           IF CUST-STAT = "99"
+               DISPLAY "Hit End of File" UPON CONSOLE
+           END-IF.
+
+           DISPLAY "LIST SAMPLE FILE DESCENDING" UPON CONSOLE.
+           MOVE ZERO TO REC-NUM
+           START TSPFILE KEY LESS THAN PRIME-KEY
+           IF CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " starting file"
+                                UPON CONSOLE
+               STOP RUN
+           END-IF.
+      *>     READ  TSPFILE PREVIOUS RECORD WITH NO LOCK
+           READ  TSPFILE PREVIOUS RECORD
+           IF CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " on 1st read of file"
+                                UPON CONSOLE
+               STOP RUN
+           END-IF.
+           PERFORM UNTIL CUST-STAT NOT = "00"
+                      OR REC-NUM > REC-MAX
+               DISPLAY "Key: " CM-CUST-NUM " is " CM-COMPANY
+                        " Disk=" CM-DISK ":"
+                         UPON CONSOLE
+               READ TSPFILE PREVIOUS RECORD
+                    AT END
+                        MOVE "99" TO CUST-STAT
+                END-READ
+                ADD 1 TO REC-NUM
+           END-PERFORM.
+
+           DISPLAY "LIST SAMPLE FILE BY KEY3" UPON CONSOLE.
+           MOVE ZERO                         TO REC-NUM
+           MOVE SPACES                       TO TSPFL-RECORD.
+           START TSPFILE KEY GREATER THAN OR EQUAL TO SPLIT-KEY3
+           IF  CUST-STAT NOT = "00"
+           AND CUST-STAT NOT = "02"
+               DISPLAY "Error " CUST-STAT " starting file"
+                                UPON CONSOLE
+               STOP RUN
+           END-IF.
+      *>     READ  TSPFILE NEXT RECORD WITH NO LOCK
+           READ  TSPFILE NEXT RECORD
+           IF  CUST-STAT NOT = "00"
+           AND CUST-STAT NOT = "02"
+               DISPLAY "Error " CUST-STAT " on 1st read of file"
+                                UPON CONSOLE
+               STOP RUN
+           END-IF.
+           PERFORM UNTIL (CUST-STAT NOT = "00"
+                      AND CUST-STAT NOT = "02")
+                      OR REC-NUM > REC-MAX
+               DISPLAY "Key: " CM-CUST-NUM " is " CM-COMPANY
+                        " Disk=" CM-DISK ":"
+                         UPON CONSOLE
+               READ TSPFILE NEXT RECORD
+                    AT END
+                        MOVE "99" TO CUST-STAT
+                END-READ
+                ADD 1 TO REC-NUM
+           END-PERFORM.
+      *---- Some results may be different with VB-ISAM  ------*
+           MOVE SPACES                       TO TSPFL-RECORD.
+           MOVE DATA-CUST-NUM      (2)       TO CM-CUST-NUM.
+           READ TSPFILE KEY IS PRIME-KEY
+           IF  CUST-STAT NOT = "23"
+               DISPLAY "Error " CUST-STAT " instead of 23"
+                                UPON CONSOLE
+           END-IF.
+           MOVE DATA-COMPANY       (2)       TO CM-COMPANY.
+           READ TSPFILE KEY IS PRIME-KEY
+           IF  CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " on primary read "
+                                UPON CONSOLE
+           ELSE
+               DISPLAY "Got: " CM-CUST-NUM " is " CM-COMPANY
+                        " Disk=" CM-DISK ":"
+                         UPON CONSOLE
+           END-IF.
+           READ TSPFILE NEXT RECORD
+           IF  CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " on next read "
+                                UPON CONSOLE
+           ELSE
+               DISPLAY "Nxt: " CM-CUST-NUM " is " CM-COMPANY
+                        " Disk=" CM-DISK ":"
+                         UPON CONSOLE
+           END-IF.
+           MOVE DATA-TELEPHONE     (7)       TO CM-TELEPHONE.
+           MOVE DATA-MACHINE       (7)       TO CM-MACHINE.
+           READ TSPFILE KEY IS SPLIT-KEY2
+           IF  CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " instead of 23"
+                                UPON CONSOLE
+           ELSE
+               DISPLAY "Ky2: " CM-CUST-NUM " is " CM-COMPANY
+                        " Mach=" CM-MACHINE ":"
+                         UPON CONSOLE
+           END-IF.
+           CLOSE TSPFILE.
+])
+
+AT_CHECK([$COMPILE_FIXED prog.cob], [0], [], [])
+
+AT_CHECK([./a.out], [0],
+[Loading sample data file.
+Sample data file load complete.
+LIST SAMPLE FILE
+Key: ALP00000 is ALPHA ELECTRICAL CO. LTD. Disk=8417    :
+Key: BET00000 is BETA SHOE MFG. INC.       Disk=8470    :
+Key: DEL00000 is DELTA LUGGAGE REPAIRS     Disk=********:
+Key: EPS00000 is EPSILON EQUIPMENT SUPPLY  Disk=********:
+Key: FOR00000 is FORTUNE COOKIE COMPANY    Disk=8470    :
+Key: GAM00000 is GAMMA X-RAY TECHNOLOGY    Disk=8417    :
+Key: GIB00000 is GIBRALTER LIFE INSURANCE  Disk=8417    :
+Key: H&J00000 is H & J PLUMBING SUPPLIES   Disk=********:
+Key: INC00000 is INCREMENTAL BACKUP CORP.  Disk=8417    :
+Key: JOH00000 is JOHNSON BOATING SUPPLIES  Disk=8417    :
+Key: KON00000 is KONFLAB PLASTIC PRODUCTS. Disk=8417    :
+LIST SAMPLE FILE DESCENDING
+Key: KON00000 is KONFLAB PLASTIC PRODUCTS. Disk=8417    :
+Key: JOH00000 is JOHNSON BOATING SUPPLIES  Disk=8417    :
+Key: INC00000 is INCREMENTAL BACKUP CORP.  Disk=8417    :
+Key: H&J00000 is H & J PLUMBING SUPPLIES   Disk=********:
+Key: GIB00000 is GIBRALTER LIFE INSURANCE  Disk=8417    :
+Key: GAM00000 is GAMMA X-RAY TECHNOLOGY    Disk=8417    :
+Key: FOR00000 is FORTUNE COOKIE COMPANY    Disk=8470    :
+Key: EPS00000 is EPSILON EQUIPMENT SUPPLY  Disk=********:
+Key: DEL00000 is DELTA LUGGAGE REPAIRS     Disk=********:
+Key: BET00000 is BETA SHOE MFG. INC.       Disk=8470    :
+Key: ALP00000 is ALPHA ELECTRICAL CO. LTD. Disk=8417    :
+LIST SAMPLE FILE BY KEY3
+Key: ALP00000 is ALPHA ELECTRICAL CO. LTD. Disk=8417    :
+Key: GAM00000 is GAMMA X-RAY TECHNOLOGY    Disk=8417    :
+Key: GIB00000 is GIBRALTER LIFE INSURANCE  Disk=8417    :
+Key: INC00000 is INCREMENTAL BACKUP CORP.  Disk=8417    :
+Key: JOH00000 is JOHNSON BOATING SUPPLIES  Disk=8417    :
+Key: KON00000 is KONFLAB PLASTIC PRODUCTS. Disk=8417    :
+Key: BET00000 is BETA SHOE MFG. INC.       Disk=8470    :
+Key: FOR00000 is FORTUNE COOKIE COMPANY    Disk=8470    :
+Key: MOR00000 is MORNINGSIDE CARPENTRY.    Disk=8470    :
+Key: OLD00000 is OLD TYME PIZZA MFG. CO.   Disk=8470    :
+Key: PRE00000 is PRESTIGE OFFICE FURNITURE Disk=8470    :
+Got: BET00000 is BETA SHOE MFG. INC.       Disk=8470    :
+Nxt: DEL00000 is DELTA LUGGAGE REPAIRS     Disk=********:
+Ky2: GIB00000 is GIBRALTER LIFE INSURANCE  Mach=UNI-80/6:
+], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([81. SEQUENTIAL file with LOCK MODE EXCLUSIVE])
+AT_KEYWORDS([runfile])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+
+AT_XFAIL_IF([true])
+
+AT_DATA([prog1.cob], [
+       identification division.
+       program-id. prog1.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign disk
+           lock mode is exclusive
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec pic x.
+       working-storage section.
+       1    fs pic xx.
+       1    os-check   pic x(7).
+         88 os-is-windows-or-dos values 'WINDOWS' 'FREEDOS'.
+       78  callee       value "./prog2".
+       78  callee-wdos  value ".\prog2".
+       procedure division.
+           open output file1.
+           close file1.
+           open input file1.
+           accept os-check from environment "OS".
+           if os-check = spaces
+             accept os-check from environment "OS_NAME".
+           inspect os-check converting "werfdosin" to "WERFDOSIN".
+           if os-is-windows-or-dos
+             call "SYSTEM" using callee-wdos
+           else
+             call "SYSTEM" using callee.
+           close file1.
+           stop run.
+])
+AT_DATA([prog2.cob], [
+       identification division.
+       program-id. prog2.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign disk status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec pic x.
+       working-storage section.
+       1    fs pic xx.
+       procedure division.
+           open input file1.
+           if fs not = "61"
+              display "FAILED: " fs
+              close file1
+           end-if.
+           stop run.
+])
+
+AT_CHECK([$COMPILE_FIXED prog1.cob], [0], [], [])
+AT_CHECK([$COMPILE_FIXED prog2.cob], [0], [], [])
+AT_CHECK([./a.out1], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([82. SEQUENTIAL file with OPEN WITH LOCK])
+AT_KEYWORDS([runfile])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# ASSIGN DISK - not ISO
+AT_XFAIL_IF([true])
+
+AT_DATA([prog1.cob], [
+       identification division.
+       program-id. prog1.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign disk status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec pic x.
+       working-storage section.
+       1    fs pic xx.
+       1    os-check   pic x(7).
+         88 os-is-windows-or-dos values 'WINDOWS' 'FREEDOS'.
+       78  callee       value "./prog2".
+       78  callee-wdos  value ".\prog2".
+       procedure division.
+           open output file1.
+           close file1.
+           open input file1 with lock.
+           accept os-check from environment "OS".
+           if os-check = spaces
+             accept os-check from environment "OS_NAME".
+           inspect os-check converting "werfdosin" to "WERFDOSIN".
+           if os-is-windows-or-dos
+             call "SYSTEM" using callee-wdos
+           else
+             call "SYSTEM" using callee.
+           close file1.
+           stop run.
+])
+AT_DATA([prog2.cob], [
+       identification division.
+       program-id. prog2.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign disk status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec pic x.
+       working-storage section.
+       1    fs pic xx.
+       procedure division.
+           open input file1.
+           if fs not = "61"
+              display "FAILED: " fs
+              close file1
+           end-if.
+           stop run.
+])
+
+AT_CHECK([$COMPILE_FIXED prog1.cob], [0], [], [])
+AT_CHECK([$COMPILE_FIXED prog2.cob], [0], [], [])
+AT_CHECK([./a.out1], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([83. SEQUENTIAL file with SHARING NO])
+AT_KEYWORDS([runfile])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# ASSIGN DISK - not ISO
+
+AT_XFAIL_IF([true])
+
+AT_DATA([prog1.cob], [
+       identification division.
+       program-id. prog1.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign disk
+           sharing no
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec pic x.
+       working-storage section.
+       1    fs pic xx.
+       1    os-check   pic x(7).
+         88 os-is-windows-or-dos values 'WINDOWS' 'FREEDOS'.
+       78  callee       value "./prog2".
+       78  callee-wdos  value ".\prog2".
+       procedure division.
+           open output file1.
+           close file1.
+           open input file1.
+           accept os-check from environment "OS".
+           if os-check = spaces
+             accept os-check from environment "OS_NAME".
+           inspect os-check converting "werfdosin" to "WERFDOSIN".
+           if os-is-windows-or-dos
+             call "SYSTEM" using callee-wdos
+           else
+             call "SYSTEM" using callee.
+           close file1.
+           stop run.
+])
+AT_DATA([prog2.cob], [
+       identification division.
+       program-id. prog2.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign disk status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec pic x.
+       working-storage section.
+       1    fs pic xx.
+       procedure division.
+           open input file1.
+           if fs not = "61"
+              display "FAILED: " fs
+              close file1
+           end-if.
+           stop run.
+])
+
+AT_CHECK([$COMPILE_FIXED prog1.cob], [0], [], [])
+AT_CHECK([$COMPILE_FIXED prog2.cob], [0], [], [])
+AT_CHECK([./a.out1], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([84. SEQUENTIAL file with SHARING READ ONLY])
+AT_KEYWORDS([runfile])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# ASSIGN DISK : iso says DISK implementor defined TODO?
+
+AT_DATA([prog1.cob], [
+       identification division.
+       program-id. prog1.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign disk
+           sharing read only
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec pic x.
+       working-storage section.
+       1    fs pic xx.
+       1    os-check   pic x(7).
+         88 os-is-windows-or-dos values 'WINDOWS' 'FREEDOS'.
+       78  callee       value "./prog2".
+       78  callee-wdos  value ".\prog2".
+       procedure division.
+           open output file1.
+           close file1.
+           open input file1.
+           accept os-check from environment "OS".
+           if os-check = spaces
+             accept os-check from environment "OS_NAME".
+           inspect os-check converting "werfdosin" to "WERFDOSIN".
+           if os-is-windows-or-dos
+             call "SYSTEM" using callee-wdos
+           else
+             call "SYSTEM" using callee.
+           close file1.
+           stop run.
+])
+AT_DATA([prog2.cob], [
+       identification division.
+       program-id. prog2.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign disk status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec pic x.
+       working-storage section.
+       1    fs pic xx.
+       procedure division.
+           open i-o file1.
+           if fs not = "61"
+              display "FAILED 1: " fs
+              close file1
+           end-if.
+           open input file1.
+           if fs not = "00"
+              display "FAILED 2: " fs
+           else
+              close file1
+           end-if.
+           stop run.
+])
+
+AT_CHECK([$COMPILE_FIXED prog1.cob], [0], [], [])
+AT_CHECK([$COMPILE_FIXED prog2.cob], [0], [], [])
+AT_CHECK([./a.out1], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([85. SEQUENTIAL file with blocked lock])
+AT_KEYWORDS([runfile])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+
+
+AT_DATA([prog1.cob], [
+       identification division.
+       program-id. prog1.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign disk.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec pic x.
+       working-storage section.
+       1    os-check   pic x(7).
+         88 os-is-windows-or-dos values 'WINDOWS' 'FREEDOS'.
+       78  callee       value "./prog2".
+       78  callee-wdos  value ".\prog2".
+       procedure division.
+           open output file1.
+           close file1.
+           open input file1.
+           accept os-check from environment "OS".
+           if os-check = spaces
+             accept os-check from environment "OS_NAME".
+           inspect os-check converting "werfdosin" to "WERFDOSIN".
+           if os-is-windows-or-dos
+             call "SYSTEM" using callee-wdos
+           else
+             call "SYSTEM" using callee.
+           close file1.
+           stop run.
+])
+AT_DATA([prog2.cob], [
+       identification division.
+       program-id. prog2.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign disk status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec pic x.
+       working-storage section.
+       1    fs pic xx.
+       procedure division.
+           open input file1.
+           if fs not = "00"
+              display "FAILED: " fs
+              stop run
+           end-if.
+           close file1
+           open input file1 with lock.
+           if fs not = "61"
+              display "FAILED: " fs
+              close file1
+           end-if.
+           stop run.
+])
+
+AT_CHECK([$COMPILE_FIXED prog1.cob], [0], [], [])
+AT_CHECK([$COMPILE_FIXED prog2.cob], [0], [], [])
+AT_CHECK([./a.out1], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([91. INDEXED file with LOCK MODE EXCLUSIVE])
+AT_KEYWORDS([runfile])
+
+## TO-DO: Support INDEXED file sharing/locking.
+AT_SKIP_IF([test "$COB_HAS_ISAM" = "no"])
+AT_XFAIL_IF([true])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+
+AT_DATA([prog1.cob], [
+       identification division.
+       program-id. prog1.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           organization indexed
+           record key file1-key
+           lock mode is exclusive
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    fs pic xx.
+       1    os-check   pic x(7).
+         88 os-is-windows-or-dos values 'WINDOWS' 'FREEDOS'.
+       78  callee       value "./prog2".
+       78  callee-wdos  value ".\prog2".
+       procedure division.
+           open output file1.
+           close file1.
+           open input file1.
+           accept os-check from environment "OS".
+           if os-check = spaces
+             accept os-check from environment "OS_NAME".
+           inspect os-check converting "werfdosin" to "WERFDOSIN".
+           if os-is-windows-or-dos
+             call "SYSTEM" using callee-wdos
+           else
+             call "SYSTEM" using callee.
+           close file1.
+           stop run.
+])
+AT_DATA([prog2.cob], [
+       identification division.
+       program-id. prog2.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           organization indexed
+           record key file1-key
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    fs pic xx.
+       procedure division.
+           open input file1.
+           if fs not = "61"
+              display "FAILED: " fs
+              close file1
+           end-if.
+           stop run.
+])
+
+AT_CHECK([$COMPILE_FIXED prog1.cob], [0], [], [])
+AT_CHECK([$COMPILE_FIXED prog2.cob], [0], [], [])
+AT_CHECK([./a.out1], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([91. INDEXED file with LOCK MODE EXCLUSIVE])
+AT_KEYWORDS([runfile])
+
+## TO-DO: Support INDEXED file sharing/locking.
+AT_SKIP_IF([test "$COB_HAS_ISAM" = "no"])
+AT_XFAIL_IF([true])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+
+AT_DATA([prog1.cob], [
+       identification division.
+       program-id. prog1.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           organization indexed
+           record key file1-key
+           lock mode is exclusive
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    fs pic xx.
+       1    os-check   pic x(7).
+         88 os-is-windows-or-dos values 'WINDOWS' 'FREEDOS'.
+       78  callee       value "./prog2".
+       78  callee-wdos  value ".\prog2".
+       procedure division.
+           open output file1.
+           close file1.
+           open input file1.
+           accept os-check from environment "OS".
+           if os-check = spaces
+             accept os-check from environment "OS_NAME".
+           inspect os-check converting "werfdosin" to "WERFDOSIN".
+           if os-is-windows-or-dos
+             call "SYSTEM" using callee-wdos
+           else
+             call "SYSTEM" using callee.
+           close file1.
+           stop run.
+])
+AT_DATA([prog2.cob], [
+       identification division.
+       program-id. prog2.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           organization indexed
+           record key file1-key
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    fs pic xx.
+       procedure division.
+           open input file1.
+           if fs not = "61"
+              display "FAILED: " fs
+              close file1
+           end-if.
+           stop run.
+])
+
+AT_CHECK([$COMPILE_FIXED prog1.cob], [0], [], [])
+AT_CHECK([$COMPILE_FIXED prog2.cob], [0], [], [])
+AT_CHECK([./a.out1], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([92. INDEXED file with OPEN WITH LOCK])
+AT_KEYWORDS([runfile])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+
+## TO-DO: Support INDEXED file sharing/locking.
+AT_SKIP_IF([test "$COB_HAS_ISAM" = "no"])
+AT_XFAIL_IF([true])
+
+AT_DATA([prog1.cob], [
+       identification division.
+       program-id. prog1.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           organization indexed
+           record key file1-key
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    fs pic xx.
+       1    os-check   pic x(7).
+         88 os-is-windows-or-dos values 'WINDOWS' 'FREEDOS'.
+       78  callee       value "./prog2".
+       78  callee-wdos  value ".\prog2".
+       procedure division.
+           open output file1.
+           close file1.
+           open input file1 with lock.
+           accept os-check from environment "OS".
+           if os-check = spaces
+             accept os-check from environment "OS_NAME".
+           inspect os-check converting "werfdosin" to "WERFDOSIN".
+           if os-is-windows-or-dos
+             call "SYSTEM" using callee-wdos
+           else
+             call "SYSTEM" using callee.
+           close file1.
+           stop run.
+])
+AT_DATA([prog2.cob], [
+       identification division.
+       program-id. prog2.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           organization indexed
+           record key file1-key
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    fs pic xx.
+       procedure division.
+           open input file1.
+           if fs not = "61"
+              display "FAILED: " fs
+              close file1
+           end-if.
+           stop run.
+])
+
+AT_CHECK([$COMPILE_FIXED prog1.cob], [0], [], [])
+AT_CHECK([$COMPILE_FIXED prog2.cob], [0], [], [])
+AT_CHECK([./a.out1], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([92. INDEXED file with OPEN WITH LOCK])
+AT_KEYWORDS([runfile])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+
+## TO-DO: Support INDEXED file sharing/locking.
+AT_SKIP_IF([test "$COB_HAS_ISAM" = "no"])
+AT_XFAIL_IF([true])
+
+AT_DATA([prog1.cob], [
+       identification division.
+       program-id. prog1.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           organization indexed
+           record key file1-key
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    fs pic xx.
+       1    os-check   pic x(7).
+         88 os-is-windows-or-dos values 'WINDOWS' 'FREEDOS'.
+       78  callee       value "./prog2".
+       78  callee-wdos  value ".\prog2".
+       procedure division.
+           open output file1.
+           close file1.
+           open input file1 with lock.
+           accept os-check from environment "OS".
+           if os-check = spaces
+             accept os-check from environment "OS_NAME".
+           inspect os-check converting "werfdosin" to "WERFDOSIN".
+           if os-is-windows-or-dos
+             call "SYSTEM" using callee-wdos
+           else
+             call "SYSTEM" using callee.
+           close file1.
+           stop run.
+])
+AT_DATA([prog2.cob], [
+       identification division.
+       program-id. prog2.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           organization indexed
+           record key file1-key
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    fs pic xx.
+       procedure division.
+           open input file1.
+           if fs not = "61"
+              display "FAILED: " fs
+              close file1
+           end-if.
+           stop run.
+])
+
+AT_CHECK([$COMPILE_FIXED prog1.cob], [0], [], [])
+AT_CHECK([$COMPILE_FIXED prog2.cob], [0], [], [])
+AT_CHECK([./a.out1], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([93. INDEXED file with SHARING NO])
+AT_KEYWORDS([runfile])
+
+## TO-DO: Support INDEXED file sharing/locking.
+AT_SKIP_IF([test "$COB_HAS_ISAM" = "no"])
+AT_XFAIL_IF([true])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+
+AT_DATA([prog1.cob], [
+       identification division.
+       program-id. prog1.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           organization indexed
+           record key file1-key
+           sharing no
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    fs pic xx.
+       1    os-check   pic x(7).
+         88 os-is-windows-or-dos values 'WINDOWS' 'FREEDOS'.
+       78  callee       value "./prog2".
+       78  callee-wdos  value ".\prog2".
+       procedure division.
+           open output file1.
+           close file1.
+           open input file1.
+           accept os-check from environment "OS".
+           if os-check = spaces
+             accept os-check from environment "OS_NAME".
+           inspect os-check converting "werfdosin" to "WERFDOSIN".
+           if os-is-windows-or-dos
+             call "SYSTEM" using callee-wdos
+           else
+             call "SYSTEM" using callee.
+           close file1.
+           stop run.
+])
+AT_DATA([prog2.cob], [
+       identification division.
+       program-id. prog2.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           organization indexed
+           record key file1-key
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    fs pic xx.
+       procedure division.
+           open input file1.
+           if fs not = "61"
+              display "FAILED: " fs
+              close file1
+           end-if.
+           stop run.
+])
+
+AT_CHECK([$COMPILE_FIXED prog1.cob], [0], [], [])
+AT_CHECK([$COMPILE_FIXED prog2.cob], [0], [], [])
+AT_CHECK([./a.out1], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([93. INDEXED file with SHARING NO])
+AT_KEYWORDS([runfile])
+
+## TO-DO: Support INDEXED file sharing/locking.
+AT_SKIP_IF([test "$COB_HAS_ISAM" = "no"])
+AT_XFAIL_IF([true])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+
+AT_DATA([prog1.cob], [
+       identification division.
+       program-id. prog1.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           organization indexed
+           record key file1-key
+           sharing no
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    fs pic xx.
+       1    os-check   pic x(7).
+         88 os-is-windows-or-dos values 'WINDOWS' 'FREEDOS'.
+       78  callee       value "./prog2".
+       78  callee-wdos  value ".\prog2".
+       procedure division.
+           open output file1.
+           close file1.
+           open input file1.
+           accept os-check from environment "OS".
+           if os-check = spaces
+             accept os-check from environment "OS_NAME".
+           inspect os-check converting "werfdosin" to "WERFDOSIN".
+           if os-is-windows-or-dos
+             call "SYSTEM" using callee-wdos
+           else
+             call "SYSTEM" using callee.
+           close file1.
+           stop run.
+])
+AT_DATA([prog2.cob], [
+       identification division.
+       program-id. prog2.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           organization indexed
+           record key file1-key
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    fs pic xx.
+       procedure division.
+           open input file1.
+           if fs not = "61"
+              display "FAILED: " fs
+              close file1
+           end-if.
+           stop run.
+])
+
+AT_CHECK([$COMPILE_FIXED prog1.cob], [0], [], [])
+AT_CHECK([$COMPILE_FIXED prog2.cob], [0], [], [])
+AT_CHECK([./a.out1], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([94. INDEXED file with SHARING READ ONLY])
+AT_KEYWORDS([runfile])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+
+## TO-DO: Support INDEXED file sharing/locking.
+AT_SKIP_IF([test "$COB_HAS_ISAM" = "no"])
+AT_XFAIL_IF([true])
+
+AT_DATA([prog1.cob], [
+       identification division.
+       program-id. prog1.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           organization indexed
+           record key file1-key
+           sharing read only
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    fs pic xx.
+       1    os-check   pic x(7).
+         88 os-is-windows-or-dos values 'WINDOWS' 'FREEDOS'.
+       78  callee       value "./prog2".
+       78  callee-wdos  value ".\prog2".
+       procedure division.
+           open output file1.
+           close file1.
+           open input file1.
+           accept os-check from environment "OS".
+           if os-check = spaces
+             accept os-check from environment "OS_NAME".
+           inspect os-check converting "werfdosin" to "WERFDOSIN".
+           if os-is-windows-or-dos
+             call "SYSTEM" using callee-wdos
+           else
+             call "SYSTEM" using callee.
+           close file1.
+           stop run.
+])
+AT_DATA([prog2.cob], [
+       identification division.
+       program-id. prog2.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           organization indexed
+           record key file1-key
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    fs pic xx.
+       procedure division.
+           open i-o file1.
+           if fs not = "61"
+              display "FAILED: " fs
+              close file1
+           end-if.
+           open input file1.
+           if fs not = "00"
+              display "FAILED: " fs
+           else
+              close file1
+           end-if.
+           stop run.
+])
+
+AT_CHECK([$COMPILE_FIXED prog1.cob], [0], [], [])
+AT_CHECK([$COMPILE_FIXED prog2.cob], [0], [], [])
+AT_CHECK([./a.out1], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([94. INDEXED file with SHARING READ ONLY])
+AT_KEYWORDS([runfile])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+
+## TO-DO: Support INDEXED file sharing/locking.
+AT_SKIP_IF([test "$COB_HAS_ISAM" = "no"])
+AT_XFAIL_IF([true])
+
+AT_DATA([prog1.cob], [
+       identification division.
+       program-id. prog1.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           organization indexed
+           record key file1-key
+           sharing read only
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    fs pic xx.
+       1    os-check   pic x(7).
+         88 os-is-windows-or-dos values 'WINDOWS' 'FREEDOS'.
+       78  callee       value "./prog2".
+       78  callee-wdos  value ".\prog2".
+       procedure division.
+           open output file1.
+           close file1.
+           open input file1.
+           accept os-check from environment "OS".
+           if os-check = spaces
+             accept os-check from environment "OS_NAME".
+           inspect os-check converting "werfdosin" to "WERFDOSIN".
+           if os-is-windows-or-dos
+             call "SYSTEM" using callee-wdos
+           else
+             call "SYSTEM" using callee.
+           close file1.
+           stop run.
+])
+AT_DATA([prog2.cob], [
+       identification division.
+       program-id. prog2.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           organization indexed
+           record key file1-key
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    fs pic xx.
+       procedure division.
+           open i-o file1.
+           if fs not = "61"
+              display "FAILED: " fs
+              close file1
+           end-if.
+           open input file1.
+           if fs not = "00"
+              display "FAILED: " fs
+           else
+              close file1
+           end-if.
+           stop run.
+])
+
+AT_CHECK([$COMPILE_FIXED prog1.cob], [0], [], [])
+AT_CHECK([$COMPILE_FIXED prog2.cob], [0], [], [])
+AT_CHECK([./a.out1], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([95. INDEXED file with blocked lock])
+AT_KEYWORDS([runfile])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+
+## TO-DO: Support INDEXED file sharing/locking.
+AT_SKIP_IF([test "$COB_HAS_ISAM" = "no"])
+AT_XFAIL_IF([true])
+
+AT_DATA([prog1.cob], [
+       identification division.
+       program-id. prog1.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           organization indexed
+           record key file1-key.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    os-check   pic x(7).
+         88 os-is-windows-or-dos values 'WINDOWS' 'FREEDOS'.
+       78  callee       value "./prog2".
+       78  callee-wdos  value ".\prog2".
+       procedure division.
+           open output file1.
+           close file1.
+           open input file1.
+           accept os-check from environment "OS".
+           if os-check = spaces
+             accept os-check from environment "OS_NAME".
+           inspect os-check converting "werfdosin" to "WERFDOSIN".
+           if os-is-windows-or-dos
+             call "SYSTEM" using callee-wdos
+           else
+             call "SYSTEM" using callee.
+           close file1.
+           stop run.
+])
+AT_DATA([prog2.cob], [
+       identification division.
+       program-id. prog2.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           organization indexed
+           record key file1-key
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    fs pic xx.
+       procedure division.
+           open input file1.
+           if fs not = "00"
+              display "FAILED: " fs
+              stop run
+           end-if.
+           close file1
+           open input file1 with lock.
+           if fs not = "61"
+              display "FAILED: " fs
+              close file1
+           end-if.
+           stop run.
+])
+
+AT_CHECK([$COMPILE_FIXED prog1.cob], [0], [], [])
+AT_CHECK([$COMPILE_FIXED prog2.cob], [0], [], [])
+AT_CHECK([./a.out1], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([95. INDEXED file with blocked lock])
+AT_KEYWORDS([runfile])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+
+## TO-DO: Support INDEXED file sharing/locking.
+AT_SKIP_IF([test "$COB_HAS_ISAM" = "no"])
+AT_XFAIL_IF([true])
+
+AT_DATA([prog1.cob], [
+       identification division.
+       program-id. prog1.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           organization indexed
+           record key file1-key.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    os-check   pic x(7).
+         88 os-is-windows-or-dos values 'WINDOWS' 'FREEDOS'.
+       78  callee       value "./prog2".
+       78  callee-wdos  value ".\prog2".
+       procedure division.
+           open output file1.
+           close file1.
+           open input file1.
+           accept os-check from environment "OS".
+           if os-check = spaces
+             accept os-check from environment "OS_NAME".
+           inspect os-check converting "werfdosin" to "WERFDOSIN".
+           if os-is-windows-or-dos
+             call "SYSTEM" using callee-wdos
+           else
+             call "SYSTEM" using callee.
+           close file1.
+           stop run.
+])
+AT_DATA([prog2.cob], [
+       identification division.
+       program-id. prog2.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           organization indexed
+           record key file1-key
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    fs pic xx.
+       procedure division.
+           open input file1.
+           if fs not = "00"
+              display "FAILED: " fs
+              stop run
+           end-if.
+           close file1
+           open input file1 with lock.
+           if fs not = "61"
+              display "FAILED: " fs
+              close file1
+           end-if.
+           stop run.
+])
+
+AT_CHECK([$COMPILE_FIXED prog1.cob], [0], [], [])
+AT_CHECK([$COMPILE_FIXED prog2.cob], [0], [], [])
+AT_CHECK([./a.out1], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([96. INDEXED file with LOCK AUTOMATIC (1)])
+AT_KEYWORDS([runfile])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# TODO NOT IMPLEMENTED LOCK
+
+# AT_SKIP_IF([test "$COB_HAS_ISAM" = "no"])
+# TODO NOT IMPLEMENTED LOCK
+# AT_XFAIL_IF([true])
+
+AT_DATA([prog1.cob], [
+       identification division.
+       program-id. prog1.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           access mode is random
+           organization indexed
+           record key file1-key
+           lock mode is automatic
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    fs pic xx.
+       1    os-check   pic x(7).
+         88 os-is-windows-or-dos values 'WINDOWS' 'FREEDOS'.
+       78  callee       value "./prog2".
+       78  callee-wdos  value ".\prog2".
+       procedure division.
+           open output file1.
+           move "X" to file1-key.
+           write file1-rec.
+           if fs not = "00"
+              display "FAILED 1::w fs=" fs.
+           close file1.
+           open i-o file1.
+           move "X" to file1-key.
+           read file1.
+           if fs not = "00"
+              display "FAILED 1::r fs=" fs.
+           accept os-check from environment "OS".
+           if os-check = spaces
+             accept os-check from environment "OS_NAME".
+           inspect os-check converting "werfdosin" to "WERFDOSIN".
+           if os-is-windows-or-dos
+             call "SYSTEM" using callee-wdos
+           else
+             call "SYSTEM" using callee.
+           close file1.
+           stop run.
+])
+AT_DATA([prog2.cob], [
+       identification division.
+       program-id. prog2.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           access mode is random
+           organization indexed
+           record key file1-key
+           lock mode is automatic
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    fs pic xx.
+       procedure division.
+           open i-o file1.
+           move "X" to file1-key.
+           read file1.
+           if fs not = "61"
+              display "FAILED 2::r " fs.
+           close file1
+           stop run.
+])
+
+AT_CHECK([$COMPILE_FIXED prog1.cob], [0], [], [])
+AT_CHECK([$COMPILE_FIXED prog2.cob], [0], [], [])
+AT_CHECK([./a.out1], [0], [], [])
+
+
+AT_CLEANUP
+
+
+AT_SETUP([97. INDEXED file with LOCK AUTOMATIC (2)])
+AT_KEYWORDS([runfile])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# TODO NOT IMPLEMENTED LOCK
+
+# AT_SKIP_IF([test "$COB_HAS_ISAM" = "no"])
+
+AT_DATA([prog1.cob], [
+       identification division.
+       program-id. prog1.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           access mode is random
+           organization indexed
+           record key file1-key
+           lock mode is automatic
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    fs pic xx.
+       1    os-check   pic x(7).
+         88 os-is-windows-or-dos values 'WINDOWS' 'FREEDOS'.
+       78  callee       value "./prog2".
+       78  callee-wdos  value ".\prog2".
+       procedure division.
+           open output file1.
+           move "X" to file1-key.
+           write file1-rec.
+           if fs not = "00"
+              display "FAILED 1::w fs=" fs.
+           close file1.
+           open i-o file1.
+           move "X" to file1-key.
+           read file1.
+           if fs not = "00"
+              display "FAILED 1::r fs=" fs.
+           rewrite file1-rec.
+           if fs not = "00"
+              display "FAILED 1::rw fs=" fs.
+           accept os-check from environment "OS".
+           if os-check = spaces
+             accept os-check from environment "OS_NAME".
+           inspect os-check converting "werfdosin" to "WERFDOSIN".
+           if os-is-windows-or-dos
+             call "SYSTEM" using callee-wdos
+           else
+             call "SYSTEM" using callee.
+           close file1.
+           stop run.
+])
+AT_DATA([prog2.cob], [
+       identification division.
+       program-id. prog2.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           access mode is random
+           organization indexed
+           record key file1-key
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    fs pic xx.
+       procedure division.
+           open input file1.
+           move "X" to file1-key.
+           read file1.
+           if fs not = "00"
+              display "FAILED 2::r " fs
+           end-if.
+           close file1
+           stop run.
+])
+
+AT_CHECK([$COMPILE_FIXED prog1.cob], [0], [], [])
+AT_CHECK([$COMPILE_FIXED prog2.cob], [0], [], [])
+AT_CHECK([./a.out1], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([98. INDEXED file with LOCK MANUAL])
+AT_KEYWORDS([runfile])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# NOT IMPLEMENTED LOCK TODO
+
+AT_DATA([prog1.cob], [
+       identification division.
+       program-id. prog1.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           access mode is random
+           organization indexed
+           record key file1-key
+           lock mode is manual
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    fs pic xx.
+       1    os-check   pic x(7).
+         88 os-is-windows-or-dos values 'WINDOWS' 'FREEDOS'.
+       78  callee       value "./prog2".
+       78  callee-wdos  value ".\prog2".
+       procedure division.
+           open output file1.
+           move "X" to file1-key.
+           write file1-rec.
+           if fs not = "00"
+              display "FAILED 1::w fs=" fs.
+           close file1.
+           open i-o file1.
+           move "X" to file1-key.
+           read file1 with lock.
+           if fs not = "00"
+              display "FAILED 1::r fs=" fs.
+           accept os-check from environment "OS".
+           if os-check = spaces
+             accept os-check from environment "OS_NAME".
+           inspect os-check converting "werfdosin" to "WERFDOSIN".
+           if os-is-windows-or-dos
+             call "SYSTEM" using callee-wdos
+           else
+             call "SYSTEM" using callee.
+           close file1.
+           stop run.
+])
+AT_DATA([prog2.cob], [
+       identification division.
+       program-id. prog2.
+       environment division.
+       input-output section.
+       file-control.
+       select file1 assign "file1"
+           access mode is random
+           organization indexed
+           record key file1-key
+           status is fs.
+       data division.
+       file section.
+       fd file1.
+       1    file1-rec.
+        2   file1-key pic x.
+       working-storage section.
+       1    fs pic xx.
+       procedure division.
+           open i-o file1.
+           move "X" to file1-key.
+           read file1.
+           if fs not = "61"
+              display "FAILED 2::r " fs
+           end-if.
+           close file1
+           stop run.
+])
+
+AT_CHECK([$COMPILE_FIXED prog1.cob], [0], [], [])
+AT_CHECK([$COMPILE_FIXED prog2.cob], [0], [], [])
+AT_CHECK([./a.out1], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([102. READ INPUT pipe & WRITE OUTPUT pipe])
+AT_KEYWORDS([runfile])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+
+# only implemented with 4+
+AT_XFAIL_IF([true])
+
+AT_DATA([test-data-in],
+[NAME
+STREET
+TOWN
+COUNTRY
+])
+
+AT_DATA([provider], [
+cat $1
+])
+
+AT_DATA([consumer], [
+cat
+])
+
+AT_DATA([prog.cob], [
+       identification division.
+       program-id. prog.
+       environment division.
+       configuration section.
+       input-output section.
+       file-control.
+           select pipe-in
+               organization line sequential
+               access sequential
+               assign to w-command
+               status is f-status.
+           select pipe-out
+               organization line sequential
+               access sequential
+               assign to w-command
+               status is f-status.
+       data division.
+       file section.
+       fd  pipe-in.
+       1   pipe-msg-in pic x(132).
+       fd  pipe-out.
+       1   pipe-msg-out pic x(132).
+       working-storage section.
+       77  f-status pic xx.
+           88  f-status-ok value "00".
+       77  w-command pic x(100).
+       procedure division.
+           move "< sh ./provider ./test-data-in"
+             to w-command.
+           open input pipe-in.
+           if not f-status-ok
+              display "FAILED: OPEN INPUT"
+              stop run
+           end-if.
+           move "> sh ./consumer > ./test-data-out"
+             to w-command.
+           open output pipe-out.
+           if not f-status-ok
+              display "FAILED: OPEN OUTPUT"
+              stop run
+           end-if.
+           perform until not f-status-ok
+              read pipe-in
+              if f-status-ok
+                 perform x01-100-map
+                 write pipe-msg-out
+              end-if
+           end-perform.
+           close pipe-in.
+           close pipe-out.
+           stop run.
+      *
+       x01-100-map.
+           move "*** Jacques Tati ***" to pipe-msg-out.
+           if (pipe-msg-in = "COUNTRY")
+              move "Country: FRANCE" to pipe-msg-out.
+           if (pipe-msg-in = "TOWN")
+              move "Town: DEAUVILLE" to pipe-msg-out.
+           if (pipe-msg-in = "NAME")
+              move "Name: M. Hulot" to pipe-msg-out.
+           if (pipe-msg-in = "STREET")
+              move "Street: Rue des Anglais" to pipe-msg-out.
+])
+
+AT_CHECK([$COMPILE_FIXED prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [], [])
+AT_CHECK([cat test-data-out], [0],
+[Name: M. Hulot
+Street: Rue des Anglais
+Town: DEAUVILLE
+Country: FRANCE
+])
+
+AT_CLEANUP
+
+
+AT_SETUP([103. EXTFH: using ISAM callback])
+AT_KEYWORDS([runfile EXTFH])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# GNU -f
+
+AT_SKIP_IF([test "$COB_HAS_ISAM" = "no"])
+AT_SKIP_IF(false)
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT OPTIONAL TSPFILE
+           ASSIGN TO "testisam"
+           ORGANIZATION INDEXED ACCESS DYNAMIC
+           RECORD KEY IS CM-CUST-NUM
+           ALTERNATE RECORD KEY IS CM-TELEPHONE WITH DUPLICATES
+           ALTERNATE RECORD KEY IS CM-DISK WITH DUPLICATES
+           FILE STATUS IS CUST-STAT .
+
+           SELECT TSTFILE
+           ASSIGN TO "testisam"
+           ORGANIZATION INDEXED ACCESS DYNAMIC
+           RECORD KEY IS TS-CUST-NUM
+           ALTERNATE RECORD KEY IS TS-TELEPHONE WITH DUPLICATES
+           ALTERNATE RECORD KEY IS TS-DISK WITH DUPLICATES
+           FILE STATUS IS CUST-STAT .
+
+           SELECT FLATFILE ASSIGN EXTERNAL RELFIX
+           ORGANIZATION RELATIVE
+           ACCESS IS RANDOM RELATIVE KEY IS REC-NUM
+           FILE STATUS IS CUST-STAT.
+
+       DATA  DIVISION.
+       FILE SECTION.
+       FD  TSPFILE
+           BLOCK CONTAINS 5 RECORDS.
+
+       01  TSPFL-RECORD.
+           05  TSPFL-REC.
+           10  CM-CUST-NUM.
+             15  CM-CUST-PRE                   PICTURE X(3).
+             15  CM-CUST-NNN                   PICTURE X(5).
+           10  CM-STATUS                       PICTURE X.
+           10  CM-COMPANY                      PICTURE X(25).
+           10  CM-ADDRESS-1                    PICTURE X(25).
+           10  CM-ADDRESS-2                    PICTURE X(25).
+           10  CM-ADDRESS-3                    PICTURE X(25).
+           10  CM-TELEPHONE                    PICTURE 9(10).
+           10  CM-DP-MGR                       PICTURE X(25).
+           10  CM-MACHINE                      PICTURE X(8).
+           10  CM-MEMORY                       PICTURE X(4).
+           10  CM-DISK                         PICTURE X(8).
+           10  CM-TAPE                         PICTURE X(8).
+           10  CM-NO-TERMINALS                 PICTURE 9(5).
+
+       FD  TSTFILE
+           BLOCK CONTAINS 5 RECORDS.
+
+       01  TSTFL-RECORD.
+           05  TSTFL-REC.
+           10  TS-CUST-NUM                     PICTURE X(8).
+           10  TS-STATUS                       PICTURE X.
+           10  TS-COMPANY                      PICTURE X(25).
+           10  TS-ADDRESS-1                    PICTURE X(25).
+           10  TS-ADDRESS-2                    PICTURE X(25).
+           10  TS-ADDRESS-3                    PICTURE X(25).
+           10  TS-TELEPHONE                    PICTURE 9(10).
+           10  TS-DP-MGR                       PICTURE X(25).
+           10  TS-MACHINE                      PICTURE X(8).
+           10  TS-MEMORY                       PICTURE X(4).
+           10  TS-DISK                         PICTURE X(8).
+           10  TS-TAPE                         PICTURE X(8).
+
+       FD  FLATFILE
+           BLOCK CONTAINS 5 RECORDS.
+
+       01  TSP2-RECORD.
+           10  C2-CUST-NUM                     PICTURE X(8).
+           10  C2-COMPANY                      PICTURE X(25).
+           10  C2-DISK                         PICTURE X(8).
+           10  C2-NO-TERMINALS                 PICTURE 9(4) COMP-4.
+           10  C2-PK-DATE                      PICTURE S9(14) COMP-3.
+
+       WORKING-STORAGE SECTION.
+
+       01  CUST-STAT.
+           05  FILLER PICTURE XX.
+       77  MAX-SUB           VALUE  16         PICTURE 9(5) COMP SYNC.
+
+       01  TEST-DATA.
+
+         02  DATA-CUST-NUM-TBL.
+
+           05  FILLER PIC X(8) VALUE "ALP00000".
+           05  FILLER PIC X(8) VALUE "BET00000".
+           05  FILLER PIC X(8) VALUE "GAM00000".
+           05  FILLER PIC X(8) VALUE "DEL00000".
+           05  FILLER PIC X(8) VALUE "EPS00000".
+           05  FILLER PIC X(8) VALUE "FOR00000".
+           05  FILLER PIC X(8) VALUE "GIB00000".
+           05  FILLER PIC X(8) VALUE "H&J00000".
+           05  FILLER PIC X(8) VALUE "INC00000".
+           05  FILLER PIC X(8) VALUE "JOH00000".
+           05  FILLER PIC X(8) VALUE "KON00000".
+           05  FILLER PIC X(8) VALUE "LEW00000".
+           05  FILLER PIC X(8) VALUE "MOR00000".
+           05  FILLER PIC X(8) VALUE "NEW00000".
+           05  FILLER PIC X(8) VALUE "OLD00000".
+           05  FILLER PIC X(8) VALUE "PRE00000".
+
+         02  DATA-CUST-NUM REDEFINES DATA-CUST-NUM-TBL
+                                       PIC X(8) OCCURS 16.
+         02  DATA-COMPANY-TBL.
+
+           05  FILLER PIC X(25) VALUE "ALPHA ELECTRICAL CO. LTD.".
+           05  FILLER PIC X(25) VALUE "BETA SHOE MFG. INC.      ".
+           05  FILLER PIC X(25) VALUE "GAMMA X-RAY TECHNOLOGY   ".
+           05  FILLER PIC X(25) VALUE "DELTA LUGGAGE REPAIRS    ".
+           05  FILLER PIC X(25) VALUE "EPSILON EQUIPMENT SUPPLY ".
+           05  FILLER PIC X(25) VALUE "FORTUNE COOKIE COMPANY   ".
+           05  FILLER PIC X(25) VALUE "GIBRALTER LIFE INSURANCE ".
+           05  FILLER PIC X(25) VALUE "H & J PLUMBING SUPPLIES  ".
+           05  FILLER PIC X(25) VALUE "INCREMENTAL BACKUP CORP. ".
+           05  FILLER PIC X(25) VALUE "JOHNSON BOATING SUPPLIES ".
+           05  FILLER PIC X(25) VALUE "KONFLAB PLASTIC PRODUCTS.".
+           05  FILLER PIC X(25) VALUE "LEWISTON GRAPHICS LTD.   ".
+           05  FILLER PIC X(25) VALUE "MORNINGSIDE CARPENTRY.   ".
+           05  FILLER PIC X(25) VALUE "NEW WAVE SURF SHOPS INC. ".
+           05  FILLER PIC X(25) VALUE "OLD TYME PIZZA MFG. CO.  ".
+           05  FILLER PIC X(25) VALUE "PRESTIGE OFFICE FURNITURE".
+
+         02  DATA-COMPANY  REDEFINES DATA-COMPANY-TBL
+                                       PIC X(25) OCCURS 16.
+         02  DATA-ADDRESS-1-TBL.
+
+           05  FILLER PIC X(25) VALUE "123 MAIN STREET          ".
+           05  FILLER PIC X(25) VALUE "1090 2ND AVE. WEST       ".
+           05  FILLER PIC X(25) VALUE "1401 JEFFERSON BLVD.     ".
+           05  FILLER PIC X(25) VALUE "1620 ARIZONA WAY         ".
+           05  FILLER PIC X(25) VALUE "1184 EAST FIRST STREET   ".
+           05  FILLER PIC X(25) VALUE "114 JOHN F. KENNEDY AVE. ".
+           05  FILLER PIC X(25) VALUE "650 LIBERTY CRESCENT     ".
+           05  FILLER PIC X(25) VALUE "77 SUNSET BLVD.          ".
+           05  FILLER PIC X(25) VALUE "10908 SANTA MONICA BLVD. ".
+           05  FILLER PIC X(25) VALUE "1134 PARIS ROAD          ".
+           05  FILLER PIC X(25) VALUE "808 NORTHWEST MAIN ST.   ".
+           05  FILLER PIC X(25) VALUE "9904 QUEEN STREET        ".
+           05  FILLER PIC X(25) VALUE "1709 DUNDAS CRESCENT W.  ".
+           05  FILLER PIC X(25) VALUE "3240 MARIS AVENUE        ".
+           05  FILLER PIC X(25) VALUE "1705 WISCONSIN ROAD      ".
+           05  FILLER PIC X(25) VALUE "114A MAPLE GROVE         ".
+
+         02  DATA-ADDRESS-1 REDEFINES DATA-ADDRESS-1-TBL
+                                       PIC X(25) OCCURS 16.
+         02  DATA-ADDRESS-2-TBL.
+
+           05  FILLER PIC X(10) VALUE "NEW YORK  ".
+           05  FILLER PIC X(10) VALUE "ATLANTA   ".
+           05  FILLER PIC X(10) VALUE "WASHINGTON".
+           05  FILLER PIC X(10) VALUE "TORONTO   ".
+           05  FILLER PIC X(10) VALUE "CALGARY   ".
+           05  FILLER PIC X(10) VALUE "SAN DIEGO ".
+           05  FILLER PIC X(10) VALUE "LOS RIOS  ".
+           05  FILLER PIC X(10) VALUE "MADISON   ".
+           05  FILLER PIC X(10) VALUE "WILBUR    ".
+           05  FILLER PIC X(10) VALUE "TOPEKA    ".
+           05  FILLER PIC X(10) VALUE "SEATTLE   ".
+           05  FILLER PIC X(10) VALUE "NEW JERSEY".
+           05  FILLER PIC X(10) VALUE "FORT WAYNE".
+           05  FILLER PIC X(10) VALUE "COLUMBUS  ".
+           05  FILLER PIC X(10) VALUE "RICHMOND  ".
+           05  FILLER PIC X(10) VALUE "WHITEPLAIN".
+
+         02  DATA-ADDRESS-2 REDEFINES DATA-ADDRESS-2-TBL
+                                       PIC X(10) OCCURS 16.
+         02  DATA-ADDRESS-3-TBL.
+
+           05  FILLER PIC X(10) VALUE "N.Y.      ".
+           05  FILLER PIC X(10) VALUE "GEORGIA   ".
+           05  FILLER PIC X(10) VALUE "D.C.      ".
+           05  FILLER PIC X(10) VALUE "CANADA    ".
+           05  FILLER PIC X(10) VALUE "CANADA    ".
+           05  FILLER PIC X(10) VALUE "CALIFORNIA".
+           05  FILLER PIC X(10) VALUE "NEW MEXICO".
+           05  FILLER PIC X(10) VALUE "WISCONSIN ".
+           05  FILLER PIC X(10) VALUE "DELAWARE  ".
+           05  FILLER PIC X(10) VALUE "KANSAS    ".
+           05  FILLER PIC X(10) VALUE "WASHINGTON".
+           05  FILLER PIC X(10) VALUE "N.J.      ".
+           05  FILLER PIC X(10) VALUE "COLORADO  ".
+           05  FILLER PIC X(10) VALUE "OHIO      ".
+           05  FILLER PIC X(10) VALUE "VIRGINIA  ".
+           05  FILLER PIC X(10) VALUE "N.Y.      ".
+
+         02  DATA-ADDRESS-3 REDEFINES DATA-ADDRESS-3-TBL
+                                       PIC X(10) OCCURS 16.
+         02  DATA-TELEPHONE-TBL.
+
+           05  FILLER PIC 9(10) VALUE 3131234432.
+           05  FILLER PIC 9(10) VALUE 4082938498.
+           05  FILLER PIC 9(10) VALUE 8372487274.
+           05  FILLER PIC 9(10) VALUE 4169898509.
+           05  FILLER PIC 9(10) VALUE 5292398745.
+           05  FILLER PIC 9(10) VALUE 8009329492.
+           05  FILLER PIC 9(10) VALUE 6456445643.
+           05  FILLER PIC 9(10) VALUE 6546456333.
+           05  FILLER PIC 9(10) VALUE 3455445444.
+           05  FILLER PIC 9(10) VALUE 6456445643.
+           05  FILLER PIC 9(10) VALUE 7456434355.
+           05  FILLER PIC 9(10) VALUE 6554456433.
+           05  FILLER PIC 9(10) VALUE 4169898509.
+           05  FILLER PIC 9(10) VALUE 7534587453.
+           05  FILLER PIC 9(10) VALUE 8787458374.
+           05  FILLER PIC 9(10) VALUE 4169898509.
+
+         02  DATA-TELEPHONE REDEFINES DATA-TELEPHONE-TBL
+                                       PIC 9(10) OCCURS 16.
+         02  DATA-DP-MGR-TBL.
+
+           05  FILLER PIC X(20) VALUE "MR. DAVE HARRIS     ".
+           05  FILLER PIC X(20) VALUE "MS. JANICE SILCOX   ".
+           05  FILLER PIC X(20) VALUE "MR. ALLAN JONES     ".
+           05  FILLER PIC X(20) VALUE "MR. PETER MACKAY    ".
+           05  FILLER PIC X(20) VALUE "MRS. DONNA BREWER   ".
+           05  FILLER PIC X(20) VALUE "MR. MICHAEL SMYTHE  ".
+           05  FILLER PIC X(20) VALUE "MR. D.A. MORRISON   ".
+           05  FILLER PIC X(20) VALUE "MR. BRIAN PATTERSON ".
+           05  FILLER PIC X(20) VALUE "MR. DARRYL TOWNSEND ".
+           05  FILLER PIC X(20) VALUE "MS. VALERIE HARPER  ".
+           05  FILLER PIC X(20) VALUE "MR. FRED MILLER     ".
+           05  FILLER PIC X(20) VALUE "MR. DONALD FISCHER  ".
+           05  FILLER PIC X(20) VALUE "MR. STEVEN YOURDIN  ".
+           05  FILLER PIC X(20) VALUE "MS. Goldie Hawn     ".
+           05  FILLER PIC X(20) VALUE "MS. ALICE WINSTON   ".
+           05  FILLER PIC X(20) VALUE "MR. THOMAS JEFFERSON".
+
+         02  DATA-DP-MGR    REDEFINES DATA-DP-MGR-TBL
+                                       PIC X(20) OCCURS 16.
+         02  DATA-MACHINE-TBL.
+
+           05  FILLER PIC X(8) VALUE "UNI-9030".
+           05  FILLER PIC X(8) VALUE "UNI-9040".
+           05  FILLER PIC X(8) VALUE "UNI-80/3".
+           05  FILLER PIC X(8) VALUE "UNI-80/5".
+           05  FILLER PIC X(8) VALUE "UNI-80/6".
+           05  FILLER PIC X(8) VALUE "UNI-80/6".
+           05  FILLER PIC X(8) VALUE "UNI-80/6".
+           05  FILLER PIC X(8) VALUE "UNI-80/8".
+           05  FILLER PIC X(8) VALUE "UNI-80/8".
+           05  FILLER PIC X(8) VALUE "UNI-80/8".
+           05  FILLER PIC X(8) VALUE "UNI-80/8".
+           05  FILLER PIC X(8) VALUE "UNI-80/8".
+           05  FILLER PIC X(8) VALUE "UNI-80/8".
+           05  FILLER PIC X(8) VALUE "UNI-80/8".
+           05  FILLER PIC X(8) VALUE "UNI-9040".
+           05  FILLER PIC X(8) VALUE "UNI-9040".
+
+         02  DATA-MACHINE   REDEFINES DATA-MACHINE-TBL
+                                       PIC X(8) OCCURS 16.
+         02  DATA-NO-TERMINALS-TBL.
+
+           05  FILLER PIC 9(3) COMP-3 VALUE 85.
+           05  FILLER PIC 9(3) COMP-3 VALUE 34.
+           05  FILLER PIC 9(3) COMP-3 VALUE 75.
+           05  FILLER PIC 9(3) COMP-3 VALUE 45.
+           05  FILLER PIC 9(3) COMP-3 VALUE 90.
+           05  FILLER PIC 9(3) COMP-3 VALUE 107.
+           05  FILLER PIC 9(3) COMP-3 VALUE 67.
+           05  FILLER PIC 9(3) COMP-3 VALUE 32.
+           05  FILLER PIC 9(3) COMP-3 VALUE 16.
+           05  FILLER PIC 9(3) COMP-3 VALUE 34.
+           05  FILLER PIC 9(3) COMP-3 VALUE 128.
+           05  FILLER PIC 9(3) COMP-3 VALUE 64.
+           05  FILLER PIC 9(3) COMP-3 VALUE 110.
+           05  FILLER PIC 9(3) COMP-3 VALUE 324.
+           05  FILLER PIC 9(3) COMP-3 VALUE 124.
+           05  FILLER PIC 9(3) COMP-3 VALUE 86.
+
+         02  DATA-NO-TERMINALS REDEFINES DATA-NO-TERMINALS-TBL
+                                       PIC 9(3) COMP-3 OCCURS 16.
+
+       01  WORK-AREA.
+           05  REC-NUM                         PICTURE 9(6) VALUE 0.
+           05  REC-MAX                         PICTURE 9(6) VALUE 10.
+           05  SUB                             PICTURE 9(4) COMP SYNC.
+               88  ODD-RECORD                  VALUE 1 3 5 7 9 10 11.
+
+           05  TSPFL-KEY                       PICTURE X(8).
+
+       PROCEDURE DIVISION.
+
+       MAINFILE.
+           OPEN OUTPUT TSPFILE
+           CLOSE TSPFILE.
+
+           OPEN I-O TSPFILE
+           MOVE '99' TO CUST-STAT
+           READ  TSPFILE NEXT RECORD WITH NO LOCK
+           IF CUST-STAT NOT = "10"
+               DISPLAY "Error " CUST-STAT " on read of empty file"
+                                UPON CONSOLE
+               STOP RUN
+           END-IF.
+           MOVE LOW-VALUES                     TO TSPFL-RECORD.
+           START TSPFILE KEY GREATER THAN CM-CUST-NUM
+           IF CUST-STAT NOT = "23"
+               DISPLAY "Error " CUST-STAT " starting empty file"
+                                UPON CONSOLE
+               STOP RUN
+           END-IF.
+           READ  TSPFILE NEXT RECORD WITH NO LOCK
+           IF CUST-STAT NOT = "46"
+               DISPLAY "Error " CUST-STAT " start/read of empty file"
+                                UPON CONSOLE
+               STOP RUN
+           END-IF.
+           DISPLAY "OK: Operations on empty file"
+           CLOSE TSPFILE.
+
+           PERFORM LOADFILE.
+           PERFORM LISTFILE.
+           OPEN INPUT TSTFILE
+           IF CUST-STAT NOT = "00"
+               DISPLAY "Expected ERROR " CUST-STAT
+                       " opening TSTFILE, Record size different"
+                       UPON CONSOLE
+           ELSE
+               DISPLAY "Un-Expected open TSTFILE, Record size different"
+                       UPON CONSOLE
+               CLOSE TSTFILE
+           END-IF.
+           PERFORM LOADFLAT.
+           STOP RUN.
+
+       LOADFILE.
+           DISPLAY "Loading sample data file."
+                            UPON CONSOLE.
+
+           OPEN OUTPUT TSPFILE
+           IF CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT
+               " opening 'testisam' file" UPON CONSOLE
+               STOP RUN
+           END-IF.
+
+           PERFORM 1000-LOAD-RECORD
+                        VARYING SUB FROM 1 BY 1
+                          UNTIL SUB > MAX-SUB.
+
+           DISPLAY "Sample data file load complete."
+                            UPON CONSOLE.
+           CLOSE TSPFILE.
+
+      *---------------------------------------------------------------*
+      *         LOAD A RECORD FROM DATA TABLES                        *
+      *---------------------------------------------------------------*
+
+       1000-LOAD-RECORD.
+
+           MOVE SPACES                       TO TSPFL-RECORD.
+           MOVE DATA-CUST-NUM      (SUB)     TO CM-CUST-NUM.
+           MOVE CM-CUST-NUM                  TO TSPFL-KEY.
+           MOVE DATA-COMPANY       (SUB)     TO CM-COMPANY.
+           MOVE DATA-ADDRESS-1     (SUB)     TO CM-ADDRESS-1.
+           MOVE DATA-ADDRESS-2     (SUB)     TO CM-ADDRESS-2.
+           MOVE DATA-ADDRESS-3     (SUB)     TO CM-ADDRESS-3.
+           MOVE DATA-TELEPHONE     (SUB)     TO CM-TELEPHONE.
+           MOVE DATA-DP-MGR        (SUB)     TO CM-DP-MGR.
+           MOVE DATA-MACHINE       (SUB)     TO CM-MACHINE.
+           MOVE DATA-NO-TERMINALS  (SUB)     TO CM-NO-TERMINALS.
+
+           IF  ODD-RECORD
+               MOVE "8417"                   TO CM-DISK
+               MOVE "1600 BPI"               TO CM-TAPE
+               MOVE "1MEG"                   TO CM-MEMORY
+           ELSE
+               MOVE "8470"                   TO CM-DISK
+               MOVE "6250 BPI"               TO CM-TAPE
+               MOVE "3MEG"                   TO CM-MEMORY.
+
+           WRITE TSPFL-RECORD.
+           IF CUST-STAT NOT = "00"
+           AND CUST-STAT NOT = "02"
+               DISPLAY "Load - Key: " TSPFL-KEY ", Status: " CUST-STAT
+                                 UPON CONSOLE.
+
+       LISTFILE.
+           DISPLAY "LIST SAMPLE FILE" UPON CONSOLE.
+           OPEN INPUT TSTFILE
+           MOVE SPACES                       TO TSTFL-RECORD.
+           MOVE "PRE00000" TO CM-CUST-NUM.
+           START TSTFILE KEY GREATER THAN OR EQUAL TO TS-CUST-NUM
+           READ  TSTFILE NEXT RECORD
+           READ  TSTFILE NEXT RECORD
+           CLOSE TSTFILE.
+
+           MOVE ZERO TO REC-NUM
+           OPEN INPUT TSPFILE
+           IF CUST-STAT NOT = "00"
+               DISPLAY "ERROR " CUST-STAT " OPENING INPUT FILE"
+                                             UPON CONSOLE
+               STOP RUN
+           END-IF.
+           MOVE SPACES                       TO TSPFL-RECORD.
+           MOVE "PRE00000" TO CM-CUST-NUM.
+           START TSPFILE KEY GREATER THAN OR EQUAL TO CM-CUST-NUM
+           READ  TSPFILE NEXT RECORD
+           READ  TSPFILE NEXT RECORD
+
+           MOVE SPACES                       TO TSPFL-RECORD.
+           MOVE "DEL00000" TO CM-CUST-NUM.
+           START TSPFILE KEY GREATER THAN CM-CUST-NUM
+           IF CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " starting file"
+                                UPON CONSOLE
+               STOP RUN
+           END-IF.
+           READ  TSPFILE NEXT RECORD WITH NO LOCK
+           IF CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " on 1st read of file"
+                                UPON CONSOLE
+               STOP RUN
+           END-IF.
+           PERFORM UNTIL CUST-STAT NOT = "00"
+                      OR REC-NUM > REC-MAX
+               DISPLAY "Key: " CM-CUST-NUM " is " CM-COMPANY
+                        " Disk=" CM-DISK "."
+                         UPON CONSOLE
+               READ TSPFILE NEXT RECORD
+                    AT END
+                        MOVE "99" TO CUST-STAT
+                END-READ
+                ADD 1 TO REC-NUM
+           END-PERFORM
+           IF CUST-STAT = "99"
+               DISPLAY "Hit End of File" UPON CONSOLE
+           END-IF.
+
+           DISPLAY "LIST SAMPLE FILE DESCENDING" UPON CONSOLE.
+           MOVE ZERO TO REC-NUM
+           START TSPFILE KEY LESS THAN CM-CUST-NUM
+           IF CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " starting file"
+                                UPON CONSOLE
+               STOP RUN
+           END-IF.
+           READ  TSPFILE PREVIOUS RECORD WITH NO LOCK
+           IF CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " on 1st read of file"
+                                UPON CONSOLE
+               STOP RUN
+           END-IF.
+           PERFORM UNTIL CUST-STAT NOT = "00"
+                      OR REC-NUM > REC-MAX
+               DISPLAY "Key: " CM-CUST-NUM " is " CM-COMPANY
+                        " Disk=" CM-DISK "."
+                         UPON CONSOLE
+               READ TSPFILE PREVIOUS RECORD
+                    AT END
+                        MOVE "99" TO CUST-STAT
+                END-READ
+                ADD 1 TO REC-NUM
+           END-PERFORM.
+
+           CLOSE TSPFILE.
+
+           OPEN I-O TSPFILE.
+           MOVE SPACES                       TO TSPFL-RECORD.
+           MOVE DATA-CUST-NUM      (2)       TO CM-CUST-NUM.
+           MOVE 'X'                          TO CM-CUST-NUM (5:1).
+           READ TSPFILE KEY IS CM-CUST-NUM
+           IF  CUST-STAT NOT = "23"
+               DISPLAY "Error " CUST-STAT " instead of 23."
+                                UPON CONSOLE
+           END-IF.
+           MOVE DATA-CUST-NUM      (2)       TO CM-CUST-NUM.
+           MOVE DATA-COMPANY       (2)       TO CM-COMPANY.
+           READ TSPFILE KEY IS CM-CUST-NUM
+           IF  CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " on primary read ."
+                                UPON CONSOLE
+           ELSE
+               DISPLAY "Got: " CM-CUST-NUM " is " CM-COMPANY
+                        " Disk=" CM-DISK "."
+                         UPON CONSOLE
+           END-IF.
+           READ TSPFILE NEXT RECORD
+           IF  CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " on next read"
+                                UPON CONSOLE
+           ELSE
+               DISPLAY "Nxt: " CM-CUST-NUM " is " CM-COMPANY
+                        " Disk=" CM-DISK "."
+                         UPON CONSOLE
+           END-IF.
+           MOVE DATA-TELEPHONE     (7)       TO CM-TELEPHONE.
+           MOVE DATA-MACHINE       (7)       TO CM-MACHINE.
+           READ TSPFILE KEY IS CM-TELEPHONE
+           IF  CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " instead of 23"
+                                UPON CONSOLE
+           ELSE
+               DISPLAY "Ky2: " CM-CUST-NUM " is " CM-COMPANY
+                        " Mach=" CM-MACHINE "."
+                         UPON CONSOLE
+           END-IF.
+           WRITE TSPFL-RECORD
+           IF  CUST-STAT NOT = "22"
+               DISPLAY "Error " CUST-STAT " instead of 22"
+                                UPON CONSOLE
+           ELSE
+               DISPLAY "  Write: " CM-CUST-NUM " got 22 as expected"
+                         UPON CONSOLE
+           END-IF.
+           MOVE DATA-CUST-NUM      (3)       TO CM-CUST-NUM.
+           MOVE DATA-COMPANY       (3)       TO CM-COMPANY.
+           READ TSPFILE KEY IS CM-CUST-NUM
+           DISPLAY "   Read: " CM-CUST-NUM " got "
+                         CUST-STAT " as expected "
+                         CM-NO-TERMINALS " terminals"
+                         UPON CONSOLE.
+           ADD 5 TO CM-NO-TERMINALS
+           REWRITE TSPFL-RECORD
+           IF  CUST-STAT NOT = "02"
+           AND CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " instead of 02"
+                                UPON CONSOLE
+           ELSE
+               DISPLAY "ReWrite: " CM-CUST-NUM " got "
+                         "00/02 as expected "
+                         CM-NO-TERMINALS " terminals"
+                         UPON CONSOLE
+           END-IF.
+           MOVE DATA-CUST-NUM      (2)       TO CM-CUST-NUM.
+           MOVE DATA-COMPANY       (2)       TO CM-COMPANY.
+           READ TSPFILE KEY IS CM-CUST-NUM
+           DISPLAY "   Read: " CM-CUST-NUM " got "
+                         CUST-STAT " as expected "
+                         CM-NO-TERMINALS " terminals"
+                         UPON CONSOLE.
+           MOVE DATA-CUST-NUM      (3)       TO CM-CUST-NUM.
+           MOVE DATA-COMPANY       (3)       TO CM-COMPANY.
+           REWRITE TSPFL-RECORD
+           IF  CUST-STAT NOT = "02"
+           AND CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " instead of 02"
+                                UPON CONSOLE
+           ELSE
+               DISPLAY "ReWrite: " CM-CUST-NUM " got "
+                       "00/02 as expected"
+                         UPON CONSOLE
+           END-IF.
+           MOVE DATA-CUST-NUM      (6)       TO CM-CUST-NUM.
+           MOVE DATA-COMPANY       (6)       TO CM-COMPANY.
+           READ TSPFILE KEY IS CM-CUST-NUM
+           MOVE DATA-TELEPHONE     (7)       TO CM-TELEPHONE.
+           MOVE DATA-MACHINE       (7)       TO CM-MACHINE.
+           REWRITE TSPFL-RECORD
+           IF  CUST-STAT NOT = "02"
+           AND CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " instead of 02"
+                                UPON CONSOLE
+           ELSE
+               DISPLAY "ReWrite: " CM-CUST-NUM " got "
+                        "00/02 as expected"
+                         UPON CONSOLE
+           END-IF.
+           DELETE TSPFILE.
+           CLOSE TSPFILE.
+
+       LOADFLAT.
+           OPEN OUTPUT FLATFILE.
+           PERFORM FLAT-RECORD
+                        VARYING SUB FROM 1 BY 1
+                          UNTIL SUB > MAX-SUB
+                             OR SUB > 5.
+           CLOSE FLATFILE.
+           OPEN INPUT FLATFILE.
+           MOVE 3 TO REC-NUM
+           READ FLATFILE
+           MOVE 999 TO REC-NUM
+           READ FLATFILE
+           CLOSE FLATFILE.
+
+       FLAT-RECORD.
+
+           MOVE SPACES                       TO TSP2-RECORD.
+           MOVE SUB                          TO REC-NUM.
+           MOVE DATA-CUST-NUM      (SUB)     TO C2-CUST-NUM.
+           MOVE DATA-COMPANY       (SUB)     TO C2-COMPANY.
+           MOVE DATA-NO-TERMINALS  (SUB)     TO C2-NO-TERMINALS.
+           MOVE 20070319                     TO C2-PK-DATE.
+           IF  ODD-RECORD
+               MOVE "8417"                   TO C2-DISK
+           ELSE
+               MOVE "8470"                   TO C2-DISK.
+           WRITE TSP2-RECORD.
+])
+
+AT_DATA([cmod.c], [[
+#include <stdio.h>
+
+
+static char *txtOpCode(int opCode);
+
+/*********************************************************
+ *  TSTFH - External File Handler entry point.
+*********************************************************/
+
+COB_EXT_EXPORT int
+TSTFH (unsigned char *opCodep, FCD3 *fcd)
+{
+   unsigned int   opCode;
+
+   if (*opCodep == 0xfa)
+      opCode = 0xfa00 + opCodep[1];
+   else
+      opCode = opCodep[1];
+
+   if (fcd->fileOrg == ORG_LINE_SEQ
+    || fcd->fileOrg == ORG_SEQ
+    || fcd->fileOrg == ORG_INDEXED
+    || fcd->fileOrg == ORG_RELATIVE) {
+      switch (opCode) {
+      case OP_OPEN_OUTPUT:
+      case OP_OPEN_IO:
+      case OP_OPEN_EXTEND:
+      case OP_OPEN_OUTPUT_NOREWIND:
+         return EXTFH(opCodep, fcd);
+         break;
+
+      case OP_OPEN_INPUT:
+      case OP_OPEN_INPUT_NOREWIND:
+      case OP_OPEN_INPUT_REVERSED:
+         return EXTFH(opCodep, fcd);
+         break;
+
+      default:
+         break;
+      }
+
+   }
+
+   if (opCode == OP_CLOSE
+    && (fcd->openMode & OPEN_NOT_OPEN) ) {
+      return 0;
+   }
+
+   return EXTFH(opCodep, fcd);
+}
+]])
+
+AT_CHECK([$COMPILE_FIXED -fcallfh=TSTFH prog.cob cmod.c], [0], [], [])
+
+AT_CHECK([./a.out], [0],
+[OK: Operations on empty file
+Loading sample data file.
+Sample data file load complete.
+LIST SAMPLE FILE
+Key: EPS00000 is EPSILON EQUIPMENT SUPPLY  Disk=8417    .
+Key: FOR00000 is FORTUNE COOKIE COMPANY    Disk=8470    .
+Key: GAM00000 is GAMMA X-RAY TECHNOLOGY    Disk=8417    .
+Key: GIB00000 is GIBRALTER LIFE INSURANCE  Disk=8417    .
+Key: H&J00000 is H & J PLUMBING SUPPLIES   Disk=8470    .
+Key: INC00000 is INCREMENTAL BACKUP CORP.  Disk=8417    .
+Key: JOH00000 is JOHNSON BOATING SUPPLIES  Disk=8417    .
+Key: KON00000 is KONFLAB PLASTIC PRODUCTS. Disk=8417    .
+Key: LEW00000 is LEWISTON GRAPHICS LTD.    Disk=8470    .
+Key: MOR00000 is MORNINGSIDE CARPENTRY.    Disk=8470    .
+Key: NEW00000 is NEW WAVE SURF SHOPS INC.  Disk=8470    .
+LIST SAMPLE FILE DESCENDING
+Key: NEW00000 is NEW WAVE SURF SHOPS INC.  Disk=8470    .
+Key: MOR00000 is MORNINGSIDE CARPENTRY.    Disk=8470    .
+Key: LEW00000 is LEWISTON GRAPHICS LTD.    Disk=8470    .
+Key: KON00000 is KONFLAB PLASTIC PRODUCTS. Disk=8417    .
+Key: JOH00000 is JOHNSON BOATING SUPPLIES  Disk=8417    .
+Key: INC00000 is INCREMENTAL BACKUP CORP.  Disk=8417    .
+Key: H&J00000 is H & J PLUMBING SUPPLIES   Disk=8470    .
+Key: GIB00000 is GIBRALTER LIFE INSURANCE  Disk=8417    .
+Key: GAM00000 is GAMMA X-RAY TECHNOLOGY    Disk=8417    .
+Key: FOR00000 is FORTUNE COOKIE COMPANY    Disk=8470    .
+Key: EPS00000 is EPSILON EQUIPMENT SUPPLY  Disk=8417    .
+Got: BET00000 is BETA SHOE MFG. INC.       Disk=8470    .
+Nxt: DEL00000 is DELTA LUGGAGE REPAIRS     Disk=8470    .
+Ky2: GIB00000 is GIBRALTER LIFE INSURANCE  Mach=UNI-80/6.
+  Write: GIB00000 got 22 as expected
+   Read: GAM00000 got 00 as expected 00075 terminals
+ReWrite: GAM00000 got 00/02 as expected 00080 terminals
+   Read: BET00000 got 00 as expected 00034 terminals
+ReWrite: GAM00000 got 00/02 as expected
+ReWrite: FOR00000 got 00/02 as expected
+Expected ERROR 39 opening TSTFILE, Record size different
+], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([103. EXTFH: using ISAM callback])
+AT_KEYWORDS([runfile EXTFH])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# GNU -f
+
+AT_SKIP_IF([test "$COB_HAS_ISAM" = "no"])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT OPTIONAL TSPFILE
+           ASSIGN TO "testisam"
+           ORGANIZATION INDEXED ACCESS DYNAMIC
+           RECORD KEY IS CM-CUST-NUM
+           ALTERNATE RECORD KEY IS CM-TELEPHONE WITH DUPLICATES
+           ALTERNATE RECORD KEY IS CM-DISK WITH DUPLICATES
+           FILE STATUS IS CUST-STAT .
+
+           SELECT TSTFILE
+           ASSIGN TO "testisam"
+           ORGANIZATION INDEXED ACCESS DYNAMIC
+           RECORD KEY IS TS-CUST-NUM
+           ALTERNATE RECORD KEY IS TS-TELEPHONE WITH DUPLICATES
+           ALTERNATE RECORD KEY IS TS-DISK WITH DUPLICATES
+           FILE STATUS IS CUST-STAT .
+
+           SELECT FLATFILE ASSIGN EXTERNAL RELFIX
+           ORGANIZATION RELATIVE
+           ACCESS IS RANDOM RELATIVE KEY IS REC-NUM
+           FILE STATUS IS CUST-STAT.
+
+       DATA  DIVISION.
+       FILE SECTION.
+       FD  TSPFILE
+           BLOCK CONTAINS 5 RECORDS.
+
+       01  TSPFL-RECORD.
+           05  TSPFL-REC.
+           10  CM-CUST-NUM.
+             15  CM-CUST-PRE                   PICTURE X(3).
+             15  CM-CUST-NNN                   PICTURE X(5).
+           10  CM-STATUS                       PICTURE X.
+           10  CM-COMPANY                      PICTURE X(25).
+           10  CM-ADDRESS-1                    PICTURE X(25).
+           10  CM-ADDRESS-2                    PICTURE X(25).
+           10  CM-ADDRESS-3                    PICTURE X(25).
+           10  CM-TELEPHONE                    PICTURE 9(10).
+           10  CM-DP-MGR                       PICTURE X(25).
+           10  CM-MACHINE                      PICTURE X(8).
+           10  CM-MEMORY                       PICTURE X(4).
+           10  CM-DISK                         PICTURE X(8).
+           10  CM-TAPE                         PICTURE X(8).
+           10  CM-NO-TERMINALS                 PICTURE 9(5).
+
+       FD  TSTFILE
+           BLOCK CONTAINS 5 RECORDS.
+
+       01  TSTFL-RECORD.
+           05  TSTFL-REC.
+           10  TS-CUST-NUM                     PICTURE X(8).
+           10  TS-STATUS                       PICTURE X.
+           10  TS-COMPANY                      PICTURE X(25).
+           10  TS-ADDRESS-1                    PICTURE X(25).
+           10  TS-ADDRESS-2                    PICTURE X(25).
+           10  TS-ADDRESS-3                    PICTURE X(25).
+           10  TS-TELEPHONE                    PICTURE 9(10).
+           10  TS-DP-MGR                       PICTURE X(25).
+           10  TS-MACHINE                      PICTURE X(8).
+           10  TS-MEMORY                       PICTURE X(4).
+           10  TS-DISK                         PICTURE X(8).
+           10  TS-TAPE                         PICTURE X(8).
+
+       FD  FLATFILE
+           BLOCK CONTAINS 5 RECORDS.
+
+       01  TSP2-RECORD.
+           10  C2-CUST-NUM                     PICTURE X(8).
+           10  C2-COMPANY                      PICTURE X(25).
+           10  C2-DISK                         PICTURE X(8).
+           10  C2-NO-TERMINALS                 PICTURE 9(4) COMP-4.
+           10  C2-PK-DATE                      PICTURE S9(14) COMP-3.
+
+       WORKING-STORAGE SECTION.
+
+       01  CUST-STAT.
+           05  FILLER PICTURE XX.
+       77  MAX-SUB           VALUE  16         PICTURE 9(5) COMP SYNC.
+
+       01  TEST-DATA.
+
+         02  DATA-CUST-NUM-TBL.
+
+           05  FILLER PIC X(8) VALUE "ALP00000".
+           05  FILLER PIC X(8) VALUE "BET00000".
+           05  FILLER PIC X(8) VALUE "GAM00000".
+           05  FILLER PIC X(8) VALUE "DEL00000".
+           05  FILLER PIC X(8) VALUE "EPS00000".
+           05  FILLER PIC X(8) VALUE "FOR00000".
+           05  FILLER PIC X(8) VALUE "GIB00000".
+           05  FILLER PIC X(8) VALUE "H&J00000".
+           05  FILLER PIC X(8) VALUE "INC00000".
+           05  FILLER PIC X(8) VALUE "JOH00000".
+           05  FILLER PIC X(8) VALUE "KON00000".
+           05  FILLER PIC X(8) VALUE "LEW00000".
+           05  FILLER PIC X(8) VALUE "MOR00000".
+           05  FILLER PIC X(8) VALUE "NEW00000".
+           05  FILLER PIC X(8) VALUE "OLD00000".
+           05  FILLER PIC X(8) VALUE "PRE00000".
+
+         02  DATA-CUST-NUM REDEFINES DATA-CUST-NUM-TBL
+                                       PIC X(8) OCCURS 16.
+         02  DATA-COMPANY-TBL.
+
+           05  FILLER PIC X(25) VALUE "ALPHA ELECTRICAL CO. LTD.".
+           05  FILLER PIC X(25) VALUE "BETA SHOE MFG. INC.      ".
+           05  FILLER PIC X(25) VALUE "GAMMA X-RAY TECHNOLOGY   ".
+           05  FILLER PIC X(25) VALUE "DELTA LUGGAGE REPAIRS    ".
+           05  FILLER PIC X(25) VALUE "EPSILON EQUIPMENT SUPPLY ".
+           05  FILLER PIC X(25) VALUE "FORTUNE COOKIE COMPANY   ".
+           05  FILLER PIC X(25) VALUE "GIBRALTER LIFE INSURANCE ".
+           05  FILLER PIC X(25) VALUE "H & J PLUMBING SUPPLIES  ".
+           05  FILLER PIC X(25) VALUE "INCREMENTAL BACKUP CORP. ".
+           05  FILLER PIC X(25) VALUE "JOHNSON BOATING SUPPLIES ".
+           05  FILLER PIC X(25) VALUE "KONFLAB PLASTIC PRODUCTS.".
+           05  FILLER PIC X(25) VALUE "LEWISTON GRAPHICS LTD.   ".
+           05  FILLER PIC X(25) VALUE "MORNINGSIDE CARPENTRY.   ".
+           05  FILLER PIC X(25) VALUE "NEW WAVE SURF SHOPS INC. ".
+           05  FILLER PIC X(25) VALUE "OLD TYME PIZZA MFG. CO.  ".
+           05  FILLER PIC X(25) VALUE "PRESTIGE OFFICE FURNITURE".
+
+         02  DATA-COMPANY  REDEFINES DATA-COMPANY-TBL
+                                       PIC X(25) OCCURS 16.
+         02  DATA-ADDRESS-1-TBL.
+
+           05  FILLER PIC X(25) VALUE "123 MAIN STREET          ".
+           05  FILLER PIC X(25) VALUE "1090 2ND AVE. WEST       ".
+           05  FILLER PIC X(25) VALUE "1401 JEFFERSON BLVD.     ".
+           05  FILLER PIC X(25) VALUE "1620 ARIZONA WAY         ".
+           05  FILLER PIC X(25) VALUE "1184 EAST FIRST STREET   ".
+           05  FILLER PIC X(25) VALUE "114 JOHN F. KENNEDY AVE. ".
+           05  FILLER PIC X(25) VALUE "650 LIBERTY CRESCENT     ".
+           05  FILLER PIC X(25) VALUE "77 SUNSET BLVD.          ".
+           05  FILLER PIC X(25) VALUE "10908 SANTA MONICA BLVD. ".
+           05  FILLER PIC X(25) VALUE "1134 PARIS ROAD          ".
+           05  FILLER PIC X(25) VALUE "808 NORTHWEST MAIN ST.   ".
+           05  FILLER PIC X(25) VALUE "9904 QUEEN STREET        ".
+           05  FILLER PIC X(25) VALUE "1709 DUNDAS CRESCENT W.  ".
+           05  FILLER PIC X(25) VALUE "3240 MARIS AVENUE        ".
+           05  FILLER PIC X(25) VALUE "1705 WISCONSIN ROAD      ".
+           05  FILLER PIC X(25) VALUE "114A MAPLE GROVE         ".
+
+         02  DATA-ADDRESS-1 REDEFINES DATA-ADDRESS-1-TBL
+                                       PIC X(25) OCCURS 16.
+         02  DATA-ADDRESS-2-TBL.
+
+           05  FILLER PIC X(10) VALUE "NEW YORK  ".
+           05  FILLER PIC X(10) VALUE "ATLANTA   ".
+           05  FILLER PIC X(10) VALUE "WASHINGTON".
+           05  FILLER PIC X(10) VALUE "TORONTO   ".
+           05  FILLER PIC X(10) VALUE "CALGARY   ".
+           05  FILLER PIC X(10) VALUE "SAN DIEGO ".
+           05  FILLER PIC X(10) VALUE "LOS RIOS  ".
+           05  FILLER PIC X(10) VALUE "MADISON   ".
+           05  FILLER PIC X(10) VALUE "WILBUR    ".
+           05  FILLER PIC X(10) VALUE "TOPEKA    ".
+           05  FILLER PIC X(10) VALUE "SEATTLE   ".
+           05  FILLER PIC X(10) VALUE "NEW JERSEY".
+           05  FILLER PIC X(10) VALUE "FORT WAYNE".
+           05  FILLER PIC X(10) VALUE "COLUMBUS  ".
+           05  FILLER PIC X(10) VALUE "RICHMOND  ".
+           05  FILLER PIC X(10) VALUE "WHITEPLAIN".
+
+         02  DATA-ADDRESS-2 REDEFINES DATA-ADDRESS-2-TBL
+                                       PIC X(10) OCCURS 16.
+         02  DATA-ADDRESS-3-TBL.
+
+           05  FILLER PIC X(10) VALUE "N.Y.      ".
+           05  FILLER PIC X(10) VALUE "GEORGIA   ".
+           05  FILLER PIC X(10) VALUE "D.C.      ".
+           05  FILLER PIC X(10) VALUE "CANADA    ".
+           05  FILLER PIC X(10) VALUE "CANADA    ".
+           05  FILLER PIC X(10) VALUE "CALIFORNIA".
+           05  FILLER PIC X(10) VALUE "NEW MEXICO".
+           05  FILLER PIC X(10) VALUE "WISCONSIN ".
+           05  FILLER PIC X(10) VALUE "DELAWARE  ".
+           05  FILLER PIC X(10) VALUE "KANSAS    ".
+           05  FILLER PIC X(10) VALUE "WASHINGTON".
+           05  FILLER PIC X(10) VALUE "N.J.      ".
+           05  FILLER PIC X(10) VALUE "COLORADO  ".
+           05  FILLER PIC X(10) VALUE "OHIO      ".
+           05  FILLER PIC X(10) VALUE "VIRGINIA  ".
+           05  FILLER PIC X(10) VALUE "N.Y.      ".
+
+         02  DATA-ADDRESS-3 REDEFINES DATA-ADDRESS-3-TBL
+                                       PIC X(10) OCCURS 16.
+         02  DATA-TELEPHONE-TBL.
+
+           05  FILLER PIC 9(10) VALUE 3131234432.
+           05  FILLER PIC 9(10) VALUE 4082938498.
+           05  FILLER PIC 9(10) VALUE 8372487274.
+           05  FILLER PIC 9(10) VALUE 4169898509.
+           05  FILLER PIC 9(10) VALUE 5292398745.
+           05  FILLER PIC 9(10) VALUE 8009329492.
+           05  FILLER PIC 9(10) VALUE 6456445643.
+           05  FILLER PIC 9(10) VALUE 6546456333.
+           05  FILLER PIC 9(10) VALUE 3455445444.
+           05  FILLER PIC 9(10) VALUE 6456445643.
+           05  FILLER PIC 9(10) VALUE 7456434355.
+           05  FILLER PIC 9(10) VALUE 6554456433.
+           05  FILLER PIC 9(10) VALUE 4169898509.
+           05  FILLER PIC 9(10) VALUE 7534587453.
+           05  FILLER PIC 9(10) VALUE 8787458374.
+           05  FILLER PIC 9(10) VALUE 4169898509.
+
+         02  DATA-TELEPHONE REDEFINES DATA-TELEPHONE-TBL
+                                       PIC 9(10) OCCURS 16.
+         02  DATA-DP-MGR-TBL.
+
+           05  FILLER PIC X(20) VALUE "MR. DAVE HARRIS     ".
+           05  FILLER PIC X(20) VALUE "MS. JANICE SILCOX   ".
+           05  FILLER PIC X(20) VALUE "MR. ALLAN JONES     ".
+           05  FILLER PIC X(20) VALUE "MR. PETER MACKAY    ".
+           05  FILLER PIC X(20) VALUE "MRS. DONNA BREWER   ".
+           05  FILLER PIC X(20) VALUE "MR. MICHAEL SMYTHE  ".
+           05  FILLER PIC X(20) VALUE "MR. D.A. MORRISON   ".
+           05  FILLER PIC X(20) VALUE "MR. BRIAN PATTERSON ".
+           05  FILLER PIC X(20) VALUE "MR. DARRYL TOWNSEND ".
+           05  FILLER PIC X(20) VALUE "MS. VALERIE HARPER  ".
+           05  FILLER PIC X(20) VALUE "MR. FRED MILLER     ".
+           05  FILLER PIC X(20) VALUE "MR. DONALD FISCHER  ".
+           05  FILLER PIC X(20) VALUE "MR. STEVEN YOURDIN  ".
+           05  FILLER PIC X(20) VALUE "MS. Goldie Hawn     ".
+           05  FILLER PIC X(20) VALUE "MS. ALICE WINSTON   ".
+           05  FILLER PIC X(20) VALUE "MR. THOMAS JEFFERSON".
+
+         02  DATA-DP-MGR    REDEFINES DATA-DP-MGR-TBL
+                                       PIC X(20) OCCURS 16.
+         02  DATA-MACHINE-TBL.
+
+           05  FILLER PIC X(8) VALUE "UNI-9030".
+           05  FILLER PIC X(8) VALUE "UNI-9040".
+           05  FILLER PIC X(8) VALUE "UNI-80/3".
+           05  FILLER PIC X(8) VALUE "UNI-80/5".
+           05  FILLER PIC X(8) VALUE "UNI-80/6".
+           05  FILLER PIC X(8) VALUE "UNI-80/6".
+           05  FILLER PIC X(8) VALUE "UNI-80/6".
+           05  FILLER PIC X(8) VALUE "UNI-80/8".
+           05  FILLER PIC X(8) VALUE "UNI-80/8".
+           05  FILLER PIC X(8) VALUE "UNI-80/8".
+           05  FILLER PIC X(8) VALUE "UNI-80/8".
+           05  FILLER PIC X(8) VALUE "UNI-80/8".
+           05  FILLER PIC X(8) VALUE "UNI-80/8".
+           05  FILLER PIC X(8) VALUE "UNI-80/8".
+           05  FILLER PIC X(8) VALUE "UNI-9040".
+           05  FILLER PIC X(8) VALUE "UNI-9040".
+
+         02  DATA-MACHINE   REDEFINES DATA-MACHINE-TBL
+                                       PIC X(8) OCCURS 16.
+         02  DATA-NO-TERMINALS-TBL.
+
+           05  FILLER PIC 9(3) COMP-3 VALUE 85.
+           05  FILLER PIC 9(3) COMP-3 VALUE 34.
+           05  FILLER PIC 9(3) COMP-3 VALUE 75.
+           05  FILLER PIC 9(3) COMP-3 VALUE 45.
+           05  FILLER PIC 9(3) COMP-3 VALUE 90.
+           05  FILLER PIC 9(3) COMP-3 VALUE 107.
+           05  FILLER PIC 9(3) COMP-3 VALUE 67.
+           05  FILLER PIC 9(3) COMP-3 VALUE 32.
+           05  FILLER PIC 9(3) COMP-3 VALUE 16.
+           05  FILLER PIC 9(3) COMP-3 VALUE 34.
+           05  FILLER PIC 9(3) COMP-3 VALUE 128.
+           05  FILLER PIC 9(3) COMP-3 VALUE 64.
+           05  FILLER PIC 9(3) COMP-3 VALUE 110.
+           05  FILLER PIC 9(3) COMP-3 VALUE 324.
+           05  FILLER PIC 9(3) COMP-3 VALUE 124.
+           05  FILLER PIC 9(3) COMP-3 VALUE 86.
+
+         02  DATA-NO-TERMINALS REDEFINES DATA-NO-TERMINALS-TBL
+                                       PIC 9(3) COMP-3 OCCURS 16.
+
+       01  WORK-AREA.
+           05  REC-NUM                         PICTURE 9(6) VALUE 0.
+           05  REC-MAX                         PICTURE 9(6) VALUE 10.
+           05  SUB                             PICTURE 9(4) COMP SYNC.
+               88  ODD-RECORD                  VALUE 1 3 5 7 9 10 11.
+
+           05  TSPFL-KEY                       PICTURE X(8).
+
+       PROCEDURE DIVISION.
+
+       MAINFILE.
+           OPEN OUTPUT TSPFILE
+           CLOSE TSPFILE.
+
+           OPEN I-O TSPFILE
+           MOVE '99' TO CUST-STAT
+           READ  TSPFILE NEXT RECORD WITH NO LOCK
+           IF CUST-STAT NOT = "10"
+               DISPLAY "Error " CUST-STAT " on read of empty file"
+                                UPON CONSOLE
+               STOP RUN
+           END-IF.
+           MOVE LOW-VALUES                     TO TSPFL-RECORD.
+           START TSPFILE KEY GREATER THAN CM-CUST-NUM
+           IF CUST-STAT NOT = "23"
+               DISPLAY "Error " CUST-STAT " starting empty file"
+                                UPON CONSOLE
+               STOP RUN
+           END-IF.
+           READ  TSPFILE NEXT RECORD WITH NO LOCK
+           IF CUST-STAT NOT = "46"
+               DISPLAY "Error " CUST-STAT " start/read of empty file"
+                                UPON CONSOLE
+               STOP RUN
+           END-IF.
+           DISPLAY "OK: Operations on empty file"
+           CLOSE TSPFILE.
+
+           PERFORM LOADFILE.
+           PERFORM LISTFILE.
+           OPEN INPUT TSTFILE
+           IF CUST-STAT NOT = "00"
+               DISPLAY "Expected ERROR " CUST-STAT
+                       " opening TSTFILE, Record size different"
+                       UPON CONSOLE
+           ELSE
+               DISPLAY "Un-Expected open TSTFILE, Record size different"
+                       UPON CONSOLE
+               CLOSE TSTFILE
+           END-IF.
+           PERFORM LOADFLAT.
+           STOP RUN.
+
+       LOADFILE.
+           DISPLAY "Loading sample data file."
+                            UPON CONSOLE.
+
+           OPEN OUTPUT TSPFILE
+           IF CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT
+               " opening 'testisam' file" UPON CONSOLE
+               STOP RUN
+           END-IF.
+
+           PERFORM 1000-LOAD-RECORD
+                        VARYING SUB FROM 1 BY 1
+                          UNTIL SUB > MAX-SUB.
+
+           DISPLAY "Sample data file load complete."
+                            UPON CONSOLE.
+           CLOSE TSPFILE.
+
+      *---------------------------------------------------------------*
+      *         LOAD A RECORD FROM DATA TABLES                        *
+      *---------------------------------------------------------------*
+
+       1000-LOAD-RECORD.
+
+           MOVE SPACES                       TO TSPFL-RECORD.
+           MOVE DATA-CUST-NUM      (SUB)     TO CM-CUST-NUM.
+           MOVE CM-CUST-NUM                  TO TSPFL-KEY.
+           MOVE DATA-COMPANY       (SUB)     TO CM-COMPANY.
+           MOVE DATA-ADDRESS-1     (SUB)     TO CM-ADDRESS-1.
+           MOVE DATA-ADDRESS-2     (SUB)     TO CM-ADDRESS-2.
+           MOVE DATA-ADDRESS-3     (SUB)     TO CM-ADDRESS-3.
+           MOVE DATA-TELEPHONE     (SUB)     TO CM-TELEPHONE.
+           MOVE DATA-DP-MGR        (SUB)     TO CM-DP-MGR.
+           MOVE DATA-MACHINE       (SUB)     TO CM-MACHINE.
+           MOVE DATA-NO-TERMINALS  (SUB)     TO CM-NO-TERMINALS.
+
+           IF  ODD-RECORD
+               MOVE "8417"                   TO CM-DISK
+               MOVE "1600 BPI"               TO CM-TAPE
+               MOVE "1MEG"                   TO CM-MEMORY
+           ELSE
+               MOVE "8470"                   TO CM-DISK
+               MOVE "6250 BPI"               TO CM-TAPE
+               MOVE "3MEG"                   TO CM-MEMORY.
+
+           WRITE TSPFL-RECORD.
+           IF CUST-STAT NOT = "00"
+           AND CUST-STAT NOT = "02"
+               DISPLAY "Load - Key: " TSPFL-KEY ", Status: " CUST-STAT
+                                 UPON CONSOLE.
+
+       LISTFILE.
+           DISPLAY "LIST SAMPLE FILE" UPON CONSOLE.
+           OPEN INPUT TSTFILE
+           MOVE SPACES                       TO TSTFL-RECORD.
+           MOVE "PRE00000" TO CM-CUST-NUM.
+           START TSTFILE KEY GREATER THAN OR EQUAL TO TS-CUST-NUM
+           READ  TSTFILE NEXT RECORD
+           READ  TSTFILE NEXT RECORD
+           CLOSE TSTFILE.
+
+           MOVE ZERO TO REC-NUM
+           OPEN INPUT TSPFILE
+           IF CUST-STAT NOT = "00"
+               DISPLAY "ERROR " CUST-STAT " OPENING INPUT FILE"
+                                             UPON CONSOLE
+               STOP RUN
+           END-IF.
+           MOVE SPACES                       TO TSPFL-RECORD.
+           MOVE "PRE00000" TO CM-CUST-NUM.
+           START TSPFILE KEY GREATER THAN OR EQUAL TO CM-CUST-NUM
+           READ  TSPFILE NEXT RECORD
+           READ  TSPFILE NEXT RECORD
+
+           MOVE SPACES                       TO TSPFL-RECORD.
+           MOVE "DEL00000" TO CM-CUST-NUM.
+           START TSPFILE KEY GREATER THAN CM-CUST-NUM
+           IF CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " starting file"
+                                UPON CONSOLE
+               STOP RUN
+           END-IF.
+           READ  TSPFILE NEXT RECORD WITH NO LOCK
+           IF CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " on 1st read of file"
+                                UPON CONSOLE
+               STOP RUN
+           END-IF.
+           PERFORM UNTIL CUST-STAT NOT = "00"
+                      OR REC-NUM > REC-MAX
+               DISPLAY "Key: " CM-CUST-NUM " is " CM-COMPANY
+                        " Disk=" CM-DISK "."
+                         UPON CONSOLE
+               READ TSPFILE NEXT RECORD
+                    AT END
+                        MOVE "99" TO CUST-STAT
+                END-READ
+                ADD 1 TO REC-NUM
+           END-PERFORM
+           IF CUST-STAT = "99"
+               DISPLAY "Hit End of File" UPON CONSOLE
+           END-IF.
+
+           DISPLAY "LIST SAMPLE FILE DESCENDING" UPON CONSOLE.
+           MOVE ZERO TO REC-NUM
+           START TSPFILE KEY LESS THAN CM-CUST-NUM
+           IF CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " starting file"
+                                UPON CONSOLE
+               STOP RUN
+           END-IF.
+           READ  TSPFILE PREVIOUS RECORD WITH NO LOCK
+           IF CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " on 1st read of file"
+                                UPON CONSOLE
+               STOP RUN
+           END-IF.
+           PERFORM UNTIL CUST-STAT NOT = "00"
+                      OR REC-NUM > REC-MAX
+               DISPLAY "Key: " CM-CUST-NUM " is " CM-COMPANY
+                        " Disk=" CM-DISK "."
+                         UPON CONSOLE
+               READ TSPFILE PREVIOUS RECORD
+                    AT END
+                        MOVE "99" TO CUST-STAT
+                END-READ
+                ADD 1 TO REC-NUM
+           END-PERFORM.
+
+           CLOSE TSPFILE.
+
+           OPEN I-O TSPFILE.
+           MOVE SPACES                       TO TSPFL-RECORD.
+           MOVE DATA-CUST-NUM      (2)       TO CM-CUST-NUM.
+           MOVE 'X'                          TO CM-CUST-NUM (5:1).
+           READ TSPFILE KEY IS CM-CUST-NUM
+           IF  CUST-STAT NOT = "23"
+               DISPLAY "Error " CUST-STAT " instead of 23."
+                                UPON CONSOLE
+           END-IF.
+           MOVE DATA-CUST-NUM      (2)       TO CM-CUST-NUM.
+           MOVE DATA-COMPANY       (2)       TO CM-COMPANY.
+           READ TSPFILE KEY IS CM-CUST-NUM
+           IF  CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " on primary read ."
+                                UPON CONSOLE
+           ELSE
+               DISPLAY "Got: " CM-CUST-NUM " is " CM-COMPANY
+                        " Disk=" CM-DISK "."
+                         UPON CONSOLE
+           END-IF.
+           READ TSPFILE NEXT RECORD
+           IF  CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " on next read"
+                                UPON CONSOLE
+           ELSE
+               DISPLAY "Nxt: " CM-CUST-NUM " is " CM-COMPANY
+                        " Disk=" CM-DISK "."
+                         UPON CONSOLE
+           END-IF.
+           MOVE DATA-TELEPHONE     (7)       TO CM-TELEPHONE.
+           MOVE DATA-MACHINE       (7)       TO CM-MACHINE.
+           READ TSPFILE KEY IS CM-TELEPHONE
+           IF  CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " instead of 23"
+                                UPON CONSOLE
+           ELSE
+               DISPLAY "Ky2: " CM-CUST-NUM " is " CM-COMPANY
+                        " Mach=" CM-MACHINE "."
+                         UPON CONSOLE
+           END-IF.
+           WRITE TSPFL-RECORD
+           IF  CUST-STAT NOT = "22"
+               DISPLAY "Error " CUST-STAT " instead of 22"
+                                UPON CONSOLE
+           ELSE
+               DISPLAY "  Write: " CM-CUST-NUM " got 22 as expected"
+                         UPON CONSOLE
+           END-IF.
+           MOVE DATA-CUST-NUM      (3)       TO CM-CUST-NUM.
+           MOVE DATA-COMPANY       (3)       TO CM-COMPANY.
+           READ TSPFILE KEY IS CM-CUST-NUM
+           DISPLAY "   Read: " CM-CUST-NUM " got "
+                         CUST-STAT " as expected "
+                         CM-NO-TERMINALS " terminals"
+                         UPON CONSOLE.
+           ADD 5 TO CM-NO-TERMINALS
+           REWRITE TSPFL-RECORD
+           IF  CUST-STAT NOT = "02"
+           AND CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " instead of 02"
+                                UPON CONSOLE
+           ELSE
+               DISPLAY "ReWrite: " CM-CUST-NUM " got "
+                         "00/02 as expected "
+                         CM-NO-TERMINALS " terminals"
+                         UPON CONSOLE
+           END-IF.
+           MOVE DATA-CUST-NUM      (2)       TO CM-CUST-NUM.
+           MOVE DATA-COMPANY       (2)       TO CM-COMPANY.
+           READ TSPFILE KEY IS CM-CUST-NUM
+           DISPLAY "   Read: " CM-CUST-NUM " got "
+                         CUST-STAT " as expected "
+                         CM-NO-TERMINALS " terminals"
+                         UPON CONSOLE.
+           MOVE DATA-CUST-NUM      (3)       TO CM-CUST-NUM.
+           MOVE DATA-COMPANY       (3)       TO CM-COMPANY.
+           REWRITE TSPFL-RECORD
+           IF  CUST-STAT NOT = "02"
+           AND CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " instead of 02"
+                                UPON CONSOLE
+           ELSE
+               DISPLAY "ReWrite: " CM-CUST-NUM " got "
+                       "00/02 as expected"
+                         UPON CONSOLE
+           END-IF.
+           MOVE DATA-CUST-NUM      (6)       TO CM-CUST-NUM.
+           MOVE DATA-COMPANY       (6)       TO CM-COMPANY.
+           READ TSPFILE KEY IS CM-CUST-NUM
+           MOVE DATA-TELEPHONE     (7)       TO CM-TELEPHONE.
+           MOVE DATA-MACHINE       (7)       TO CM-MACHINE.
+           REWRITE TSPFL-RECORD
+           IF  CUST-STAT NOT = "02"
+           AND CUST-STAT NOT = "00"
+               DISPLAY "Error " CUST-STAT " instead of 02"
+                                UPON CONSOLE
+           ELSE
+               DISPLAY "ReWrite: " CM-CUST-NUM " got "
+                        "00/02 as expected"
+                         UPON CONSOLE
+           END-IF.
+           DELETE TSPFILE.
+           CLOSE TSPFILE.
+
+       LOADFLAT.
+           OPEN OUTPUT FLATFILE.
+           PERFORM FLAT-RECORD
+                        VARYING SUB FROM 1 BY 1
+                          UNTIL SUB > MAX-SUB
+                             OR SUB > 5.
+           CLOSE FLATFILE.
+           OPEN INPUT FLATFILE.
+           MOVE 3 TO REC-NUM
+           READ FLATFILE
+           MOVE 999 TO REC-NUM
+           READ FLATFILE
+           CLOSE FLATFILE.
+
+       FLAT-RECORD.
+
+           MOVE SPACES                       TO TSP2-RECORD.
+           MOVE SUB                          TO REC-NUM.
+           MOVE DATA-CUST-NUM      (SUB)     TO C2-CUST-NUM.
+           MOVE DATA-COMPANY       (SUB)     TO C2-COMPANY.
+           MOVE DATA-NO-TERMINALS  (SUB)     TO C2-NO-TERMINALS.
+           MOVE 20070319                     TO C2-PK-DATE.
+           IF  ODD-RECORD
+               MOVE "8417"                   TO C2-DISK
+           ELSE
+               MOVE "8470"                   TO C2-DISK.
+           WRITE TSP2-RECORD.
+])
+
+AT_DATA([cmod.c], [[
+#include <stdio.h>
+
+
+static char *txtOpCode(int opCode);
+
+/*********************************************************
+ *  TSTFH - External File Handler entry point.
+*********************************************************/
+
+COB_EXT_EXPORT int
+TSTFH (unsigned char *opCodep, FCD3 *fcd)
+{
+   unsigned int   opCode;
+
+   if (*opCodep == 0xfa)
+      opCode = 0xfa00 + opCodep[1];
+   else
+      opCode = opCodep[1];
+
+   if (fcd->fileOrg == ORG_LINE_SEQ
+    || fcd->fileOrg == ORG_SEQ
+    || fcd->fileOrg == ORG_INDEXED
+    || fcd->fileOrg == ORG_RELATIVE) {
+      switch (opCode) {
+      case OP_OPEN_OUTPUT:
+      case OP_OPEN_IO:
+      case OP_OPEN_EXTEND:
+      case OP_OPEN_OUTPUT_NOREWIND:
+         return EXTFH(opCodep, fcd);
+         break;
+
+      case OP_OPEN_INPUT:
+      case OP_OPEN_INPUT_NOREWIND:
+      case OP_OPEN_INPUT_REVERSED:
+         return EXTFH(opCodep, fcd);
+         break;
+
+      default:
+         break;
+      }
+
+   }
+
+   if (opCode == OP_CLOSE
+    && (fcd->openMode & OPEN_NOT_OPEN) ) {
+      return 0;
+   }
+
+   return EXTFH(opCodep, fcd);
+}
+]])
+
+AT_CHECK([$COMPILE_FIXED -fcallfh=TSTFH prog.cob cmod.c], [0], [], [])
+
+AT_CHECK([./a.out], [0],
+[OK: Operations on empty file
+Loading sample data file.
+Sample data file load complete.
+LIST SAMPLE FILE
+Key: EPS00000 is EPSILON EQUIPMENT SUPPLY  Disk=8417    .
+Key: FOR00000 is FORTUNE COOKIE COMPANY    Disk=8470    .
+Key: GAM00000 is GAMMA X-RAY TECHNOLOGY    Disk=8417    .
+Key: GIB00000 is GIBRALTER LIFE INSURANCE  Disk=8417    .
+Key: H&J00000 is H & J PLUMBING SUPPLIES   Disk=8470    .
+Key: INC00000 is INCREMENTAL BACKUP CORP.  Disk=8417    .
+Key: JOH00000 is JOHNSON BOATING SUPPLIES  Disk=8417    .
+Key: KON00000 is KONFLAB PLASTIC PRODUCTS. Disk=8417    .
+Key: LEW00000 is LEWISTON GRAPHICS LTD.    Disk=8470    .
+Key: MOR00000 is MORNINGSIDE CARPENTRY.    Disk=8470    .
+Key: NEW00000 is NEW WAVE SURF SHOPS INC.  Disk=8470    .
+LIST SAMPLE FILE DESCENDING
+Key: NEW00000 is NEW WAVE SURF SHOPS INC.  Disk=8470    .
+Key: MOR00000 is MORNINGSIDE CARPENTRY.    Disk=8470    .
+Key: LEW00000 is LEWISTON GRAPHICS LTD.    Disk=8470    .
+Key: KON00000 is KONFLAB PLASTIC PRODUCTS. Disk=8417    .
+Key: JOH00000 is JOHNSON BOATING SUPPLIES  Disk=8417    .
+Key: INC00000 is INCREMENTAL BACKUP CORP.  Disk=8417    .
+Key: H&J00000 is H & J PLUMBING SUPPLIES   Disk=8470    .
+Key: GIB00000 is GIBRALTER LIFE INSURANCE  Disk=8417    .
+Key: GAM00000 is GAMMA X-RAY TECHNOLOGY    Disk=8417    .
+Key: FOR00000 is FORTUNE COOKIE COMPANY    Disk=8470    .
+Key: EPS00000 is EPSILON EQUIPMENT SUPPLY  Disk=8417    .
+Got: BET00000 is BETA SHOE MFG. INC.       Disk=8470    .
+Nxt: DEL00000 is DELTA LUGGAGE REPAIRS     Disk=8470    .
+Ky2: GIB00000 is GIBRALTER LIFE INSURANCE  Mach=UNI-80/6.
+  Write: GIB00000 got 22 as expected
+   Read: GAM00000 got 00 as expected 00075 terminals
+ReWrite: GAM00000 got 00/02 as expected 00080 terminals
+   Read: BET00000 got 00 as expected 00034 terminals
+ReWrite: GAM00000 got 00/02 as expected
+ReWrite: FOR00000 got 00/02 as expected
+Expected ERROR 39 opening TSTFILE, Record size different
+], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([104. EXTFH: SEQUENTIAL files])
+AT_KEYWORDS([runfile EXTFH])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# GNU -f
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT FLATFILE ASSIGN EXTERNAL SEQFIX
+           ORGANIZATION SEQUENTIAL
+           FILE STATUS IS CUST-STAT .
+
+       DATA DIVISION.
+       FILE SECTION.
+       FD  FLATFILE
+           BLOCK CONTAINS 5 RECORDS.
+
+       01  TSPFL-RECORD.
+           10  CM-CUST-NUM                     PICTURE X(8).
+           10  CM-COMPANY                      PICTURE X(25).
+           10  CM-DISK                         PICTURE X(8).
+           10  CM-NO-TERMINALS                 PICTURE 9(4) COMP-4.
+           10  CM-PK-DATE                      PICTURE S9(14) COMP-3.
+           10  CM-TRAILER                      PICTURE X(8).
+
+       WORKING-STORAGE SECTION.
+
+       77  MAX-SUB           VALUE  6          PICTURE 9(4) COMP SYNC.
+       77  CUST-STAT                           PICTURE X(2).
+
+       01  TEST-DATA.
+
+         02  DATA-CUST-NUM-TBL.
+
+           05  FILLER PIC X(8) VALUE "ALP00000".
+           05  FILLER PIC X(8) VALUE "BET00000".
+           05  FILLER PIC X(8) VALUE "GAM00000".
+           05  FILLER PIC X(8) VALUE "DEL00000".
+           05  FILLER PIC X(8) VALUE "EPS00000".
+           05  FILLER PIC X(8) VALUE "FOR00000".
+
+         02  DATA-CUST-NUM REDEFINES DATA-CUST-NUM-TBL
+                                       PIC X(8) OCCURS 6.
+         02  DATA-COMPANY-TBL.
+
+           05  FILLER PIC X(25) VALUE "ALPHA ELECTRICAL CO. LTD.".
+           05  FILLER PIC X(25) VALUE "BETA SHOE MFG. INC.      ".
+           05  FILLER PIC X(25) VALUE "GAMMA X-RAY TECHNOLOGY   ".
+           05  FILLER PIC X(25) VALUE "DELTA LUGGAGE REPAIRS    ".
+           05  FILLER PIC X(25) VALUE "EPSILON EQUIPMENT SUPPLY ".
+           05  FILLER PIC X(25) VALUE "FORTUNE COOKIE COMPANY   ".
+         02  DATA-COMPANY  REDEFINES DATA-COMPANY-TBL
+                                       PIC X(25) OCCURS 6.
+         02  DATA-ADDRESS-2-TBL.
+
+           05  FILLER PIC X(10) VALUE "NEW YORK  ".
+           05  FILLER PIC X(10) VALUE "ATLANTA   ".
+           05  FILLER PIC X(10) VALUE "WASHINGTON".
+           05  FILLER PIC X(10) VALUE "TORONTO   ".
+           05  FILLER PIC X(10) VALUE "CALGARY   ".
+           05  FILLER PIC X(10) VALUE "WHITEPLAIN".
+
+         02  DATA-ADDRESS   REDEFINES DATA-ADDRESS-2-TBL
+                                       PIC X(10) OCCURS 6.
+
+         02  DATA-NO-TERMINALS-TBL.
+
+           05  FILLER PIC 9(3) COMP-3 VALUE 10.
+           05  FILLER PIC 9(3) COMP-3 VALUE 13.
+           05  FILLER PIC 9(3) COMP-3 VALUE 75.
+           05  FILLER PIC 9(3) COMP-3 VALUE 10.
+           05  FILLER PIC 9(3) COMP-3 VALUE 90.
+           05  FILLER PIC 9(3) COMP-3 VALUE 254.
+
+         02  DATA-NO-TERMINALS REDEFINES DATA-NO-TERMINALS-TBL
+                                       PIC 9(3) COMP-3 OCCURS 6.
+       01  WORK-AREA.
+           05  SUB                             PICTURE 9(4) COMP SYNC.
+               88  ODD-RECORD                  VALUE 1 3 5.
+
+
+       PROCEDURE DIVISION.
+
+           OPEN INPUT FLATFILE.
+           DISPLAY "Open Input when no file Sts:" CUST-STAT
+           OPEN EXTEND FLATFILE.
+           DISPLAY "Open Extend when no file Sts:" CUST-STAT
+           CLOSE FLATFILE.
+           DISPLAY "Close when no open file Sts:" CUST-STAT
+           OPEN OUTPUT FLATFILE.
+           CLOSE FLATFILE.
+           OPEN EXTEND FLATFILE.
+           DISPLAY "Open Extend when empty file Sts:" CUST-STAT
+           CLOSE FLATFILE.
+
+           PERFORM LOADFILE.
+           OPEN INPUT FLATFILE.
+           DISPLAY "Open Sts:" CUST-STAT
+           READ FLATFILE
+           DISPLAY "Read " CM-CUST-NUM " Sts:" CUST-STAT.
+           READ FLATFILE
+           DISPLAY "Read " CM-CUST-NUM " Sts:" CUST-STAT.
+           CLOSE FLATFILE.
+
+           OPEN I-O FLATFILE.
+           READ FLATFILE
+           DISPLAY "Read " CM-CUST-NUM " Sts:" CUST-STAT.
+           ADD 1 TO CM-NO-TERMINALS
+           REWRITE TSPFL-RECORD
+           DISPLAY "REWRITE " CM-CUST-NUM " Sts " CUST-STAT
+                   " Trms:" CM-NO-TERMINALS.
+           CLOSE FLATFILE.
+
+           OPEN I-O FLATFILE.
+           READ FLATFILE
+           DISPLAY "Read " CM-CUST-NUM " Sts:" CUST-STAT.
+           ADD 1 TO CM-NO-TERMINALS
+           REWRITE TSPFL-RECORD
+           DISPLAY "REWRITE " CM-CUST-NUM " Sts " CUST-STAT
+                   " Trms:" CM-NO-TERMINALS.
+           READ FLATFILE WITH LOCK
+           DISPLAY "Read " CM-CUST-NUM
+      *    DELETE FLATFILE
+      *    DISPLAY "DELETE " CM-CUST-NUM " Sts " CUST-STAT.
+           CLOSE FLATFILE.
+           OPEN INPUT FLATFILE.
+           DISPLAY "Re-list File Open Sts:" CUST-STAT
+           PERFORM UNTIL CUST-STAT NOT = "00"
+               PERFORM READ-RECORD
+           END-PERFORM.
+           CLOSE FLATFILE.
+           OPEN EXTEND FLATFILE.
+           MOVE 2 TO SUB
+           PERFORM LOAD-RECORD
+           CLOSE FLATFILE.
+           OPEN INPUT FLATFILE.
+           DISPLAY "List File afer EXTEND Open Sts:" CUST-STAT
+           PERFORM UNTIL CUST-STAT NOT = "00"
+               PERFORM READ-RECORD
+           END-PERFORM.
+           CLOSE FLATFILE.
+           STOP RUN RETURNING 0.
+
+       READ-RECORD.
+           MOVE SPACES                       TO TSPFL-RECORD.
+           READ FLATFILE
+           IF CUST-STAT NOT = "00"
+             DISPLAY "Read Status: " CUST-STAT
+           ELSE
+             DISPLAY "Read  " CM-CUST-NUM
+                     " Trms:" CM-NO-TERMINALS
+           END-IF.
+
+       LOADFILE.
+           DISPLAY "Loading sample data file.".
+
+           OPEN OUTPUT FLATFILE.
+
+           PERFORM LOAD-RECORD
+                        VARYING SUB FROM 1 BY 1
+                          UNTIL SUB > MAX-SUB.
+
+           DISPLAY "Sample data file load complete.".
+           CLOSE FLATFILE.
+
+       LOAD-RECORD.
+
+           MOVE SPACES                       TO TSPFL-RECORD.
+           MOVE DATA-CUST-NUM      (SUB)     TO CM-CUST-NUM.
+           MOVE DATA-COMPANY       (SUB)     TO CM-COMPANY.
+           MOVE DATA-NO-TERMINALS  (SUB)     TO CM-NO-TERMINALS.
+           MOVE 20070319                     TO CM-PK-DATE.
+           IF SUB = 1 OR 4 OR 6
+               MOVE -20070319                 TO CM-PK-DATE.
+
+           IF  ODD-RECORD
+               MOVE "8417"                   TO CM-DISK
+           ELSE
+               MOVE "8470"                   TO CM-DISK.
+           WRITE TSPFL-RECORD.
+])
+
+AT_DATA([cmod.c], [[
+#include <stdio.h>
+
+
+static char *txtOpCode(int opCode);
+
+static int
+doOpenFile(
+   unsigned char  *opCodep,
+   FCD3  *fcd,
+   char  *opmsg)
+{
+   int      sts;
+
+   sts = EXTFH( opCodep, fcd );
+   printf("EXFTH did %s; Status=%c%c; File now %s\n",
+       opmsg, fcd->fileStatus[0], fcd->fileStatus[1],
+       (fcd->openMode & OPEN_NOT_OPEN) ? "Closed" : "Open");
+   return sts;
+}
+
+/*********************************************************
+ *  TSTFH - External File Handler entry point.
+*********************************************************/
+
+COB_EXT_EXPORT int
+TSTFH (unsigned char *opCodep, FCD3 *fcd)
+{
+   unsigned int   opCode;
+   int      sts;
+
+   if (*opCodep == 0xfa)
+      opCode = 0xfa00 + opCodep[1];
+   else
+      opCode = opCodep[1];
+
+   if (fcd->fileOrg == ORG_LINE_SEQ
+    || fcd->fileOrg == ORG_SEQ
+    || fcd->fileOrg == ORG_INDEXED
+    || fcd->fileOrg == ORG_RELATIVE) {
+      switch (opCode) {
+      case OP_OPEN_OUTPUT:
+      case OP_OPEN_IO:
+      case OP_OPEN_EXTEND:
+      case OP_OPEN_OUTPUT_NOREWIND:
+         return doOpenFile( opCodep, fcd, txtOpCode(opCode));
+         break;
+
+      case OP_OPEN_INPUT:
+      case OP_OPEN_INPUT_NOREWIND:
+      case OP_OPEN_INPUT_REVERSED:
+         return doOpenFile( opCodep, fcd, txtOpCode(opCode));
+         break;
+
+      case OP_CLOSE:
+         return doOpenFile( opCodep, fcd, txtOpCode(opCode));
+         break;
+
+      default:
+         break;
+      }
+
+   }
+
+   if (opCode == OP_CLOSE
+    && (fcd->openMode & OPEN_NOT_OPEN) ) {
+      return 0;
+   }
+
+   sts = EXTFH(opCodep, fcd);
+   printf("EXFTH did %s; Status=%c%c\n", txtOpCode(opCode),
+       fcd->fileStatus[0], fcd->fileStatus[1]);
+   return sts;
+}
+
+static char *           /* Return Text name of function */
+txtOpCode(int opCode)
+{
+   static char tmp[32];
+   switch (opCode) {
+   case OP_OPEN_INPUT:     return "OPEN_IN";
+   case OP_OPEN_OUTPUT:       return "OPEN_OUT";
+   case OP_OPEN_IO:     return "OPEN_IO";
+   case OP_OPEN_EXTEND:       return "OPEN_EXT";
+   case OP_OPEN_INPUT_NOREWIND:  return "OPEN_IN_NOREW";
+   case OP_OPEN_OUTPUT_NOREWIND: return "OPEN_OUT_NOREW";
+   case OP_OPEN_INPUT_REVERSED:  return "OPEN_IN_REV";
+   case OP_CLOSE:          return "CLOSE";
+   case OP_CLOSE_LOCK:     return "CLOSE_LOCK";
+   case OP_CLOSE_NOREWIND:    return "CLOSE_NORED";
+   case OP_CLOSE_REEL:     return "CLOSE_REEL";
+   case OP_CLOSE_REMOVE:      return "CLOSE_REMOVE";
+   case OP_CLOSE_NO_REWIND:   return "CLOSE_NO_REW";
+   case OP_START_EQ:       return "START_EQ";
+   case OP_START_EQ_ANY:      return "START_EQ_ANY";
+   case OP_START_GT:       return "START_GT";
+   case OP_START_GE:       return "START_GE";
+   case OP_START_LT:       return "START_LT";
+   case OP_START_LE:       return "START_LE";
+   case OP_READ_SEQ_NO_LOCK:  return "READ_SEQ_NO_LK";
+   case OP_READ_SEQ:       return "READ_SEQ";
+   case OP_READ_SEQ_LOCK:     return "READ_SEQ_LK";
+   case OP_READ_SEQ_KEPT_LOCK:   return "READ_SEQ_KEPT_LK";
+   case OP_READ_PREV_NO_LOCK:    return "READ_PREV_NO_LK";
+   case OP_READ_PREV:      return "READ_PREV";
+   case OP_READ_PREV_LOCK:    return "READ_PREV_LK";
+   case OP_READ_PREV_KEPT_LOCK:  return "READ_PREV_KEPT_LK";
+   case OP_READ_RAN:       return "READ_RAN";
+   case OP_READ_RAN_NO_LOCK:  return "READ_RAN_NO_LK";
+   case OP_READ_RAN_KEPT_LOCK:   return "READ_RAN_KEPT_LK";
+   case OP_READ_RAN_LOCK:     return "READ_RAN_LK";
+   case OP_READ_DIR:       return "READ_DIR";
+   case OP_READ_DIR_NO_LOCK:  return "READ_DIR_NO_LK";
+   case OP_READ_DIR_KEPT_LOCK:   return "READ_DIR_KEPT_LK";
+   case OP_READ_DIR_LOCK:     return "READ_DIR_LK";
+   case OP_READ_POSITION:     return "READ_POSITION";
+   case OP_WRITE:          return "WRITE";
+   case OP_REWRITE:     return "REWRITE";
+   case OP_DELETE:      return "DELETE";
+   case OP_DELETE_FILE:       return "DELETE_FILE";
+   case OP_UNLOCK:      return "UNLOCK";
+   case OP_ROLLBACK:       return "ROLLBACK";
+   case OP_COMMIT:      return "COMMIT";
+   case OP_WRITE_BEFORE:      return "WRITE_BEFORE";
+   case OP_WRITE_BEFORE_TAB:  return "WRITE_BEFORE_TAB";
+   case OP_WRITE_BEFORE_PAGE:    return "WRITE_BEFORE_PAGE";
+   case OP_WRITE_AFTER:       return "WRITE_AFTER";
+   case OP_WRITE_AFTER_TAB:   return "WRITE_AFTER_TAB";
+   case OP_WRITE_AFTER_PAGE:  return "WRITE_AFTER_PAGE";
+   }
+   sprintf(tmp, "Func 0x%02X:", opCode);
+   return tmp;
+}
+]])
+
+AT_CHECK([$COMPILE_FIXED -fcallfh=TSTFH prog.cob cmod.c], [0], [], [])
+
+AT_CHECK([./a.out], [0],
+[EXFTH did OPEN_IN; Status=35; File now Closed
+Open Input when no file Sts:35
+EXFTH did OPEN_EXT; Status=35; File now Closed
+Open Extend when no file Sts:35
+EXFTH did CLOSE; Status=42; File now Closed
+Close when no open file Sts:42
+EXFTH did OPEN_OUT; Status=00; File now Open
+EXFTH did CLOSE; Status=00; File now Closed
+EXFTH did OPEN_EXT; Status=00; File now Open
+Open Extend when empty file Sts:00
+EXFTH did CLOSE; Status=00; File now Closed
+Loading sample data file.
+EXFTH did OPEN_OUT; Status=00; File now Open
+EXFTH did WRITE; Status=00
+EXFTH did WRITE; Status=00
+EXFTH did WRITE; Status=00
+EXFTH did WRITE; Status=00
+EXFTH did WRITE; Status=00
+EXFTH did WRITE; Status=00
+Sample data file load complete.
+EXFTH did CLOSE; Status=00; File now Closed
+EXFTH did OPEN_IN; Status=00; File now Open
+Open Sts:00
+EXFTH did READ_SEQ; Status=00
+Read ALP00000 Sts:00
+EXFTH did READ_SEQ; Status=00
+Read BET00000 Sts:00
+EXFTH did CLOSE; Status=00; File now Closed
+EXFTH did OPEN_IO; Status=00; File now Open
+EXFTH did READ_SEQ; Status=00
+Read ALP00000 Sts:00
+EXFTH did REWRITE; Status=00
+REWRITE ALP00000 Sts 00 Trms:0011
+EXFTH did CLOSE; Status=00; File now Closed
+EXFTH did OPEN_IO; Status=00; File now Open
+EXFTH did READ_SEQ; Status=00
+Read ALP00000 Sts:00
+EXFTH did REWRITE; Status=00
+REWRITE ALP00000 Sts 00 Trms:0012
+EXFTH did READ_SEQ; Status=00
+Read BET00000
+EXFTH did CLOSE; Status=00; File now Closed
+EXFTH did OPEN_IN; Status=00; File now Open
+Re-list File Open Sts:00
+EXFTH did READ_SEQ; Status=00
+Read  ALP00000 Trms:0012
+EXFTH did READ_SEQ; Status=00
+Read  BET00000 Trms:0013
+EXFTH did READ_SEQ; Status=00
+Read  GAM00000 Trms:0075
+EXFTH did READ_SEQ; Status=00
+Read  DEL00000 Trms:0010
+EXFTH did READ_SEQ; Status=00
+Read  EPS00000 Trms:0090
+EXFTH did READ_SEQ; Status=00
+Read  FOR00000 Trms:0254
+EXFTH did READ_SEQ; Status=10
+Read Status: 10
+EXFTH did CLOSE; Status=00; File now Closed
+EXFTH did OPEN_EXT; Status=00; File now Open
+EXFTH did WRITE; Status=00
+EXFTH did CLOSE; Status=00; File now Closed
+EXFTH did OPEN_IN; Status=00; File now Open
+List File afer EXTEND Open Sts:00
+EXFTH did READ_SEQ; Status=00
+Read  ALP00000 Trms:0012
+EXFTH did READ_SEQ; Status=00
+Read  BET00000 Trms:0013
+EXFTH did READ_SEQ; Status=00
+Read  GAM00000 Trms:0075
+EXFTH did READ_SEQ; Status=00
+Read  DEL00000 Trms:0010
+EXFTH did READ_SEQ; Status=00
+Read  EPS00000 Trms:0090
+EXFTH did READ_SEQ; Status=00
+Read  FOR00000 Trms:0254
+EXFTH did READ_SEQ; Status=00
+Read  BET00000 Trms:0013
+EXFTH did READ_SEQ; Status=10
+Read Status: 10
+EXFTH did CLOSE; Status=00; File now Closed
+], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([105. EXTFH: LINE SEQUENTIAL files, direct EXTFH])
+AT_KEYWORDS([runfile])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# GNU -f
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+       DATA DIVISION.
+       FILE SECTION.
+       WORKING-STORAGE SECTION.
+
+       01  I                       PIC XX COMP-X.
+
+       01  WS-FCD-DDNAME           PIC X(8) VALUE SPACES.
+       01  WS-FCD-PTR              POINTER   VALUE NULL.
+
+       01  WS-FCD-SIZE             PIC 9(04) VALUE   0       COMP-5.
+       01  WS-FCD-FLAGS            PIC 9(04) VALUE   0       COMP-5.
+
+       01  DISPLAY-BYTE.
+          05  DISPLAY-XXX             PIC X(03).
+          05  DISPLAY-ZZ9             REDEFINES DISPLAY-XXX
+                                      PIC ZZ9.
+       01  ACTION-CODE                 pic x(2).
+          78  OP-OPEN-INPUT           value x"fa00".
+          78  OP-OPEN-OUTPUT          value x"fa01".
+          78  OP-OPEN-I-O             value x"fa02".
+          78  OP-WRITE                value x"faf3".
+          78  OP-RELEASE              value x"faf3".
+          78  OP-REWRITE              value x"faf4".
+          78  OP-READ-NEXT            value x"faf5".
+          78  OP-START-EQUAL          value x"fae9".
+          78  OP-CLOSE                value x"fa80".
+          78  OP-QUERY-FILE           value x"0006".
+
+       01  ACTION-CODE-WORK            redefines ACTION-CODE.
+          05  ACTION-CODE-1           PIC x(01)                 COMP-X.
+          05  ACTION-CODE-2           PIC x(01)                 COMP-X.
+
+       01  DISPLAY-A1-XXX              PIC X(03).
+       01  DISPLAY-A1-ZZ9              REDEFINES DISPLAY-A1-XXX
+                                      PIC ZZ9.
+       01  DISPLAY-A2-XXX              PIC X(03).
+       01  DISPLAY-A2-ZZ9              REDEFINES DISPLAY-A2-XXX
+                                       PIC ZZ9.
+
+       01  FCD-FILENAME               PIC X(80) value "test.out".
+       01  FCD-RECORD                 PIC X(512) value spaces.
+
+       LINKAGE SECTION.
+
+       01  FCD-MAP.
+           copy 'xfhfcd3.cpy'.
+
+      *================================================================*
+       PROCEDURE DIVISION.
+      *----------------------------------------------------------------*
+       000-MAIN.
+
+          PERFORM 100-OPEN.
+
+          PERFORM VARYING I FROM 1 BY 1 UNTIL I > 10
+            MOVE I TO DISPLAY-A1-ZZ9
+            MOVE DISPLAY-A1-ZZ9 TO FCD-RECORD
+            PERFORM 300-WRITE
+          END-PERFORM.
+
+          PERFORM 400-CLOSE.
+          STOP RUN.
+
+      *----------------------------------------------------------------*
+      *    Process the open request
+      *
+       100-OPEN.
+
+          MOVE "TESTOUT" TO WS-FCD-DDNAME
+
+          MOVE LENGTH OF FCD-MAP TO WS-FCD-SIZE
+          DISPLAY "FCD SIZE " WS-FCD-SIZE.
+
+          IF WS-FCD-PTR EQUAL NULL
+             ALLOCATE ws-fcd-size characters
+                                  returning WS-FCD-PTR
+
+             SET  ADDRESS OF FCD-MAP  TO WS-FCD-PTR
+             MOVE LOW-VALUES          TO FCD-MAP
+             MOVE WS-FCD-SIZE         TO FCD-LENGTH
+             move fcd--version-number TO FCD-VERSION
+             MOVE "00"                TO FCD-FILE-STATUS
+             move fcd--status-defined to FCD-ACCESS-MODE
+             move fcd--open-closed    to FCD-OPEN-MODE
+             move fcd--external-name  to FCD-OTHER-FLAGS
+             SET  FCD-HANDLE          TO NULL
+             MOVE 8                   TO FCD-NAME-LENGTH
+             SET  FCD-FILENAME-ADDRESS TO ADDRESS
+                                       OF WS-FCD-DDNAME
+             SET  FCD-KEY-DEF-ADDRESS TO NULL
+             move fcd--allow-readers  to FCD-LOCKTYPES
+          ELSE
+             SET  ADDRESS OF FCD-MAP  TO WS-FCD-PTR
+             IF FCD-OPEN-MODE NOT = fcd--open-closed
+                DISPLAY "ERRROR - FILE ALREADY OPEN"
+                STOP RUN
+             END-IF
+          END-IF
+
+          move fcd--line-sequential-org to FCD-ORGANIZATION
+          move fcd--recmode-fixed       to FCD-RECORDING-MODE
+          move 10 to FCD-MIN-REC-LENGTH, FCD-MAX-REC-LENGTH
+          SET  FCD-RECORD-ADDRESS     TO ADDRESS OF FCD-RECORD
+
+      * Move fcd--cr-delimiter for CR LF after each record
+      *   move fcd--cr-delimiter        to FCD-STATUS-TYPE
+
+          move op-open-output to action-code
+
+          PERFORM 800-CALL-EXTFH
+          .
+
+      *----------------------------------------------------------------*
+      *    Process the write request
+      *
+       300-WRITE.
+
+          move 10 to FCD-CURRENT-REC-LEN
+          move op-write to action-code
+          PERFORM 800-CALL-EXTFH
+          .
+      *----------------------------------------------------------------*
+      *    Process the close request
+      *
+       400-CLOSE.
+          MOVE "00"                   TO FCD-FILE-STATUS
+          move op-close               to action-code
+          PERFORM 800-CALL-EXTFH
+          .
+      *----------------------------------------------------------------*
+      *    External file handler interface -- all I/O goes through here
+      *
+        800-CALL-EXTFH.
+
+            CALL "EXTFH" USING ACTION-CODE, FCD-MAP
+
+            IF FCD-STATUS-KEY-1 = "9" AND FCD-BINARY = 199
+               MOVE "10" TO FCD-FILE-STATUS
+            END-IF
+            .
+])
+
+# FIXME: by default comp-x should not be truncated (see rw-branch)
+AT_CHECK([$COMPILE_FIXED -fnotrun prog.cob], [0], [], [])
+
+AT_CHECK([TESTOUT=TEST-OUT ./a.out], [0],
+[FCD SIZE 00216
+], [])
+
+
+AT_CAPTURE_FILE(./TEST-OUT)
+
+# note: currently with the same behaviour as MF
+#       (ignoring minimal record length for line-sequential)
+#       this may change in the future...
+AT_DATA([reference], [  1
+  2
+  3
+  4
+  5
+  6
+  7
+  8
+  9
+ 10
+])
+
+AT_CHECK([diff reference TEST-OUT], [0], [], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([107. TURN EC-I-O])
+AT_KEYWORDS([runfile directive])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+
+AT_XFAIL_IF([true])
+# FIXME: FUNCTION EXCEPTION-STATUS should be empty when an EC occurs but has been
+#   >>TURN'd off.
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT OPTIONAL f ASSIGN "out.txt"
+               SEQUENTIAL
+               FILE STATUS f-status.
+
+           SELECT g ASSIGN "out.txt"
+               SEQUENTIAL.
+
+       DATA DIVISION.
+       FILE SECTION.
+       FD  f.
+       01  f-rec PIC X.
+
+       FD  g.
+       01  g-rec PIC X.
+
+       WORKING-STORAGE SECTION.
+       01  f-status PIC XX.
+
+       PROCEDURE DIVISION.
+           OPEN OUTPUT f
+           WRITE f-rec FROM "a"
+           CLOSE f
+
+           SET LAST EXCEPTION TO OFF
+           >>TURN EC-I-O CHECKING ON
+           *> Read f too many times without libcob error
+           OPEN INPUT f
+           PERFORM 2 TIMES
+               READ f
+               DISPLAY f-rec
+           END-PERFORM
+
+           DISPLAY f-status
+           DISPLAY FUNCTION TRIM(FUNCTION EXCEPTION-STATUS)
+           SET LAST EXCEPTION TO OFF
+
+           CLOSE f
+
+           >>TURN EC-I-O g CHECKING ON
+
+           *> Read f too many times without libcob error
+           OPEN INPUT f
+           PERFORM 2 TIMES
+               READ f
+               DISPLAY f-rec
+           END-PERFORM
+
+           DISPLAY f-status
+           DISPLAY FUNCTION TRIM(FUNCTION EXCEPTION-STATUS)
+           SET LAST EXCEPTION TO OFF
+
+           CLOSE f
+
+           *> Read g too many times with libcob error
+           OPEN INPUT g
+           PERFORM 2 TIMES
+               READ g
+               DISPLAY g-rec
+           END-PERFORM
+
+           CLOSE g
+           .
+])
+
+AT_CHECK([$COMPILE_FIXED prog.cob ], [0], [], [])
+AT_CHECK([./a.out], [1],
+[a
+a
+10
+
+a
+a
+10
+
+a
+],
+[libcob: prog.cob:61: error: end of file (status = 10) for file g ('out.txt') on READ
+libcob: prog.cob:61: warning: implicit CLOSE of g ('out.txt')
+])
+
+AT_CLEANUP
+
+
+
+
+AT_SETUP([RECORDING MODE (IBM QSAM)])
+AT_KEYWORDS([file extensions])
+AT_XFAIL_IF([test "$COB_DIALECT" != "ibm"])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT f ASSIGN "f.dat" LINE SEQUENTIAL.
+       DATA DIVISION.
+       FILE SECTION.
+       FD  f RECORDING MODE IS U.
+       01  x PIC X.
+       PROCEDURE DIVISION.
+           OPEN INPUT f
+           CLOSE f
+           .
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[cobol1: warning: RECORDING MODE ignored, not defined by ISO 2023
+])
+AT_CLEANUP

@@ -1,0 +1,13 @@
+skoda     : Made by the Volkswagen Group.
+seat      : Made by the Volkswagen Group.
+audi      : Made in Germany by the Volkswagen Group.
+volkswagen: Made in Germany by the Volkswagen Group.
+mercedes  : Made in Germany.
+bmw       : Made in Germany.
+porsche   : Made in Germany.
+ 
+Volksgroup is initially FALSE
+After 'SET Volksgroup TO TRUE':
+Volksgroup is TRUE
+After 'SET Volksgroup TO FALSE':
+Volksgroup is FALSE

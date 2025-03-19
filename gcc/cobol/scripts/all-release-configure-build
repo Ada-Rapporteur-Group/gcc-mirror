@@ -1,0 +1,113 @@
+#!/bin/sh
+
+set -e
+set -x
+
+if [ "$1" = "commit-release" ]
+then
+    pwd
+    commit_md5=$(git log -1 --abbrev-commit | awk '/^commit/ { print $2}')
+    COMMIT_VERSION=-dev-$commit_md5
+    shift
+else
+    COMMIT_VERSION=-dev-000000000
+fi
+
+#
+# Process flow:  Invoke this routine when it is time to compile the current
+# branch, starting with a full configure.
+#
+
+# These prerequisites suffice for a compilation on Ubuntu 20.04  The various
+# tests avoid attempting to re-install packages, which can be annoying when the
+# user doesn't have complete sudo permissions.
+if test -z "$(which g++ || true)"; then sudo apt -y install g++; fi
+if test -z "$(find /usr/include/ -name gmp.h)"; then sudo apt -y install libgmp-dev; fi
+if test -z "$(find /usr/include/ -name mpfr.h)"; then sudo apt -y install libmpfr-dev; fi
+if test -z "$(find /usr/include/ -name mpc.h)"; then sudo apt -y install libmpc-dev; fi
+if test -z "$(find /usr/include/ -name zlib.h)"; then sudo apt -y install libz-dev; fi
+if test -z "$(which make || true)"; then sudo apt -y install make; fi
+if test -z "$(which bison || true)"; then sudo apt -y install bison; fi
+if test -z "$(which flex || true)"; then sudo apt -y install flex; fi
+
+VERSION=$(cat ${0%/*}/../../../gcc/BASE-VER)
+MAJOR_VERSION=$(echo $VERSION | sed 's/^\([0-9]\+\)[.].*$/\1/')
+test "$VERSION"
+
+PKGVERSION="GCOBOL ${VERSION}${COMMIT_VERSION}"
+
+# Set up for a build, using the presumptive directory tree that we've been using
+# for development.
+
+arch=$(arch)
+
+test "$arch"
+if [ $arch = x86_64 ]
+then
+    arch_options='--with-abi=m64 --with-tune=generic --enable-default-pie'
+fi
+
+# We start in <repo>/gcc/cobol/scripts
+cd ${0%/*}/../../..
+if [ -z "$BUILDDIR" ]
+then
+    BUILDDIR=build
+fi
+mkdir -p $BUILDDIR
+cd $BUILDDIR
+rm -fr *
+
+../configure					\
+	--enable-languages=all		\
+	--disable-bootstrap			\
+$(END)
+
+#	--disable-multilib			\
+#	--with-pkgversion="$PKGVERSION"		\
+#	--prefix=/usr				\
+#	--libdir=/usr/lib/gcobol		\
+#	--libexecdir=/usr/libexec/gcobol	\
+#	--with-gcc-major-version-only		\
+#	--program-suffix=-$MAJOR_VERSION	\
+#	--enable-shared				\
+#	--enable-linker-build-id		\
+#	--without-included-gettext		\
+#	--enable-threads=posix			\
+#	--enable-clocale=gnu			\
+#	--enable-libstdcxx-debug		\
+#	--enable-libstdcxx-time=yes		\
+#	--with-default-libstdcxx-abi=new	\
+#	--enable-gnu-unique-object		\
+#	--disable-vtable-verify			\
+#	--enable-plugin				\
+#	--with-system-zlib			\
+#	--with-target-system-zlib=auto		\
+#	--disable-werror			\
+#	--disable-cet				\
+#	  $arch_options				\
+#	--without-cuda-driver			\
+#	--enable-checking=release		\
+#	--build=${arch}-linux-gnu		\
+#	--host=${arch}-linux-gnu		\
+#	--target=${arch}-linux-gnu		\
+#	--with-build-config=bootstrap-lto-lean	\
+#	--enable-link-mutex --without-isl
+
+
+
+if [ "$1" ]
+then
+    make $@
+else
+    make -j $(nproc)
+fi
+
+if [ $USER = gitlab-runner ]
+then
+    if [ -w /usr/ ]
+    then
+        make -s install
+    else
+        echo "not installed; no access to /usr"
+    fi
+fi

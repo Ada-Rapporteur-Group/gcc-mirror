@@ -1,0 +1,15 @@
+program-aaa calls nested program program-b1
+   program-b1 calls its nested program-c
+      Hello from b1's program-c
+program-aaa calls nested program program-b2
+   program-b2 calls its nested program-c
+      Hello from b2's program-c
+program-aaa calls nested program program-b3
+   program-b2 calls its nested program-c
+      Hello from b3's program-c
+This is common-test
+This is common-level-1B
+This is common-level-2B
+This is common-level-3B
+This is common-level-2A
+This is common-level-3C

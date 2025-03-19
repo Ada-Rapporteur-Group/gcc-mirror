@@ -1,0 +1,44 @@
+TEST1
+123 should be 123
+000 should be 000
+123 should be 123
+123 should be 456
+000 should be 000
+TEST2
+"123" should be "123"
+"   " should be "   "
+"123" should be "123"
+"abc" should be "abc"
+"   " should be "   "
+TEST3
+"123456" should be "123456"
+"000   " should be "000   "
+"123   " should be "123   "
+"000456" should be "000456"
+"123456" should be "123456"
+"456abc" should be "456abc"
+"000   " should be "000   "
+TEST4
+"123456" should be "123456"
+"000   " should be "000   "
+"000456" should be "000456"
+"123   " should be "123   "
+"987456" should be "987456"
+"456abc" should be "456abc"
+"000   " should be "000   "
+TEST5
+"123456" should be "123456"
+"000   " should be "000   "
+"000456" should be "000456"
+"123   " should be "123   "
+"123QRS" should be "123QRS"
+"456abc" should be "456abc"
+"000   " should be "000   "
+TEST6
+"123456" should be "123456"
+"000   " should be "000   "
+"000456" should be "000456"
+"123   " should be "123   "
+"987QRS" should be "987QRS"
+"456abc" should be "456abc"
+"000   " should be "000   "

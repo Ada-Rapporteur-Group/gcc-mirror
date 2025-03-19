@@ -1,0 +1,261 @@
+
+AT_BANNER([V1 FIXED FORMAT TESTS])
+
+AT_SETUP([1. FIXED FORMAT data in cols 73 and beyond])
+AT_KEYWORDS([v1-bugs fixed-format])
+AT_XFAIL_IF(true)
+### Waiting on Jim to "handle"
+AT_DATA([prog.cob], [
+       *> ISO-IEC2014 leaves the length of the Program Area in Fixed
+       *> Formay to the implementor.
+       *> By convention it ends in position 72.
+       *> IBM's COBOLs, Microfocus, GnuCOBOL follow that convention.
+       IDENTIFICATION DIVISION.                                         VALID
+       PROGRAM-ID. prog.
+       PROCEDURE DIVISION.
+       DISPLAY "OK"
+       EXIT PROGRAM.
+       END PROGRAM prog.
+])
+AT_CHECK([$COMPILE -o prog prog.cob], [0], [], [])
+AT_CHECK([./prog], [0], [OK
+], [])
+AT_CLEANUP
+
+AT_SETUP([2. FIXED FORMAT data misplaced asterisk])
+AT_KEYWORDS([v1-bugs fixed-format])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       77 var PIC 99 VALUE ZERO.
+       PROCEDURE DIVISION.
+       COMPUTE VAR = 5
+      * 3
+       + 6.
+       DISPLAY var.
+       EXIT PROGRAM.
+       END PROGRAM prog.
+])
+AT_CHECK([$COMPILE -o prog prog.cob], [0], [], [])
+AT_CHECK([./prog], [0], [11
+], [])
+AT_CLEANUP
+
+AT_BANNER([V1 COPY Tests])
+
+AT_SETUP([3. COPY filename with explicit suffix in literal-1])
+
+AT_KEYWORDS([v1-bugs fixed-format])
+AT_CHECK([mkdir cpy], [0], [], [])
+AT_DATA([cpy/foo.cpy], [
+       DISPLAY "OK".
+])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       PROCEDURE DIVISION.
+       COPY "foo.cpy".
+       EXIT PROGRAM.
+       END PROGRAM prog.
+])
+AT_CHECK([$COMPILE -Icpy -o prog prog.cob], [0], [], [])
+AT_CHECK([./prog], [0], [OK
+], [])
+AT_CLEANUP
+
+AT_SETUP([4. COPY filename with no suffix in literal-1])
+
+AT_KEYWORDS([v1-bugs fixed-format])
+AT_CHECK([mkdir cpy], [0], [], [])
+AT_DATA([cpy/foo], [
+       DISPLAY "OK".
+])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       PROCEDURE DIVISION.
+       COPY "foo".
+       EXIT PROGRAM.
+       END PROGRAM prog.
+])
+AT_CHECK([$COMPILE -Icpy -o prog prog.cob], [0], [], [])
+AT_CHECK([./prog], [0], [OK
+], [])
+AT_CLEANUP
+
+########
+# Deferring "COPY foo in sub" where "-I." is on the GCOBOL command line
+#    it's the "IN SUB" part that's likely not implemented
+
+AT_SETUP([5. COPY: replacement order - ])
+AT_KEYWORDS([v1-bugs copy])
+
+AT_DATA([xxxx.cpy], [
+       01 TEST-VAR PIC X(2) VALUE "OK".
+])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       COPY xxxx
+          REPLACING ==TEST-VAR== BY ==FIRST-MATCH==
+                    ==TEST-VAR== BY ==SECOND-MATCH==.
+       PROCEDURE        DIVISION.
+           DISPLAY FIRST-MATCH NO ADVANCING
+           END-DISPLAY.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE -I. prog.cob], [0], [], [])
+# AT_CHECK([$COMPILE_ONLY prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [OK], [])
+
+AT_CLEANUP
+
+AT_SETUP([6. COPY: replacement order - 2])
+# Sub-test without multiple REPLACING clauses
+# REPLACING works. With single REPLACING clause.
+AT_KEYWORDS([v1-bugs copy])
+
+AT_DATA([xxxx.cpy], [
+       01 TEST-VAR PIC X(2) VALUE "OK".
+])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       COPY xxxx
+          REPLACING ==TEST-VAR== BY ==FIRST-MATCH==.
+       PROCEDURE        DIVISION.
+           DISPLAY FIRST-MATCH NO ADVANCING
+           END-DISPLAY.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE -I. prog.cob], [0], [], [])
+# AT_CHECK([$COMPILE_ONLY prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [OK], [])
+
+AT_CLEANUP
+
+AT_SETUP([7. COPY: replacement order - 3])
+AT_SKIP_IF(true)
+# Sub-test without multiple REPLACING clauses
+# REPLACING works. With two REPLACING clauses but different
+#   REPLACING targets..
+# Raises the question of whether the original cobc test is valid
+#    the standard implies it is.
+AT_KEYWORDS([v1-bugs copy])
+
+AT_DATA([xxxx.cpy], [
+       01 TEST-VAR PIC X(2) VALUE "OK".
+])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       COPY xxxx
+          REPLACING ==OK== BY ==HI==
+          REPLACING ==TEST-VAR== BY ==FIRST-MATCH==.
+       PROCEDURE        DIVISION.
+           DISPLAY FIRST-MATCH NO ADVANCING
+           END-DISPLAY.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE -I. prog.cob], [0], [], [])
+# AT_CHECK([$COMPILE_ONLY prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [HI], [])
+AT_CLEANUP
+
+AT_BANNER([DISPLAY])
+
+AT_SETUP([8. DISPLAY, separator character, recognizing numeric literal])
+AT_KEYWORDS([v1-bugs fixed-format])
+AT_DATA([prog.cob], [
+       identification division.
+       program-id. prog.
+       procedure division.
+           display 1,1,1.
+           end program prog.
+])
+AT_CHECK([$COMPILE -Icpy -o prog prog.cob], [0], [], [])
+AT_CHECK([./prog], [0], [111
+], [])
+AT_CLEANUP
+
+AT_BANNER([COMMAND-LINE])
+
+AT_SETUP([9. v1-bugs command-line])
+AT_KEYWORDS([v1-bugs fixed-format])
+AT_DATA([prog.cob], [
+       *> ODD FAILURE: failing to recognize "" as SPACE
+       identification division.
+       program-id. prog.
+       data division.
+       working-storage section.
+       77 cmd-line-parm pic x(20).
+       procedure division.
+          ACCEPT cmd-line-parm FROM COMMAND-LINE(2).
+          IF cmd-line-parm NOT EQUAL SPACE THEN
+             DISPLAY cmd-line-parm.
+           end program prog.
+])
+AT_CHECK([$COMPILE -Icpy -o prog prog.cob], [0], [], [])
+AT_CHECK([./prog OK], [0], [], [])
+AT_CLEANUP
+
+
+AT_BANNER([DIVIDE])
+AT_SETUP([10. v1-bugs DIVIDE using "a in b"])
+AT_KEYWORDS([v1-bugs unstring])
+AT_DATA([prog.cob],[
+       ID DIVISION.
+       PROGRAM-ID. prog.
+
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 first.
+          05 anum pic 9 value 4.
+       01 second.
+          05 anum pic 9 value 2.
+       01 answer pic 9.
+
+       PROCEDURE DIVISION.
+       MAIN-PARAGRAPH.
+         DIVIDE anum in first BY anum in second giving answer.
+         DISPLAY answer With NO ADVANCING.
+           END PROGRAM prog.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([a.out], [0], [2], [])
+AT_CLEANUP
+
+AT_SETUP([11. ADD 1 2 TO 3 GIVING B])
+AT_KEYWORDS([add v1])
+AT_DATA([prog.cob],[
+       ID DIVISION.
+       PROGRAM-ID. prog.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 var1 PIC 99 VALUE 4.
+       01 var1 PIC 99.
+       PROCEDURE DIVISION.
+          ADD 1 2 TO var1 GIVING var2.
+          IF var2 NOT EQUAL 7
+          THEN
+             DISPLAY "Wrong answer, expected 7, got " var2 "."
+          END-IF.
+          EXIT PROGRAM.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([a.out], [0], [0], [])
+AT_CLEANUP

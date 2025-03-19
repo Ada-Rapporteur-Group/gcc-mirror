@@ -1,0 +1,71 @@
+Home Page:  https://cobolworx.com/pages/cobforgcc.html
+Repository: https://gitlab.cobolworx.com/COBOLworx/gcc-cobol
+Packages:   https://gitlab.cobolworx.com/COBOLworx/gcc-cobol/-/packages/2
+
+The GCC Cobol aspirant is now 16 months old, and pupating. If Cobol's 60-year history were an hour, gcobol is now one minute old.
+
+When last we met our intrepid duo, gcobol had compiled 100 programs, perhaps 1000 lines of Cobol.  Today we're pleased to announce a milestone: success with "nucleus" module of the NIST CCVS-85 test suite.
+
+The Cobol Compiler Validation System
+
+    "tests for conformity to the American National Standard (ANSI Document Reference X3.23-1985) and the standard of the International Organisation for Standardisation (ISO Document Reference ISO-1989-1985)".
+
+It comprises 14 modules totaling 391 programs, with each program implementing many tests.
+
+We addressed ourselves just to the 95 programs in "nucleus" module, which tests the core language features.  We can report 100% of 4381 tests succeed for 93 of those 95.  That's 8744 lines of Cobol.  We ignored the remaining 2 programs because they test obsolete features.  If you want a Cobol compiler that supports features that were obsolete in 1985, you probably have a card reader handy.
+
+We have, in other words, a verified, working Cobol-85 compiler.
+
+$ cloc gcc/cobol/*.{cc,h,l,y} libgcobol/*.cc
+      36 text files.
+      36 unique files.
+       0 files ignored.
+
+github.com/AlDanial/cloc v 1.90  T=0.09 s (419.0 files/s, 710127.6 lines/s)
+----------------------------------------------------------------
+Language      files          blank        comment           code
+----------------------------------------------------------------
+C++              19           5330           6546          32332
+yacc              2           1147            367           8744
+C/C++ Header     14            598            892           3010
+lex               1            312             95           1637
+----------------------------------------------------------------
+SUM:             36           7387           7900          45723
+----------------------------------------------------------------
+
+The packages above are created via CI/CD for each successful commit.
+
+But wait!  There's more!
+
+    https://cobolworx.com/pages/cobforgcc.html
+
+We're extending gdb for Cobol, too.  While there's more work to do, the important stuff is there: set break points, jump over PERFORM statements, and examine data.
+
+For your administrative convenience, we have packaged both gcobol and gdb-gcobol as binary Ubuntu packages.  The gcobol package contains *only* the gcobol files; installing it will not disturb your gcc installation.
+
+Each package is based on the master branch in the git repository, the better to facilitate eventual inclusion in GCC and gdb.
+
+Plans.
+
+We are continuing with other NIST verification modules.  If using git, you can track our progress with "make -C nist/ report".
+
+We hope the future direction of gcobol will soon be influenced by user interest.  While an ISO standard Cobol compiler is a good foundation, every Cobol shop relies on different variations and extensions to the language.  Early adopters have an opportunity to make their voices heard and needs met.
+
+For the immediate future, we're planning:
+
+    * (more) conditional compilation
+    * improvements to EBCDIC and Unicode support
+    * better error messages
+    * support for EXEC SQL
+    * modifications consequent to GCC review
+
+Thank you for you kind attention.
+
+--jkl
+
+P.S. As a reminder, gcobol is a Cobol compiler based on gcc. It should not be
+confused with GnuCOBOL (https://savannah.gnu.org/projects/gnucobol).
+That project is a Cobol translator: it compiles Cobol to C, and
+invokes gcc to produce executable code.
+
+

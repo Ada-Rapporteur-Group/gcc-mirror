@@ -1,0 +1,49 @@
+## Copyright (C) 2003-2012, 2014-2019 Free Software Foundation, Inc.
+## Copyright (C) 2020-2023 COBOLworx.
+## Written by Keisuke Nishida, Roger While, Simon Sobisch, Ron Norman,
+##    Marty Heyman, Nick Mower
+##
+## This file was copied from GnuCOBOL and modified for use with COBOL.
+## for GCC (gcobol).
+## The COBOL for GCC compiler is free software: you can redistribute it
+## and/or modify it under the terms of the Symas Open Licence. A copy
+## of that license is in the LICENSE file included in the distribution.
+##
+
+### COBOL for GCC Test Suite
+
+### ISO+IEC+1989-2002 14.8.1 ACCEPT statement
+### ISO+IEC+1989-2014 14.9.1 ACCEPT statement
+
+# Format 1: hardware / device
+
+# AT_SETUP([ACCEPT OMITTED (simple)])
+# AT_KEYWORDS([accept extensions])
+# AT_SKIP_IF(true)
+# OMITTED clause of ACCEPT for Format 1 not present in
+#    ISO-IEC2014. DIALECT potential
+# ### COMMENTED OUT ENTIRELY ###
+# OMITTED clause of ACCEPT not implemented (EXTENSION?) TODO
+#
+# AT_DATA([prog.cob], [
+#        IDENTIFICATION DIVISION.
+#        PROGRAM-ID.    prog.
+#        PROCEDURE      DIVISION.
+#            ACCEPT OMITTED.
+# ])
+#
+# AT_DATA([input.txt], [
+# ])
+#
+#
+# AT_CLEANUP
+
+#
+## FORMAT 1: FROM mnemonic TEST(S) needed TODO
+#
+
+#
+## Format 2: chronological / temporal
+#
+
+

@@ -1,0 +1,42 @@
+diff -u --label /home/jklowden/projects/3rd/gcc/master\+cobol/gcc/cobol/nist/cbl/EXEC85.cbl --label \#\<buffer\ cbl/EXEC85.cbl\> /home/jklowden/projects/3rd/gcc/master\+cobol/gcc/cobol/nist/cbl/EXEC85.cbl /tmp/buffer-content-nCCVFW
+--- /home/jklowden/projects/3rd/gcc/master+cobol/gcc/cobol/nist/cbl/EXEC85.cbl
++++ #<buffer cbl/EXEC85.cbl>
+@@ -23,11 +23,11 @@
+ 002400 FILE-CONTROL.                                                    
+ 002500     SELECT  OPTIONAL POPULATION-FILE                             
+ 002600     ASSIGN TO                                                    
+-002700     XXXXX001.                                                    
++002700     XXXXX001 ORGANIZATION LINE SEQUENTIAL.                       
+ 002800     SELECT  SOURCE-COBOL-PROGRAMS                                
+ 002900     ASSIGN TO                                                    
+ 003000     XXXXX002                                                     
+-003100     ORGANIZATION SEQUENTIAL.                                     
++003100     ORGANIZATION LINE SEQUENTIAL.                                
+ 003200     SELECT  UPDATED-POPULATION-FILE                              
+ 003300     ASSIGN TO                                                    
+ 003400     XXXXX003.                                                    
+@@ -36,7 +36,7 @@
+ 003700     XXXXX055.                                                    
+ 003800     SELECT  CONTROL-CARD-FILE                                    
+ 003900     ASSIGN TO                                                    
+-004000     XXXXX058.                                                    
++004000     XXXXX058 ORGANIZATION LINE SEQUENTIAL.                       
+ 004100 DATA DIVISION.                                                   
+ 004200 FILE SECTION.                                                    
+ 004300 FD  POPULATION-FILE.                                             
+@@ -286,11 +286,11 @@
+ 028700       15    WV-OPT                  PIC X.                       
+ 028800       15    FILLER                  PIC X.                       
+ 028900 01  WX-X-CARD-TABLE.                                             
+-029000   05        WX-X-CARD               OCCURS 200.                  
++029000   05        WX-X-CARD               OCCURS 500.                  
+ 029100     10      WX-X-CHAR               PIC X                        
+ 029200                                     OCCURS 60.                   
+ 029300 01  WX-PROG-POS-TABLE.                                           
+-029400   05        WX-PROG-POS             OCCURS 200                   
++029400   05        WX-PROG-POS             OCCURS 500                   
+ 029500                                     PIC 99.                      
+ 029600 01  WY-SWITCHES.                                                 
+ 029700   05        WY-OPTION-SWITCHES.                                  
+
+Diff finished.  Fri Apr  8 18:04:20 2022

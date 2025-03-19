@@ -1,0 +1,24 @@
+ 
+Enter a two letter code - NJ
+30. NJ New Jersey     Trenton         8,864,590
+ 
+Enter a state capital - Juneau        
+02. AK Alaska         Juneau            731,449
+ 
+Enter a state number - 33
+33. NC North Carolina Raleigh         9,752,073
+ 
+Enter a state name - Kentucky      
+17. KY Kentucky       Frankfort       4,380,415
+ 
+Enter a state number - 01
+01. AL Alabama        Montgomery      4,822,023
+ 
+Enter a state capital - Albany        
+32. NY New York       Albany         19,570,261
+ 
+Enter a state number - 50
+50. WY Wyoming        Cheyenne          576,412
+ 
+Enter a two letter code - WV
+48. WV West Virginia  Charleston      1,855,413

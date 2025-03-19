@@ -1,0 +1,69 @@
+#!/bin/sh
+set -e
+
+#
+# Compare the contents of the prerequisites file to the status of the
+# existing system.  For each utility or library that is missing,
+# install using yum(8).
+#
+# The exception is Bison.  To build gcobol, a newer version of Bison
+# is required than is supplied by the Red Hat 8 package.  Bison is
+# built & installed from source using the supplied build-bison script.
+#
+# To avoid security problems, if this script is running as root, it
+# switches to another account, "$user", presumably non-privileged,
+# when building and installing Bison.  If that variable is not
+# defined, the script terminates.
+#
+
+# change to script's directory
+cd ${0%/*}
+
+if [ -z "$prerequisites" ]
+then
+    prerequisites=${0%/*}/../share/prerequisites
+fi
+
+grep -v '^#' $prerequisites  |
+while read type file pkg
+do
+    case $type in
+	cmd)
+	    if [ $file = bison ]
+	    then
+		needed="3.8.2"
+		version=$(bison --version |
+			      awk -v needed=$needed '/^bison/ {
+			           print $NF < needed? $NF : needed }')
+		if [ $version = $needed ]
+		then
+		    $file --version | grep -i [^/]$file
+		    continue;
+		fi
+		if [ 0 = $(id -u) ]
+		then
+		    jkl=$(awk -F: '/^jklowden/ {print $1}' /etc/passwd)
+		    user=${user:-$jkl}
+		    if [ -z "$user" ]
+		    then
+			echo 'bison not installed and "$user" not defined' >&2
+			echo 'error: will not build bison as root' >&2
+			exit 1
+		    fi
+		    su $user -c ./build-bison
+		else
+		    ./build-bison
+		fi
+		continue
+	    fi
+	    pattern=$(echo $file | sed 's/+/[+]/g')
+	    $file --version | grep -Ei [^/]?$pattern || true
+	    command -v $file > /dev/null ||
+		yum install -y $pkg
+	    ;;
+	lib)
+	    find /usr/include/ -name $file ||
+		yum install -y $pkg
+	    ;;
+    esac
+done

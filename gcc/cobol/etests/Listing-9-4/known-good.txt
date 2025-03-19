@@ -1,0 +1,13 @@
+0 =      
+1 = *    
+2 = **   
+3 = ***  
+4 = **** 
+5 = *****
+inspect_text two22three333four4444bob
+twos:   12
+threes: 23
+fours:  34
+bobs:   41
+inspect_text two22seven333four4444jim
+(should be ) two22seven333four4444jim

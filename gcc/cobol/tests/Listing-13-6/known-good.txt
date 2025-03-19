@@ -1,0 +1,11 @@
+We read in 243 countries
+We are writing ZZ to Country(244) While NumberOfCountries is 243
+Enter a country code (space to stop) :- Bo is Bolivia                  
+ 
+Enter a country code (space to stop) :- MX is Mexico                   
+ 
+Enter a country code (space to stop) :-  
+Looking for  ZZ with NumberOfCountries set to 243
+Country code ZZ is not valid
+Looking for  ZZ with NumberOfCountries set to 244
+ZZ is  **** FOUND ****         

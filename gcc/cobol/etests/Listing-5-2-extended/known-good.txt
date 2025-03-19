@@ -1,0 +1,22 @@
+James        is a Coboler
+Freddy       is not a Coboler
+CityCode is 0
+Invalid city code entered
+CityCode is 1
+Hey, we're in the capital.
+Apply the rent surcharge!
+CityCode is 2
+Hey, we're home.
+Apply the rent surcharge!
+CityCode is 3
+Apply the rent surcharge!
+CityCode is 4
+Apply the rent surcharge!
+CityCode is 5
+CityCode is 6
+CityCode is 7
+Invalid city code entered
+CityCode is 8
+Invalid city code entered
+CityCode is 9
+Invalid city code entered

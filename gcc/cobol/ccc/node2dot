@@ -1,0 +1,48 @@
+#!/usr/bin/python3
+
+import sys
+
+def main():
+  if len(sys.argv) != 2:
+    print("Usage: single parameter is the .nodes filename")
+    sys.exit(1)
+
+  filename:str = sys.argv[1]
+  all_lines:list = open(filename).read().split("\n")
+
+  shape:str = "box"
+
+  print("digraph G")
+  print("{")
+  
+  node_texts:dict = {}
+
+  node:int
+  daughter:int
+  for line in all_lines:
+    if line.find("***********************************") == 0:
+      node = int(line[53:])
+      continue
+    if line.find("tree_code:") == 0:
+      tokens:list = line.split()
+      node_text:str = 'N{0} [shape={1},label="N{0}\\n{2}"]'.format(node, shape, tokens[1])
+      node_texts[node] = node_text
+      print(node_text);
+  
+  print("")
+
+  for line in all_lines:
+    if line.find("***********************************") == 0:
+      node = int(line[53:])
+      continue;
+    tokens:list = line.split()
+    if len(tokens) > 1:
+      if tokens[1].find("NodeNumber") >= 0:
+        daughter = int(tokens[1][10:])
+        if node != daughter:
+          print("N{0} -> N{1}".format(node, daughter))
+        continue
+
+  print("}")
+
+main()

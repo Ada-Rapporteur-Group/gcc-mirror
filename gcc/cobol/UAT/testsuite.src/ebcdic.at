@@ -1,0 +1,865 @@
+AT_COPYRIGHT([Test cases Copyright (C) 2022 COBOLworx a subsidiary of Symas Corp.
+
+Written by Marty Heyman])
+
+### GnuCOBOL Test Suite
+
+AT_BANNER([EBCDIC and source code pages])
+
+AT_SETUP([Simple values: UTF-8  in ASCII  mode])
+AT_KEYWORDS([EBCDIC])
+# Even though autom4te uses a .m4f file that sets LC_ALL=C, the LANG environment
+# variable is still "en_US.UTF-8", and AT_DATA is generated in UTF-8
+AT_DATA([prog.cob], [
+        identification   division.
+        program-id.      progs.
+        procedure        division.
+        call             "prog1"
+        call             "prog2"
+        stop run.
+        end program progs.
+      
+        identification   division.
+        program-id.      prog1.
+        data             division.
+        working-storage  section.
+        01 p1            pic x(1)  value "â".
+        01 p2            pic x(2)  value "âê".
+        01 p3            pic x(3)  value "âêî".
+        01 p4            pic x(4)  value "âêîô".
+        01 p5            pic x(5)  value "âêîôû".
+        01 p6            pic x(6)  value "âêîôûa".
+        01 p7            pic x(7)  value "âêîôûab".
+        01 p8            pic x(8)  value "âêîôûabc".
+        01 p9            pic x(9)  value "âêîôûabcd".
+        01 p10           pic x(10) value "âêîôûabcde".
+        procedure        division.
+        DISPLAY "Original values"
+            display """" p1 """"
+            display """" p2 """"
+            display """" p3 """"
+            display """" p4 """"
+            display """" p5 """"
+            display """" p6 """"
+            display """" p7 """"
+            display """" p8 """"
+            display """" p9 """"
+            display """" p10 """"
+        DISPLAY "Literals"
+            display """" "â"          """"
+            display """" "âê"         """"
+            display """" "âêî"        """"
+            display """" "âêîô"       """"
+            display """" "âêîôû"      """"
+            display """" "âêîôûa"     """"
+            display """" "âêîôûab"    """"
+            display """" "âêîôûabc"   """"
+            display """" "âêîôûabcd"  """"
+            display """" "âêîôûabcde" """"
+        DISPLAY "Z-Literals"
+            display """" Z"â"          """"
+            display """" Z"âê"         """"
+            display """" Z"âêî"        """"
+            display """" Z"âêîô"       """"
+            display """" Z"âêîôû"      """"
+            display """" Z"âêîôûa"     """"
+            display """" Z"âêîôûab"    """"
+            display """" Z"âêîôûabc"   """"
+            display """" Z"âêîôûabcd"  """"
+            display """" Z"âêîôûabcde" """"
+        DISPLAY "Move literals"
+            move "Â"          to p1
+            move "ÂÊ"         to p2
+            move "ÂÊÎ"        to p3
+            move "ÂÊÎÔ"       to p4
+            move "ÂÊÎÔÛ"      to p5
+            move "ÂÊÎÔÛA"     to p6
+            move "ÂÊÎÔÛAE"    to p7
+            move "ÂÊÎÔÛAEI"   to p8
+            move "ÂÊÎÔÛAEIO"  to p9
+            move "ÂÊÎÔÛAEIOU" to p10
+            display """" p1 """"
+            display """" p2 """"
+            display """" p3 """"
+            display """" p4 """"
+            display """" p5 """"
+            display """" p6 """"
+            display """" p7 """"
+            display """" p8 """"
+            display """" p9 """"
+            display """" p10 """"
+            goback.
+        end program prog1.
+      
+        identification division.
+        program-id. prog2.
+        environment division.
+        input-output section.
+        file-control.
+        select file1 assign to "file1.txt"
+                     organization is line sequential.
+        data division.
+        file section.
+        fd file1.
+        01 fdata  pic x(32).
+        procedure division.
+        open output file1
+        move "This is line 1 - hello, world"    to fdata
+        write fdata
+        move "This is line 2 - hallå, världen"  to fdata
+        write fdata
+        move "This is line 3 - hola, món"       to fdata
+        write fdata
+        close file1
+        open input file1
+        read file1
+        display """" fdata """"
+        read file1
+        display """" fdata """"
+        read file1
+        display """" fdata """"
+        close file1
+        goback.
+        end program prog2.
+])
+AT_CHECK([iconv -f UTF-8 -t UTF-8 prog.cob >converted.cob], [0], [], [])
+AT_CHECK([$COMPILE converted.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [Original values
+"â"
+"âê"
+"âêî"
+"âêîô"
+"âêîôû"
+"âêîôûa"
+"âêîôûab"
+"âêîôûabc"
+"âêîôûabcd"
+"âêîôûabcde"
+Literals
+"â"
+"âê"
+"âêî"
+"âêîô"
+"âêîôû"
+"âêîôûa"
+"âêîôûab"
+"âêîôûabc"
+"âêîôûabcd"
+"âêîôûabcde"
+Z-Literals
+"â"
+"âê"
+"âêî"
+"âêîô"
+"âêîôû"
+"âêîôûa"
+"âêîôûab"
+"âêîôûabc"
+"âêîôûabcd"
+"âêîôûabcde"
+Move literals
+"Â"
+"ÂÊ"
+"ÂÊÎ"
+"ÂÊÎÔ"
+"ÂÊÎÔÛ"
+"ÂÊÎÔÛA"
+"ÂÊÎÔÛAE"
+"ÂÊÎÔÛAEI"
+"ÂÊÎÔÛAEIO"
+"ÂÊÎÔÛAEIOU"
+"This is line 1 - hello, world   "
+"This is line 2 - hallå, världen "
+"This is line 3 - hola, món      "
+], [])
+AT_CHECK([LC_ALL=$LANG iconv -f CP1252 file1.txt], [0], [This is line 1 - hello, world
+This is line 2 - hallå, världen
+This is line 3 - hola, món
+], [])
+AT_CLEANUP
+
+AT_SETUP([Simple values: CP1252 in ASCII  mode])
+AT_KEYWORDS([EBCDIC])
+# Even though autom4te uses a .m4f file that sets LC_ALL=C, the LANG environment
+# variable is still "en_US.UTF-8", and AT_DATA is generated in UTF-8
+AT_DATA([prog.cob], [
+        identification   division.
+        program-id.      progs.
+        procedure        division.
+        call             "prog1"
+        call             "prog2"
+        stop run.
+        end program progs.
+      
+        identification   division.
+        program-id.      prog1.
+        data             division.
+        working-storage  section.
+        01 p1            pic x(1)  value "â".
+        01 p2            pic x(2)  value "âê".
+        01 p3            pic x(3)  value "âêî".
+        01 p4            pic x(4)  value "âêîô".
+        01 p5            pic x(5)  value "âêîôû".
+        01 p6            pic x(6)  value "âêîôûa".
+        01 p7            pic x(7)  value "âêîôûab".
+        01 p8            pic x(8)  value "âêîôûabc".
+        01 p9            pic x(9)  value "âêîôûabcd".
+        01 p10           pic x(10) value "âêîôûabcde".
+        procedure        division.
+        DISPLAY "Original values"
+            display """" p1 """"
+            display """" p2 """"
+            display """" p3 """"
+            display """" p4 """"
+            display """" p5 """"
+            display """" p6 """"
+            display """" p7 """"
+            display """" p8 """"
+            display """" p9 """"
+            display """" p10 """"
+        DISPLAY "Literals"
+            display """" "â"          """"
+            display """" "âê"         """"
+            display """" "âêî"        """"
+            display """" "âêîô"       """"
+            display """" "âêîôû"      """"
+            display """" "âêîôûa"     """"
+            display """" "âêîôûab"    """"
+            display """" "âêîôûabc"   """"
+            display """" "âêîôûabcd"  """"
+            display """" "âêîôûabcde" """"
+        DISPLAY "Z-Literals"
+            display """" Z"â"          """"
+            display """" Z"âê"         """"
+            display """" Z"âêî"        """"
+            display """" Z"âêîô"       """"
+            display """" Z"âêîôû"      """"
+            display """" Z"âêîôûa"     """"
+            display """" Z"âêîôûab"    """"
+            display """" Z"âêîôûabc"   """"
+            display """" Z"âêîôûabcd"  """"
+            display """" Z"âêîôûabcde" """"
+        DISPLAY "Move literals"
+            move "Â"          to p1
+            move "ÂÊ"         to p2
+            move "ÂÊÎ"        to p3
+            move "ÂÊÎÔ"       to p4
+            move "ÂÊÎÔÛ"      to p5
+            move "ÂÊÎÔÛA"     to p6
+            move "ÂÊÎÔÛAE"    to p7
+            move "ÂÊÎÔÛAEI"   to p8
+            move "ÂÊÎÔÛAEIO"  to p9
+            move "ÂÊÎÔÛAEIOU" to p10
+            display """" p1 """"
+            display """" p2 """"
+            display """" p3 """"
+            display """" p4 """"
+            display """" p5 """"
+            display """" p6 """"
+            display """" p7 """"
+            display """" p8 """"
+            display """" p9 """"
+            display """" p10 """"
+            goback.
+        end program prog1.
+      
+        identification division.
+        program-id. prog2.
+        environment division.
+        input-output section.
+        file-control.
+        select file1 assign to "file1.txt"
+                     organization is line sequential.
+        data division.
+        file section.
+        fd file1.
+        01 fdata  pic x(32).
+        procedure division.
+        open output file1
+        move "This is line 1 - hello, world"    to fdata
+        write fdata
+        move "This is line 2 - hallå, världen"  to fdata
+        write fdata
+        move "This is line 3 - hola, món"       to fdata
+        write fdata
+        close file1
+        open input file1
+        read file1
+        display """" fdata """"
+        read file1
+        display """" fdata """"
+        read file1
+        display """" fdata """"
+        close file1
+        goback.
+        end program prog2.
+])
+AT_CHECK([iconv -f UTF-8 -t CP1252 prog.cob >converted.cob], [0], [], [])
+AT_CHECK([$COMPILE converted.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [Original values
+"â"
+"âê"
+"âêî"
+"âêîô"
+"âêîôû"
+"âêîôûa"
+"âêîôûab"
+"âêîôûabc"
+"âêîôûabcd"
+"âêîôûabcde"
+Literals
+"â"
+"âê"
+"âêî"
+"âêîô"
+"âêîôû"
+"âêîôûa"
+"âêîôûab"
+"âêîôûabc"
+"âêîôûabcd"
+"âêîôûabcde"
+Z-Literals
+"â"
+"âê"
+"âêî"
+"âêîô"
+"âêîôû"
+"âêîôûa"
+"âêîôûab"
+"âêîôûabc"
+"âêîôûabcd"
+"âêîôûabcde"
+Move literals
+"Â"
+"ÂÊ"
+"ÂÊÎ"
+"ÂÊÎÔ"
+"ÂÊÎÔÛ"
+"ÂÊÎÔÛA"
+"ÂÊÎÔÛAE"
+"ÂÊÎÔÛAEI"
+"ÂÊÎÔÛAEIO"
+"ÂÊÎÔÛAEIOU"
+"This is line 1 - hello, world   "
+"This is line 2 - hallå, världen "
+"This is line 3 - hola, món      "
+], [])
+AT_CHECK([LC_ALL=$LANG iconv -f CP1252 file1.txt], [0], [This is line 1 - hello, world
+This is line 2 - hallå, världen
+This is line 3 - hola, món
+], [])
+AT_CLEANUP
+
+AT_SETUP([Simple values: UTF-8  in EBCDIC mode])
+AT_KEYWORDS([EBCDIC])
+# Even though autom4te uses a .m4f file that sets LC_ALL=C, the LANG environment
+# variable is still "en_US.UTF-8", and AT_DATA is generated in UTF-8
+AT_DATA([prog.cob], [
+        identification   division.
+        program-id.      progs.
+        procedure        division.
+        call             "prog1"
+        call             "prog2"
+        stop run.
+        end program progs.
+      
+        identification   division.
+        program-id.      prog1.
+        data             division.
+        working-storage  section.
+        01 p1            pic x(1)  value "â".
+        01 p2            pic x(2)  value "âê".
+        01 p3            pic x(3)  value "âêî".
+        01 p4            pic x(4)  value "âêîô".
+        01 p5            pic x(5)  value "âêîôû".
+        01 p6            pic x(6)  value "âêîôûa".
+        01 p7            pic x(7)  value "âêîôûab".
+        01 p8            pic x(8)  value "âêîôûabc".
+        01 p9            pic x(9)  value "âêîôûabcd".
+        01 p10           pic x(10) value "âêîôûabcde".
+        procedure        division.
+        DISPLAY "Original values"
+            display """" p1 """"
+            display """" p2 """"
+            display """" p3 """"
+            display """" p4 """"
+            display """" p5 """"
+            display """" p6 """"
+            display """" p7 """"
+            display """" p8 """"
+            display """" p9 """"
+            display """" p10 """"
+        DISPLAY "Literals"
+            display """" "â"          """"
+            display """" "âê"         """"
+            display """" "âêî"        """"
+            display """" "âêîô"       """"
+            display """" "âêîôû"      """"
+            display """" "âêîôûa"     """"
+            display """" "âêîôûab"    """"
+            display """" "âêîôûabc"   """"
+            display """" "âêîôûabcd"  """"
+            display """" "âêîôûabcde" """"
+        DISPLAY "Z-Literals"
+            display """" Z"â"          """"
+            display """" Z"âê"         """"
+            display """" Z"âêî"        """"
+            display """" Z"âêîô"       """"
+            display """" Z"âêîôû"      """"
+            display """" Z"âêîôûa"     """"
+            display """" Z"âêîôûab"    """"
+            display """" Z"âêîôûabc"   """"
+            display """" Z"âêîôûabcd"  """"
+            display """" Z"âêîôûabcde" """"
+        DISPLAY "Move literals"
+            move "Â"          to p1
+            move "ÂÊ"         to p2
+            move "ÂÊÎ"        to p3
+            move "ÂÊÎÔ"       to p4
+            move "ÂÊÎÔÛ"      to p5
+            move "ÂÊÎÔÛA"     to p6
+            move "ÂÊÎÔÛAE"    to p7
+            move "ÂÊÎÔÛAEI"   to p8
+            move "ÂÊÎÔÛAEIO"  to p9
+            move "ÂÊÎÔÛAEIOU" to p10
+            display """" p1 """"
+            display """" p2 """"
+            display """" p3 """"
+            display """" p4 """"
+            display """" p5 """"
+            display """" p6 """"
+            display """" p7 """"
+            display """" p8 """"
+            display """" p9 """"
+            display """" p10 """"
+            goback.
+        end program prog1.
+      
+        identification division.
+        program-id. prog2.
+        environment division.
+        input-output section.
+        file-control.
+        select file1 assign to "file1.txt"
+                     organization is line sequential.
+        data division.
+        file section.
+        fd file1.
+        01 fdata  pic x(32).
+        procedure division.
+        open output file1
+        move "This is line 1 - hello, world"    to fdata
+        write fdata
+        move "This is line 2 - hallå, världen"  to fdata
+        write fdata
+        move "This is line 3 - hola, món"       to fdata
+        write fdata
+        close file1
+        open input file1
+        read file1
+        display """" fdata """"
+        read file1
+        display """" fdata """"
+        read file1
+        display """" fdata """"
+        close file1
+        goback.
+        end program prog2.
+])
+AT_CHECK([iconv -f UTF-8 -t UTF-8 prog.cob >converted.cob], [0], [], [])
+AT_CHECK([$COMPILE -finternal-ebcdic converted.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [Original values
+"â"
+"âê"
+"âêî"
+"âêîô"
+"âêîôû"
+"âêîôûa"
+"âêîôûab"
+"âêîôûabc"
+"âêîôûabcd"
+"âêîôûabcde"
+Literals
+"â"
+"âê"
+"âêî"
+"âêîô"
+"âêîôû"
+"âêîôûa"
+"âêîôûab"
+"âêîôûabc"
+"âêîôûabcd"
+"âêîôûabcde"
+Z-Literals
+"â"
+"âê"
+"âêî"
+"âêîô"
+"âêîôû"
+"âêîôûa"
+"âêîôûab"
+"âêîôûabc"
+"âêîôûabcd"
+"âêîôûabcde"
+Move literals
+"Â"
+"ÂÊ"
+"ÂÊÎ"
+"ÂÊÎÔ"
+"ÂÊÎÔÛ"
+"ÂÊÎÔÛA"
+"ÂÊÎÔÛAE"
+"ÂÊÎÔÛAEI"
+"ÂÊÎÔÛAEIO"
+"ÂÊÎÔÛAEIOU"
+"This is line 1 - hello, world   "
+"This is line 2 - hallå, världen "
+"This is line 3 - hola, món      "
+], [])
+AT_CHECK([LC_ALL=$LANG iconv -f CP1140 file1.txt], [0], [This is line 1 - hello, world
+This is line 2 - hallå, världen
+This is line 3 - hola, món
+], [])
+AT_CLEANUP
+
+AT_SETUP([Simple values: CP1252 in EBCDIC mode])
+AT_KEYWORDS([EBCDIC])
+# Even though autom4te uses a .m4f file that sets LC_ALL=C, the LANG environment
+# variable is still "en_US.UTF-8", and AT_DATA is generated in UTF-8
+AT_DATA([prog.cob], [
+        identification   division.
+        program-id.      progs.
+        procedure        division.
+        call             "prog1"
+        call             "prog2"
+        stop run.
+        end program progs.
+      
+        identification   division.
+        program-id.      prog1.
+        data             division.
+        working-storage  section.
+        01 p1            pic x(1)  value "â".
+        01 p2            pic x(2)  value "âê".
+        01 p3            pic x(3)  value "âêî".
+        01 p4            pic x(4)  value "âêîô".
+        01 p5            pic x(5)  value "âêîôû".
+        01 p6            pic x(6)  value "âêîôûa".
+        01 p7            pic x(7)  value "âêîôûab".
+        01 p8            pic x(8)  value "âêîôûabc".
+        01 p9            pic x(9)  value "âêîôûabcd".
+        01 p10           pic x(10) value "âêîôûabcde".
+        procedure        division.
+        DISPLAY "Original values"
+            display """" p1 """"
+            display """" p2 """"
+            display """" p3 """"
+            display """" p4 """"
+            display """" p5 """"
+            display """" p6 """"
+            display """" p7 """"
+            display """" p8 """"
+            display """" p9 """"
+            display """" p10 """"
+        DISPLAY "Literals"
+            display """" "â"          """"
+            display """" "âê"         """"
+            display """" "âêî"        """"
+            display """" "âêîô"       """"
+            display """" "âêîôû"      """"
+            display """" "âêîôûa"     """"
+            display """" "âêîôûab"    """"
+            display """" "âêîôûabc"   """"
+            display """" "âêîôûabcd"  """"
+            display """" "âêîôûabcde" """"
+        DISPLAY "Z-Literals"
+            display """" Z"â"          """"
+            display """" Z"âê"         """"
+            display """" Z"âêî"        """"
+            display """" Z"âêîô"       """"
+            display """" Z"âêîôû"      """"
+            display """" Z"âêîôûa"     """"
+            display """" Z"âêîôûab"    """"
+            display """" Z"âêîôûabc"   """"
+            display """" Z"âêîôûabcd"  """"
+            display """" Z"âêîôûabcde" """"
+        DISPLAY "Move literals"
+            move "Â"          to p1
+            move "ÂÊ"         to p2
+            move "ÂÊÎ"        to p3
+            move "ÂÊÎÔ"       to p4
+            move "ÂÊÎÔÛ"      to p5
+            move "ÂÊÎÔÛA"     to p6
+            move "ÂÊÎÔÛAE"    to p7
+            move "ÂÊÎÔÛAEI"   to p8
+            move "ÂÊÎÔÛAEIO"  to p9
+            move "ÂÊÎÔÛAEIOU" to p10
+            display """" p1 """"
+            display """" p2 """"
+            display """" p3 """"
+            display """" p4 """"
+            display """" p5 """"
+            display """" p6 """"
+            display """" p7 """"
+            display """" p8 """"
+            display """" p9 """"
+            display """" p10 """"
+            goback.
+        end program prog1.
+      
+        identification division.
+        program-id. prog2.
+        environment division.
+        input-output section.
+        file-control.
+        select file1 assign to "file1.txt"
+                     organization is line sequential.
+        data division.
+        file section.
+        fd file1.
+        01 fdata  pic x(32).
+        procedure division.
+        open output file1
+        move "This is line 1 - hello, world"    to fdata
+        write fdata
+        move "This is line 2 - hallå, världen"  to fdata
+        write fdata
+        move "This is line 3 - hola, món"       to fdata
+        write fdata
+        close file1
+        open input file1
+        read file1
+        display """" fdata """"
+        read file1
+        display """" fdata """"
+        read file1
+        display """" fdata """"
+        close file1
+        goback.
+        end program prog2.
+])
+AT_CHECK([iconv -f UTF-8 -t CP1252 prog.cob >converted.cob], [0], [], [])
+AT_CHECK([$COMPILE -finternal-ebcdic converted.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [Original values
+"â"
+"âê"
+"âêî"
+"âêîô"
+"âêîôû"
+"âêîôûa"
+"âêîôûab"
+"âêîôûabc"
+"âêîôûabcd"
+"âêîôûabcde"
+Literals
+"â"
+"âê"
+"âêî"
+"âêîô"
+"âêîôû"
+"âêîôûa"
+"âêîôûab"
+"âêîôûabc"
+"âêîôûabcd"
+"âêîôûabcde"
+Z-Literals
+"â"
+"âê"
+"âêî"
+"âêîô"
+"âêîôû"
+"âêîôûa"
+"âêîôûab"
+"âêîôûabc"
+"âêîôûabcd"
+"âêîôûabcde"
+Move literals
+"Â"
+"ÂÊ"
+"ÂÊÎ"
+"ÂÊÎÔ"
+"ÂÊÎÔÛ"
+"ÂÊÎÔÛA"
+"ÂÊÎÔÛAE"
+"ÂÊÎÔÛAEI"
+"ÂÊÎÔÛAEIO"
+"ÂÊÎÔÛAEIOU"
+"This is line 1 - hello, world   "
+"This is line 2 - hallå, världen "
+"This is line 3 - hola, món      "
+], [])
+AT_CHECK([LC_ALL=$LANG iconv -f CP1140 file1.txt], [0], [This is line 1 - hello, world
+This is line 2 - hallå, världen
+This is line 3 - hola, món
+], [])
+AT_CLEANUP
+
+
+
+
+
+
+
+AT_SETUP([Bundesstraße:  UTF-8  in ASCII  mode])
+AT_KEYWORDS([EBCDIC])
+AT_DATA([prog.cob], [
+        identification   division.
+        program-id.      prog.
+        data division.
+        working-storage section.
+        77 p64 pic x(64) value  "                    I am 64 characters".
+        77 p1  pic x(64) value  "üüüüüüüüüüüüüüüüüüü Bundesstraße".
+        77 p2  pic x(64) value z"üüüüüüüüüüüüüüüüüüü Bundesstraße".
+        procedure division.
+        display """" p64 """"
+        display """" p1  """"
+        display """" p2  """"
+        display """"     "üüüüüüüüüüüüüüüüüüü Bundesstraße" """"
+        display """"    z"üüüüüüüüüüüüüüüüüüü Bundesstraße" """"
+        goback.
+        end program prog.
+])
+AT_CHECK([iconv -f UTF-8 -t UTF-8 prog.cob >converted.cob], [0], [], [])
+AT_CHECK([$COMPILE converted.cob], [0], [], [])
+AT_CHECK([./a.out], [0], ["                    I am 64 characters                          "
+"üüüüüüüüüüüüüüüüüüü Bundesstraße                                "
+"üüüüüüüüüüüüüüüüüüü Bundesstraße"
+"üüüüüüüüüüüüüüüüüüü Bundesstraße"
+"üüüüüüüüüüüüüüüüüüü Bundesstraße"
+], [])
+AT_CLEANUP
+
+AT_SETUP([Bundesstraße:  CP1252 in ASCII  mode])
+AT_KEYWORDS([EBCDIC])
+AT_DATA([prog.cob], [
+        identification   division.
+        program-id.      prog.
+        data division.
+        working-storage section.
+        77 p64 pic x(64) value  "                    I am 64 characters".
+        77 p1  pic x(64) value  "üüüüüüüüüüüüüüüüüüü Bundesstraße".
+        77 p2  pic x(64) value z"üüüüüüüüüüüüüüüüüüü Bundesstraße".
+        procedure division.
+        display """" p64 """"
+        display """" p1  """"
+        display """" p2  """"
+        display """"     "üüüüüüüüüüüüüüüüüüü Bundesstraße" """"
+        display """"    z"üüüüüüüüüüüüüüüüüüü Bundesstraße" """"
+        goback.
+        end program prog.
+])
+AT_CHECK([iconv -f UTF-8 -t CP1252 prog.cob >converted.cob], [0], [], [])
+AT_CHECK([$COMPILE converted.cob], [0], [], [])
+AT_CHECK([./a.out], [0], ["                    I am 64 characters                          "
+"üüüüüüüüüüüüüüüüüüü Bundesstraße                                "
+"üüüüüüüüüüüüüüüüüüü Bundesstraße"
+"üüüüüüüüüüüüüüüüüüü Bundesstraße"
+"üüüüüüüüüüüüüüüüüüü Bundesstraße"
+], [])
+AT_CLEANUP
+
+AT_SETUP([Bundesstraße:  UTF-8  in EBCDIC mode])
+AT_KEYWORDS([EBCDIC])
+AT_DATA([prog.cob], [
+        identification   division.
+        program-id.      prog.
+        data division.
+        working-storage section.
+        77 p64 pic x(64) value  "                    I am 64 characters".
+        77 p1  pic x(64) value  "üüüüüüüüüüüüüüüüüüü Bundesstraße".
+        77 p2  pic x(64) value z"üüüüüüüüüüüüüüüüüüü Bundesstraße".
+        procedure division.
+        display """" p64 """"
+        display """" p1  """"
+        display """" p2  """"
+        display """"     "üüüüüüüüüüüüüüüüüüü Bundesstraße" """"
+        display """"    z"üüüüüüüüüüüüüüüüüüü Bundesstraße" """"
+        goback.
+        end program prog.
+])
+AT_CHECK([iconv -f UTF-8 -t UTF-8 prog.cob >converted.cob], [0], [], [])
+AT_CHECK([$COMPILE -finternal-ebcdic converted.cob], [0], [], [])
+AT_CHECK([./a.out], [0], ["                    I am 64 characters                          "
+"üüüüüüüüüüüüüüüüüüü Bundesstraße                                "
+"üüüüüüüüüüüüüüüüüüü Bundesstraße"
+"üüüüüüüüüüüüüüüüüüü Bundesstraße"
+"üüüüüüüüüüüüüüüüüüü Bundesstraße"
+], [])
+AT_CLEANUP
+
+AT_SETUP([Bundesstraße:  CP1252 in EBCDIC mode])
+AT_KEYWORDS([EBCDIC])
+AT_DATA([prog.cob], [
+        identification   division.
+        program-id.      prog.
+        data division.
+        working-storage section.
+        77 p64 pic x(64) value  "                    I am 64 characters".
+        77 p1  pic x(64) value  "üüüüüüüüüüüüüüüüüüü Bundesstraße".
+        77 p2  pic x(64) value z"üüüüüüüüüüüüüüüüüüü Bundesstraße".
+        procedure division.
+        display """" p64 """"
+        display """" p1  """"
+        display """" p2  """"
+        display """"     "üüüüüüüüüüüüüüüüüüü Bundesstraße" """"
+        display """"    z"üüüüüüüüüüüüüüüüüüü Bundesstraße" """"
+        goback.
+        end program prog.
+])
+AT_CHECK([iconv -f UTF-8 -t CP1252 prog.cob >converted.cob], [0], [], [])
+AT_CHECK([$COMPILE -finternal-ebcdic converted.cob], [0], [], [])
+AT_CHECK([./a.out], [0], ["                    I am 64 characters                          "
+"üüüüüüüüüüüüüüüüüüü Bundesstraße                                "
+"üüüüüüüüüüüüüüüüüüü Bundesstraße"
+"üüüüüüüüüüüüüüüüüüü Bundesstraße"
+"üüüüüüüüüüüüüüüüüüü Bundesstraße"
+], [])
+AT_CLEANUP
+
+
+# AT_SETUP([Simple values: UTF-8  in ASCII  mode])
+# AT_KEYWORDS([EBCDIC])
+# AT_DATA([prog.cob], [
+# ])
+# AT_CHECK([iconv -f UTF-8 -t UTF-8 prog.cob >converted.cob], [0], [], [])
+# AT_CHECK([$COMPILE converted.cob], [0], [], [])
+# AT_CHECK([./a.out], [0], [Original values
+# ], [])
+# AT_CLEANUP
+# 
+# AT_SETUP([Simple values: CP1252 in ASCII  mode])
+# AT_KEYWORDS([EBCDIC])
+# AT_DATA([prog.cob], [
+# ])
+# AT_CHECK([iconv -f UTF-8 -t CP1252 prog.cob >converted.cob], [0], [], [])
+# AT_CHECK([$COMPILE converted.cob], [0], [], [])
+# AT_CHECK([./a.out], [0], [
+# ], [])
+# AT_CLEANUP
+# 
+# AT_SETUP([Simple values: UTF-8  in EBCDIC mode])
+# AT_KEYWORDS([EBCDIC])
+# AT_DATA([prog.cob], [
+# ])
+# AT_CHECK([iconv -f UTF-8 -t UTF-8 prog.cob >converted.cob], [0], [], [])
+# AT_CHECK([$COMPILE -finternal-ebcdic converted.cob], [0], [], [])
+# AT_CHECK([./a.out], [0], [n      "
+# ], [])
+# AT_CLEANUP
+# 
+# AT_SETUP([Simple values: CP1252 in EBCDIC mode])
+# AT_KEYWORDS([EBCDIC])
+# AT_DATA([prog.cob], [
+# ])
+# AT_CHECK([iconv -f UTF-8 -t CP1252 prog.cob >converted.cob], [0], [], [])
+# AT_CHECK([$COMPILE -finternal-ebcdic converted.cob], [0], [], [])
+# AT_CHECK([./a.out], [0], [
+# ], [])
+# AT_CLEANUP
+
+
+
+
+
+
+

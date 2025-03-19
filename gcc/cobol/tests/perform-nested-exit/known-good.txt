@@ -1,0 +1,40 @@
+00    About to start...
+01 I am a
+02 I am b
+03 I am c
+04 I am d
+04                           fall through to z
+04 I am z
+03    back from d through z; fall through to d
+03 I am d
+03                           fall through to z
+03 I am z
+02    back from c through z; fall through to c
+02 I am c
+03 I am d
+03                           fall through to z
+03 I am z
+02    back from d through z; fall through to d
+02 I am d
+02                           fall through to z
+02 I am z
+01    back from b through z; fall through to b
+01 I am b
+02 I am c
+03 I am d
+03                           fall through to z
+03 I am z
+02    back from d through z; fall through to d
+02 I am d
+02                           fall through to z
+02 I am z
+01    back from c through z; fall through to c
+01 I am c
+02 I am d
+02                           fall through to z
+02 I am z
+01    back from d through z; fall through to d
+01 I am d
+01                           fall through to z
+01 I am z
+00        back from a through z

@@ -1,0 +1,18 @@
+SmallScaledNumber should be     +.00000423 and is      +.00000423
+LargeScaledNumber should be       45600000 and is        45600000
+ScaledBillions    should be   123000000000 and is    123000000000
+ 
+MOVING SmallScaledNumber TO PrnSmall
+PrnSmall         should be    00.000004230 and is    00.000004230
+ 
+MOVING LargeScaledNumber TO PrnLarge
+PrnLarge         should be   45,600,000.00 and is   45,600,000.00
+ 
+Adding SmallScaledNumber TO SmallNumber
+PrnSmall         should be    01.111115340 and is    01.111115340
+ 
+Adding LargeScaledNumber TO LargeNumber
+LargeNumber      should be   56,711,111.00 and is   56,711,111.00
+ 
+MOVE ScaledBillions TO PrnBillions
+PrnBillions      should be 123,000,000,000 and is 123,000,000,000

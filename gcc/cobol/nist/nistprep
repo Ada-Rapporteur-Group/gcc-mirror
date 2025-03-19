@@ -1,0 +1,81 @@
+#! /usr/bin/awk -f
+
+BEGIN { FIELDWIDTHS = "6 66" }
+
+#
+# Split newcob.val into Cobol and data files.
+# Discard characters past column 72.  
+#
+
+/^CCVS85/        { print; next }
+/^[*]END-OF-POP/ { print; next }
+
+{
+  delete header
+}
+
+/^ *[*][HE]/ {
+  $0 = $1 $2  # eliminate data after column 72
+  gsub(/^ +/, "")
+  gsub(/ +$/, "")
+  nf = split( $0, header, /[, ]/ )
+  if( header[1] !~ /^[*]HEADER$|^[*]END-OF$/ ) {
+    print NR ":", "strange...", $0 > "/dev/stderr"
+    for( k in header ) {
+      print k, header[k]
+    }
+    exit
+  }
+}
+
+header[1] == "*HEADER" {
+  if( header[2] == "COBOL") {
+    gsub(/ +$/, "", header[nf])
+    filename = header[nf] ".cbl"
+    #rint "filename is", filename, "length", nf > "/dev/stderr"
+    next
+  }
+
+  if( header[2] == "DATA*") {
+    gsub(/ +$/, "", header[3])
+    filename = header[3] ".dat"
+    next
+  }
+    
+  if( header[2] ~ /^[[:alnum:]]+$/ && header[3] ~ /^[[:alnum:]]+ *$/ ) {
+    gsub(/ +$/, "", header[3])
+    filename = header[2] "." header[3]
+    next
+  }
+    
+  print NR ":", "strange...", $0 > "/dev/stderr"
+  for( i in header ) {
+    print i, "'" header[i] "'"
+  }
+  exit
+}
+
+header[1] == "*END-OF" {
+  output = filename ~ /dat$/? "" :  "      " $0
+  print output > filename
+  filename = "/dev/stderr"
+  line = 0
+  next
+}
+
+# Data files are output verbatim
+filename ~ /dat$/ {
+  #rint NR, filename, ":'" $0 "'" > "/dev/stderr"
+  print > filename
+  line++
+  next
+}  
+
+# Print line-number, indicator, and COBOL text up to column 73.
+{
+  print $1 $2 > filename
+  line++
+  next
+}
+    
+

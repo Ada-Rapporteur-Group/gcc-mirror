@@ -1,0 +1,6 @@
+#!/bin/sh
+
+for f in ./*.rpt; do
+    iconv -f CP1140 -t UTF-8 $f >rpt.tmp
+    mv rpt.tmp $f
+    done

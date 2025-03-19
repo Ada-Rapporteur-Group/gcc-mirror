@@ -1,0 +1,1335 @@
+## Copyright (C) 2003-2012, 2014-2015, 2017-2020 Free Software Foundation, Inc.
+## Written by Keisuke Nishida, Roger While, Simon Sobisch, Edward Hart,
+## Ron Norman
+##
+## This file is part of GnuCOBOL.
+##
+## The GnuCOBOL compiler is free software: you can redistribute it
+## and/or modify it under the terms of the GNU General Public License
+## as published by the Free Software Foundation, either version 3 of the
+## License, or (at your option) any later version.
+##
+## GnuCOBOL is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with GnuCOBOL.  If not, see <https://www.gnu.org/licenses/>.
+
+### GnuCOBOL Test Suite
+
+### Fundamental Tests
+
+AT_SETUP([GLOBAL CONSTANT])
+AT_KEYWORDS([fundamental])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# 01-level CONSTANT is legal in 2014.
+# 78 is part of the extended CDF of Gnu
+# A new GLOBAL CONSTANT test is needed.
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT      DIVISION.
+       INPUT-OUTPUT     SECTION.
+       FILE-CONTROL.
+       SELECT TEST-FILE
+              ASSIGN    GLOB-PATH
+       .
+       DATA             DIVISION.
+       FILE             SECTION.
+       FD  TEST-FILE    GLOBAL.
+       01  TEST-REC     PIC X(4).
+       WORKING-STORAGE  SECTION.
+       78  GLOB-PATH           GLOBAL VALUE "GLOBP1".
+       01  GLOB-PATH2 CONSTANT GLOBAL       "GLOBP2".
+      * Test global vars because of implicitly defined ASSIGN var, too.
+       78  GLOB-VAR            GLOBAL VALUE "GLOBV1".
+       01  GLOB-VAR2  CONSTANT GLOBAL       "GLOBV2".
+       PROCEDURE        DIVISION.
+           DISPLAY GLOB-PATH GLOB-VAR
+           END-DISPLAY.
+           CALL "prog2"
+           END-CALL.
+           CALL "prog3"
+           END-CALL.
+           STOP RUN.
+        IDENTIFICATION   DIVISION.
+        PROGRAM-ID.      prog2.
+        ENVIRONMENT      DIVISION.
+        INPUT-OUTPUT     SECTION.
+        FILE-CONTROL.
+        SELECT TEST2-FILE
+               ASSIGN    GLOB-PATH2
+        .
+        DATA             DIVISION.
+        FILE             SECTION.
+        FD  TEST2-FILE   GLOBAL.
+        01  TEST2-REC    PIC X(4).
+        WORKING-STORAGE  SECTION.
+        PROCEDURE        DIVISION.
+            DISPLAY GLOB-PATH2 GLOB-VAR2
+            END-DISPLAY.
+            EXIT PROGRAM.
+        END PROGRAM prog2.
+       END PROGRAM prog.
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog3.
+       ENVIRONMENT      DIVISION.
+       INPUT-OUTPUT     SECTION.
+       FILE-CONTROL.
+       SELECT TEST3-FILE
+              ASSIGN    GLOB-PATH
+       .
+       DATA             DIVISION.
+       FILE             SECTION.
+       FD  TEST3-FILE   GLOBAL.
+       01  TEST3-REC    PIC X(4).
+       WORKING-STORAGE  SECTION.
+       PROCEDURE        DIVISION.
+           DISPLAY 'in prog3'
+           END-DISPLAY
+           IF GLOB-PATH NOT = SPACES
+              DISPLAY FUNCTION TRIM (GLOB-PATH TRAILING)
+              END-DISPLAY
+           END-IF
+           EXIT PROGRAM.
+       END PROGRAM prog3.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0],
+[GLOBP1GLOBV1
+GLOBP2GLOBV2
+in prog3
+GLOB-PATH
+])
+
+AT_CLEANUP
+
+
+AT_SETUP([GLOBAL identifiers from ENVIRONMENT DIVISION])
+AT_KEYWORDS([fundamental function CURRENCY SIGN RETURNING])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+## Functions not supported
+
+AT_DATA([prog.cob], [
+       FUNCTION-ID. f1.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 r BINARY-LONG.
+       PROCEDURE DIVISION RETURNING r.
+           move 1 to r
+           GOBACK
+           .
+       END FUNCTION f1.
+       FUNCTION-ID. f2.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 i BINARY-LONG.
+       01 r BINARY-LONG.
+       PROCEDURE DIVISION USING i RETURNING r.
+           add i to i giving r
+           GOBACK
+           .
+       END FUNCTION f2.
+
+       PROGRAM-ID.   prog.
+
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       REPOSITORY.
+           FUNCTION f1
+           FUNCTION f2.
+       SPECIAL-NAMES.
+           CURRENCY SIGN IS "Y"
+           DECIMAL-POINT IS COMMA.
+
+       PROCEDURE DIVISION.
+           CALL "prog-nested"
+           .
+
+       PROGRAM-ID. prog-nested.
+
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       77  n1    BINARY-LONG VALUE 0.
+       77  curr  PIC 9.9999,99Y.
+
+       PROCEDURE DIVISION.
+           MOVE f1()   TO n1
+           IF n1 NOT = 1
+             DISPLAY "ERROR 1" GOBACK
+           END-IF
+           MOVE f2(n1) TO n1
+           IF n1 NOT = 2
+             DISPLAY "ERROR 2" GOBACK
+           END-IF
+           MOVE f1()   TO n1
+           IF n1 NOT = 1
+             DISPLAY "ERROR 1 2nd" GOBACK
+           END-IF
+           MOVE f2(f2(n1)) TO n1
+           IF n1 NOT = 4
+             DISPLAY "ERROR 4" GOBACK
+           END-IF
+           MOVE n1 TO curr
+           DISPLAY curr
+
+           GOBACK
+           .
+       END PROGRAM prog-nested.
+       END PROGRAM prog.
+
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0],
+[0.0004,00Y
+])
+
+AT_CLEANUP
+
+
+AT_SETUP([function with variable-length RETURNING item])
+AT_KEYWORDS([fundamental udf])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+## Functions not supported
+## Skipped in 3.1.1, 3.1.2 by Gnu TODO
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       FUNCTION-ID. reply.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       77 arg-len   USAGE BINARY-LONG.
+       LINKAGE SECTION.
+       01 argument  PIC X ANY LENGTH.
+       01 result.
+          05 filler PIC X OCCURS 0 to 999 DEPENDING ON arg-len.
+       PROCEDURE DIVISION USING BY REFERENCE argument RETURNING result.
+           MOVE FUNCTION LENGTH (argument) TO arg-len
+           MOVE argument TO result.
+       END FUNCTION reply.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       REPOSITORY.
+           FUNCTION reply.
+
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       77  arg   pic x(100).
+
+       PROCEDURE DIVISION.
+      *>
+           IF not (FUNCTION         REPLY ("test")  = "test"
+               and FUNCTION LENGTH (REPLY ("test")) = 4     )
+              DISPLAY "'test' failed: "
+                     FUNCTION LENGTH (REPLY ("test")) " #"
+                     FUNCTION         REPLY ("test")  "#".
+      *>
+           IF not (FUNCTION         REPLY ("test   ")  = "test"
+               and FUNCTION LENGTH (REPLY ("test   ")) = 7     )
+              DISPLAY "'test   ' failed: "
+                     FUNCTION LENGTH (REPLY ("test   ")) " #"
+                     FUNCTION         REPLY ("test   ")  "#".
+      *>
+           IF not (FUNCTION         REPLY (arg)  = spaces
+               and FUNCTION LENGTH (REPLY (arg)) = 100 )
+              DISPLAY "empty arg failed: "
+                     FUNCTION LENGTH (REPLY (arg)) " #"
+                     FUNCTION         REPLY (arg)  "#".
+      *>
+           MOVE "echo this" to arg
+           IF not (FUNCTION         REPLY (arg)  = arg
+               and FUNCTION LENGTH (REPLY (arg)) = 100 )
+              DISPLAY "echo arg failed: "
+                     FUNCTION LENGTH (REPLY (arg)) " #"
+                     FUNCTION         REPLY (arg)  "#".
+      *>
+           MOVE z"echo this" to arg
+           IF not (FUNCTION         REPLY (arg)  = arg
+               and FUNCTION LENGTH (REPLY (arg)) = 100 )
+              DISPLAY "z'echo arg failed: "
+                     FUNCTION LENGTH (REPLY (arg)) " #"
+                     FUNCTION         REPLY (arg)  "#".
+      *>
+           GOBACK
+           .
+       END PROGRAM prog.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([Entry point visibility (1) (needs "ENTRY")])
+AT_KEYWORDS([fundamental CALL])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# TODO NOT IMPLEMENTED "ENTRY"
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA DIVISION.
+       PROCEDURE        DIVISION.
+           CALL 'module'
+           CALL 'modulepart'
+           STOP RUN.
+])
+
+AT_DATA([module.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      module.
+       DATA DIVISION.
+       PROCEDURE        DIVISION.
+           DISPLAY 'A' WITH NO ADVANCING
+           GOBACK.
+       ENTRY 'modulepart'.
+           DISPLAY 'B' WITH NO ADVANCING
+           GOBACK.
+])
+
+AT_CHECK([$COMPILE_MODULE -shared -o libM.so module.cob], [0], [], [])
+AT_CHECK([$COMPILE prog.cob -L. -lM], [0], [], [])
+AT_CHECK([./a.out], [0], [AB], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([Contained program visibility (2)])
+AT_KEYWORDS([fundamental CALL])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+AT_XFAIL_IF(true)
+# Gnu specific check
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  X   PIC X(5) GLOBAL  VALUE "prog1".
+       PROCEDURE        DIVISION.
+           IF X NOT = "prog1"
+              DISPLAY X
+              END-DISPLAY
+           END-IF.
+           CALL "prog2"
+           END-CALL.
+           STOP RUN.
+        IDENTIFICATION   DIVISION.
+        PROGRAM-ID.      prog2.
+        DATA DIVISION.
+        WORKING-STORAGE SECTION.
+        01  X   PIC X(5) GLOBAL  VALUE "prog2".
+        PROCEDURE        DIVISION.
+            IF X NOT = "prog2"
+               DISPLAY X
+               END-DISPLAY
+            END-IF.
+            CALL "prog3"
+            END-CALL.
+            EXIT PROGRAM.
+        END PROGRAM prog2.
+        IDENTIFICATION   DIVISION.
+        PROGRAM-ID.      prog3.
+        DATA DIVISION.
+        WORKING-STORAGE SECTION.
+        PROCEDURE        DIVISION.
+            IF X NOT = "prog2"
+               DISPLAY X
+               END-DISPLAY
+            END-IF.
+            EXIT PROGRAM.
+        END PROGRAM prog3.
+       END PROGRAM prog.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [1], [],
+[libcob: prog.cob:25: error: module 'prog3' not found
+])
+
+AT_CLEANUP
+
+
+AT_SETUP([CALL/CANCEL with program-prototype-name])
+AT_KEYWORDS([fundamental])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+## GNU error checking (design questions)
+## Something about program prototyping???
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION  DIVISION.
+       PROGRAM-ID.     prog.
+
+       ENVIRONMENT     DIVISION.
+       CONFIGURATION   SECTION.
+       REPOSITORY.
+           PROGRAM recursion-test
+           PROGRAM cancel-test
+           .
+       DATA            DIVISION.
+       WORKING-STORAGE SECTION.
+       01  num         PIC 9 VALUE 0.
+
+       PROCEDURE       DIVISION.
+           CALL recursion-test USING num
+           DISPLAY "<"
+
+           CALL cancel-test
+           CALL cancel-test
+           CANCEL cancel-test
+           CALL cancel-test
+           DISPLAY "<"
+           .
+       END PROGRAM     prog.
+
+
+       IDENTIFICATION  DIVISION.
+       PROGRAM-ID.     recursion-test RECURSIVE.
+
+       DATA            DIVISION.
+       LINKAGE         SECTION.
+       01  x           PIC 9.
+
+       PROCEDURE       DIVISION USING x.
+           ADD 1 TO x
+           DISPLAY x NO ADVANCING
+           IF x = 1
+               CALL recursion-test USING x
+           END-IF
+           .
+       END PROGRAM     recursion-test.
+
+
+       IDENTIFICATION  DIVISION.
+       PROGRAM-ID.     cancel-test.
+
+       DATA            DIVISION.
+       WORKING-STORAGE SECTION.
+       01  x           PIC 9 VALUE 1.
+
+       PROCEDURE       DIVISION.
+           DISPLAY x NO ADVANCING
+           ADD 1 TO x
+           .
+       END PROGRAM     cancel-test.
+])
+
+# TO-DO: Fix these warnings when program prototypes are added.
+AT_CHECK([$COMPILE -fno-program-name-redefinition prog.cob], [0], [],
+[prog.cob:8: warning: no definition/prototype seen for PROGRAM 'recursion-test'
+prog.cob:9: warning: no definition/prototype seen for PROGRAM 'cancel-test'
+])
+AT_CHECK([./a.out], [0],
+[12<
+121<
+])
+AT_CLEANUP
+
+AT_SETUP([SYNC in OCCURS])
+AT_KEYWORDS([fundamental CDF SYNCHRONIZE])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# CDF not implemented
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION  DIVISION.
+       PROGRAM-ID.     prog.
+
+       DATA            DIVISION.
+       WORKING-STORAGE SECTION.
+       01 x.
+           03  ptrs                     OCCURS 5 TIMES.
+               05  misalign-1           PIC X.
+               05  ptr                  POINTER, SYNC.
+               05  ptr-num              REDEFINES ptr,
+       >>IF P64 SET
+                                        USAGE BINARY-DOUBLE UNSIGNED.
+       >>ELSE
+                                        USAGE BINARY-LONG UNSIGNED.
+       >>END-IF
+               05  misalign-2           PIC X.
+
+       01  num                          BINARY-LONG.
+
+       PROCEDURE       DIVISION.
+           SET ptr (2) TO ADDRESS OF ptr (2)
+           SET ptr (3) TO ADDRESS OF ptr (3)
+
+           SUBTRACT ptr-num (2) FROM ptr-num (3) GIVING num
+           DISPLAY FUNCTION MOD (num, FUNCTION LENGTH (ptr (1)))
+           .
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0],
+[000000000
+])
+
+AT_CLEANUP
+
+
+AT_SETUP([debugging lines (-fdebugging-line)])
+AT_KEYWORDS([fundamental])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# GnuCOBOL -fdebugging-lines ... control over whether
+# debug lines are active or not without modifying source
+# NICE FEATURE -- TODO
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       PROCEDURE        DIVISION.
+           DISPLAY "OK" NO ADVANCING
+           END-DISPLAY.
+      D    DISPLAY "KO" NO ADVANCING
+      D    END-DISPLAY.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_FIXED prog.cob], [0], [], [])
+# AT_CHECK([$COMPILE -fdebugging-line prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0],
+[OKKO], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([debugging lines, free format (not active)])
+AT_KEYWORDS([fundamental extensions])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# GnuCOBOL UNIQUE floating debug indicator
+# We can consider this as an implementor extension later
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       PROCEDURE        DIVISION.
+             DISPLAY "OK" NO ADVANCING
+             END-DISPLAY.
+      >>D    DISPLAY "KO" NO ADVANCING
+      >>D    END-DISPLAY.
+             STOP RUN.
+])
+
+AT_CHECK([$COMPILE -free prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0],
+[OK], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([debugging lines, free format (-fdebugging-line)])
+AT_KEYWORDS([fundamental extensions])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# GnuCOBOL UNIQUE floating debug indicator
+# We can consider this as an implementor extension later
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       PROCEDURE        DIVISION.
+             DISPLAY "OK" NO ADVANCING
+             END-DISPLAY.
+      >>D    DISPLAY "KO" NO ADVANCING
+      >>D    END-DISPLAY.
+             STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0],
+[OKKO], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([USE FOR DEBUGGING (no DEBUGGING MODE)])
+AT_KEYWORDS([fundamental declaratives debugging])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# ISO does not show USE FOR DEBUGGING in DECLARATIVES
+# ??? TODO
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+           SOURCE-COMPUTER.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       PROCEDURE        DIVISION.
+       DECLARATIVES.
+       TEST-DEBUG SECTION. USE FOR DEBUGGING ON ALL PROCEDURES.
+           DISPLAY DEBUG-ITEM END-DISPLAY.
+       END DECLARATIVES.
+       FIRST-PAR.
+           DISPLAY "OK1" END-DISPLAY.
+           GO TO SECOND-PAR.
+       SECOND-PAR.
+           DISPLAY "OK2" END-DISPLAY.
+       THIRD-PAR.
+           DISPLAY "OK3" END-DISPLAY.
+           PERFORM FIRST-PAR THRU SECOND-PAR.
+           DISPLAY "OK4" END-DISPLAY.
+           PERFORM SECOND-PAR.
+           DISPLAY "OK5" END-DISPLAY.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([COB_SET_DEBUG=1 ./a.out], [0],
+[OK1
+OK2
+OK3
+OK1
+OK2
+OK4
+OK2
+OK5
+], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([USE FOR DEBUGGING (COB_SET_DEBUG deactivated)])
+AT_KEYWORDS([fundamental])
+AT_SKIP_IF(true)
+AT_XFAIL_IF(true)
+# USE FOR DEBUGGIN ON not ISO, not implemented TODO
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+           SOURCE-COMPUTER. mine WITH DEBUGGING MODE.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       PROCEDURE        DIVISION.
+       DECLARATIVES.
+       TEST-DEBUG SECTION. USE FOR DEBUGGING ON ALL PROCEDURES.
+           DISPLAY DEBUG-ITEM END-DISPLAY.
+       END DECLARATIVES.
+       FIRST-PAR.
+           DISPLAY "OK1" END-DISPLAY.
+           GO TO SECOND-PAR.
+       SECOND-PAR.
+           DISPLAY "OK2" END-DISPLAY.
+       THIRD-PAR.
+           DISPLAY "OK3" END-DISPLAY.
+           PERFORM FIRST-PAR THRU SECOND-PAR.
+           DISPLAY "OK4" END-DISPLAY.
+           PERFORM SECOND-PAR.
+           DISPLAY "OK5" END-DISPLAY.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([COB_SET_DEBUG=0 ./a.out], [0],
+[OK1
+OK2
+OK3
+OK1
+OK2
+OK4
+OK2
+OK5
+], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([USE FOR DEBUGGING ON ALL PROCEDURES])
+AT_KEYWORDS([fundamental])
+AT_SKIP_IF(true)
+AT_XFAIL_IF(true)
+# USE FOR DEBUGGIN ON not ISO, not implemented TODO
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+           SOURCE-COMPUTER. mine WITH DEBUGGING MODE.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       PROCEDURE        DIVISION.
+       DECLARATIVES.
+       TEST-DEBUG SECTION. USE FOR DEBUGGING ON ALL PROCEDURES.
+           DISPLAY DEBUG-ITEM "|" END-DISPLAY.
+       END DECLARATIVES.
+       FIRST-PAR.
+           DISPLAY "OK1" END-DISPLAY.
+           GO TO SECOND-PAR.
+       SECOND-PAR.
+           DISPLAY "OK2" END-DISPLAY.
+       THIRD-PAR.
+           DISPLAY "OK3" END-DISPLAY.
+           PERFORM FIRST-PAR THRU SECOND-PAR.
+           DISPLAY "OK4" END-DISPLAY.
+           PERFORM SECOND-PAR.
+           DISPLAY "OK5" END-DISPLAY.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([COB_SET_DEBUG=1 ./a.out], [0],
+[       FIRST-PAR                                        START PROGRAM                 |
+OK1
+    16 SECOND-PAR                                                                     |
+OK2
+    18 THIRD-PAR                                        FALL THROUGH                  |
+OK3
+    21 FIRST-PAR                                        PERFORM LOOP                  |
+OK1
+    16 SECOND-PAR                                                                     |
+OK2
+OK4
+    23 SECOND-PAR                                       PERFORM LOOP                  |
+OK2
+OK5
+], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([USE FOR DEBUGGING ON procedure])
+AT_KEYWORDS([fundamental])
+AT_SKIP_IF(true)
+AT_XFAIL_IF(true)
+# USE FOR DEBUGGIN ON not ISO, not implemented TODO
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+           SOURCE-COMPUTER. mine WITH DEBUGGING MODE.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       PROCEDURE        DIVISION.
+       DECLARATIVES.
+       TEST-DEBUG SECTION. USE FOR DEBUGGING ON SECOND-PAR.
+           DISPLAY DEBUG-ITEM "|" END-DISPLAY.
+       END DECLARATIVES.
+       FIRST-PAR.
+           DISPLAY "OK1" END-DISPLAY.
+           GO TO SECOND-PAR.
+       SECOND-PAR.
+           DISPLAY "OK2" END-DISPLAY.
+       THIRD-PAR.
+           DISPLAY "OK3" END-DISPLAY.
+           PERFORM FIRST-PAR THRU SECOND-PAR.
+           DISPLAY "OK4" END-DISPLAY.
+           PERFORM SECOND-PAR.
+           DISPLAY "OK5" END-DISPLAY.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([COB_SET_DEBUG=1 ./a.out], [0],
+[OK1
+    16 SECOND-PAR                                                                     |
+OK2
+OK3
+OK1
+    16 SECOND-PAR                                                                     |
+OK2
+OK4
+    23 SECOND-PAR                                       PERFORM LOOP                  |
+OK2
+OK5
+], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([USE FOR DEBUGGING (COB_SET_DEBUG switched)])
+AT_KEYWORDS([fundamental])
+AT_SKIP_IF(true)
+AT_XFAIL_IF(true)
+# USE FOR DEBUGGIN ON not ISO, not implemented TODO
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+           SOURCE-COMPUTER. mine WITH DEBUGGING MODE.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       PROCEDURE        DIVISION.
+       DECLARATIVES.
+       TEST-DEBUG SECTION. USE FOR DEBUGGING ON ALL PROCEDURES.
+           DISPLAY DEBUG-ITEM "|" END-DISPLAY.
+       END DECLARATIVES.
+       FIRST-PAR.
+           SET ENVIRONMENT "COB_SET_DEBUG" TO "false"
+           DISPLAY "OK1" END-DISPLAY.
+           GO TO SECOND-PAR.
+       SECOND-PAR.
+           DISPLAY "OK2" END-DISPLAY.
+       THIRD-PAR.
+           DISPLAY "OK3" END-DISPLAY.
+           PERFORM FIRST-PAR THRU SECOND-PAR.
+           DISPLAY "OK4" END-DISPLAY.
+           SET ENVIRONMENT "COB_SET_DEBUG" TO "Y"
+           PERFORM SECOND-PAR.
+           DISPLAY "OK5" END-DISPLAY.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([COB_SET_DEBUG=1 ./a.out], [0],
+[       FIRST-PAR                                        START PROGRAM                 |
+OK1
+OK2
+OK3
+OK1
+OK2
+OK4
+    25 SECOND-PAR                                       PERFORM LOOP                  |
+OK2
+OK5
+], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([USE FOR DEBUGGING ON [[ALL]] REFERENCES OF field])
+AT_KEYWORDS([fundamental])
+AT_SKIP_IF(true)
+AT_XFAIL_IF(true)
+# USE FOR DEBUGGIN ON not ISO, not implemented TODO
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+           SOURCE-COMPUTER. mine WITH DEBUGGING MODE.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  MY-DATA-FIELDS.
+           02  MY-DATA-FIELD-1  PIC 9 VALUE 1.
+           02  MY-DATA-FIELD-2  PIC 9 VALUE 4.
+       01  MY-DATA-FIELD-B  PIC X(40) VALUE "ABCD".
+       PROCEDURE        DIVISION.
+       DECLARATIVES.
+       TEST-DEBUG SECTION.
+           USE FOR DEBUGGING ON ALL REFERENCES OF MY-DATA-FIELD-1
+                                ALL               MY-DATA-FIELD-2
+                                MY-DATA-FIELD-B.
+           DISPLAY DEBUG-ITEM "|" END-DISPLAY.
+       END DECLARATIVES.
+       INIT-PAR.
+           MOVE 6 TO MY-DATA-FIELD-2.
+       FIRST-PAR.
+           PERFORM VARYING MY-DATA-FIELD-1 FROM 1 BY 1
+                   UNTIL   MY-DATA-FIELD-1 > MY-DATA-FIELD-2
+              *> empty by design
+           END-PERFORM.
+       END-PAR.
+           MOVE "99" TO MY-DATA-FIELD-B.
+           MOVE MY-DATA-FIELD-B TO MY-DATA-FIELDS.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE -fmissing-statement=ok prog.cob], [0], [], [])
+# TODO: validate against other compilers, especially the line 30;
+#       likely the second line should be 25 instead of 24:
+AT_CHECK([COB_SET_DEBUG=1 ./a.out], [0],
+[    22 MY-DATA-FIELD-2                                  6                                       |
+    24 MY-DATA-FIELD-1                                  1                                       |
+    24 MY-DATA-FIELD-1                                  1                                       |
+    24 MY-DATA-FIELD-2                                  6                                       |
+    24 MY-DATA-FIELD-1                                  2                                       |
+    24 MY-DATA-FIELD-1                                  2                                       |
+    24 MY-DATA-FIELD-2                                  6                                       |
+    24 MY-DATA-FIELD-1                                  3                                       |
+    24 MY-DATA-FIELD-1                                  3                                       |
+    24 MY-DATA-FIELD-2                                  6                                       |
+    24 MY-DATA-FIELD-1                                  4                                       |
+    24 MY-DATA-FIELD-1                                  4                                       |
+    24 MY-DATA-FIELD-2                                  6                                       |
+    24 MY-DATA-FIELD-1                                  5                                       |
+    24 MY-DATA-FIELD-1                                  5                                       |
+    24 MY-DATA-FIELD-2                                  6                                       |
+    24 MY-DATA-FIELD-1                                  6                                       |
+    24 MY-DATA-FIELD-1                                  6                                       |
+    24 MY-DATA-FIELD-2                                  6                                       |
+    24 MY-DATA-FIELD-1                                  7                                       |
+    24 MY-DATA-FIELD-1                                  7                                       |
+    24 MY-DATA-FIELD-2                                  6                                       |
+    29 MY-DATA-FIELD-B                                  99                                      |
+], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([USE FOR DEBUGGING, reference within DEBUGGING])
+AT_KEYWORDS([fundamental])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# USE FOR DEBUGGIN ON not ISO, not implemented TODO
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+           SOURCE-COMPUTER. mine WITH DEBUGGING MODE.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  DATA-FIELD   PIC X(40) VALUE "ABCD".
+       PROCEDURE        DIVISION.
+       DECLARATIVES.
+       TEST-DEBUG SECTION.
+           USE FOR DEBUGGING ON ALL REFERENCES OF DATA-FIELD.
+           DISPLAY DEBUG-ITEM "|".
+           MOVE "ABCD" TO DATA-FIELD.
+           DISPLAY DEBUG-ITEM "|".
+       END DECLARATIVES.
+       SOME-PAR.
+           MOVE QUOTE TO DATA-FIELD.
+           IF DATA-FIELD = QUOTE DISPLAY "NO DEBUG" STOP RUN.
+           DISPLAY "DEBUG".
+           STOP RUN.
+])
+AT_CHECK([$COMPILE -Wno-terminator prog.cob], [0], [], [])
+AT_CHECK([COB_SET_DEBUG=1 ./a.out], [0],
+[    19 DATA-FIELD                                       """"""""""""""""""""""""""""""""""""""""|
+    19 DATA-FIELD                                       """"""""""""""""""""""""""""""""""""""""|
+    20 DATA-FIELD                                       ABCD                                    |
+    20 DATA-FIELD                                       ABCD                                    |
+DEBUG
+], [])
+AT_CHECK([./a.out], [0],
+[NO DEBUG
+], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([USE FOR DEBUGGING, time of execution])
+AT_KEYWORDS([fundamental DEBUGGING])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# USE FOR DEBUGGIN ON not ISO, not implemented TODO
+
+# FIXME: the debugging procedure is executed after the statement,
+#        which is generally fine, but not for "nested" statements
+#        where DEBUG-ITEM contains wrong data and the
+#        debugging procedure is called too late
+AT_XFAIL_IF(true)
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+           SOURCE-COMPUTER. mine WITH DEBUGGING MODE.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  DATA-FIELD   PIC X(40) VALUE "ABCD".
+       PROCEDURE        DIVISION.
+       DECLARATIVES.
+       TEST-DEBUG SECTION.
+           USE FOR DEBUGGING ON ALL REFERENCES OF DATA-FIELD.
+           DISPLAY DEBUG-ITEM "|".
+           MOVE "ABCD" TO DATA-FIELD.
+       END DECLARATIVES.
+       SOME-PAR.
+           MOVE QUOTE TO DATA-FIELD.
+           IF DATA-FIELD = QUOTE
+              DISPLAY "NO DEBUG"
+           ELSE
+              DISPLAY "DEBUG"
+              MOVE SPACES TO DATA-FIELD
+              CALL "NOTHERE" USING DATA-FIELD
+                 ON OVERFLOW
+                    DISPLAY "THIS IS FINE".
+           STOP RUN.
+])
+AT_CHECK([$COMPILE -w prog.cob], [0], [], [])
+AT_CHECK([COB_SET_DEBUG=1 ./a.out], [0],
+[    18 DATA-FIELD                                       """"""""""""""""""""""""""""""""""""""""|
+    19 DATA-FIELD                                       ABCD                                    |
+DEBUG
+    23 DATA-FIELD                                                                               |
+    24 DATA-FIELD                                       ABCD                                    |
+THIS IS FINE
+], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([USE FOR DEBUGGING, reference with OCCURS])
+AT_KEYWORDS([fundamental DEBUGGING])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# DEBUGGINg in DECLARATIVES not ISO not implimented TODO
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+           SOURCE-COMPUTER. mine WITH DEBUGGING MODE.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  FILLER.
+           02 FILLER    OCCURS 10.
+              03 FILLER    OCCURS 5.
+                 04 DATA-FIELD   PIC X(40) VALUE "ABCD" OCCURS 2.
+       PROCEDURE        DIVISION.
+       DECLARATIVES.
+       TEST-DEBUG SECTION.
+           USE FOR DEBUGGING ON ALL REFERENCES OF DATA-FIELD.
+           DISPLAY DEBUG-ITEM "|" END-DISPLAY.
+       END DECLARATIVES.
+       SOME-PAR.
+           MOVE QUOTE TO DATA-FIELD (4, 2, 1).
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([COB_SET_DEBUG=1 ./a.out], [0],
+[    20 DATA-FIELD                     +0004 +0002 +0001 """"""""""""""""""""""""""""""""""""""""|
+], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([USE FOR DEBUGGING, referencing BASED item])
+AT_KEYWORDS([fundamental DEBUGGING FREE ALLOCATE])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+
+# uncommon issue but shouldn't SIGSEGV --> TODO: fix later
+# TODO: also check "ADDRESS OF" (non)-ALLOCATED field
+AT_XFAIL_IF(true)
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+           SOURCE-COMPUTER. mine WITH DEBUGGING MODE.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  DATA-FIELD   PIC X(40) VALUE "ABCD" BASED.
+       PROCEDURE        DIVISION.
+       DECLARATIVES.
+       TEST-DEBUG SECTION.
+           USE FOR DEBUGGING ON ALL REFERENCES OF DATA-FIELD.
+           DISPLAY DEBUG-ITEM "|" END-DISPLAY.
+       END DECLARATIVES.
+       SOME-PAR.
+           ALLOCATE DATA-FIELD INITIALIZED.
+           FREE DATA-FIELD.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+# not sure about the output, check MF, claiming to support BASED + DEBUGGING
+AT_CHECK([COB_SET_DEBUG=1 ./a.out], [0],
+[    17 DATA-FIELD                                      ABCD                                     |
+    18 DATA-FIELD                                       ABCD                                    |
+], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([USE FOR DEBUGGING file])
+AT_KEYWORDS([fundamental OPEN WRITE READ CLOSE])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# USE FOR DEBUGGIN ON not ISO, not implemented TODO
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+           SOURCE-COMPUTER. mine WITH DEBUGGING MODE.
+       INPUT-OUTPUT     SECTION.
+       FILE-CONTROL.
+       SELECT TEST-FILE ASSIGN "./TEST-FILE".
+       DATA             DIVISION.
+       FILE             SECTION.
+       FD  TEST-FILE.
+       01  TEST-REC     PIC X(40).
+       PROCEDURE        DIVISION.
+       DECLARATIVES.
+       TEST-DEBUG SECTION.
+           USE FOR DEBUGGING ON TEST-FILE.
+           DISPLAY DEBUG-ITEM "|" END-DISPLAY.
+       END DECLARATIVES.
+       SOME-PAR.
+           OPEN  OUTPUT TEST-FILE.
+           WRITE TEST-REC FROM "DEF".
+           CLOSE TEST-FILE.
+           OPEN  INPUT TEST-FILE.
+           READ TEST-FILE.
+           CLOSE TEST-FILE.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([COB_SET_DEBUG=1 ./a.out], [0],
+[    21 TEST-FILE                                                                                |
+    23 TEST-FILE                                                                                |
+    24 TEST-FILE                                                                                |
+    25 TEST-FILE                                        DEF                                     |
+    26 TEST-FILE                                                                                |
+], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([Abbreviated Expressions])
+AT_KEYWORDS([fundamental expression conditional special-names ])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# SPECIAL NAMES NOT SUPPORTED(?????)
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SPECIAL-NAMES.
+           SWITCH-1
+           IS WRK-SWITCH-1
+           ON STATUS IS ON-WRK-SWITCH-1
+           OFF STATUS IS OFF-WRK-SWITCH-1
+           SWITCH-2
+           IS WRK-SWITCH-2
+           OFF STATUS IS OFF-WRK-SWITCH-2.
+       DATA DIVISION.
+      ******************************************************************
+       WORKING-STORAGE SECTION.
+      *
+       01 FLD9-0   PIC 9 VALUE 0.
+       01 FLD9-1   PIC 9 VALUE 1.
+       01 FLD9-2   PIC 9 VALUE 2.
+       01 FLD9-5   PIC 9 VALUE 5.
+       01 FLD9-7   PIC 9 VALUE 7.
+       01 FLD9-9   PIC 9 VALUE 9.
+       01 FLDX     PIC X VALUE 'X'.
+       01 FLDY     PIC X VALUE 'Y'.
+       01 FLDYY    PIC X VALUE 'Y'.
+       01 FLDZ     PIC X VALUE 'Z'.
+       01 TESTNUM  PIC 99 VALUE 1.
+
+       PROCEDURE DIVISION.
+       MAIN-LINE.
+
+           IF FLD9-7 > FLD9-5 AND NOT < FLD9-0 OR FLD9-1
+                PERFORM PASS ELSE PERFORM FAIL.
+           IF FLD9-7 NOT = FLD9-5 OR FLD9-1
+                PERFORM PASS ELSE PERFORM FAIL.
+           IF FLD9-7 NOT = FLD9-5 AND FLD9-1
+                PERFORM PASS ELSE PERFORM FAIL.
+           IF NOT FLD9-7 = FLD9-5 OR FLD9-1
+                PERFORM PASS ELSE PERFORM FAIL.
+           IF NOT (FLD9-5 > FLD9-7 OR < FLD9-1)
+                PERFORM PASS ELSE PERFORM FAIL.
+           IF NOT (FLD9-7 NOT > FLD9-5 AND FLD9-2 AND NOT FLD9-1)
+                PERFORM PASS ELSE PERFORM FAIL.
+           IF FLD9-9 > FLD9-2 AND FLD9-7 AND FLD9-5
+                PERFORM PASS ELSE PERFORM FAIL.
+           IF FLD9-9 > FLD9-2 AND FLD9-7 OR FLD9-5
+                PERFORM PASS ELSE PERFORM FAIL.
+           IF FLD9-1 < FLD9-2 AND FLD9-5 AND FLD9-7
+                PERFORM PASS ELSE PERFORM FAIL.
+
+      * // DISPLAY "***Constant expressions***".
+           IF 9 > 2 AND 7 AND 5 AND 1
+                PERFORM PASS ELSE PERFORM FAIL.
+           IF 1 < 2 AND 5 AND 7 AND 9
+                PERFORM PASS ELSE PERFORM FAIL.
+           IF 5 < 2 OR 1 OR 9 OR 7
+                PERFORM PASS ELSE PERFORM FAIL.
+           IF 5 > 1 AND < 3 OR 6
+                PERFORM PASS ELSE PERFORM FAIL.
+
+      * // DISPLAY "***Switch expressions***".
+           IF           ON-WRK-SWITCH-1
+                 OR NOT OFF-WRK-SWITCH-2
+                AND     OFF-WRK-SWITCH-1
+                PERFORM FAIL ELSE PERFORM PASS.
+           DISPLAY "***FINE***" WITH NO ADVANCING.
+           STOP RUN.
+
+       PASS.
+      * // DISPLAY 'Test ' TESTNUM ' passed'
+           ADD 1 TO TESTNUM.
+
+       FAIL.
+           DISPLAY 'Test ' TESTNUM ' failed!'
+           ADD 1 TO TESTNUM.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [],
+[prog.cob: in paragraph 'MAIN-LINE':
+prog.cob:47: warning: suggest parentheses around AND within OR
+prog.cob:53: warning: expression '9' GREATER THAN '2' is always TRUE
+prog.cob:53: warning: expression '9' GREATER THAN '7' is always TRUE
+prog.cob:53: warning: expression '9' GREATER THAN '5' is always TRUE
+prog.cob:53: warning: expression '9' GREATER THAN '1' is always TRUE
+prog.cob:55: warning: expression '1' LESS THAN '2' is always TRUE
+prog.cob:55: warning: expression '1' LESS THAN '5' is always TRUE
+prog.cob:55: warning: expression '1' LESS THAN '7' is always TRUE
+prog.cob:55: warning: expression '1' LESS THAN '9' is always TRUE
+prog.cob:57: warning: expression '5' LESS THAN '2' is always FALSE
+prog.cob:57: warning: expression '5' LESS THAN '1' is always FALSE
+prog.cob:57: warning: expression '5' LESS THAN '9' is always TRUE
+prog.cob:57: warning: expression '5' LESS THAN '7' is always TRUE
+prog.cob:59: warning: expression '5' GREATER THAN '1' is always TRUE
+prog.cob:59: warning: expression '5' LESS THAN '3' is always FALSE
+prog.cob:59: warning: expression '5' LESS THAN '6' is always TRUE
+])
+
+AT_CHECK([./a.out], [0], [***FINE***], [])
+
+AT_CLEANUP
+
+
+AT_SETUP([TYPEDEF application])
+AT_KEYWORDS([fundamental EXTERNAL])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+## TYPEDEF not implemented
+
+AT_DATA([caller.cob], [
+       IDENTIFICATION  DIVISION.
+       PROGRAM-ID.     caller.
+
+       DATA            DIVISION.
+       WORKING-STORAGE SECTION.
+       77  INT         IS TYPEDEF BINARY-LONG.
+       77  EXT-INT     IS TYPEDEF BINARY-LONG EXTERNAL.
+      *> should this be possible?
+      *>77  INT-VAL     IS TYPEDEF USAGE INT VALUE 12.
+       77  INT-VAL     IS TYPEDEF BINARY-LONG VALUE 12.
+       77  SOMEVAR     USAGE INT VALUE 10.
+       77  SOMEVAL     USAGE INT-VAL.
+       77  SOMEEXT     USAGE EXT-INT.
+
+       PROCEDURE       DIVISION.
+           IF SOMEVAR <> 10
+              DISPLAY "SOMEVAR (INT) wrong: " SOMEVAR
+           END-IF
+           IF SOMEVAL <> 12
+              DISPLAY "SOMEVAR (INT-VAL) wrong: " SOMEVAL
+           END-IF
+           MOVE 42 TO SOMEEXT
+           CALL "callee"
+           .
+])
+
+AT_DATA([callee.cob], [
+       IDENTIFICATION  DIVISION.
+       PROGRAM-ID.     callee.
+
+       DATA            DIVISION.
+       WORKING-STORAGE SECTION.
+       77  EXT-INT     IS TYPEDEF BINARY-LONG EXTERNAL.
+       77  SOMEEXT     USAGE EXT-INT.
+
+       PROCEDURE       DIVISION.
+           IF SOMEEXT <> 42
+              DISPLAY "SOMEEXT (EXT-INT) wrong: " SOMEEXT
+           END-IF
+           .
+])
+
+AT_CHECK([$COMPILE caller.cob], [0], [], [])
+AT_CHECK([$COMPILE_MODULE -o callee.so callee.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([DISPLAY literals (needs B'0101' and BX'EC')])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+AT_KEYWORDS([fundamental])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       PROCEDURE        DIVISION.
+           DISPLAY "abc"
+           END-DISPLAY.
+           DISPLAY  123
+           END-DISPLAY.
+           DISPLAY +123
+           END-DISPLAY.
+           DISPLAY -123
+           END-DISPLAY.
+           DISPLAY  12.3
+           END-DISPLAY.
+           DISPLAY +12.3
+           END-DISPLAY.
+           DISPLAY -12.3
+           END-DISPLAY.
+           DISPLAY 1.23E0
+           END-DISPLAY.
+           DISPLAY +1.23E0
+           END-DISPLAY.
+           DISPLAY -1.23E0
+           END-DISPLAY.
+           DISPLAY 12.3E-2
+           END-DISPLAY.
+           DISPLAY +12.3E-2
+           END-DISPLAY.
+           DISPLAY -12.3E-2
+           END-DISPLAY.
+           DISPLAY B'0101'
+           END-DISPLAY.
+           DISPLAY BX'EC'
+           END-DISPLAY.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [abc
+123
++123
+-123
+12.3
++12.3
+-12.3
+1.23
++1.23
+-1.23
+.123
++.123
+-.123
+5
+236
+])
+AT_CLEANUP
+
+

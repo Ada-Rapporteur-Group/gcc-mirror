@@ -1,0 +1,28 @@
+Enter text : TextLine before: The quick brown fox jumps over the lazy dog's back.                             
+TextLine after : THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG'S BACK.                             
+Letter A occurs  2 times
+Letter B occurs  2 times
+Letter C occurs  2 times
+Letter D occurs  1 times
+Letter E occurs  3 times
+Letter F occurs  1 times
+Letter G occurs  1 times
+Letter H occurs  2 times
+Letter I occurs  1 times
+Letter J occurs  1 times
+Letter K occurs  2 times
+Letter L occurs  1 times
+Letter M occurs  1 times
+Letter N occurs  1 times
+Letter O occurs  4 times
+Letter P occurs  1 times
+Letter Q occurs  1 times
+Letter R occurs  2 times
+Letter S occurs  2 times
+Letter T occurs  2 times
+Letter U occurs  2 times
+Letter V occurs  1 times
+Letter W occurs  1 times
+Letter X occurs  1 times
+Letter Y occurs  1 times
+Letter Z occurs  1 times

@@ -1,0 +1,18 @@
+Numeric Display arithmetic
+Num1 is +5; Num2 is +4
+Product should be    +20, is = +20
+Sum should be        +09, is = +09
+Difference should be -01, is = -01
+ 
+COMP-5 Arithmetic
+Num1_5 is +0000000000005; Num2_5 is +0000000000004
+Product should be    +0000000000020, is = +0000000000020
+Sum should be        +0000000000009, is = +0000000000009
+Difference should be -0000000000001, is = -0000000000001
+ 
+COMP-3 Arithmetic
+Num1_3 is +0000000000005; Num2_3 is +0000000000004
+Product should be    +0000000000020, is = +0000000000020
+Sum should be        +0000000000009, is = +0000000000009
+Difference should be -0000000000001, is = -0000000000001
+ 

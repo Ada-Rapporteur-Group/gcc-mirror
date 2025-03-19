@@ -1,0 +1,396 @@
+## Copyright (C) 2023 Symas Corporation
+
+AT_SETUP([COMPUTE multiplication to FIX4])
+AT_KEYWORDS([onsize size])
+AT_DATA([prog.cob], [
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. onsize.
+        DATA DIVISION.
+        WORKING-STORAGE SECTION.
+        01  FIX4DISPLAY                PIC 9(4) DISPLAY.
+        01  FIX8DISPLAY                PIC 9(8) DISPLAY VALUE 12345678.
+        01  FIX8BINARY                 PIC 9(8) BINARY  VALUE 12345678.
+        01  FIX8PACKED                 PIC 9(8) PACKED-DECIMAL  VALUE 12345678.
+        01  FIX8NUMEDT                 PIC 9(8).0       VALUE 12345678.
+        01  FLOATSHORT                 FLOAT-SHORT      VALUE 12345678.
+        01  FLOATLONG                  FLOAT-LONG       VALUE 12345678.
+        01  FLOATEXT                   FLOAT-EXTENDED   VALUE 12345678.
+
+        PROCEDURE       DIVISION.
+
+      *> FIX8DISPLAY
+            DISPLAY     "COMPUTE FIX4DISPLAY = FIX8DISPLAY without SIZE ERROR"
+            MOVE        9876        TO FIX4DISPLAY
+            COMPUTE     FIX4DISPLAY = FIX8DISPLAY
+            DISPLAY     "FIX4DISPLAY is " FIX4DISPLAY
+            DISPLAY     "Should      be 5678"
+            DISPLAY     "."
+
+            DISPLAY     "COMPUTE FIX4DISPLAY = FIX8DISPLAY with SIZE ERROR"
+            COMPUTE     FIX4DISPLAY = FIX8DISPLAY
+            MOVE        9876        TO FIX4DISPLAY
+            COMPUTE     FIX4DISPLAY = FIX8DISPLAY
+                            ON SIZE ERROR Display "Proper size error"
+                        NOT ON SIZE ERROR Display "Improper no error"
+            END-COMPUTE
+            DISPLAY     "FIX4DISPLAY is " FIX4DISPLAY
+            DISPLAY     "Should      be 9876"
+            DISPLAY     "."
+
+      *> FIX8BINARY
+
+            DISPLAY     "COMPUTE FIX4DISPLAY = FIX8BINARY without SIZE ERROR"
+            COMPUTE     FIX4DISPLAY = FIX8BINARY
+            DISPLAY     "FIX4DISPLAY is " FIX4DISPLAY
+            DISPLAY     "Should      be 5678"
+            DISPLAY     "."
+
+            DISPLAY     "COMPUTE FIX4DISPLAY = FIX8BINARY with SIZE ERROR"
+            COMPUTE     FIX4DISPLAY = FIX8BINARY
+            MOVE        9876        TO FIX4DISPLAY
+            COMPUTE     FIX4DISPLAY = FIX8BINARY
+                            ON SIZE ERROR Display "Proper size error"
+                        NOT ON SIZE ERROR Display "Improper no error"
+            END-COMPUTE
+            DISPLAY     "FIX4DISPLAY is " FIX4DISPLAY
+            DISPLAY     "Should      be 9876"
+            DISPLAY     "."
+
+      *> FIX8PACKED
+
+            DISPLAY     "COMPUTE FIX4DISPLAY = FIX8PACKED without SIZE ERROR"
+            COMPUTE     FIX4DISPLAY = FIX8PACKED
+            DISPLAY     "FIX4DISPLAY is " FIX4DISPLAY
+            DISPLAY     "Should      be 5678"
+            DISPLAY     "."
+
+            DISPLAY     "COMPUTE FIX4DISPLAY = FIX8PACKED with SIZE ERROR"
+            COMPUTE     FIX4DISPLAY = FIX8PACKED
+            MOVE        9876        TO FIX4DISPLAY
+            COMPUTE     FIX4DISPLAY = FIX8PACKED
+                            ON SIZE ERROR Display "Proper size error"
+                        NOT ON SIZE ERROR Display "Improper no error"
+            END-COMPUTE
+            DISPLAY     "FIX4DISPLAY is " FIX4DISPLAY
+            DISPLAY     "Should      be 9876"
+            DISPLAY     "."
+
+      *> FIX8NUMEDT
+
+            DISPLAY     "COMPUTE FIX4DISPLAY = FIX8NUMEDT without SIZE ERROR"
+            COMPUTE     FIX4DISPLAY = FIX8NUMEDT
+            DISPLAY     "FIX4DISPLAY is " FIX4DISPLAY
+            DISPLAY     "Should      be 5678"
+            DISPLAY     "."
+
+            DISPLAY     "COMPUTE FIX4DISPLAY = FIX8NUMEDT with SIZE ERROR"
+            COMPUTE     FIX4DISPLAY = FIX8NUMEDT
+            MOVE        9876        TO FIX4DISPLAY
+            COMPUTE     FIX4DISPLAY = FIX8NUMEDT
+                            ON SIZE ERROR Display "Proper size error"
+                        NOT ON SIZE ERROR Display "Improper no error"
+            END-COMPUTE
+            DISPLAY     "FIX4DISPLAY is " FIX4DISPLAY
+            DISPLAY     "Should      be 9876"
+            DISPLAY     "."
+
+      *> FLOATSHORT
+
+            DISPLAY     "COMPUTE FIX4DISPLAY = FLOATSHORT without SIZE ERROR"
+            COMPUTE     FIX4DISPLAY = FLOATSHORT
+            DISPLAY     "FIX4DISPLAY is " FIX4DISPLAY
+            DISPLAY     "Should      be 5678"
+            DISPLAY     "."
+
+            DISPLAY     "COMPUTE FIX4DISPLAY = FLOATSHORT with SIZE ERROR"
+            COMPUTE     FIX4DISPLAY = FLOATSHORT
+            MOVE        9876        TO FIX4DISPLAY
+            COMPUTE     FIX4DISPLAY = FLOATSHORT
+                            ON SIZE ERROR Display "Proper size error"
+                        NOT ON SIZE ERROR Display "Improper no error"
+            END-COMPUTE
+            DISPLAY     "FIX4DISPLAY is " FIX4DISPLAY
+            DISPLAY     "Should      be 9876"
+            DISPLAY     "."
+
+      *> FLOATLONG
+
+            DISPLAY     "COMPUTE FIX4DISPLAY = FLOATLONG without SIZE ERROR"
+            COMPUTE     FIX4DISPLAY = FLOATLONG
+            DISPLAY     "FIX4DISPLAY is " FIX4DISPLAY
+            DISPLAY     "Should      be 5678"
+            DISPLAY     "."
+
+            DISPLAY     "COMPUTE FIX4DISPLAY = FLOATLONG with SIZE ERROR"
+            COMPUTE     FIX4DISPLAY = FLOATLONG
+            MOVE        9876        TO FIX4DISPLAY
+            COMPUTE     FIX4DISPLAY = FLOATLONG
+                            ON SIZE ERROR Display "Proper size error"
+                        NOT ON SIZE ERROR Display "Improper no error"
+            END-COMPUTE
+            DISPLAY     "FIX4DISPLAY is " FIX4DISPLAY
+            DISPLAY     "Should      be 9876"
+            DISPLAY     "."
+
+      *> FLOATEXT
+
+            DISPLAY     "COMPUTE FIX4DISPLAY = FLOATEXT without SIZE ERROR"
+            COMPUTE     FIX4DISPLAY = FLOATEXT
+            DISPLAY     "FIX4DISPLAY is " FIX4DISPLAY
+            DISPLAY     "Should      be 5678"
+            DISPLAY     "."
+
+            DISPLAY     "COMPUTE FIX4DISPLAY = FLOATEXT with SIZE ERROR"
+            COMPUTE     FIX4DISPLAY = FLOATEXT
+            MOVE        9876        TO FIX4DISPLAY
+            COMPUTE     FIX4DISPLAY = FLOATEXT
+                            ON SIZE ERROR Display "Proper size error"
+                        NOT ON SIZE ERROR Display "Improper no error"
+            END-COMPUTE
+            DISPLAY     "FIX4DISPLAY is " FIX4DISPLAY
+            DISPLAY     "Should      be 9876"
+            DISPLAY     ".".
+
+            STOP RUN.
+        END PROGRAM onsize.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [COMPUTE FIX4DISPLAY = FIX8DISPLAY without SIZE ERROR
+FIX4DISPLAY is 5678
+Should      be 5678
+.
+COMPUTE FIX4DISPLAY = FIX8DISPLAY with SIZE ERROR
+Proper size error
+FIX4DISPLAY is 9876
+Should      be 9876
+.
+COMPUTE FIX4DISPLAY = FIX8BINARY without SIZE ERROR
+FIX4DISPLAY is 5678
+Should      be 5678
+.
+COMPUTE FIX4DISPLAY = FIX8BINARY with SIZE ERROR
+Proper size error
+FIX4DISPLAY is 9876
+Should      be 9876
+.
+COMPUTE FIX4DISPLAY = FIX8PACKED without SIZE ERROR
+FIX4DISPLAY is 5678
+Should      be 5678
+.
+COMPUTE FIX4DISPLAY = FIX8PACKED with SIZE ERROR
+Proper size error
+FIX4DISPLAY is 9876
+Should      be 9876
+.
+COMPUTE FIX4DISPLAY = FIX8NUMEDT without SIZE ERROR
+FIX4DISPLAY is 5678
+Should      be 5678
+.
+COMPUTE FIX4DISPLAY = FIX8NUMEDT with SIZE ERROR
+Proper size error
+FIX4DISPLAY is 9876
+Should      be 9876
+.
+COMPUTE FIX4DISPLAY = FLOATSHORT without SIZE ERROR
+FIX4DISPLAY is 5678
+Should      be 5678
+.
+COMPUTE FIX4DISPLAY = FLOATSHORT with SIZE ERROR
+Proper size error
+FIX4DISPLAY is 9876
+Should      be 9876
+.
+COMPUTE FIX4DISPLAY = FLOATLONG without SIZE ERROR
+FIX4DISPLAY is 5678
+Should      be 5678
+.
+COMPUTE FIX4DISPLAY = FLOATLONG with SIZE ERROR
+Proper size error
+FIX4DISPLAY is 9876
+Should      be 9876
+.
+COMPUTE FIX4DISPLAY = FLOATEXT without SIZE ERROR
+FIX4DISPLAY is 5678
+Should      be 5678
+.
+COMPUTE FIX4DISPLAY = FLOATEXT with SIZE ERROR
+Proper size error
+FIX4DISPLAY is 9876
+Should      be 9876
+.
+], [])
+AT_CLEANUP
+
+AT_SETUP([MULTIPLY to FIX4])
+AT_KEYWORDS([onsize size])
+AT_DATA([prog.cob], [
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. onsize.
+        DATA DIVISION.
+        WORKING-STORAGE SECTION.
+        01  FIX4DISPLAY                PIC 9(4) DISPLAY.
+        01  FIX4PACKED                 PIC 9(4) PACKED-DECIMAL.
+        01  FIX4BINARY                 PIC 9(4) BINARY.
+        01  FIX4COMP5                  PIC 9(4) COMP-5.
+        01  FLTSHORT                            FLOAT-SHORT.
+        01  FLTLONG                             FLOAT-LONG.
+        01  FLTEXT                              FLOAT-EXTENDED.
+
+        PROCEDURE       DIVISION.
+
+        DISPLAY "Checking size error on FIX4DISPLAY"
+        MOVE 1 TO FIX4DISPLAY
+        PERFORM 10 TIMEs
+            DISPLAY  "    FIX4DISPLAY is : " FIX4DISPLAY
+            MULTIPLY 10 BY FIX4DISPLAY
+                     ON SIZE ERROR DISPLAY "    Got size error" GO TO DONE1
+            END-MULTIPLY
+        END-PERFORM.
+        DONE1.
+        DISPLAY  "    Final       is : " FIX4DISPLAY
+        DISPLAY "."
+
+        DISPLAY "Checking size error on FIX4PACKED"
+        MOVE 1 TO FIX4PACKED
+        PERFORM 10 TIMEs
+            DISPLAY  "    FIX4PACKED is : " FIX4PACKED
+            MULTIPLY 10 BY FIX4PACKED
+                     ON SIZE ERROR DISPLAY "    Got size error" GO TO DONE2
+            END-MULTIPLY
+        END-PERFORM.
+        DONE2.
+        DISPLAY  "    Final      is : " FIX4PACKED
+        DISPLAY "."
+
+        DISPLAY "Checking size error on FIX4BINARY"
+        MOVE 1 TO FIX4BINARY
+        PERFORM 10 TIMEs
+            DISPLAY  "    FIX4BINARY is : " FIX4BINARY
+            MULTIPLY 10 BY FIX4BINARY
+                     ON SIZE ERROR DISPLAY "    Got size error" GO TO DONE3
+            END-MULTIPLY
+        END-PERFORM.
+        DONE3.
+        DISPLAY  "    Final      is : " FIX4BINARY
+        DISPLAY "."
+
+        DISPLAY "Checking size error on FIX4COMP5"
+        MOVE 1 TO FIX4COMP5
+        PERFORM 10 TIMEs
+            DISPLAY  "    FIX4COMP5 is : " FIX4COMP5
+            MULTIPLY 10 BY FIX4COMP5
+                     ON SIZE ERROR DISPLAY "    Got size error" GO TO DONE4
+            END-MULTIPLY
+        END-PERFORM.
+        DONE4.
+        DISPLAY  "    Final     is : " FIX4COMP5
+        DISPLAY "."
+
+        DISPLAY "Checking size error on FLTSHORT"
+        MOVE 1.E34 TO FLTSHORT
+        PERFORM 10 TIMEs
+            DISPLAY  "    FLTSHORT is : " FLTSHORT
+            MULTIPLY 10 BY FLTSHORT
+                     ON SIZE ERROR DISPLAY "    Got size error" GO TO DONE5
+            END-MULTIPLY
+        END-PERFORM.
+        DONE5.
+        DISPLAY  "    Final    is : " FLTSHORT
+        DISPLAY "."
+
+        MOVE 1.E304 TO FLTLONG
+        PERFORM 1000 TIMEs
+            DISPLAY  "    FLTLONG is  : " FLTLONG
+            MULTIPLY 10 BY FLTLONG
+                     ON SIZE ERROR DISPLAY "    Got size error" GO TO DONE6
+            END-MULTIPLY
+        END-PERFORM.
+        DONE6.
+        DISPLAY  "    Final   is  : " FLTLONG
+        DISPLAY "."
+
+        MOVE 1.E4928 TO FLTEXT
+        PERFORM 10 TIMEs
+            DISPLAY  "    FLTEXT is  : " FLTEXT
+            MULTIPLY 10 BY FLTEXT
+                     ON SIZE ERROR DISPLAY "    Got size error" GO TO DONE7
+            END-MULTIPLY
+        END-PERFORM.
+        DONE7.
+        DISPLAY  "    Final  is   : " FLTEXT
+        DISPLAY ".".
+
+        END PROGRAM onsize.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [Checking size error on FIX4DISPLAY
+    FIX4DISPLAY is : 0001
+    FIX4DISPLAY is : 0010
+    FIX4DISPLAY is : 0100
+    FIX4DISPLAY is : 1000
+    Got size error
+    Final       is : 1000
+.
+Checking size error on FIX4PACKED
+    FIX4PACKED is : 0001
+    FIX4PACKED is : 0010
+    FIX4PACKED is : 0100
+    FIX4PACKED is : 1000
+    Got size error
+    Final      is : 1000
+.
+Checking size error on FIX4BINARY
+    FIX4BINARY is : 0001
+    FIX4BINARY is : 0010
+    FIX4BINARY is : 0100
+    FIX4BINARY is : 1000
+    Got size error
+    Final      is : 1000
+.
+Checking size error on FIX4COMP5
+    FIX4COMP5 is : 0001
+    FIX4COMP5 is : 0010
+    FIX4COMP5 is : 0100
+    FIX4COMP5 is : 1000
+    Got size error
+    Final     is : 1000
+.
+Checking size error on FLTSHORT
+    FLTSHORT is : 9.99999979E+33
+    FLTSHORT is : 9.999999419E+34
+    FLTSHORT is : 9.999999617E+35
+    FLTSHORT is : 9.999999934E+36
+    FLTSHORT is : 9.99999968E+37
+    Got size error
+    Final    is : 9.99999968E+37
+.
+    FLTLONG is  : 9.99999999999999939E+303
+    FLTLONG is  : 9.99999999999999939E+304
+    FLTLONG is  : 9.99999999999999861E+305
+    FLTLONG is  : 9.99999999999999861E+306
+    FLTLONG is  : 9.99999999999999811E+307
+    Got size error
+    Final   is  : 9.99999999999999811E+307
+.
+    FLTEXT is  : 9.999999999999999999999999999999999576E+4927
+    FLTEXT is  : 9.999999999999999999999999999999999856E+4928
+    FLTEXT is  : 1.000000000000000000000000000000000053E+4930
+    FLTEXT is  : 1.000000000000000000000000000000000124E+4931
+    FLTEXT is  : 1.000000000000000000000000000000000124E+4932
+    Got size error
+    Final  is   : 1.000000000000000000000000000000000124E+4932
+.
+], [])
+AT_CLEANUP
+
+
+
+# AT_SETUP([TEMPLATE])
+# AT_KEYWORDS([onsize size])
+# AT_DATA([prog.cob], [
+# ])
+# AT_CHECK([$COMPILE prog.cob], [0], [], [])
+# AT_CHECK([./a.out], [0], [
+# ], [])
+# AT_CLEANUP
+

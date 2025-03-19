@@ -1,0 +1,5 @@
+Enter a dollar value to convert :- The DollarValue entered: 0000.47
+Dollar value    =      $0.47
+Ferengi value   =      GoldPressedLatinum 0.47
+Yen value       =     ¥46.37
+Pound value     =      £0.30

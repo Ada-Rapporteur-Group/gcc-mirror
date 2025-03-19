@@ -1,0 +1,2 @@
+#!/bin/sh
+iconv -f UTF-8 -t CP1140 Employee.dat.ascii >Employee.dat

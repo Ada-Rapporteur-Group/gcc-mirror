@@ -1,0 +1,6 @@
+1234567 Alice       aa 11111
+7654321 Bob         bb 22222
+1122334 Carol       cc 22222
+1212121 Dave        dd 11111
+2121212 Elizabeth   ee 33333
+2211221 Frank       ff 44444

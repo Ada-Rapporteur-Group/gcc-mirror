@@ -1,0 +1,19 @@
+AT_COPYRIGHT([Copyright (C) 2022 COBOLworx a subsidiary of Symas Corp.
+Written by Marty Heyman])
+
+### GnuCOBOL Test Suite V2
+
+AT_INIT([COBOL for GCC Tests V2])
+AT_COLOR_TESTS
+
+AT_TESTED([gcobol])
+
+AT_BANNER([STRING Tests])
+m4_include([string.at])
+
+AT_BANNER([UNSTRING Tests])
+m4_include([unstring.at])
+
+AT_BANNER([Odd Causes of Failures])
+m4_include([oddballs.at])
+

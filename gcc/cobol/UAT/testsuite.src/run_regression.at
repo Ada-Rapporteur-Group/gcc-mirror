@@ -1,0 +1,358 @@
+AT_COPYRIGHT([Test cases Copyright (C) 2022 COBOLworx a subsidiary of Symas Corp.
+
+Written by Marty Heyman])
+
+### GnuCOBOL Test Suite
+
+AT_COLOR_TESTS
+
+AT_TESTED('$GCOBOL')
+
+AT_SETUP([FIXED FORMAT data in cols 73 and beyond])
+AT_KEYWORDS([former-bugs fixed-format])
+AT_DATA([prog.cob], [
+       *> ISO-IEC2014 leaves the length of the Program Area in Fixed
+       *> Format to the implementor.
+       *> By convention it ends in position 72.
+       *> IBM's COBOLs, Microfocus, GnuCOBOL follow that convention.
+       IDENTIFICATION DIVISION.                                         VALID
+       PROGRAM-ID. prog.
+       PROCEDURE DIVISION.
+       DISPLAY "OK"
+       GOBACK.
+       END PROGRAM prog.
+])
+AT_CHECK([$COMPILE_FIXED -o prog prog.cob], [0], [], [])
+AT_CHECK([./prog], [0], [OK
+], [])
+AT_CLEANUP
+
+AT_SETUP([FIXED FORMAT data misplaced asterisk])
+AT_KEYWORDS([former-bugs fixed-format])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       77 var PIC 99 VALUE ZERO.
+       PROCEDURE DIVISION.
+       COMPUTE VAR = 5
+      * 3
+       + 6.
+       IF var NOT = 11
+          MOVE 1 to RETURN-CODE
+          DISPLAY var.
+       GOBACK.
+       END PROGRAM prog.
+])
+AT_CHECK([$COMPILE_FIXED -o prog prog.cob], [0], [], [])
+AT_CHECK([./prog], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([command-line])
+AT_KEYWORDS([former-bugs fixed-format])
+AT_DATA([prog.cob], [
+       *> ODD FAILURE: failing to recognize "" as SPACE
+       identification division.
+       program-id. prog.
+       data division.
+       working-storage section.
+       77 cmd-line-parm pic x(20).
+       procedure division.
+          ACCEPT cmd-line-parm FROM COMMAND-LINE(2).
+          IF cmd-line-parm NOT EQUAL SPACE THEN
+             DISPLAY "Not SPACE: " """" cmd-line-parm """"
+          ELSE
+             DISPLAY "Okay"
+             END-IF.
+           end program prog.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [Okay
+], [])
+AT_CLEANUP
+
+AT_SETUP([repository])
+AT_KEYWORDS([former-bugs copy])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+          REPOSITORY.
+       PROCEDURE DIVISION.
+          DISPLAY "OK".
+])
+# Need compiler output to verify correct failure
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([source-computer object-computer repository (1)])
+AT_KEYWORDS([former-bugs source-computer object-computer repository])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+          SOURCE-COMPUTER a.
+          OBJECT-COMPUTER a.
+       PROCEDURE DIVISION.
+          DISPLAY "OK".
+])
+AT_CHECK([$COMPILE prog.cob], [1], [], [prog.cob:6:27: error: syntax error, unexpected NAME, expecting '.'
+    6 |           SOURCE-COMPUTER a.
+      |                           ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([source-computer object-computer repository (2)])
+# REPOSITORY section in incorrect order.
+AT_KEYWORDS([former-bugs source-computer object-computer])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+          SOURCE-COMPUTER. a.
+          OBJECT-COMPUTER. b.
+       PROCEDURE DIVISION.
+          DISPLAY "OK".
+])
+# Need compiler output to verify correct failure
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([procedure division using by])
+AT_KEYWORDS([former-bugs procedure-division using])
+AT_DATA([prog.cob],[
+m4_include(v1-bug3.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [0], [],[])
+AT_CLEANUP
+
+AT_SETUP([-shared])
+AT_KEYWORDS([former-bugs shared])
+AT_DATA([prog.cob],[
+id division.
+program-id. prog.
+procedure division.
+   display "this is prog".
+   GOBACK.
+])
+AT_DATA([prog1.cob],[
+id division.
+program-id. prog1.
+procedure division.
+   display "this is prog1".
+   GOBACK.
+])
+AT_DATA([prog2.cob],[
+id division.
+program-id. prog3.
+procedure division.
+   call "prog1".
+   GOBACK.
+])
+AT_CHECK([$COMPILE -fpic -shared -o libprog.so prog.cob prog1.cob], [0], [],[])
+AT_CHECK([$COMPILE -o prog2 prog2.cob -L. -lprog -Wl,-rpath=.], [0], [],[])
+AT_CHECK([./prog2], [0], [this is prog1
+],[])
+AT_CLEANUP
+
+AT_SETUP([ADD 1 2 TO 3 GIVING B])
+AT_KEYWORDS([former-bugs add v1])
+AT_DATA([prog.cob],[
+       ID DIVISION.
+       PROGRAM-ID. prog.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 var1 PIC 99.
+       PROCEDURE DIVISION.
+          ADD 1 2 TO 4 GIVING var1.
+          IF var1 NOT EQUAL 7
+          THEN
+             DISPLAY "Wrong answer, expected 7, got " var1 "."
+          END-IF.
+          GOBACK.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([ACCEPT foo FROM COMMAND-LINE(1)])
+AT_KEYWORDS([former-bugs cli accept])
+AT_DATA([prog.cob], [
+       ID DIVISION.
+       PROGRAM-ID. prog.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 var1 PIC X100.
+       PROCEDURE DIVISION.
+          ACCEPT var1 FROM COMMAND-LINE(1).
+          DISPLAY var1.
+          GOBACK.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([ACCEPT foo FROM ENVIRONMENT)])
+AT_KEYWORDS([former-bugs cli accept])
+AT_DATA([prog.cob], [
+       ID DIVISION.
+       PROGRAM-ID. prog.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 var1 PIC X(100).
+       01 var2 PIC X(100).
+       PROCEDURE DIVISION.
+          ACCEPT var1 FROM ENVIRONMENT "FOR_VAR1".
+          DISPLAY FUNCTION TRIM(var1) NO ADVANCING.
+          ACCEPT var2 FROM ENVIRONMENT "FOR_VAR2".
+          DISPLAY FUNCTION TRIM(var2) NO ADVANCING.
+          GOBACK.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([FOR_VAR1=value FOR_VAR2=Y ./a.out], [0], [valueY], [])
+AT_CLEANUP
+
+AT_SETUP([COMP-5 Sanity Check)])
+AT_KEYWORDS([former-bugs comp-5 packed])
+AT_DATA([prog.cob], [
+      *> This program should produce no output.  It is a sanity check of
+      *> COMP-5 moves and addition.
+        program-id. comp5.
+        data division.
+        working-storage section.
+        77 var PIC 999V999 COMP-5 .
+        77 var1 PIC 999V9(1) COMP-5 .
+        77 var2 PIC 999V9(2) COMP-5 .
+        77 var3 PIC 999V9(3) COMP-5 .
+        77 var4 PIC 999V9(4) COMP-5 .
+        77 var5 PIC 999V9(5) COMP-5 .
+        77 var6 PIC 999V9(6) COMP-5 .
+        77 var7 PIC 999V9(7) COMP-5 .
+        77 var8 PIC 999V9(8) COMP-5 .
+        77 var555 PIC 999V99999999 COMP-5 VALUE 555.55555555.
+        procedure division.
+        move 111.111 to var.
+        if var not equal to 111.111 display var.
+        add 000.001 to var.
+        if var not equal to 111.112 display var.
+        add 000.01 to var.
+        if var not equal to 111.122 display var.
+        add 000.1 to var.
+        if var not equal to 111.222 display var.
+        add 1 to var.
+        if var not equal to 112.222 display var.
+        add 10 to var.
+        if var not equal to 122.222 display var.
+        add 100 to var.
+        if var not equal to 222.222 display var.
+        move 555.55555555 to var1
+        move 555.55555555 to var2
+        move 555.55555555 to var3
+        move 555.55555555 to var4
+        move 555.55555555 to var5
+        move 555.55555555 to var6
+        move 555.55555555 to var7
+        move 555.55555555 to var8
+        add 0.00000001 TO var555 giving var1 rounded
+        add 0.00000001 TO var555 giving var2 rounded
+        add 0.00000001 TO var555 giving var3 rounded
+        add 0.00000001 TO var555 giving var4 rounded
+        add 0.00000001 TO var555 giving var5 rounded
+        add 0.00000001 TO var555 giving var6 rounded
+        add 0.00000001 TO var555 giving var7 rounded
+        add 0.00000001 TO var555 giving var8 rounded
+        if var1 not equal to 555.6 display var1.
+        if var2 not equal to 555.56 display var2.
+        if var3 not equal to 555.556 display var3.
+        if var4 not equal to 555.5556 display var4.
+        if var5 not equal to 555.55556 display var5.
+        if var6 not equal to 555.555556 display var6.
+        if var7 not equal to 555.5555556 display var7.
+        if var8 not equal to 555.55555556 display var8.
+        stop run.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([Empty refmod should be a syntax error])
+AT_KEYWORDS([refmod])
+AT_DATA([prog.cob], [       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC X(4) VALUE "abcd".
+       01 I             PIC 9 VALUE 4.
+       01 J             PIC 9 VALUE 3.
+       PROCEDURE        DIVISION.
+
+           DISPLAY X(:) NO ADVANCING
+           END-DISPLAY.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [1], [], [prog.cob:10:22: error: syntax error, unexpected ':'
+   10 |            DISPLAY X(:) NO ADVANCING
+      |                      ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+
+AT_SETUP([Too many digits in PIC string])
+AT_KEYWORDS([bugs])
+AT_DATA([prog.cob], [      *> This program aborts during compilation because the number of digits
+      *> in VAR1 is greater than MAX_FIXED_POINT_DIGITS, which is found in
+      *> symbols.h
+      *> It should fail with a more graceful error.
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 VAR1  PIC 9(3)V9(336).
+       PROCEDURE DIVISION.
+       GOBACK.
+])
+AT_CHECK([$COMPILE prog.cob], [1], [],[prog.cob:9:21: error: VAR1 limited to capacity of 37 (would need 339)
+    9 |        01 VAR1  PIC 9(3)V9(336).
+      |                     ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([PICTURE string with 9(0) crashes the compiler])
+AT_KEYWORDS([bugs])
+AT_DATA([prog.cob], [       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 VAR1  PICTURE 9(7)V9(0).
+       01 VAR2  PICTURE 9(7)V9(0).
+       01 VAR3  PICTURE 9(7)V9(0).
+       01 VAR4  PICTURE 9(7)V9(0).
+       PROCEDURE DIVISION.
+       MOVE 2 TO VAR1
+       MOVE 4 TO VAR2
+       DIVIDE VAR1 INTO VAR2
+       DISPLAY VAR1 SPACE VAR2 SPACE VAR3
+       GOBACK.
+])
+AT_CHECK([$COMPILE prog.cob], [1], [],[prog.cob:5:30: error: '(0)' invalid in PICTURE (ISO 2023 13.18.40.3)
+    5 |        01 VAR1  PICTURE 9(7)V9(0).
+      |                              ^
+prog.cob:6:30: error: '(0)' invalid in PICTURE (ISO 2023 13.18.40.3)
+    6 |        01 VAR2  PICTURE 9(7)V9(0).
+      |                              ^
+prog.cob:7:30: error: '(0)' invalid in PICTURE (ISO 2023 13.18.40.3)
+    7 |        01 VAR3  PICTURE 9(7)V9(0).
+      |                              ^
+prog.cob:8:30: error: '(0)' invalid in PICTURE (ISO 2023 13.18.40.3)
+    8 |        01 VAR4  PICTURE 9(7)V9(0).
+      |                              ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+

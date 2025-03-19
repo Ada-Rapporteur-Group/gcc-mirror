@@ -1,0 +1,28 @@
+SRCDIR=$(shell git rev-parse --show-toplevel)
+BUILDDIR = $(SRCDIR)/build
+
+GCOBOL = $(BUILDDIR)/gcc/gcobol -B$(BUILDDIR)/gcc
+
+LIBCOBOL_A=$(shell find $(BUILDDIR) -name "libgcobol.a")
+LIBCOBOL_PATH = $(dir $(LIBCOBOL_A))
+LIBROOT = $(subst /libgcobol/.libs/,,$(LIBCOBOL_PATH))
+LIBSTDC_PATH = $(LIBROOT)/libstdc++-v3/src/.libs
+
+RPATH_OPT = -Wl,-rpath=
+RPATH = $(addprefix $(RPATH_OPT),$(LIBCOBOL_PATH) $(LIBSTDC_PATH))
+
+CPPFLAGS = -I $(SRCDIR)/gcc/cobol -I $(SRCDIR)/gcc/cobol/nist
+
+LDFLAGS = $(LIBCOBOL_A) $(RPATH)
+
+SEARCH_PATHS = -L $(LIBSTDC_PATH) -L $(LIBCOBOL_PATH)
+
+GCOBFLAGS = $(COBFLAGS) -fmax-errors 2 $(SEARCH_PATHS)
+
+SQ/SQ103A: SQ/SQ103A.cbl except.sq103a.o
+
+except.sq103a.cc: declaratives.SQ103A.h
+
+% : %.cbl
+	@echo '---> $(notdir $@)'
+	$(GCOBOL) -o $@ $(GCOBFLAGS) -main $^ $(LDFLAGS)

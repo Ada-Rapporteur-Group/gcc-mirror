@@ -1,0 +1,1 @@
+Enter text : The line contains 12 vowels and 28 consonants.

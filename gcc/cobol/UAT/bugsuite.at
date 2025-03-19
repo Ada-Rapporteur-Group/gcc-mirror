@@ -1,0 +1,13 @@
+AT_COPYRIGHT([Test cases Copyright (C) 2022 COBOLworx a subsidiary of Symas Corp.
+
+Written by Marty Heyman])
+
+### GnuCOBOL Test Suite
+
+AT_INIT([COBOL for GCC Tests])
+AT_COLOR_TESTS
+
+AT_TESTED('$GCOBOL')
+
+m4_include([bugs.at])
+

@@ -1,0 +1,4 @@
+Enter a Hex number - 0000 is a Hex number
+----------------------------------
+Enter a name - ABC1            is not alphabetic
+ABC1            is not a real name

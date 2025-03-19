@@ -2611,7 +2611,7 @@ directories, to avoid imposing the performance cost of
   missing_languages=`echo "$missing_languages" | sed -e "s/^,//" -e "s/,$//"`
   stage1_languages=`echo "$stage1_languages" | sed -e "s/^,//" -e "s/,$//"`
   new_enable_languages=`echo "$new_enable_languages" | sed -e "s/^,//" -e "s/,$//"`
-
+  
   if test "x$missing_languages" != x; then
     AC_MSG_ERROR([
 The following requested languages could not be built: ${missing_languages}

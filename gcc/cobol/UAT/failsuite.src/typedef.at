@@ -1,0 +1,411 @@
+AT_COPYRIGHT([Test cases Copyright (C) 2024 Free Software Foundation
+
+Written by Simon Sobisch])
+
+
+AT_BANNER([TYPEDEF Tests])
+
+AT_SETUP([typedef 1])
+AT_KEYWORDS([typedef])
+AT_DATA([caller.cob], [
+       IDENTIFICATION  DIVISION.
+       PROGRAM-ID.     caller.
+       
+       DATA            DIVISION.
+       WORKING-STORAGE SECTION.
+       01  INT         IS TYPEDEF BINARY-LONG.
+           88  INT-ZERO  VALUE 0.
+           88  INT-ONE   VALUE 1.
+       77  EXT-INT     IS TYPEDEF BINARY-LONG EXTERNAL.
+       77  INT-VAL     IS TYPEDEF BINARY-LONG VALUE 12.
+       01  SOMEVAR     USAGE INT VALUE 10.
+       01  SOMEVAR2    USAGE INT VALUE 11.
+       77  SOMEVAL     USAGE INT-VAL.
+       77  SOMEEXT     USAGE EXT-INT.
+       
+       PROCEDURE       DIVISION.
+           IF SOMEVAR <> 10
+              DISPLAY "SOMEVAR (INT) wrong: " SOMEVAR.
+           IF SOMEVAL <> 12
+              DISPLAY "SOMEVAL (INT-VAL) wrong: " SOMEVAL.
+           SET INT-ZERO OF SOMEVAR  TO TRUE
+           SET INT-ONE  OF SOMEVAR2 TO TRUE
+           IF SOMEVAR  <> 0
+              DISPLAY "SOMEVAR  (INT) by SET wrong: " SOMEVAR.
+           IF SOMEVAR2 <> 1
+              DISPLAY "SOMEVAR2 (INT) by SET wrong: " SOMEVAR2.
+           IF INT-ONE  OF SOMEVAR
+           OR NOT INT-ONE  OF SOMEVAR2
+              DISPLAY "CHECK BY condition-nam wrong".
+           MOVE 42 TO SOMEEXT
+           CALL "callee"
+           GOBACK.
+])
+AT_DATA([callee.cob], [
+       IDENTIFICATION  DIVISION.
+       PROGRAM-ID.     callee.
+       DATA            DIVISION.
+       WORKING-STORAGE SECTION.
+       77  EXT-INT     IS TYPEDEF BINARY-LONG EXTERNAL.
+       77  SOMEEXT     USAGE EXT-INT.
+
+       PROCEDURE       DIVISION.
+           IF SOMEEXT <> 42
+              DISPLAY "SOMEEXT (EXT-INT) wrong: " SOMEEXT
+           END-IF
+           .
+])
+AT_CHECK([$COMPILE_MODULE -dialect mf callee.cob], [0], [], [])
+AT_CHECK([$COMPILE -dialect mf caller.cob callee.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+AT_CLEANUP
+
+
+
+
+AT_SETUP([TYPEDEF clause])
+AT_KEYWORDS([definition EXTERNAL GLOBAL TYPE USAGE listing symbols xref])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 AUSGABE-FILE-NAME-T          PIC X(50) IS TYPEDEF.
+       01 SOME-VERY-LONG-TYPEDEF-NAME  PIC 9999  IS TYPEDEF.
+       01 AUSGABE-FILE-NAME-2T         IS TYPEDEF.
+          05 FILLER    PIC 9999.
+          05 DETAIL-NO USAGE SOME-VERY-LONG-TYPEDEF-NAME.
+      *
+       01  MESSAGE-TEXT-2T IS TYPEDEF.
+         02 AUSGABE-FILE-NAME     USAGE AUSGABE-FILE-NAME-T.
+         02 FILLER REDEFINES AUSGABE-FILE-NAME.
+             05 FILLER PIC 9999.
+         02 AUSGABE-FILE-NAME-2   USAGE AUSGABE-FILE-NAME-2T.
+         02 FILLER                USAGE AUSGABE-FILE-NAME-T.
+      *
+       01  MESSAGE-TEXT-2 EXTERNAL USAGE MESSAGE-TEXT-2T.
+ 
+       77 OUTPUT-NAME USAGE SOME-VERY-LONG-TYPEDEF-NAME GLOBAL.
+ 
+       01 Z-MESSAGE-T2 USAGE AUSGABE-FILE-NAME-2T.
+       01 Z-MESSAGE-T3.
+          49 MT3                    USAGE MESSAGE-TEXT-2T.
+          49 MT3-REN  REDEFINES MT3 USAGE MESSAGE-TEXT-2T.
+ 
+       01 CALCULUS             PIC S9(15)V9(03) IS TYPEDEF.
+          88 NO-DETAIL         VALUE ZERO.
+          88 MIN-DETAIL        VALUE 0.001.
+       01 USER-TYPE            IS TYPEDEF.
+          02 AMOUNT            USAGE CALCULUS.
+          02 FILLER            OCCURS 100.
+             05 GRP-AMOUNT     USAGE CALCULUS.
+       01 USER-VAR             USAGE USER-TYPE.
+ 
+       01 PROC                 USAGE PROGRAM-POINTER IS TYPEDEF.
+          88 PROC-UNSET        VALUE NULL.
+       77 MY-PROC              USAGE PROC VALUE NULL.
+ 
+       PROCEDURE DIVISION.
+           DISPLAY AUSGABE-FILE-NAME OF MESSAGE-TEXT-2
+           DISPLAY DETAIL-NO         OF Z-MESSAGE-T2
+           DISPLAY AUSGABE-FILE-NAME OF MT3
+           DISPLAY OUTPUT-NAME
+           MOVE -123.45 TO AMOUNT
+           MOVE AMOUNT  TO GRP-AMOUNT (1)
+           IF MY-PROC = NULL
+              SET MY-PROC TO ADDRESS OF PROGRAM "prog".
+           GOBACK.
+])
+
+AT_DATA([progstd.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 AUSGABE-FILE-NAME-T     PIC X(50) IS TYPEDEF.
+       01 DETAIL-NO-T             PIC 9999  IS TYPEDEF.
+       01 AUSGABE-FILE-NAME-2T              IS TYPEDEF.
+          05 FILLER    PIC 9999.
+          05 DETAIL-NO TYPE TO DETAIL-NO-T.
+      *
+       01  MESSAGE-TEXT-2T IS TYPEDEF.
+         02 AUSGABE-FILE-NAME     TYPE AUSGABE-FILE-NAME-T.
+         02 FILLER REDEFINES AUSGABE-FILE-NAME.
+             05 FILLER PIC 9999.
+         02 AUSGABE-FILE-NAME-2   TYPE AUSGABE-FILE-NAME-2T.
+         02 FILLER                TYPE AUSGABE-FILE-NAME-T.
+      *
+       01  MESSAGE-TEXT-2 EXTERNAL TYPE MESSAGE-TEXT-2T.
+ 
+       77 OUTPUT-NAME TYPE TO DETAIL-NO-T GLOBAL.
+ 
+       01 Z-MESSAGE-T2 TYPE AUSGABE-FILE-NAME-2T.
+       01 Z-MESSAGE-T3.
+          49 MT3                    TYPE MESSAGE-TEXT-2T.
+          49 MT3-REN  REDEFINES MT3 TYPE MESSAGE-TEXT-2T.
+ 
+       77 CALCULUS             PIC S9(15)V9(03) IS TYPEDEF.
+ 
+       01 SOME-STRUCT          IS TYPEDEF.
+          02 SOME-DATA         PIC 9.
+          02 SOME-VALUES       OCCURS 3.
+             03 OTHER-DATA     PIC X.
+             03 OTHER-VALUES   OCCURS 2 PIC 9.
+       77 SOME2-DATA           PIC 9.
+       01 SOME-STRUCT2         IS TYPEDEF.
+          02 SOME2-VALUES      OCCURS 1 TO 6 DEPENDING ON SOME2-DATA
+                               DESCENDING KEY SB SA
+                               INDEXED BY SOME2-INDEX.
+             05 SA             PIC X VALUE x'12'.
+             05 SB             PIC 9 VALUE 0.
+             05 SDATA          PIC X(12).
+ 
+       01 MY-TEST.
+          02 AMOUNT            TYPE CALCULUS.
+          02 FILLER            OCCURS 100.
+             05 GRP-AMOUNT     TYPE CALCULUS.
+          02 MY-NAME           TYPE SOME-STRUCT  OCCURS 5.
+          02 MY-NAME2          TYPE SOME-STRUCT2.
+       01 MY-TEST2             TYPE SOME-STRUCT2.
+       LINKAGE SECTION.
+       01 MY-STORE             TYPE CALCULUS.
+ 
+       PROCEDURE DIVISION USING MY-STORE.
+           DISPLAY AUSGABE-FILE-NAME OF MESSAGE-TEXT-2
+           DISPLAY DETAIL-NO         OF Z-MESSAGE-T2
+           DISPLAY AUSGABE-FILE-NAME OF MT3
+           DISPLAY OUTPUT-NAME
+           SET ADDRESS OF MY-STORE TO NULL
+           INITIALIZE MY-NAME(2) GRP-AMOUNT (99)
+           INITIALIZE OTHER-VALUES (2, 3, 2)
+           SEARCH ALL SOME2-VALUES OF MY-NAME2
+             WHEN SA(SOME2-INDEX) = x'12'
+                CONTINUE.
+           GOBACK.
+])
+
+AT_CHECK([$COMPILE_ONLY -dialect mf prog.cob], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([typedef 1])
+AT_KEYWORDS([typedef])
+AT_DATA([badprog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  MESSAGE-TEXT-2T IS TYPEDEF.
+         02 AUSGABE-FILE-NAME     PIC X(50).
+         02 F1      USAGE MESSAGE-TEXT-2T.
+       01 MT2 USAGE MESSAGE-TEXT-2T.
+             05 FILLER PIC 9999.
+       01 MT3 TYPE TO MESSAGE-TEXT-2T PIC X.
+       77 OUTPUT-NAME  TYPE TO MESSAGE-TEXT-2T.
+])
+AT_CHECK([$COMPILE_ONLY -dialect mf badprog.cob], [1], [],
+[badprog.cob:8: error: 02 F1  may not reference itself as part of 01 MESSAGE-TEXT-2T at 'MESSAGE-TEXT-2T'
+badprog.cob:10: error: F1 created with SAME AS or TYPE TO, cannot have new member FILLER at 'FILLER'
+badprog.cob:10: error: 05 FILLER is not part of an 01 record at 'FILLER'
+badprog.cob:12: error: PIC incompatible with TYPE TO
+badprog.cob:12: error: 77 OUTPUT-NAME TYPE TO MESSAGE-TEXT-2T must be an elementary item at 'MESSAGE-TEXT-2T'
+.:13: 5 errors in DATA DIVISION, compilation ceases detected at end of file
+cobol1: error: failed compiling badprog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([SAME AS clause])
+AT_KEYWORDS([definition EXTERNAL GLOBAL])
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  MESSAGE-TEXT-2 EXTERNAL.
+         02 AUSGABE-FILE-NAME   PIC X(50).
+         02 FILLER REDEFINES AUSGABE-FILE-NAME.
+             05 FILLER          PIC 9999.
+         02 AUSGABE-FILE-NAME-2.
+             05 FILLER          PIC 9999.
+             05 DETAIL-NO       PIC 9999.
+         02 FILLER SAME AS AUSGABE-FILE-NAME.
+
+       77 OUTPUT-NAME SAME AS DETAIL-NO GLOBAL.
+
+       01 Z-MESSAGE-T2 SAME AS AUSGABE-FILE-NAME-2.
+       01 Z-MESSAGE-T3.
+          49 MT3       SAME AS MESSAGE-TEXT-2.
+          49 MT3-REN  REDEFINES MT3 SAME AS MESSAGE-TEXT-2.
+
+       PROCEDURE DIVISION.
+           DISPLAY AUSGABE-FILE-NAME OF MESSAGE-TEXT-2
+           DISPLAY DETAIL-NO         OF Z-MESSAGE-T2
+           DISPLAY AUSGABE-FILE-NAME OF MT3
+           DISPLAY OUTPUT-NAME
+           GOBACK.
+])
+
+AT_DATA([badprog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  MESSAGE-TEXT-2.
+         02 AUSGABE-FILE-NAME                 PIC X(50).
+         02 F1         SAME AS MESSAGE-TEXT-2.
+       01 MT2          SAME AS MESSAGE-TEXT-2.
+             05 FILLER                        PIC 9999.
+       01 MT3          SAME AS MESSAGE-TEXT-2 PIC X.
+       77 OUTPUT-NAME  SAME AS MESSAGE-TEXT-2.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [0], [], [])
+AT_CHECK([$COMPILE_ONLY badprog.cob], [1], [],
+[badprog.cob:8: error: item may not reference itself
+badprog.cob:10: error: entry following SAME AS may not be subordinate to it
+badprog.cob:11: error: illegal combination of SAME AS with other clauses
+badprog.cob:12: error: elementary item expected
+])
+AT_CLEANUP
+
+# Here's a special test case that include a not-used but cool feature:
+# VALIDATE; my suggestion is that gcobol should be able to parse that
+# correctly, an error on the statement itself "not implemented" is
+# totally fine. This is directly copied from the standard (only added
+# the syntactic parts missing).
+AT_SETUP([typedef 1])
+AT_KEYWORDS([typedef])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       DATA  DIVISION.
+       WORKING-STORAGE SECTION.
+      *> D.22.7.1    Example of validation of USAGE DISPLAY items
+      *>
+      *>*************************************************************
+      *>Description of target record (note: should be possible to define later)
+      *>*************************************************************
+      *>This is set up by the optional DESTINATION clauses defined
+      *>in the input record;
+      *>if a format error is found, a default value is stored instead.
+       01  TARGET-AREA.
+           05  OUT-NAME       PIC X(20).
+           05  OUT-WEEK       PIC 99 COMP   OCCURS 5.
+      *>*************************************************************
+      *>Validated items
+      *>*************************************************************
+       01  INPUT-RECORD.
+      *>PIC 99 checks that IN-TYPE is 2 characters numeric;
+           03  IN-TYPE         PIC 99
+      *>if IN-TYPE fails the PICTURE check, it is assumed to be 1;
+      *>without a DEFAULT clause, the assumed value would here be 0.
+                                   DEFAULT 1.
+      *>PRESENT WHEN states the condition for this format to be used.
+           03  IN-REC-FORMAT-1 PRESENT WHEN IN-TYPE = 0 OR 1 OR 2.
+      *>PICTURE A(20) checks for 20 alphabetic (or space) characters.
+               05  IN-NAME       PIC A(20)
+      *>PRESENT WHEN defines when the validation clauses for this data item apply:
+                                    PRESENT WHEN IN-TYPE = 0 OR 1
+      *>CLASS checks each character for a class defined in SPECIAL-NAMES
+      *>or a predefined class
+                                    CLASS IS ALPHABETIC-UPPER
+      *>DESTINATION moves this item (or spaces if not alpha) to OUT-NAME.
+                                    DESTINATION OUT-NAME.
+      *>PRESENT WHEN checks whether the item is "blank" under this condition
+               05  FILLER REDEFINES IN-NAME  PIC X(20) *> should PIC be optional?
+                                    PRESENT WHEN IN-TYPE = 2
+                                    DESTINATION OUT-NAME.
+                   88               VALUE SPACES IS VALID.
+      *>The values of IN-WEEK are checked to be in non-descending order.
+               05  IN-WEEK       PIC 99  OCCURS 5
+                   VARYING IN-WEEK-NO FROM 1, IN-NEXT-WEEK-NO FROM 2
+                   INVALID WHEN IN-WEEK-NO < 5
+                   AND IN-WEEK (IN-WEEK-NO) > IN-WEEK (IN-NEXT-WEEK-NO)
+      *>OUT-WEEK (1) to (5) will hold the values of IN-WEEK (1) to (5),
+      *>or zero for any one that failed the format (PICTURE) test.
+                   DESTINATION OUT-WEEK (IN-WEEK-NO).
+      *>The 88-level INVALID entries check for invalid ranges of values.
+                  88  VALUES 0, 53 THRU 99 ARE INVALID.
+      *>REDEFINES and another PRESENT WHEN define an alternate format.
+           03  IN-REC-FORMAT-2 REDEFINES IN-REC-FORMAT-1
+                                           PRESENT WHEN IN-TYPE > 2.
+      *>IN-PAY has insertion characters that must be present on input.
+               05  IN-PAY                PIC ZZ,ZZZ.ZZ.
+      *>The 88-level VALID entries check for valid ranges of values;
+      *>the condition-name, if present, may be used in the usual way.
+      *>The following assume that DECIMAL POINT IS COMMA is not specified.
+                    88  IN-PAY-OK  VALUES "10,000.00" THRU "20,000.00" ARE VALID.
+      *>88-level entries may also have a condition attached.
+                    88                    VALUES "20,000.01" THRU "30,000.00" ARE VALID
+                                          WHEN IN-TYPE = 8.
+      *>exceptional cases can be specified using PRESENT WHEN
+               05  IN-CODE                PIC AX(3)9(4)
+                                          PRESENT WHEN IN-CODE NOT = "UNKNOWN".
+               05  FILLER           PIC X(13).
+      *>
+      *>*************************************************************
+      *> Description of error messages
+      *>*************************************************************
+      *>Error messages or flags are set up or cleared automatically
+      *>when the VALIDATE statement is executed; the programmer chooses
+      *>where they go and what messages or values they contain;
+      *>they need not be contiguous as they are in this example.
+      01  VALIDATE-MESSAGES.
+          03  PIC X(40)  VALIDATE-STATUS "Unknown Record Type - 1 assumed"
+                           WHEN ERROR FOR IN-TYPE
+      *> more than one VALIDATE-STATUS clause may be defined in one entry;
+      *> a NO ERROR  phrase produces a message when the item is valid.
+                         VALIDATE-STATUS "Record type Accepted"
+                           WHEN NO ERROR FOR IN-TYPE.
+      *> The VALIDATE-STATUS clause can pinpoint the stage of the failed check.
+          03  PIC X(40)  VALIDATE-STATUS "Name not alphabetic"
+                           WHEN ERROR ON FORMAT FOR IN-NAME
+                         VALIDATE-STATUS "Lower-case not allowed in name"
+                           WHEN ERROR ON CONTENT FOR IN-NAME
+                         VALIDATE-STATUS "Name not allowed in this case"
+                           WHEN ERROR ON RELATION FOR IN-NAME.
+      *> If no message is stored, spaces will be stored in these cases.
+      *> Errors may also be indicated by flags;
+      *> they may also refer to a table of input items.
+          03  W-ERROR-FLAG   PIC 9   COMP  OCCURS 5
+                         VALIDATE-STATUS 1 WHEN ERROR FOR IN-WEEK.
+      *>An EC-VALIDATE (nonfatal) exception is also set if the
+      *>VALIDATE statement detects an invalid condition.
+
+
+      *> From D.22.7.2    Example of validation of non-display items:
+         01  MIXED-GROUP TYPEDEF STRONG.
+             05  FLD-1             PIC S9(4)  USAGE COMP.
+             05  FLD-2             PIC S9(7)  USAGE PACKED-DECIMAL.
+             05  FLD-3             PIC 1(8)   USAGE BIT ALIGNED.
+             05  PTR-1             USAGE INDEX.
+             05  PTR-2             USAGE OBJECT REFERENCE.
+             05  TXT-1             PIC N(12)  USAGE NATIONAL.
+       01 MY-MIXED-GROUP TYPE MIXED-GROUP.
+
+
+      *>
+      *>*************************************************************
+      *>Execution of the VALIDATE statement
+      *>*************************************************************
+       PROCEDURE DIVISION.
+
+      *>A single VALIDATE statement performs all the actions implied
+      *>in the above data descriptions.
+           VALIDATE INPUT-RECORD
+      *>After this statement has been executed:
+      *>(1) the input record is unchanged;
+      *>(2) input items are moved automatically to the target area;
+      *>(3) error messages are set up wherever specified in the program.
+      *>
+
+      *> From D.22.7.2    Example of validation of non-display items:
+      *>A declarative section could be used instead of VALIDATE-STATUS clauses
+      *>especially if errors are not expected.
+      *>> TURN EC-VALIDATE CHECKING ON
+           VALIDATE MY-MIXED-GROUP
+        GOBACK.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [0], [Why is this here?], [])
+AT_CLEANUP

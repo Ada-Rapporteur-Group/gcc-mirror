@@ -1,0 +1,27 @@
+#!/usr/bin/awk -f
+
+# For a file extracted by EXEC85, check for DATA components.  Print
+# any non-data lines on stdout.  Ignore DATA components not associated
+# with the input file.  Print associated DATA lines to datfile.
+
+/,DATA[*],/ {
+  output = "/dev/null"
+  n = split($0, a, /,/)
+  if( FILENAME ~ a[n] ) {
+    output = datfile
+    next
+  }
+}
+
+output && ! /[*]END/ {
+  printf "%-80s\n", $0 > output
+}
+
+!output {
+  print
+}
+
+/[*]END/ {
+  output=0
+}
+

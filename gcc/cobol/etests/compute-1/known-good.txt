@@ -1,0 +1,117 @@
+Dividing something by ZERO...
+1 C ends up being 42
+ 
+Proper Size Error
+2 C ends up being 42
+ 
+3 C ends up being 42
+ 
+Proper Size Error
+4 C ends up being 42
+ 
+Dividing 50 by 25...
+5 C ends up being 02
+ 
+6 C ends up being 02
+ 
+Proper NOT Size Error
+7 C ends up being 02
+ 
+Proper NOT Size Error
+8 C ends up being 02
+ 
+DIVIDE ZERO into 50...
+9 A ends up being 50
+ 
+Proper Size Error
+10 A ends up being 50
+ 
+11 A ends up being 50
+ 
+Proper Size Error
+12 A ends up being 50
+ 
+DIVIDE 25 into 50...
+13 A ends up being 02
+ 
+14 A ends up being 02
+ 
+Proper NOT Size Error
+15 A ends up being 02
+ 
+Proper NOT Size Error
+16 A ends up being 02
+ 
+Simple COMPUTE A=B, no ON ERROR clause
+17 COMPUTE A (PIC XX) = 005
+05
+ 
+18 COMPUTE A (PIC XX) = 045
+45
+ 
+19 COMPUTE A (PIC XX) = 345
+45
+ 
+Simple COMPUTE A=B, with ON ERROR clause
+20 COMPUTE A (PIC XX) = 005
+Proper NOT Size Error
+05
+ 
+21 COMPUTE A (PIC XX) = 045
+Proper NOT Size Error
+45
+ 
+22 COMPUTE A (PIC XX) = 345
+Proper Size Error
+45
+ 
+23 COMPUTE 1 + 2 + 3 * 4 (should be 15, no error)
+Proper NOT Size Error
+15
+ 
+24 COMPUTE 101 + 2 + 3 * 4 (should be 15, with error)
+Proper Size Error
+15
+ 
+25 COMPUTE 11 + 2 + 50/ZERO + 3 * 4 should be 99, with no error clause
+99
+ 
+26 COMPUTE 11 + 2 + 50/ZERO + 3 * 4 (should be 99, with error)
+Proper Size Error
+99
+ 
+27 COMPUTE C = 2**3, should be 08
+08
+ 
+28 COMPUTE C = 16**0.5, should be 04
+04
+ 
+29 COMPUTE C = 0**0, should be 01
+01
+ 
+30 COMPUTE C = 0**-1, should be 00
+00
+ 
+31 COMPUTE C = -16**0.5, should be 99
+99
+ 
+32 COMPUTE C = 2**3, should be 08
+Proper NOT Size Error
+08
+ 
+33 COMPUTE C = 16**0.5, should be 04
+Proper NOT Size Error
+04
+ 
+34 COMPUTE C = 0**0, should be 99
+Proper Size Error
+99
+ 
+35 COMPUTE C = 0**-1, should be 99
+Proper Size Error
+99
+ 
+36 COMPUTE C = -16**0.5, should be 99
+Proper Size Error
+99
+ 

@@ -1,0 +1,3 @@
+#!/bin/sh
+iconv -f CP1140 -t UTF-8 Listing10-3NewMast.rpt >rpt.tmp
+mv rpt.tmp Listing10-3NewMast.rpt

@@ -1,0 +1,60 @@
+D9 is 002
+B9 is 002
+X1 is '2'
+X2 is ' 2'
+X3 is '  2'
+X4 is '2'
+X5 is '02'
+X6 is '002'
+ 
+D9 EQUAL TO D9          
+D9 EQUAL TO B9          
+D9 EQUAL TO X1           NOT
+D9 EQUAL TO X2           NOT
+D9 EQUAL TO X3           NOT
+D9 EQUAL TO X4           NOT
+D9 EQUAL TO X5           NOT
+D9 EQUAL TO X6          
+ 
+B9 EQUAL TO D9          
+B9 EQUAL TO B9          
+B9 EQUAL TO X1           NOT
+B9 EQUAL TO X2           NOT
+B9 EQUAL TO X3           NOT
+B9 EQUAL TO X4           NOT
+B9 EQUAL TO X5           NOT
+B9 EQUAL TO X6          
+ 
+B9 EQUAL TO 2           
+B9 EQUAL TO 002         
+B9 EQUAL TO '2'          NOT
+B9 EQUAL TO '002'       
+ 
+ 2  EQUAL TO B9         
+'2' EQUAL TO B9          NOT
+ 
+ 002  EQUAL TO B9       
+'002' EQUAL TO B9       
+ 
+ 2  EQUAL TO  2         
+ 2  EQUAL TO '2'        
+'2' EQUAL TO  2         
+'2' EQUAL TO '2'        
+ 
+ 2  EQUAL TO  002       
+ 2  EQUAL TO '002'       NOT
+'2' EQUAL TO  002        NOT
+'2' EQUAL TO '002'       NOT
+ 
+ 002  EQUAL TO  2       
+ 002  EQUAL TO '2'       NOT
+'002' EQUAL TO  2        NOT
+'002' EQUAL TO '2'       NOT
+ 
+ 002  EQUAL TO  002     
+ 002  EQUAL TO '002'    
+'002' EQUAL TO  002     
+'002' EQUAL TO '002'    
+ 
+ 1000 EQUAL TO 999PPP   
+ 0.0001 EQUAL TO PPP999 

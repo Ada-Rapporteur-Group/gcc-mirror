@@ -1,0 +1,61 @@
+*** Film file before updates ***
+8713669 023 Alien                                   
+8805075 009 Lord of the Rings:Return of the King    
+8805091 009 Lord of the Rings:Fellowship of the Ring
+8805105 015 Mission Impossible                      
+8805121 005 Jaws                                    
+8805156 015 Carrie                                  
+8805164 009 Lord of the Rings:The Two Towers        
+8805229 005 Saving Private Ryan                     
+8805245 005 Catch Me If You Can                     
+8805253 009 Heavenly Creatures                      
+8805261 012 Master and Commander                    
+8805288 033 Cape Fear                               
+8805296 004 Overboard                               
+8805326 005 The Color Purple                        
+8805334 002 Desperado                               
+8805385 003 First Knight                            
+8805415 002 Pulp Fiction                            
+8805474 003 Ghost                                   
+8805504 002 Jackie Brown                            
+8805806 015 Carlito's Way                           
+8812438 015 The Untouchables                        
+8822334 023 Blade Runner                            
+ 
+About to DELETE 8805334
+About to DELETE 8844444
+8844444 - Delete Error. No such record
+About to INSERT/WRITE 8833333Raiders of the Lost Ark - valid insert  005
+8833333 - Insert Error. No matching entry for director - 008
+About to INSERT/WRITE 8805245   invalid Insert rec already exists    005
+8805245 - Insert Error. That FilmId already exists.
+About to UPDATE/READ '8805326'
+About to REWRITE '8805326Color Purple, The +++ valid update      005'
+About to UPDATE/READ '8811111'
+8811111 - Update error. No such record exists
+About to UPDATE/READ '8812438'
+About to REWRITE '8812438Untouchables, The +++ valid update      015'
+ 
+*** Film file after updates ***
+8713669 023 Alien                                   
+8805075 009 Lord of the Rings:Return of the King    
+8805091 009 Lord of the Rings:Fellowship of the Ring
+8805105 015 Mission Impossible                      
+8805121 005 Jaws                                    
+8805156 015 Carrie                                  
+8805164 009 Lord of the Rings:The Two Towers        
+8805229 005 Saving Private Ryan                     
+8805245 005 Catch Me If You Can                     
+8805253 009 Heavenly Creatures                      
+8805261 012 Master and Commander                    
+8805288 033 Cape Fear                               
+8805296 004 Overboard                               
+8805326 005 Color Purple, The +++ valid update      
+8805385 003 First Knight                            
+8805415 002 Pulp Fiction                            
+8805474 003 Ghost                                   
+8805504 002 Jackie Brown                            
+8805806 015 Carlito's Way                           
+8812438 015 Untouchables, The +++ valid update      
+8822334 023 Blade Runner                            
+8833333 005 Raiders of the Lost Ark - valid insert  

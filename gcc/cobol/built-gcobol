@@ -1,0 +1,20 @@
+#!/bin/sh
+# Run gcobol from the build directory
+set -e
+if [ -z "$build" ]
+then 
+    build=build
+fi
+
+srcdir=$(cd ${0%/*} && git rev-parse --show-toplevel)
+objdir=$srcdir/$build
+libdir=$(ls $objdir/$(arch)* -d)
+
+$objdir/gcc/gcobol                                      \
+	-B$objdir/gcc                                   \
+	$@                                              \
+	-L$libdir/libgcobol/.libs                       \
+	-L$libdir/libstdc++-v3/src/.libs                \
+	-Wl,-rpath=$libdir/libgcobol/.libs              \
+	-Wl,-rpath=$libdir/libstdc++-v3/src/.libs       \
+	-lgcobol -lm -ldl -lstdc++

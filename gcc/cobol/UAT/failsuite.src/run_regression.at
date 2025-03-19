@@ -1,0 +1,26 @@
+AT_COPYRIGHT([Test cases Copyright (C) 2022 COBOLworx a subsidiary of Symas Corp.
+
+Written by Marty Heyman])
+
+### GnuCOBOL Test Suite
+
+AT_SETUP([DEBUG Line not working])
+AT_KEYWORDS([former-bugs])
+AT_DATA([prog.cob],[
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SOURCE-COMPUTER.
+           Linux WITH DEBUGGING MODE.
+       PROCEDURE DIVISION.
+      *> Success is printing this message. If nothing comes out, the
+      *> test fails.
+      D    DISPLAY "DEBUG MESSAGE" NO ADVANCING.
+       EXIT PROGRAM.
+       END PROGRAM prog.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [],[])
+AT_CHECK([./a.out], [0], [DEBUG MESSAGE],[])
+AT_CLEANUP
+

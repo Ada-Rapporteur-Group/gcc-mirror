@@ -1,0 +1,152 @@
+AT_COPYRIGHT([Test cases Copyright (C) 2022 COBOLworx a subsidiary of Symas Corp.
+
+Written by Marty Heyman, Nick Mower, Bob Dubner])
+
+### GnuCOBOL Test Suite
+
+AT_INIT([COBOL for GCC Tests])
+AT_COLOR_TESTS
+
+AT_TESTED('$GCOBOL')
+
+AT_BANNER([ON SIZE])
+m4_include([run_onsize.at])
+
+AT_BANNER([FLOATING POINT])
+m4_include([run_float.at])
+
+AT_BANNER([DECLARATIVES])
+m4_include([run_declaratives.at])
+
+AT_BANNER([Reference Format Tests])
+m4_include([fixed_format.at])
+
+AT_BANNER([DATA DISPLAY])
+m4_include([data_display.at])
+
+AT_BANNER([DATA PACKED])
+m4_include([data_packed.at])
+
+AT_BANNER([DATA POINTER])
+m4_include([data_pointer.at])
+
+# listings DEFERRED
+# AT_BANNER([LISTINGS])
+# m4_include([listings.at])
+
+AT_BANNER([ACCEPT])
+m4_include([run_accept.at])
+
+AT_BANNER([EVALUATE])
+m4_include([run_evaluate.at])
+
+AT_BANNER([INSPECT])
+m4_include([inspect.at])
+
+# extensions  DEFERRED
+# AT_BANNER([EXTENSIONS])
+# m4_include([extensions.at])
+
+# run_file DEFERRED - Just too many failures TODO
+AT_BANNER([FILE])
+m4_include([run_file.at])
+
+AT_BANNER([FUNCTIONS])
+m4_include([run_functions.at])
+
+AT_BANNER([FUNDAMENTAL])
+m4_include([run_fundamental.at])
+
+AT_BANNER([INITIALIZE])
+m4_include([run_initialize.at])
+
+# manual screen DEFERRED
+# AT_BANNER([MANUAL SCREEN])
+# m4_include([run_manual_screen.at])
+
+AT_BANNER([MISC])
+m4_include([run_misc.at])
+
+# XML and JSON .. not supported
+# AT_BANNER([ML])
+# m4_include([run_ml.at])
+
+AT_BANNER([REFMOD])
+m4_include([run_refmod.at])
+
+# reportwriter  DEFERRED
+# AT_BANNER([REPORTWRITER])
+# m4_include([run_reportwriter.at])
+
+AT_BANNER([RETURNCODE])
+m4_include([run_returncode.at])
+
+AT_BANNER([SUBSCRIPTS syntax])
+m4_include([run_subscripts.at])
+
+AT_BANNER([COPY syntax])
+m4_include([syn_copy.at])
+
+AT_BANNER([DEFINITION syntax])
+m4_include([syn_definition.at])
+
+AT_BANNER([FILE syntax])
+m4_include([syn_file.at])
+
+AT_BANNER([MISC syntax])
+m4_include([syn_misc.at])
+
+AT_BANNER([MOVE syntax])
+m4_include([syn_move.at])
+
+AT_BANNER([MOVE])
+m4_include([run_move.at])
+
+AT_BANNER([MULTIPLY syntax])
+m4_include([syn_multiply.at])
+
+AT_BANNER([OCCURS syntax])
+m4_include([syn_occurs.at])
+
+AT_BANNER([REDEFINES syntax])
+m4_include([syn_redefines.at])
+
+AT_BANNER([REFMOD syntax])
+m4_include([syn_refmod.at])
+
+# reportwriter DEFERRED
+# AT_BANNER([REPORTWRITER syntax])
+# m4_include([syn_reportwriter.at])
+
+# screen DEFERRED
+# AT_BANNER([SCREEN syntax])
+# m4_include([syn_screen.at])
+
+AT_BANNER([SET syntax])
+m4_include([syn_set.at])
+
+AT_BANNER([SUBSCRIPTS syntax])
+m4_include([syn_subscripts.at])
+
+AT_BANNER([VALUE syntax])
+m4_include([syn_value.at])
+
+# Too early to worry
+# AT_BANNER([USED BINARIES])
+# m4_include([used_binaries.at])
+
+AT_BANNER([GCOBOL Intrinsics])
+m4_include([intrinsics.at])
+
+AT_BANNER([GCOBOL FUNDAMENTAL])
+m4_include([fundamental.at])
+
+AT_BANNER([CDF])
+m4_include([cdf.at])
+
+AT_BANNER([EBCDIC and source code pages])
+m4_include([ebcdic.at])
+
+AT_BANNER([GCOBOL FORMER BUGS])
+m4_include([run_regression.at])
+

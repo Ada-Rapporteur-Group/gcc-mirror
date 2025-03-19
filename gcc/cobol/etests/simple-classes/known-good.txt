@@ -1,0 +1,12 @@
+0    is a hexadecimal number
+Dead is a hexadecimal number
+Fred is not a hexadecimal number
+ 
+0               is not a real name
+Dead            is a real name
+Fred            is a real name
+ 
+0               is not alphabetic
+Dead            is alphabetic
+Fred            is alphabetic
+ 

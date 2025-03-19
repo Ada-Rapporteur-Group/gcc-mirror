@@ -1,0 +1,15 @@
+CustomerName - 123456789012345
+(should be     123456789012345)
+ 
+CustomerOrder - 001234
+(should be      001234)
+ 
+CustKey value changed to - MyValue
+(should be                 MyValue)
+ 
+NewKey value - CustKey
+(should be     CustKey)
+ 
+CustId value - CustKey
+(should be     CustKey)
+ 

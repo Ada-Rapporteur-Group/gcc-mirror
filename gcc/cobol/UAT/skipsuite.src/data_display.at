@@ -1,0 +1,118 @@
+
+### GnuCOBOL Test Suite
+
+## Copyright (C) 2020-2023 COBOLworx.
+## Written by Keisuke Nishida, Roger While, Simon Sobisch, Ron Norman,
+##    Marty Heyman, Nick Mower
+##
+## This file was copied from GnuCOBOL and modified for use with COBOL.
+## for GCC (gcobol).
+## The COBOL for GCC compiler is free software: you can redistribute it
+## and/or modify it under the terms of the Symas Open Licence. A copy
+## of that license is in the LICENSE file included in the distribution.
+##
+
+### COBOL for GCC Test Suite
+
+AT_SETUP([DISPLAY: Sign EBCDIC])
+AT_KEYWORDS([display])
+AT_XFAIL_IF(true)
+AT_SKIP_IF(false)
+# Marty doesn't understand how the logic is supposed to produce the
+# "correct out". Probably a DIALECT-ism.
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 G.
+         02 X           PIC X(10).
+         02 X-S99       REDEFINES X PIC S99.
+         02 X-S9        REDEFINES X PIC S9 OCCURS 10.
+       PROCEDURE        DIVISION.
+           MOVE 0 TO X-S9(1).
+           MOVE 1 TO X-S9(2).
+           MOVE 2 TO X-S9(3).
+           MOVE 3 TO X-S9(4).
+           MOVE 4 TO X-S9(5).
+           MOVE 5 TO X-S9(6).
+           MOVE 6 TO X-S9(7).
+           MOVE 7 TO X-S9(8).
+           MOVE 8 TO X-S9(9).
+           MOVE 9 TO X-S9(10).
+           DISPLAY X NO ADVANCING
+           END-DISPLAY.
+           MOVE -10 TO X-S99. MOVE X(2:1) TO X(1:1).
+           MOVE -1 TO X-S9(2).
+           MOVE -2 TO X-S9(3).
+           MOVE -3 TO X-S9(4).
+           MOVE -4 TO X-S9(5).
+           MOVE -5 TO X-S9(6).
+           MOVE -6 TO X-S9(7).
+           MOVE -7 TO X-S9(8).
+           MOVE -8 TO X-S9(9).
+           MOVE -9 TO X-S9(10).
+           DISPLAY X NO ADVANCING
+           END-DISPLAY.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [{ABCDEFGHI}JKLMNOPQR])
+
+AT_CLEANUP
+
+AT_SETUP([DISPLAY: unsigned])
+AT_KEYWORDS([display])
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# BINARY-INT not implemented TODO
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X-BCU         BINARY-CHAR   UNSIGNED.
+       01 X-BSU         BINARY-SHORT  UNSIGNED.
+       01 X-BIU         BINARY-INT    UNSIGNED.
+       01 X-BLU         BINARY-LONG   UNSIGNED.
+       01 X-BDU         BINARY-DOUBLE UNSIGNED.
+       01 X-US          UNSIGNED-SHORT.
+       01 X-UI          UNSIGNED-INT.
+       PROCEDURE        DIVISION.
+           MOVE 127 TO X-BCU.               DISPLAY X-BCU END-DISPLAY.
+           ADD 1 TO X-BCU END-ADD.          DISPLAY X-BCU END-DISPLAY.
+           MOVE 32767 TO X-BSU.             DISPLAY X-BSU END-DISPLAY.
+           ADD 1 TO X-BSU END-ADD.          DISPLAY X-BSU END-DISPLAY.
+           MOVE 2147483647 TO X-BIU.        DISPLAY X-BIU END-DISPLAY.
+           ADD 1 TO X-BIU END-ADD.          DISPLAY X-BIU END-DISPLAY.
+           MOVE 2147483647 TO X-BLU.        DISPLAY X-BLU END-DISPLAY.
+           ADD 1 TO X-BLU END-ADD.          DISPLAY X-BLU END-DISPLAY.
+           MOVE 9223372036854775807 TO X-BDU. DISPLAY X-BDU END-DISPLAY.
+           ADD 1 TO X-BDU END-ADD.          DISPLAY X-BDU END-DISPLAY.
+           MOVE 32767 TO X-US.              DISPLAY X-US  END-DISPLAY.
+           ADD 1 TO X-US END-ADD.           DISPLAY X-US  END-DISPLAY.
+           MOVE 2147483647 TO X-UI.         DISPLAY X-UI  END-DISPLAY.
+           ADD 1 TO X-UI END-ADD.           DISPLAY X-UI  END-DISPLAY.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0],
+[127
+128
+32767
+32768
+2147483647
+2147483648
+2147483647
+2147483648
+09223372036854775807
+09223372036854775808
+32767
+32768
+2147483647
+2147483648
+])
+
+AT_CLEANUP

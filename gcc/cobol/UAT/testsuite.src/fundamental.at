@@ -1,0 +1,342 @@
+## Copyright (C) 2003-2012, 2017-2018 Free Software Foundation, Inc.
+## Written by Keisuke Nishida, Roger While, Simon Sobisch
+##
+## This file is part of GnuCOBOL.
+##
+## The GnuCOBOL compiler is free software: you can redistribute it
+## and/or modify it under the terms of the GNU General Public License
+## as published by the Free Software Foundation, either version 3 of the
+## License, or (at your option) any later version.
+##
+## GnuCOBOL is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+##
+## You should have received a copy of the GNU General Public License
+## along with GnuCOBOL.  If not, see <https://www.gnu.org/licenses/>.
+
+### GnuCOBOL Test Suite
+
+### ISO+IEC+1989-2002 13.16.61 VALUE clause
+
+AT_SETUP([COBOL file with no suffix (1)])
+AT_KEYWORDS([fundamental file-names])
+AT_DATA([prog0141], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       PROCEDURE DIVISION.
+           DISPLAY "HELLO WORLD" WITH NO ADVANCING.
+           END PROGRAM prog.
+])
+AT_CHECK([$COMPILE -x cobol prog0141], [0], [], [])
+AT_CHECK([./a.out], [0], [HELLO WORLD], [])
+AT_CLEANUP
+
+AT_SETUP([COBOL file with no suffix (2)])
+AT_KEYWORDS([fundamental file-names])
+AT_DATA([proj1.subsec3.prog0141], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       PROCEDURE DIVISION.
+           DISPLAY "HELLO WORLD" WITH NO ADVANCING.
+           END PROGRAM prog.
+])
+AT_CHECK([$COMPILE -x cobol proj1.subsec3.prog0141], [0], [], [])
+AT_CHECK([./a.out], [0], [HELLO WORLD], [])
+AT_CLEANUP
+
+AT_SETUP([User-Defined Name Too Long])
+AT_KEYWORDS([fundamental names])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+      *>  123456789012345678901234567890123456789012345678901234567890123
+       77 this-should-work_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx63
+                           PIC 9.
+       77 this-should-fail_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx64
+                           PIC 9.
+       PROCEDURE DIVISION.
+           DISPLAY "Gratuitous procedure division statement.".
+       END PROGRAM prog.
+])
+AT_CHECK([$COMPILE prog.cob], [1], [], [prog.cob:9:11: error: name truncated to 'this-should-fail_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx6' (max 63 characters)
+    9 |        77 this-should-fail_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx64
+      |           ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([compilation cbl and .so])
+AT_KEYWORDS([compilation shared])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       PROCEDURE DIVISION.
+       CALL "prog2".
+       end program prog.
+])
+AT_DATA([prog2.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog2.
+       PROCEDURE DIVISION.
+       DISPLAY "hello, world".
+       end program prog2.
+])
+AT_CHECK([$COMPILE -shared -o prog2.so prog2.cob], [0], [], [])
+AT_CHECK([$COMPILE prog.cob ./prog2.so], [0], [], [])
+AT_CHECK([./a.out], [0], [hello, world
+], [])
+AT_CLEANUP
+
+AT_SETUP([compiled cbl and run-time .so in ./])
+AT_KEYWORDS([compilation shared])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       PROCEDURE DIVISION.
+       CALL "prog2" ON EXCEPTION DISPLAY "Couldn't find 'prog2'".
+       end program prog.
+])
+AT_DATA([prog2.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog2.
+       PROCEDURE DIVISION.
+       DISPLAY "hello, world".
+       end program prog2.
+])
+AT_CHECK([$COMPILE -ggdb -O0 -shared -o prog2.so prog2.cob], [0], [], [])
+AT_CHECK([$COMPILE -ggdb -O0 -fno-static-call prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [Couldn't find 'prog2'
+], [])
+AT_CHECK([COBPATH=. ./a.out], [0], [hello, world
+], [])
+AT_CLEANUP
+
+AT_SETUP([compiled cbl and run-time .so via COBPATH and LD_LIBRARY_PATH])
+AT_KEYWORDS([compilation shared])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       PROCEDURE DIVISION.
+       CALL "prog2" ON EXCEPTION DISPLAY "Couldn't find 'prog2'".
+       end program prog.
+])
+AT_DATA([prog2.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog2.
+       PROCEDURE DIVISION.
+       DISPLAY "hello, world".
+       end program prog2.
+])
+AT_CHECK([$COMPILE -ggdb -O0 -shared -o prog2.so prog2.cob], [0], [], [])
+AT_CHECK([$COMPILE -ggdb -O0 -fno-static-call prog.cob], [0], [], [])
+AT_CHECK([mkdir -p so], [0], [], [])
+AT_CHECK([mv *.so so], [0], [], [])
+AT_CHECK([./a.out], [0], [Couldn't find 'prog2'
+], [])
+AT_CHECK([COBPATH=./so ./a.out], [0], [hello, world
+], [])
+AT_CHECK([LD_LIBRARY_PATH=./so ./a.out], [0], [hello, world
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([explicit main entry point with -nomain])
+AT_KEYWORDS([compilation])
+AT_DATA([prog.cob], [
+        program-id. main.
+        procedure division.
+        display "hello from program-id main"
+        .
+])
+AT_CHECK([$COMPILE prog.cob], [1], [], ignore)
+AT_CHECK([$COMPILE -nomain prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [hello from program-id main
+], [])
+AT_CLEANUP
+
+AT_SETUP([various -main options (1)])
+AT_KEYWORDS([compilation])
+AT_DATA([a.cob], [
+        identification division.
+        program-id. a.
+        procedure division.
+        display "I am a; I call b1"
+        call "b1"
+        goback.
+        end program a.
+])
+AT_DATA([b.cob], [
+        identification division.
+        program-id. b1.
+        procedure division.
+        display "I am b1; I call b2"
+        call "b2"
+        goback.
+        end program b1.
+        identification division.
+        program-id. b2.
+        procedure division.
+        display "I am b2; I call c"
+        call "c"
+        goback.
+        end program b2.
+])
+AT_DATA([c.cob], [
+        identification division.
+        program-id. c.
+        procedure division.
+        display "I am c; as does the cheese, I stand alone"
+        goback.
+        end program c.
+])
+###################
+AT_CHECK([$COMPILE a.cob b.cob c.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [I am a; I call b1
+I am b1; I call b2
+I am b2; I call c
+I am c; as does the cheese, I stand alone
+], [])
+###################
+AT_CHECK([$COMPILE -main a.cob b.cob c.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [I am a; I call b1
+I am b1; I call b2
+I am b2; I call c
+I am c; as does the cheese, I stand alone
+], [])
+###################
+AT_CHECK([$COMPILE a.cob -main b.cob c.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [I am b1; I call b2
+I am b2; I call c
+I am c; as does the cheese, I stand alone
+], [])
+###################
+AT_CHECK([$COMPILE a.cob b.cob -main c.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [I am c; as does the cheese, I stand alone
+], [])
+###################
+AT_CHECK([$COMPILE -main=b.cob a.cob b.cob c.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [I am b1; I call b2
+I am b2; I call c
+I am c; as does the cheese, I stand alone
+], [])
+###################
+AT_CHECK([$COMPILE -main=b.cob:b2 a.cob b.cob c.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [I am b2; I call c
+I am c; as does the cheese, I stand alone
+], [])
+###################
+AT_CHECK([$COMPILE -main=c.cob a.cob b.cob c.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [I am c; as does the cheese, I stand alone
+], [])
+###################
+AT_CHECK([$COMPILE  a.cob b.cob c.cob -main=c.cob], [1], [], [gcobol: fatal error: "-main" without a source file
+compilation terminated.
+])
+AT_CLEANUP
+
+AT_SETUP([various -main options (2)])
+AT_KEYWORDS([compilation])
+AT_DATA([a.cob], [
+        identification division.
+        program-id. a.
+        procedure division.
+        display "I am a; I call b1"
+        call "b1"
+        goback.
+        end program a.
+])
+AT_DATA([b.cob], [
+        identification division.
+        program-id. b1.
+        procedure division.
+        display "I am b1; I call b2"
+        call "b2"
+        goback.
+        end program b1.
+        identification division.
+        program-id. b2.
+        procedure division.
+        display "I am b2; I call c"
+        call "c"
+        goback.
+        end program b2.
+])
+AT_DATA([c.cob], [
+        identification division.
+        program-id. c.
+        procedure division.
+        display "I am c; as does the cheese, I stand alone"
+        goback.
+        end program c.
+])
+###################
+AT_CHECK([$COMPILE -c -main a.cob], [0], [], [])
+AT_CHECK([$COMPILE -c       b.cob], [0], [], [])
+AT_CHECK([$COMPILE -c       c.cob], [0], [], [])
+AT_CHECK([$COMPILE    a.o b.o c.o], [0], [], [])
+AT_CHECK([./a.out], [0], [I am a; I call b1
+I am b1; I call b2
+I am b2; I call c
+I am c; as does the cheese, I stand alone
+], [])
+###################
+AT_CHECK([$COMPILE -c       a.cob], [0], [], [])
+AT_CHECK([$COMPILE -c -main b.cob], [0], [], [])
+AT_CHECK([$COMPILE -c       c.cob], [0], [], [])
+AT_CHECK([$COMPILE    a.o b.o c.o], [0], [], [])
+AT_CHECK([./a.out], [0], [I am b1; I call b2
+I am b2; I call c
+I am c; as does the cheese, I stand alone
+], [])
+###################
+AT_CHECK([$COMPILE -c       a.cob], [0], [], [])
+AT_CHECK([$COMPILE -c -main=b.cob:b2 b.cob], [0], [], [])
+AT_CHECK([$COMPILE -c       c.cob], [0], [], [])
+AT_CHECK([$COMPILE    a.o b.o c.o], [0], [], [])
+AT_CHECK([./a.out], [0], [I am b2; I call c
+I am c; as does the cheese, I stand alone
+], [])
+###################
+AT_CHECK([$COMPILE -c       a.cob], [0], [], [])
+AT_CHECK([$COMPILE -c       b.cob], [0], [], [])
+AT_CHECK([$COMPILE -c -main c.cob], [0], [], [])
+AT_CHECK([$COMPILE    a.o b.o c.o], [0], [], [])
+AT_CHECK([./a.out], [0], [I am c; as does the cheese, I stand alone
+], [])
+###################
+AT_CHECK([$COMPILE -c       a.cob], [0], [], [])
+AT_CHECK([$COMPILE -c       b.cob], [0], [], [])
+AT_CHECK([$COMPILE -c       c.cob], [0], [], [])
+AT_CHECK([$COMPILE    a.o b.o c.o], [1], [], ignore)
+AT_CLEANUP
+
+
+AT_SETUP([PROGRAM-ID main with -main switch])
+AT_KEYWORDS([fundamental main conflict])
+AT_DATA([prog.cob], [        identification      division.
+        program-id.         prog.
+        procedure           division.
+        display "I am prog".
+        end program         prog.
+
+        identification      division.
+        program-id.         main.
+        procedure           division.
+        display "I am main".
+        end program         main.
+
+])
+AT_CHECK([$COMPILE -shared prog.cob], [0], [], [])
+AT_CHECK([$COMPILE -c prog.cob], [0], [], [])
+AT_CHECK([$COMPILE -nomain prog.cob], [0], [], [])
+AT_CHECK([$COMPILE prog.cob], [1], [], [prog.cob:8:29: error: PROGRAM-ID 'main' is invalid with -main option
+    8 |         program-id.         main.
+      |                             ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP

@@ -1,0 +1,51 @@
+#!/bin/bash
+
+function dolines
+    {
+    LLINES=$LINES
+    ./manycall $LLINES
+    echo $LLINES cccp
+    echo $LLINES cccp >> manycall.txt
+#    perf stat /home/bob/repos/gcc-cobol/build/gcc/xgcc -B /home/bob/repos/gcc-cobol/build/gcc -ggdb -O0 -o ccc   ccc.c -rdynamic -ldl >> manycall.txt 2>&1
+    perf stat  cobc -x -o gc test.cbl >> manycall.txt 2>&1
+    echo $LLINES testp
+    echo $LLINES testp >> manycall.txt
+    perf stat /home/bob/repos/gcc-cobol/build/gcc/gcobol -B /home/bob/repos/gcc-cobol/build/gcc -L /home/bob/repos/gcc-cobol/build/x86_64-linux-gnu/libstdc++-v3/src/.libs -L /home/bob/repos/gcc-cobol/build/x86_64-linux-gnu/libgcobol/.libs/  -ggdb -O0    -o test   test.cbl  -Wl,-rpath=/home/bob/repos/gcc-cobol/build/x86_64-linux-gnu/libgcobol/.libs/ -Wl,-rpath=/home/bob/repos/gcc-cobol/build/x86_64-linux-gnu/libstdc++-v3/src/.libs >> manycall.txt 2>&1
+    }
+
+echo "" > manycall.txt
+
+LINES=1; dolines
+LINES=2; dolines
+LINES=5; dolines
+LINES=10; dolines
+LINES=20; dolines
+LINES=50; dolines
+LINES=100; dolines
+LINES=200; dolines
+LINES=500; dolines
+LINES=1000; dolines
+LINES=2000; dolines
+LINES=5000; dolines
+LINES=10000; dolines
+LINES=20000; dolines
+LINES=50000; dolines
+LINES=100000; dolines
+LINES=200000; dolines
+LINES=300000; dolines
+LINES=400000; dolines
+LINES=500000; dolines
+LINES=600000; dolines
+LINES=700000; dolines
+LINES=800000; dolines
+LINES=900000; dolines
+LINES=1000000; dolines
+LINES=2000000; dolines
+LINES=3000000; dolines
+LINES=4000000; dolines
+LINES=5000000; dolines
+LINES=6000000; dolines
+LINES=7000000; dolines
+LINES=8000000; dolines
+LINES=9000000; dolines
+LINES=10000000; dolines

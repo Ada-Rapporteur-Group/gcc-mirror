@@ -1,0 +1,148 @@
+Source variable is A_ALPHA 
+B_ALPHA  is  12.34     
+B_6      is  000012
+B_S6     is +000012
+B_3V3    is  012.340
+B_S3V3   is +012.340
+B_3V3B   is  012.340
+B_S3V3B  is +012.340
+B_3V3B3  is  012.340
+B_S3V3B3 is +012.340
+B_3DOT3  is  012.340
+B_S3DOT3 is +012.340
+ 
+Source variable is A_6     
+B_ALPHA  is  000012    
+B_6      is  000012
+B_S6     is +000012
+B_3V3    is  012.000
+B_S3V3   is +012.000
+B_3V3B   is  012.000
+B_S3V3B  is +012.000
+B_3V3B3  is  012.000
+B_S3V3B3 is +012.000
+B_3DOT3  is  012.000
+B_S3DOT3 is +012.000
+ 
+Source variable is A_S6    
+B_ALPHA  is  000012    
+B_6      is  000012
+B_S6     is -000012
+B_3V3    is  012.000
+B_S3V3   is -012.000
+B_3V3B   is  012.000
+B_S3V3B  is -012.000
+B_3V3B3  is  012.000
+B_S3V3B3 is -012.000
+B_3DOT3  is  012.000
+B_S3DOT3 is -012.000
+ 
+Source variable is A_3V3   
+B_ALPHA  is  <no move> 
+B_6      is  000012
+B_S6     is +000012
+B_3V3    is  012.340
+B_S3V3   is +012.340
+B_3V3B   is  012.340
+B_S3V3B  is +012.340
+B_3V3B3  is  012.340
+B_S3V3B3 is +012.340
+B_3DOT3  is  012.340
+B_S3DOT3 is +012.340
+ 
+Source variable is A_S3V3  
+B_ALPHA  is  <no move> 
+B_6      is  000012
+B_S6     is -000012
+B_3V3    is  012.340
+B_S3V3   is -012.340
+B_3V3B   is  012.340
+B_S3V3B  is -012.340
+B_3V3B3  is  012.340
+B_S3V3B3 is -012.340
+B_3DOT3  is  012.340
+B_S3DOT3 is -012.340
+ 
+Source variable is A_3V3B  
+B_ALPHA  is  <no move> 
+B_6      is  000012
+B_S6     is +000012
+B_3V3    is  012.340
+B_S3V3   is +012.340
+B_3V3B   is  012.340
+B_S3V3B  is +012.340
+B_3V3B3  is  012.340
+B_S3V3B3 is +012.340
+B_3DOT3  is  012.340
+B_S3DOT3 is +012.340
+ 
+Source variable is A_S3V3B 
+B_ALPHA  is  <no move> 
+B_6      is  000012
+B_S6     is -000012
+B_3V3    is  012.340
+B_S3V3   is -012.340
+B_3V3B   is  012.340
+B_S3V3B  is -012.340
+B_3V3B3  is  012.340
+B_S3V3B3 is -012.340
+B_3DOT3  is  012.340
+B_S3DOT3 is -012.340
+ 
+Source variable is A_3V3B3 
+B_ALPHA  is  <no move> 
+B_6      is  000012
+B_S6     is +000012
+B_3V3    is  012.340
+B_S3V3   is +012.340
+B_3V3B   is  012.340
+B_S3V3B  is +012.340
+B_3V3B3  is  012.340
+B_S3V3B3 is +012.340
+B_3DOT3  is  012.340
+B_S3DOT3 is +012.340
+ 
+Source variable is B_S3V3B3
+B_ALPHA  is  <no move> 
+B_6      is  000012
+B_S6     is +000012
+B_3V3    is  012.340
+B_S3V3   is +012.340
+B_3V3B   is  012.340
+B_S3V3B  is +012.340
+B_3V3B3  is  012.340
+B_S3V3B3 is +012.340
+B_3DOT3  is  012.340
+B_S3DOT3 is +012.340
+ 
+Source variable is A_3DOT3 
+B_ALPHA  is  012.340   
+B_6      is  000012
+B_S6     is +000012
+B_3V3    is  012.340
+B_S3V3   is +012.340
+B_3V3B   is  012.340
+B_S3V3B  is +012.340
+B_3V3B3  is  012.340
+B_S3V3B3 is +012.340
+B_3DOT3  is  012.340
+B_S3DOT3 is +012.340
+ 
+Source variable is A_S3DOT3
+B_ALPHA  is  -012.340  
+B_6      is  000012
+B_S6     is -000012
+B_3V3    is  012.340
+B_S3V3   is -012.340
+B_3V3B   is  012.340
+B_S3V3B  is -012.340
+B_3V3B3  is  012.340
+B_S3V3B3 is -012.340
+B_3DOT3  is  012.340
+B_S3DOT3 is -012.340
+ 
+Follow4 should be 'aaabbbcccddd' but is aaabbbcccddd
+Threes  should be '111222333444' but is 111222333444
+ 
+Threes  should be '111222333444' but is 111222333444
+Follow4 should be 'aaabbbcccddd' but is aaabbbcccddd

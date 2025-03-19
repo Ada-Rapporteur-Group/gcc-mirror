@@ -1,0 +1,102 @@
+*** Get Records Sequentially ***
+Enter key : 1 = FilmId, 2 = FilmTitle, 3 = DirectorId - Value entered: 1
+8713669 Alien                                    023
+8805075 Lord of the Rings:Return of the King     009
+8805091 Lord of the Rings:Fellowship of the Ring 009
+8805105 Mission Impossible                       015
+8805121 Jaws                                     005
+8805156 Carrie                                   015
+8805164 Lord of the Rings:The Two Towers         009
+8805229 Saving Private Ryan                      005
+8805245 Catch Me If You Can                      005
+8805253 Heavenly Creatures                       009
+8805261 Master and Commander                     012
+8805288 Cape Fear                                033
+8805296 Overboard                                004
+8805326 The Color Purple                         005
+8805334 Desperado                                002
+8805385 First Knight                             003
+8805415 Pulp Fiction                             002
+8805474 Ghost                                    003
+8805504 Jackie Brown                             002
+8805806 Carlito's Way                            015
+8812438 The Untouchables                         015
+8822334 Blade Runner                             023
+*** Get Records Sequentially ***
+Enter key : 1 = FilmId, 2 = FilmTitle, 3 = DirectorId - Value entered: 2
+8713669 Alien                                    023
+8822334 Blade Runner                             023
+8805288 Cape Fear                                033
+8805806 Carlito's Way                            015
+8805156 Carrie                                   015
+8805245 Catch Me If You Can                      005
+8805334 Desperado                                002
+8805385 First Knight                             003
+8805474 Ghost                                    003
+8805253 Heavenly Creatures                       009
+8805504 Jackie Brown                             002
+8805121 Jaws                                     005
+8805091 Lord of the Rings:Fellowship of the Ring 009
+8805075 Lord of the Rings:Return of the King     009
+8805164 Lord of the Rings:The Two Towers         009
+8805261 Master and Commander                     012
+8805105 Mission Impossible                       015
+8805296 Overboard                                004
+8805415 Pulp Fiction                             002
+8805229 Saving Private Ryan                      005
+8805326 The Color Purple                         005
+8812438 The Untouchables                         015
+*** Get Records Sequentially ***
+Enter key : 1 = FilmId, 2 = FilmTitle, 3 = DirectorId - Value entered: 3
+8805334 Desperado                                002
+8805415 Pulp Fiction                             002
+8805504 Jackie Brown                             002
+8805385 First Knight                             003
+8805474 Ghost                                    003
+8805296 Overboard                                004
+8805326 The Color Purple                         005
+8805121 Jaws                                     005
+8805229 Saving Private Ryan                      005
+8805245 Catch Me If You Can                      005
+8805075 Lord of the Rings:Return of the King     009
+8805091 Lord of the Rings:Fellowship of the Ring 009
+8805164 Lord of the Rings:The Two Towers         009
+8805253 Heavenly Creatures                       009
+8805261 Master and Commander                     012
+8805806 Carlito's Way                            015
+8812438 The Untouchables                         015
+8805105 Mission Impossible                       015
+8805156 Carrie                                   015
+8822334 Blade Runner                             023
+8713669 Alien                                    023
+8805288 Cape Fear                                033
+ 
+*** Get Records Directly ***
+Enter key : 1 = FilmId, 2 = FilmTitle, 3 = DirectorId - Value entered: 1
+Enter the FilmId - Value entered: 8805245
+8805245 Catch Me If You Can                      005
+ 
+*** Get Records Directly ***
+Enter key : 1 = FilmId, 2 = FilmTitle, 3 = DirectorId - Value entered: 1
+Enter the FilmId - Value entered: 9999999
+Film not found - 23
+ 
+*** Get Records Directly ***
+Enter key : 1 = FilmId, 2 = FilmTitle, 3 = DirectorId - Value entered: 2
+Enter the FilmTitle - Value entered: Jaws                                    
+8805121 Jaws                                     005
+ 
+*** Get Records Directly ***
+Enter key : 1 = FilmId, 2 = FilmTitle, 3 = DirectorId - Value entered: 2
+Enter the FilmTitle - Value entered: XXXX                                    
+Film not found - 23
+ 
+*** Get Records Directly ***
+Enter key : 1 = FilmId, 2 = FilmTitle, 3 = DirectorId - Value entered: 3
+Enter the Director Id - Value entered: 009
+8805075 Lord of the Rings:Return of the King     009
+ 
+*** Get Records Directly ***
+Enter key : 1 = FilmId, 2 = FilmTitle, 3 = DirectorId - Value entered: 3
+Enter the Director Id - Value entered: 999
+Film not found - 23

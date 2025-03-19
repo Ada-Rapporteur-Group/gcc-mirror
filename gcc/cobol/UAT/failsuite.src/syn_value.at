@@ -1,0 +1,94 @@
+## Copyright (C) 2003-2012, 2017-2018 Free Software Foundation, Inc.
+## Written by Keisuke Nishida, Roger While, Simon Sobisch
+##
+## This file is part of GnuCOBOL.
+##
+## The GnuCOBOL compiler is free software: you can redistribute it
+## and/or modify it under the terms of the GNU General Public License
+## as published by the Free Software Foundation, either version 3 of the
+## License, or (at your option) any later version.
+##
+## GnuCOBOL is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with GnuCOBOL.  If not, see <https://www.gnu.org/licenses/>.
+
+### GnuCOBOL Test Suite
+
+### ISO+IEC+1989-2002 13.16.61 VALUE clause
+
+## 13.16.61.1 General format
+
+# Format 1 (data-item): DONE
+
+# Format 2 (table): TODO
+
+# Format 3 (condition-name): TODO
+
+# Format 4 (report-section): TODO
+
+# Format 5 (content-validation-entry): TODO
+
+## 13.16.61.2 Syntax rules
+
+
+# 1) TODO
+
+
+# 2) TODO
+
+
+# 5) TODO
+
+# 6) TODO
+
+# 7) DONE
+
+
+# 8) DONE
+
+# 9) TODO
+
+# 10) DONE (tested in syn_redefines.at)
+
+# 11) TODO
+
+# 12) TODO
+
+# 13) TODO
+
+# 14) TODO
+
+# 15) TODO
+
+# 16) TODO
+
+# 17) TODO
+
+# 18) TODO
+
+# 19) TODO
+
+# 20) DONE
+
+# 21) TODO
+
+# 22) TODO
+
+# 23) TODO
+
+# 24) TODO
+
+# 25) TODO
+
+# 26) TODO
+
+# 27) TODO
+
+# 28) TODO
+
+# 29) TODO
+

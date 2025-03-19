@@ -1,0 +1,54 @@
+AT_SETUP([UNSTRING 1 - var DELIMITED BY SPACE TO var ])
+AT_KEYWORDS([string ])
+AT_DATA([prog.cob], [
+m4_include(src/unstring_001.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./$TEST_PROGRAM], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([UNSTRING 2 - var DELIMITED BY SPACE TO var, var ])
+AT_KEYWORDS([string ])
+AT_DATA([prog.cob], [
+m4_include(src/unstring_002.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./$TEST_PROGRAM], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([UNSTRING 3 - var DELIMBYTO var, DELIMBYTO var ])
+AT_KEYWORDS([string ])
+AT_DATA([prog.cob], [
+m4_include(src/unstring_003.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./$TEST_PROGRAM], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([UNSTRING 4 - var DELIMBY ALL TO var, var ])
+AT_KEYWORDS([string ])
+AT_DATA([prog.cob], [ m4_include(src/unstring_004.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./$TEST_PROGRAM], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([UNSTRING 5 - "lit" "lit" into - invalid ])
+AT_KEYWORDS([string ])
+AT_DATA([prog.cob], [ m4_include(src/unstring_005.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [1], [], [cobol1: syntax error, prog.cob line 8 at '"'
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([UNSTRING 6 - "lit" & "lit" into ])
+AT_KEYWORDS([string ])
+AT_DATA([prog.cob], [ m4_include(src/unstring_006.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [1], [], [
+something about invalid literal or ...
+])
+AT_CHECK([./$TEST_PROGRAM], [0], [], [])
+AT_CLEANUP
+

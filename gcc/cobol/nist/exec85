@@ -1,0 +1,28 @@
+#! /bin/sh
+nistdir=$(realpath $(dirname $0))
+
+#
+# Run EXEC85 to extract one program from the newcob.val population file. 
+#
+
+if [ -z "$1" ]
+then
+    echo syntax: $(basename $0) PROGRAM-ID [configuration]
+    exit 1
+fi
+
+prog=$1
+conf="$2"
+
+if [ -z "$conf" ]
+then
+    module=$(echo $prog | sed -E 's/([A-Z][A-Z]).+/\1/')
+    conf=$nistdir/${module}/.conf
+fi
+
+XXXXX001=$nistdir/newcob.val                  \
+XXXXX002=$prog.cbl                              \
+XXXXX003=XXXXX003                               \
+XXXXX055=PRINT-FILE                             \
+XXXXX058=$conf                                  \
+	$nistdir/obj/EXEC85

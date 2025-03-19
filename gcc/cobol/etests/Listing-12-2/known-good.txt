@@ -1,0 +1,15 @@
+Example 1
+All information = 12345678325Matt  Cullen  M3536120228233 
+College info    = 12345678325Matt  Cullen  
+Personal Info   = Matt  Cullen  M3536120228233 
+ 
+Example 2
+Combined names  = Matt  Cullen  
+ 
+Example 3
+Name    is Matt  Cullen  
+Gender  is M
+Phone   is 3536120228233 
+ 
+Example 4
+MyPhone is 3536120228233 

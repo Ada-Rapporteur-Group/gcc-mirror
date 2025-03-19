@@ -1,0 +1,41 @@
+Enter an increment value (0-99) - 01
+Steady  total =      1
+Dynamic total =      1
+ 
+Enter an increment value (0-99) - 02
+Steady  total =      2
+Dynamic total =      3
+ 
+Enter an increment value (0-99) - 03
+Steady  total =      3
+Dynamic total =      6
+ 
+Enter an increment value (0-99) - 04
+Steady  total =      4
+Dynamic total =     10
+ 
+Enter an increment value (0-99) - 05
+Steady  total =      5
+Dynamic total =     15
+ 
+Enter an increment value (0-99) - 06
+Steady  total =      6
+Dynamic total =     21
+ 
+Enter an increment value (0-99) - 07
+Steady  total =      7
+Dynamic total =     28
+ 
+Enter an increment value (0-99) - 08
+Steady  total =      8
+Dynamic total =     36
+ 
+Enter an increment value (0-99) - 09
+Steady  total =      9
+Dynamic total =     45
+ 
+Enter an increment value (0-99) - 10
+Steady  total =     10
+Dynamic total =     55
+ 
+Enter an increment value (0-99) - 

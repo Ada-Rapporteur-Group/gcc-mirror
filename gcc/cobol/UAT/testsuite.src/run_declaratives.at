@@ -1,0 +1,2466 @@
+## Copyright (C) 2024 Symas Corporation
+
+# AT_SETUP([TEMPLATE])
+# AT_KEYWORDS([declaratives])
+# AT_DATA([prog.cob], [
+# ])
+# AT_CHECK([$COMPILE prog.cob], [0], [], [])
+# AT_CHECK([./a.out], [0], [
+# ], [])
+# AT_CLEANUP
+
+AT_SETUP([RAISE EXCEPTION])
+AT_KEYWORDS([declaratives])
+AT_DATA([prog.cob], [
+        IDENTIFICATION      DIVISION.
+        PROGRAM-ID.         filedecl.
+        ENVIRONMENT         DIVISION.
+        INPUT-OUTPUT        SECTION.
+        FILE-CONTROL.
+           SELECT oneline   ASSIGN TO 'oneline.txt'
+                            ORGANIZATION IS LINE SEQUENTIAL
+                            FILE STATUS is FSTATUS.
+           SELECT nofile    ASSIGN TO 'nofile.txt'
+                            ORGANIZATION IS LINE SEQUENTIAL
+                            FILE STATUS is FSTATUS.
+        DATA                DIVISION.
+        FILE SECTION.
+        FD  oneline.
+            01  oneline-REC     PIC X(16).
+        FD  nofile.
+            01  nofile-REC      PIC X(16).
+        WORKING-STORAGE     SECTION.
+        77  FSTATUS             PIC 99.
+        77  FSTATUS-CORRECT     PIC 99.
+        77  STATUS-CORRECT      PIC X(64).
+        77  EF-CORRECT          PIC X(64).
+        77  EXCEPTION-SEEN      PIC X(64).
+        77  EXCEPTION-CORRECT   PIC X(64).
+        77  EXCEPTION-NONE      PIC X(64) VALUE "Exception not seen".
+        77  MSG                 PIC X(64).
+        PROCEDURE           DIVISION.
+        DECLARATIVES.
+        DECLARATIVE-1 SECTION.
+           USE AFTER EXCEPTION CONDITION EC-ALL.
+              MOVE "Declarative: " TO EXCEPTION-SEEN
+              MOVE FUNCTION EXCEPTION-STATUS TO EXCEPTION-SEEN(14: )
+      *>        DISPLAY "DECLARATIVE ALERT!!!!!!!!!!!!!!!!!!!!!!"
+      *>        DISPLAY EXCEPTION-SEEN
+              RESUME NEXT STATEMENT.
+           END DECLARATIVES.
+
+        MAIN-SECTION SECTION.
+            PERFORM       nothing-00
+            PERFORM       raise-00
+            PERFORM       raise-01
+            PERFORM       raise-02
+            PERFORM       raise-03
+            GOBACK.
+
+        >> TURN EC-ALL CHECKING OFF
+        nothing-00.
+            DISPLAY  "nothing-00: Testing report before operation"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            MOVE            99      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"  TO EF-CORRECT
+            PERFORM         status-check.
+
+        >> TURN EC-ALL CHECKING OFF
+        raise-00.
+            DISPLAY  "raise-00: Testing RAISE (CHECKING OFF)"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            RAISE EXCEPTION EC-I-O-LOGIC-ERROR
+            MOVE            99      TO FSTATUS.
+            MOVE            99      TO FSTATUS-CORRECT
+            MOVE            "EC-I-O-LOGIC-ERROR"  TO STATUS-CORRECT
+            MOVE            "00"  TO EF-CORRECT
+            PERFORM         status-check.
+
+        >> TURN EC-ALL CHECKING ON
+        raise-01.
+            DISPLAY  "raise-01: Testing RAISE (CHECKING ON)"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN
+            MOVE      "Declarative: EC-I-O-LOGIC-ERROR"
+                                                   TO EXCEPTION-CORRECT
+            RAISE EXCEPTION EC-I-O-LOGIC-ERROR
+            MOVE            99      TO FSTATUS.
+            MOVE            99      TO FSTATUS-CORRECT
+            MOVE            "EC-I-O-LOGIC-ERROR"  TO STATUS-CORRECT
+            MOVE            "00"  TO EF-CORRECT
+            PERFORM         status-check.
+
+        >> TURN EC-ALL CHECKING OFF
+        raise-02.
+            DISPLAY
+                 "raise-02: Testing RAISE/EXCEPTION-FILE (CHECKING OFF)"
+            OPEN INPUT nofile.
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN
+            MOVE      EXCEPTION-NONE TO EXCEPTION-CORRECT
+            RAISE EXCEPTION EC-I-O-LOGIC-ERROR
+            MOVE            99      TO FSTATUS.
+            MOVE            99      TO FSTATUS-CORRECT
+            MOVE            "EC-I-O-LOGIC-ERROR"  TO STATUS-CORRECT
+            MOVE            SPACES  TO EF-CORRECT
+            PERFORM         status-check.
+
+        >> TURN EC-ALL CHECKING ON
+        raise-03.
+            DISPLAY
+                 "raise-03: Testing RAISE/EXCEPTION-FILE (CHECKING ON)"
+            OPEN INPUT nofile.
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN
+            MOVE      "Declarative: EC-I-O-LOGIC-ERROR"
+                                                    TO EXCEPTION-CORRECT
+            RAISE EXCEPTION EC-I-O-LOGIC-ERROR
+            MOVE            99      TO FSTATUS.
+            MOVE            99      TO FSTATUS-CORRECT
+            MOVE            "EC-I-O-LOGIC-ERROR"  TO STATUS-CORRECT
+            MOVE            SPACES  TO EF-CORRECT
+            PERFORM         status-check.
+
+        >> TURN EC-ALL CHECKING OFF
+        status-check.
+            IF    EXCEPTION-SEEN    NOT EQUAL EXCEPTION-NONE
+               OR EXCEPTION-CORRECT NOT EQUAL EXCEPTION-NONE
+                DISPLAY "   " WITH NO ADVANCING
+                DISPLAY "DECLARATIVE processing: " WITH NO ADVANCING
+                IF EXCEPTION-SEEN EQUAL EXCEPTION-CORRECT
+                    DISPLAY "properly "
+                          """" FUNCTION TRIM(EXCEPTION-SEEN) """"
+                ELSE
+                    DISPLAY "***IMPROPER*** "
+                          """" FUNCTION TRIM(EXCEPTION-SEEN) """"
+                            "; it should be "
+                            """" FUNCTION TRIM(EXCEPTION-CORRECT) """"
+                    END-IF
+                END-IF.
+
+            DISPLAY         "   " WITH NO ADVANCING
+            IF FSTATUS EQUAL FSTATUS-CORRECT
+                DISPLAY "FSTATUS is properly " FSTATUS
+            ELSE
+                DISPLAY "FSTATUS is ***IMPROPERLY*** " FSTATUS
+                        "; it should be " FSTATUS-CORRECT
+                END-IF.
+
+            DISPLAY         "   " WITH NO ADVANCING
+            DISPLAY "FUNCTION EXCEPTION-STATUS is " WITH NO ADVANCING
+            IF FUNCTION EXCEPTION-STATUS EQUAL STATUS-CORRECT
+                DISPLAY "properly "
+                      """" FUNCTION TRIM(FUNCTION EXCEPTION-STATUS) """"
+            ELSE
+                DISPLAY "***IMPROPERLY*** "
+                      """" FUNCTION TRIM(FUNCTION EXCEPTION-STATUS) """"
+                        "; it should be "
+                        """" FUNCTION TRIM(STATUS-CORRECT) """"
+                END-IF.
+
+            DISPLAY         "   " WITH NO ADVANCING
+            DISPLAY "FUNCTION EXCEPTION-FILE is " WITH NO ADVANCING
+            IF FUNCTION EXCEPTION-FILE EQUAL EF-CORRECT
+                DISPLAY "properly "
+                      """" FUNCTION TRIM(FUNCTION EXCEPTION-FILE) """"
+            ELSE
+                DISPLAY "***IMPROPERLY*** "
+                      """" FUNCTION TRIM(FUNCTION EXCEPTION-FILE) """"
+                        "; it should be "
+                        """" FUNCTION TRIM(EF-CORRECT) """"
+                END-IF.
+
+        END PROGRAM         filedecl.
+
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [nothing-00: Testing report before operation
+   FSTATUS is properly 99
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+raise-00: Testing RAISE (CHECKING OFF)
+   FSTATUS is properly 99
+   FUNCTION EXCEPTION-STATUS is properly "EC-I-O-LOGIC-ERROR"
+   FUNCTION EXCEPTION-FILE is properly "00"
+raise-01: Testing RAISE (CHECKING ON)
+   DECLARATIVE processing: properly "Declarative: EC-I-O-LOGIC-ERROR"
+   FSTATUS is properly 99
+   FUNCTION EXCEPTION-STATUS is properly "EC-I-O-LOGIC-ERROR"
+   FUNCTION EXCEPTION-FILE is properly "00"
+raise-02: Testing RAISE/EXCEPTION-FILE (CHECKING OFF)
+   FSTATUS is properly 99
+   FUNCTION EXCEPTION-STATUS is properly "EC-I-O-LOGIC-ERROR"
+   FUNCTION EXCEPTION-FILE is properly ""
+raise-03: Testing RAISE/EXCEPTION-FILE (CHECKING ON)
+   DECLARATIVE processing: properly "Declarative: EC-I-O-LOGIC-ERROR"
+   FSTATUS is properly 99
+   FUNCTION EXCEPTION-STATUS is properly "EC-I-O-LOGIC-ERROR"
+   FUNCTION EXCEPTION-FILE is properly ""
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([none-existent file exceptions])
+AT_KEYWORDS([declaratives])
+AT_DATA([prog.cob], [
+        IDENTIFICATION      DIVISION.
+        PROGRAM-ID.         filedecl.
+        ENVIRONMENT         DIVISION.
+        INPUT-OUTPUT        SECTION.
+        FILE-CONTROL.
+           SELECT oneline   ASSIGN TO 'oneline.txt'
+                            ORGANIZATION IS LINE SEQUENTIAL
+                            FILE STATUS is FSTATUS.
+           SELECT nofile    ASSIGN TO 'nofile.txt'
+                            ORGANIZATION IS LINE SEQUENTIAL
+                            FILE STATUS is FSTATUS.
+        DATA                DIVISION.
+        FILE SECTION.
+        FD  oneline.
+            01  oneline-REC     PIC X(16).
+        FD  nofile.
+            01  nofile-REC      PIC X(16).
+        WORKING-STORAGE     SECTION.
+        77  FSTATUS             PIC 99.
+        77  FSTATUS-CORRECT     PIC 99.
+        77  STATUS-CORRECT      PIC X(64).
+        77  EF-CORRECT          PIC X(64).
+        77  EXCEPTION-SEEN      PIC X(64).
+        77  EXCEPTION-CORRECT   PIC X(64).
+        77  EXCEPTION-NONE      PIC X(64) VALUE "Exception not seen".
+        77  MSG                 PIC X(64).
+        PROCEDURE           DIVISION.
+        DECLARATIVES.
+        DECLARATIVE-1 SECTION.
+           USE AFTER EXCEPTION CONDITION EC-ALL.
+              MOVE "Declarative: " TO EXCEPTION-SEEN
+              MOVE FUNCTION EXCEPTION-STATUS TO EXCEPTION-SEEN(14: )
+      *>        DISPLAY "DECLARATIVE ALERT!!!!!!!!!!!!!!!!!!!!!!"
+      *>        DISPLAY EXCEPTION-SEEN
+              RESUME NEXT STATEMENT.
+           END DECLARATIVES.
+
+        MAIN-SECTION SECTION.
+            PERFORM         open-nofile-00
+            PERFORM         open-nofile-01
+            GOBACK.
+
+        >> TURN EC-ALL CHECKING OFF
+        open-nofile-00.
+            DISPLAY         "open-nofile-00: Testing OPEN nofile"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            OPEN INPUT      nofile.
+            MOVE            35      TO FSTATUS-CORRECT
+            MOVE            "EC-I-O-PERMANENT-ERROR"  TO STATUS-CORRECT
+            MOVE            "35nofile"    TO EF-CORRECT
+            PERFORM         status-check.
+
+        >> TURN EC-ALL CHECKING ON
+        open-nofile-01.
+            DISPLAY         "open-nofile-01: Testing OPEN nofile"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN
+            MOVE      "Declarative: EC-I-O-PERMANENT-ERROR"
+                                                    TO EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            OPEN INPUT      nofile.
+            MOVE            35      TO FSTATUS-CORRECT
+            MOVE            "EC-I-O-PERMANENT-ERROR"  TO STATUS-CORRECT
+            MOVE            "35nofile"    TO EF-CORRECT
+            PERFORM         status-check.
+
+        status-check.
+      *     DISPLAY 'EXCEPTION-SEEN is ' '"' function trim(EXCEPTION-SEEN) '"'
+            IF    EXCEPTION-SEEN    NOT EQUAL EXCEPTION-NONE
+               OR EXCEPTION-CORRECT NOT EQUAL EXCEPTION-NONE
+                DISPLAY "   " WITH NO ADVANCING
+                DISPLAY "DECLARATIVE processing: " WITH NO ADVANCING
+                IF EXCEPTION-SEEN EQUAL EXCEPTION-CORRECT
+                    DISPLAY "properly "
+                          """" FUNCTION TRIM(EXCEPTION-SEEN) """"
+                ELSE
+                    DISPLAY "***IMPROPER*** "
+                          """" FUNCTION TRIM(EXCEPTION-SEEN) """"
+                            "; it should be "
+                            """" FUNCTION TRIM(EXCEPTION-CORRECT) """"
+                    END-IF
+                END-IF.
+
+            DISPLAY         "   " WITH NO ADVANCING
+            IF FSTATUS EQUAL FSTATUS-CORRECT
+                DISPLAY "FSTATUS is properly " FSTATUS
+            ELSE
+                DISPLAY "FSTATUS is ***IMPROPERLY*** " FSTATUS
+                        "; it should be " FSTATUS-CORRECT
+                END-IF.
+
+            DISPLAY         "   " WITH NO ADVANCING
+            DISPLAY "FUNCTION EXCEPTION-STATUS is " WITH NO ADVANCING
+            IF FUNCTION EXCEPTION-STATUS EQUAL STATUS-CORRECT
+                DISPLAY "properly "
+                      """" FUNCTION TRIM(FUNCTION EXCEPTION-STATUS) """"
+            ELSE
+                DISPLAY "***IMPROPERLY*** "
+                      """" FUNCTION TRIM(FUNCTION EXCEPTION-STATUS) """"
+                        "; it should be "
+                        """" FUNCTION TRIM(STATUS-CORRECT) """"
+                END-IF.
+
+            DISPLAY         "   " WITH NO ADVANCING
+            DISPLAY "FUNCTION EXCEPTION-FILE is " WITH NO ADVANCING
+            IF FUNCTION EXCEPTION-FILE EQUAL EF-CORRECT
+                DISPLAY "properly "
+                      """" FUNCTION TRIM(FUNCTION EXCEPTION-FILE) """"
+            ELSE
+                DISPLAY "***IMPROPERLY*** "
+                      """" FUNCTION TRIM(FUNCTION EXCEPTION-FILE) """"
+                        "; it should be "
+                        """" FUNCTION TRIM(EF-CORRECT) """"
+                END-IF.
+        END PROGRAM         filedecl.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [open-nofile-00: Testing OPEN nofile
+   FSTATUS is properly 35
+   FUNCTION EXCEPTION-STATUS is properly "EC-I-O-PERMANENT-ERROR"
+   FUNCTION EXCEPTION-FILE is properly "35nofile"
+open-nofile-01: Testing OPEN nofile
+   DECLARATIVE processing: properly "Declarative: EC-I-O-PERMANENT-ERROR"
+   FSTATUS is properly 35
+   FUNCTION EXCEPTION-STATUS is properly "EC-I-O-PERMANENT-ERROR"
+   FUNCTION EXCEPTION-FILE is properly "35nofile"
+], [])
+AT_CLEANUP
+
+AT_SETUP([DECLARATIVES for READ and READ AT END])
+AT_KEYWORDS([declaratives])
+AT_DATA([prog.cob], [
+        IDENTIFICATION      DIVISION.
+        PROGRAM-ID.         filedecl.
+        ENVIRONMENT         DIVISION.
+        INPUT-OUTPUT        SECTION.
+        FILE-CONTROL.
+           SELECT oneline   ASSIGN TO 'oneline.txt'
+                            ORGANIZATION IS LINE SEQUENTIAL
+                            FILE STATUS is FSTATUS.
+           SELECT nofile    ASSIGN TO 'nofile.txt'
+                            ORGANIZATION IS LINE SEQUENTIAL
+                            FILE STATUS is FSTATUS.
+        DATA                DIVISION.
+        FILE SECTION.
+        FD  oneline.
+            01  oneline-REC     PIC X(16).
+        FD  nofile.
+            01  nofile-REC      PIC X(16).
+        WORKING-STORAGE     SECTION.
+        77  FSTATUS             PIC 99.
+        77  FSTATUS-CORRECT     PIC 99.
+        77  STATUS-CORRECT      PIC X(64).
+        77  EF-CORRECT          PIC X(64).
+        77  EXCEPTION-SEEN      PIC X(64).
+        77  EXCEPTION-CORRECT   PIC X(64).
+        77  EXCEPTION-NONE      PIC X(64) VALUE "Exception not seen".
+        77  MSG                 PIC X(64).
+        PROCEDURE           DIVISION.
+        DECLARATIVES.
+        DECLARATIVE-1 SECTION.
+           USE AFTER EXCEPTION CONDITION EC-ALL.
+              MOVE "Declarative: " TO EXCEPTION-SEEN
+              MOVE FUNCTION EXCEPTION-STATUS TO EXCEPTION-SEEN(14: )
+      *>        DISPLAY "DECLARATIVE ALERT!!!!!!!!!!!!!!!!!!!!!!"
+      *>        DISPLAY EXCEPTION-SEEN
+              RESUME NEXT STATEMENT.
+           END DECLARATIVES.
+
+        MAIN-SECTION SECTION.
+            PERFORM         write-oneline
+            PERFORM         read-oneline-00
+            PERFORM         read-oneline-01
+            PERFORM         read-oneline-10
+            PERFORM         read-oneline-11
+            GOBACK.
+
+        >> TURN EC-ALL CHECKING OFF
+        read-oneline-00.
+            DISPLAY         "read-oneline-00: Testing OPEN INPUT"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            OPEN INPUT      oneline.
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check
+
+            DISPLAY         "read-oneline-00: Testing first read"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            READ            oneline.
+            MOVE            04      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check
+
+            DISPLAY         "read-oneline-00: Testing second read"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            READ            oneline.
+            MOVE            10      TO FSTATUS-CORRECT
+            MOVE            "EC-I-O-AT-END"  TO STATUS-CORRECT
+            MOVE            "10oneline"      TO EF-CORRECT
+            PERFORM         status-check
+
+            DISPLAY         "read-oneline-00: Testing CLOSE"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            CLOSE           oneline.
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check.
+
+        >> TURN EC-ALL CHECKING OFF
+        read-oneline-01.
+            DISPLAY         "read-oneline-01: Testing OPEN INPUT"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            OPEN INPUT      oneline
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check
+
+            DISPLAY         "read-oneline-01: Testing first read"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            MOVE "***IMPROPERLY*** missed NOT AT END" to MSG
+            READ        oneline
+                        AT END     MOVE "***IMPROPER*** AT END" TO MSG
+                        NOT AT END MOVE "proper NOT AT END" TO MSG
+                        END-READ
+            DISPLAY         "   " FUNCTION TRIM(MSG)
+            MOVE            04      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check
+
+            DISPLAY         "read-oneline-01: Testing second read"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            MOVE "***IMPROPERLY*** missed AT END" to MSG
+            READ     oneline
+                     AT END     MOVE "proper AT END" TO MSG
+                     NOT AT END MOVE "***IMPROPER***  NOT AT END" TO MSG
+                     END-READ
+            DISPLAY         "   " FUNCTION TRIM(MSG)
+            MOVE            10      TO FSTATUS-CORRECT
+            MOVE            "EC-I-O-AT-END"  TO STATUS-CORRECT
+            MOVE            "10oneline"      TO EF-CORRECT
+            PERFORM         status-check
+
+            DISPLAY         "read-oneline-01: Testing CLOSE"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            CLOSE           oneline
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check.
+
+        >> TURN EC-ALL CHECKING ON
+        read-oneline-10.
+            DISPLAY         "read-oneline-10: Testing OPEN INPUT"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            OPEN INPUT      oneline.
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check
+
+            DISPLAY         "read-oneline-10: Testing first read"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            READ            oneline.
+            MOVE            04      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check
+
+            DISPLAY         "read-oneline-10: Testing second read"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN
+            MOVE      "Declarative: EC-I-O-AT-END" TO EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            READ            oneline.
+            MOVE            10      TO FSTATUS-CORRECT
+            MOVE            "EC-I-O-AT-END"  TO STATUS-CORRECT
+            MOVE            "10oneline"      TO EF-CORRECT
+            PERFORM         status-check
+
+            DISPLAY         "read-oneline-10: Testing CLOSE"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            CLOSE           oneline.
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check.
+
+        >> TURN EC-ALL CHECKING ON
+        read-oneline-11.
+            DISPLAY         "read-oneline-11: Testing OPEN INPUT"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            OPEN INPUT      oneline.
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check
+
+            DISPLAY         "read-oneline-11: Testing first read"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            MOVE "***IMPROPERLY*** missed NOT AT END" to MSG
+            READ        oneline
+                        AT END     MOVE "***IMPROPER*** AT END" TO MSG
+                        NOT AT END MOVE "proper NOT AT END" TO MSG
+                        END-READ
+            DISPLAY         "   " FUNCTION TRIM(MSG)
+            MOVE            04      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check
+
+            DISPLAY         "read-oneline-11: Testing second read"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            MOVE "***IMPROPERLY*** missed AT END" to MSG
+            READ     oneline
+                     AT END     MOVE "proper AT END" TO MSG
+                     NOT AT END MOVE "***IMPROPER***  NOT AT END" TO MSG
+                     END-READ
+            DISPLAY         "   " FUNCTION TRIM(MSG)
+            MOVE            10      TO FSTATUS-CORRECT
+            MOVE            "EC-I-O-AT-END"  TO STATUS-CORRECT
+            MOVE            "10oneline"      TO EF-CORRECT
+            PERFORM         status-check
+
+            DISPLAY         "read-oneline-11: Testing CLOSE"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            CLOSE           oneline.
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check.
+
+        >> TURN EC-ALL CHECKING OFF
+        write-oneline.
+            DISPLAY         "write-oneline: Testing OPEN OUTPUT"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            OPEN OUTPUT     oneline.
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check.
+
+            DISPLAY         "write-oneline: Testing WRITE FILE"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            MOVE            "just one line" TO oneline-rec
+            WRITE           FILE oneline
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check.
+
+            DISPLAY         "write-oneline: Testing CLOSE"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            CLOSE           oneline.
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check.
+
+        status-check.
+            IF    EXCEPTION-SEEN    NOT EQUAL EXCEPTION-NONE
+               OR EXCEPTION-CORRECT NOT EQUAL EXCEPTION-NONE
+                DISPLAY "   " WITH NO ADVANCING
+                DISPLAY "DECLARATIVE processing: " WITH NO ADVANCING
+                IF EXCEPTION-SEEN EQUAL EXCEPTION-CORRECT
+                    DISPLAY "properly "
+                          """" FUNCTION TRIM(EXCEPTION-SEEN) """"
+                ELSE
+                    DISPLAY "***IMPROPER*** "
+                          """" FUNCTION TRIM(EXCEPTION-SEEN) """"
+                            "; it should be "
+                            """" FUNCTION TRIM(EXCEPTION-CORRECT) """"
+                    END-IF
+                END-IF.
+
+            DISPLAY         "   " WITH NO ADVANCING
+            IF FSTATUS EQUAL FSTATUS-CORRECT
+                DISPLAY "FSTATUS is properly " FSTATUS
+            ELSE
+                DISPLAY "FSTATUS is ***IMPROPERLY*** " FSTATUS
+                        "; it should be " FSTATUS-CORRECT
+                END-IF.
+
+            DISPLAY         "   " WITH NO ADVANCING
+            DISPLAY "FUNCTION EXCEPTION-STATUS is " WITH NO ADVANCING
+            IF FUNCTION EXCEPTION-STATUS EQUAL STATUS-CORRECT
+                DISPLAY "properly "
+                      """" FUNCTION TRIM(FUNCTION EXCEPTION-STATUS) """"
+            ELSE
+                DISPLAY "***IMPROPERLY*** "
+                      """" FUNCTION TRIM(FUNCTION EXCEPTION-STATUS) """"
+                        "; it should be "
+                        """" FUNCTION TRIM(STATUS-CORRECT) """"
+                END-IF.
+
+            DISPLAY         "   " WITH NO ADVANCING
+            DISPLAY "FUNCTION EXCEPTION-FILE is " WITH NO ADVANCING
+            IF FUNCTION EXCEPTION-FILE EQUAL EF-CORRECT
+                DISPLAY "properly "
+                      """" FUNCTION TRIM(FUNCTION EXCEPTION-FILE) """"
+            ELSE
+                DISPLAY "***IMPROPERLY*** "
+                      """" FUNCTION TRIM(FUNCTION EXCEPTION-FILE) """"
+                        "; it should be "
+                        """" FUNCTION TRIM(EF-CORRECT) """"
+                END-IF.
+
+        END PROGRAM         filedecl.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [write-oneline: Testing OPEN OUTPUT
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+write-oneline: Testing WRITE FILE
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+write-oneline: Testing CLOSE
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+read-oneline-00: Testing OPEN INPUT
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+read-oneline-00: Testing first read
+   FSTATUS is properly 04
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+read-oneline-00: Testing second read
+   FSTATUS is properly 10
+   FUNCTION EXCEPTION-STATUS is properly "EC-I-O-AT-END"
+   FUNCTION EXCEPTION-FILE is properly "10oneline"
+read-oneline-00: Testing CLOSE
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+read-oneline-01: Testing OPEN INPUT
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+read-oneline-01: Testing first read
+   proper NOT AT END
+   FSTATUS is properly 04
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+read-oneline-01: Testing second read
+   proper AT END
+   FSTATUS is properly 10
+   FUNCTION EXCEPTION-STATUS is properly "EC-I-O-AT-END"
+   FUNCTION EXCEPTION-FILE is properly "10oneline"
+read-oneline-01: Testing CLOSE
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+read-oneline-10: Testing OPEN INPUT
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+read-oneline-10: Testing first read
+   FSTATUS is properly 04
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+read-oneline-10: Testing second read
+   DECLARATIVE processing: properly "Declarative: EC-I-O-AT-END"
+   FSTATUS is properly 10
+   FUNCTION EXCEPTION-STATUS is properly "EC-I-O-AT-END"
+   FUNCTION EXCEPTION-FILE is properly "10oneline"
+read-oneline-10: Testing CLOSE
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+read-oneline-11: Testing OPEN INPUT
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+read-oneline-11: Testing first read
+   proper NOT AT END
+   FSTATUS is properly 04
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+read-oneline-11: Testing second read
+   proper AT END
+   FSTATUS is properly 10
+   FUNCTION EXCEPTION-STATUS is properly "EC-I-O-AT-END"
+   FUNCTION EXCEPTION-FILE is properly "10oneline"
+read-oneline-11: Testing CLOSE
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+], [])
+AT_CLEANUP
+
+AT_SETUP([DECLARATIVES for READ and READ ON INVALID KEY])
+AT_KEYWORDS([declaratives])
+AT_DATA([prog.cob], [
+        IDENTIFICATION      DIVISION.
+        PROGRAM-ID.         filedecl.
+        ENVIRONMENT         DIVISION.
+        INPUT-OUTPUT        SECTION.
+        FILE-CONTROL.
+           SELECT ixfile    ASSIGN TO 'ixfile.txt'
+                            ORGANIZATION IS INDEXED
+                            ACCESS MODE IS RANDOM
+                            RECORD KEY  IS ixfile-KEY
+                            FILE STATUS is FSTATUS.
+        DATA                DIVISION.
+        FILE SECTION.
+        FD  ixfile.
+        01  ixfile-REC.
+         05 ixfile-KEY  PIC 9999.
+         05 ixfile-DATA PIC X(16).
+
+        WORKING-STORAGE     SECTION.
+        77  FSTATUS             PIC 99.
+        77  FSTATUS-CORRECT     PIC 99.
+        77  STATUS-CORRECT      PIC X(64).
+        77  EF-CORRECT          PIC X(64).
+        77  EXCEPTION-SEEN      PIC X(64).
+        77  EXCEPTION-CORRECT   PIC X(64).
+        77  EXCEPTION-NONE      PIC X(64) VALUE "Exception not seen".
+        77  MSG                 PIC X(64).
+        PROCEDURE           DIVISION.
+        DECLARATIVES.
+        DECLARATIVE-1 SECTION.
+           USE AFTER EXCEPTION CONDITION EC-ALL.
+              MOVE "Declarative: " TO EXCEPTION-SEEN
+              MOVE FUNCTION EXCEPTION-STATUS TO EXCEPTION-SEEN(14: )
+      *>        DISPLAY "DECLARATIVE ALERT!!!!!!!!!!!!!!!!!!!!!!"
+      *>        DISPLAY EXCEPTION-SEEN
+              RESUME NEXT STATEMENT.
+           END DECLARATIVES.
+
+        MAIN-SECTION SECTION.
+            PERFORM         write-ixfile
+            PERFORM         read-ixfile-00
+            PERFORM         read-ixfile-01
+            PERFORM         read-ixfile-10
+            PERFORM         read-ixfile-11
+            GOBACK.
+
+        >> TURN EC-ALL CHECKING OFF
+        read-ixfile-00.
+            DISPLAY         "read-ixfile-00: Testing OPEN INPUT"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            OPEN INPUT      ixfile.
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check
+
+            DISPLAY         "read-ixfile-00: Testing read of good key"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            MOVE            03      TO ixfile-KEY.
+            READ            ixfile.
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check
+
+            DISPLAY         "read-ixfile-00: Testing read of bad key"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            MOVE            33      TO ixfile-KEY.
+            READ            ixfile.
+            MOVE            23      TO FSTATUS-CORRECT
+            MOVE            "EC-I-O-INVALID-KEY"  TO STATUS-CORRECT
+            MOVE            "23ixfile"    TO EF-CORRECT
+            PERFORM         status-check
+
+            DISPLAY         "read-ixfile-00: Testing CLOSE"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            CLOSE           ixfile.
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check.
+
+        >> TURN EC-ALL CHECKING OFF
+        read-ixfile-01.
+            DISPLAY         "read-ixfile-01: Testing OPEN INPUT"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            OPEN INPUT      ixfile.
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check
+
+            DISPLAY         "read-ixfile-01: Testing read of good key"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            MOVE            03      TO ixfile-KEY.
+            MOVE "***IMPROPERLY*** missed NOT INVALID KEY" to MSG
+            READ ixfile
+                INVALID KEY     MOVE "***IMPROPER*** INVALID KEY" TO MSG
+                NOT INVALID KEY MOVE "proper NOT INVALID IKEY" TO MSG
+                END-READ
+            DISPLAY         "   " FUNCTION TRIM(MSG)
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check
+
+            DISPLAY         "read-ixfile-01: Testing read of bad key"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            MOVE            33      TO ixfile-KEY.
+            MOVE "***IMPROPERLY*** missed INVALID KEY" to MSG
+            READ ixfile
+                INVALID KEY     MOVE "proper INVALID IKEY" TO MSG
+                NOT INVALID KEY MOVE "***IMPROPER*** NOT INVALID KEY"
+                                                                  TO MSG
+                END-READ
+            DISPLAY         "   " FUNCTION TRIM(MSG)
+            MOVE            23      TO FSTATUS-CORRECT
+            MOVE            "EC-I-O-INVALID-KEY"  TO STATUS-CORRECT
+            MOVE            "23ixfile"    TO EF-CORRECT
+            PERFORM         status-check
+
+            DISPLAY         "read-ixfile-01: Testing CLOSE"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            CLOSE           ixfile.
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check.
+
+        >> TURN EC-ALL CHECKING ON
+        read-ixfile-10.
+            DISPLAY         "read-ixfile-10: Testing OPEN INPUT"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            OPEN INPUT      ixfile.
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check
+
+            DISPLAY         "read-ixfile-10: Testing read of good key"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            MOVE            03      TO ixfile-KEY.
+            READ            ixfile.
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check
+
+            DISPLAY         "read-ixfile-10: Testing read of bad key"
+            SET LAST EXCEPTION      TO OFF
+            MOVE  EXCEPTION-NONE TO EXCEPTION-SEEN
+            MOVE  "Declarative: EC-I-O-INVALID-KEY" TO EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            MOVE            33      TO ixfile-KEY.
+            READ            ixfile.
+            MOVE            23      TO FSTATUS-CORRECT
+            MOVE            "EC-I-O-INVALID-KEY"  TO STATUS-CORRECT
+            MOVE            "23ixfile"    TO EF-CORRECT
+            PERFORM         status-check
+
+            DISPLAY         "read-ixfile-10: Testing CLOSE"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            CLOSE           ixfile.
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check.
+
+        >> TURN EC-ALL CHECKING OFF
+        read-ixfile-11.
+            DISPLAY         "read-ixfile-11: Testing OPEN INPUT"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            OPEN INPUT      ixfile.
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check
+
+            DISPLAY         "read-ixfile-11: Testing read of good key"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            MOVE            03      TO ixfile-KEY.
+            MOVE "***IMPROPERLY*** missed NOT INVALID KEY" to MSG
+            READ ixfile
+                INVALID KEY     MOVE "***IMPROPER*** INVALID KEY" TO MSG
+                NOT INVALID KEY MOVE "proper NOT INVALID IKEY" TO MSG
+                END-READ
+            DISPLAY         "   " FUNCTION TRIM(MSG)
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check
+
+            DISPLAY         "read-ixfile-11: Testing read of bad key"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            MOVE            33      TO ixfile-KEY.
+            MOVE "***IMPROPERLY*** missed INVALID KEY" to MSG
+            READ ixfile
+                INVALID KEY     MOVE "proper INVALID IKEY" TO MSG
+                NOT INVALID KEY MOVE "***IMPROPER*** NOT INVALID KEY"
+                                                                  TO MSG
+                END-READ
+            DISPLAY         "   " FUNCTION TRIM(MSG)
+            MOVE            23      TO FSTATUS-CORRECT
+            MOVE            "EC-I-O-INVALID-KEY"  TO STATUS-CORRECT
+            MOVE            "23ixfile"    TO EF-CORRECT
+            PERFORM         status-check
+
+            DISPLAY         "read-ixfile-11: Testing CLOSE"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            CLOSE           ixfile.
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check.
+
+
+        >> TURN EC-ALL CHECKING OFF
+        write-ixfile.
+            DISPLAY         "write-ixfile: Testing OPEN OUTPUT"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            OPEN OUTPUT     ixfile.
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check.
+
+            DISPLAY         "write-ixfile: Testing WRITE first record"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            MOVE            01      TO ixfile-key.
+            MOVE            "first" TO ixfile-data
+            WRITE           FILE ixfile
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check.
+
+            DISPLAY         "write-ixfile: Testing WRITE second record"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            MOVE            03      TO ixfile-key.
+            MOVE            "third" TO ixfile-data
+            WRITE           FILE ixfile
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check.
+
+            DISPLAY         "write-ixfile: Testing CLOSE"
+            SET LAST EXCEPTION      TO OFF
+            MOVE      EXCEPTION-NONE TO EXCEPTION-SEEN EXCEPTION-CORRECT
+            MOVE            99      TO FSTATUS.
+            CLOSE           ixfile.
+            MOVE            00      TO FSTATUS-CORRECT
+            MOVE            SPACES  TO STATUS-CORRECT
+            MOVE            "00"    TO EF-CORRECT
+            PERFORM         status-check.
+
+        status-check.
+            IF    EXCEPTION-SEEN    NOT EQUAL EXCEPTION-NONE
+               OR EXCEPTION-CORRECT NOT EQUAL EXCEPTION-NONE
+                DISPLAY "   " WITH NO ADVANCING
+                DISPLAY "DECLARATIVE processing: " WITH NO ADVANCING
+                IF EXCEPTION-SEEN EQUAL EXCEPTION-CORRECT
+                    DISPLAY "properly "
+                          """" FUNCTION TRIM(EXCEPTION-SEEN) """"
+                ELSE
+                    DISPLAY "***IMPROPER*** "
+                          """" FUNCTION TRIM(EXCEPTION-SEEN) """"
+                            "; it should be "
+                            """" FUNCTION TRIM(EXCEPTION-CORRECT) """"
+                    END-IF
+                END-IF.
+
+            DISPLAY         "   " WITH NO ADVANCING
+            IF FSTATUS EQUAL FSTATUS-CORRECT
+                DISPLAY "FSTATUS is properly " FSTATUS
+            ELSE
+                DISPLAY "FSTATUS is ***IMPROPERLY*** " FSTATUS
+                        "; it should be " FSTATUS-CORRECT
+                END-IF.
+
+            DISPLAY         "   " WITH NO ADVANCING
+            DISPLAY "FUNCTION EXCEPTION-STATUS is " WITH NO ADVANCING
+            IF FUNCTION EXCEPTION-STATUS EQUAL STATUS-CORRECT
+                DISPLAY "properly "
+                      """" FUNCTION TRIM(FUNCTION EXCEPTION-STATUS) """"
+            ELSE
+                DISPLAY "***IMPROPERLY*** "
+                      """" FUNCTION TRIM(FUNCTION EXCEPTION-STATUS) """"
+                        "; it should be "
+                        """" FUNCTION TRIM(STATUS-CORRECT) """"
+                END-IF.
+
+            DISPLAY         "   " WITH NO ADVANCING
+            DISPLAY "FUNCTION EXCEPTION-FILE is " WITH NO ADVANCING
+            IF FUNCTION EXCEPTION-FILE EQUAL EF-CORRECT
+                DISPLAY "properly "
+                      """" FUNCTION TRIM(FUNCTION EXCEPTION-FILE) """"
+            ELSE
+                DISPLAY "***IMPROPERLY*** "
+                      """" FUNCTION TRIM(FUNCTION EXCEPTION-FILE) """"
+                        "; it should be "
+                        """" FUNCTION TRIM(EF-CORRECT) """"
+                END-IF.
+
+        END PROGRAM         filedecl.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [write-ixfile: Testing OPEN OUTPUT
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+write-ixfile: Testing WRITE first record
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+write-ixfile: Testing WRITE second record
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+write-ixfile: Testing CLOSE
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+read-ixfile-00: Testing OPEN INPUT
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+read-ixfile-00: Testing read of good key
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+read-ixfile-00: Testing read of bad key
+   FSTATUS is properly 23
+   FUNCTION EXCEPTION-STATUS is properly "EC-I-O-INVALID-KEY"
+   FUNCTION EXCEPTION-FILE is properly "23ixfile"
+read-ixfile-00: Testing CLOSE
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+read-ixfile-01: Testing OPEN INPUT
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+read-ixfile-01: Testing read of good key
+   proper NOT INVALID IKEY
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+read-ixfile-01: Testing read of bad key
+   proper INVALID IKEY
+   FSTATUS is properly 23
+   FUNCTION EXCEPTION-STATUS is properly "EC-I-O-INVALID-KEY"
+   FUNCTION EXCEPTION-FILE is properly "23ixfile"
+read-ixfile-01: Testing CLOSE
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+read-ixfile-10: Testing OPEN INPUT
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+read-ixfile-10: Testing read of good key
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+read-ixfile-10: Testing read of bad key
+   DECLARATIVE processing: properly "Declarative: EC-I-O-INVALID-KEY"
+   FSTATUS is properly 23
+   FUNCTION EXCEPTION-STATUS is properly "EC-I-O-INVALID-KEY"
+   FUNCTION EXCEPTION-FILE is properly "23ixfile"
+read-ixfile-10: Testing CLOSE
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+read-ixfile-11: Testing OPEN INPUT
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+read-ixfile-11: Testing read of good key
+   proper NOT INVALID IKEY
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+read-ixfile-11: Testing read of bad key
+   proper INVALID IKEY
+   FSTATUS is properly 23
+   FUNCTION EXCEPTION-STATUS is properly "EC-I-O-INVALID-KEY"
+   FUNCTION EXCEPTION-FILE is properly "23ixfile"
+read-ixfile-11: Testing CLOSE
+   FSTATUS is properly 00
+   FUNCTION EXCEPTION-STATUS is properly ""
+   FUNCTION EXCEPTION-FILE is properly "00"
+], [])
+AT_CLEANUP
+
+AT_SETUP([SET LAST EXCEPTION TO OFF])
+AT_KEYWORDS([declaratives exceptions EXCEPTION-STATUS EXCEPTION-LOCATION])
+AT_DATA([prog.cob], [        IDENTIFICATION DIVISION.
+        PROGRAM-ID. prog.
+        DATA DIVISION.
+        WORKING-STORAGE SECTION.
+        PROCEDURE DIVISION.
+        DECLARATIVES.
+            DECL-1 SECTION.
+                USE AFTER EXCEPTION CONDITION EC-BOUND-SUBSCRIPT.
+                RESUME NEXT STATEMENT.
+        END DECLARATIVES.
+            MAIN-SECTION-EXTRA SECTION.
+            MAIN-SECTION SECTION.
+            MAIN-PARAGRAPH.
+            DISPLAY "About to RAISE EC-BOUND-SUBSCRIPT"
+            >> TURN EC-BOUND-SUBSCRIPT CHECKING ON
+            RAISE EXCEPTION EC-BOUND-SUBSCRIPT
+            DISPLAY """" FUNCTION TRIM(FUNCTION EXCEPTION-STATUS)   """"
+            DISPLAY """" FUNCTION TRIM(FUNCTION EXCEPTION-LOCATION) """"
+            DISPLAY """" FUNCTION TRIM(FUNCTION EXCEPTION-STATUS)   """"
+            DISPLAY """" FUNCTION TRIM(FUNCTION EXCEPTION-LOCATION) """"
+            SET LAST EXCEPTION TO OFF
+            DISPLAY """" FUNCTION TRIM(FUNCTION EXCEPTION-STATUS)   """"
+            DISPLAY """" FUNCTION TRIM(FUNCTION EXCEPTION-LOCATION) """"
+            GOBACK.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0],
+[About to RAISE EC-BOUND-SUBSCRIPT
+"EC-BOUND-SUBSCRIPT"
+"prog; MAIN-PARAGRAPH OF MAIN-SECTION; prog.cob:16"
+"EC-BOUND-SUBSCRIPT"
+"prog; MAIN-PARAGRAPH OF MAIN-SECTION; prog.cob:16"
+""
+""
+])
+AT_CLEANUP
+
+AT_SETUP([ADD to FIX4])
+AT_KEYWORDS([declaratives onsize size])
+AT_DATA([prog.cob], [
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. onsize.
+        DATA DIVISION.
+        WORKING-STORAGE SECTION.
+        01 FIX4DISPLAY                  PIC 9(4) DISPLAY.
+
+        01 EC_STATUS                    PIC X(32).
+        01 EC_SHOULD_BE                 PIC X(32) VALUE "EC-SIZE-TRUNCATION".
+        PROCEDURE       DIVISION.
+            DECLARATIVES.
+            DECL-TRUNCATION SECTION.
+                USE AFTER EXCEPTION CONDITION EC-SIZE-TRUNCATION.
+                DISPLAY "    Caught " FUNCTION TRIM(FUNCTION EXCEPTION-STATUS)
+                        " at "       """" FUNCTION EXCEPTION-LOCATION """"
+                RESUME NEXT STATEMENT.
+            END DECLARATIVES.
+            REQUIRED-SECTION SECTION.
+
+            DISPLAY "Case 0: Simple addition 1233 + 1, no overflow"
+            SET LAST EXCEPTION TO OFF
+            MOVE 1233   TO FIX4DISPLAY
+            ADD 1       TO FIX4DISPLAY
+            MOVE FUNCTION EXCEPTION-STATUS TO EC_STATUS
+            IF EC_STATUS EQUAL TO SPACES
+                DISPLAY "    Case 0 status is properly empty"
+            ELSE
+                DISPLAY "    Case 0 status is improperly " """" FUNCTION TRIM(EC_STATUS) """"
+            END-IF
+            IF FIX4DISPLAY EQUAL 1234
+               DISPLAY "    The case 0 result is properly " FIX4DISPLAY
+            ELSE
+               DISPLAY "    The case 0 result is improperly " FIX4DISPLAY
+            END-IF
+            DISPLAY "."
+
+            DISPLAY "Case 1: Simple addition 9999 + 1 overflow"
+            SET LAST EXCEPTION TO OFF
+            MOVE 9999   TO FIX4DISPLAY
+            ADD 1       TO FIX4DISPLAY
+            MOVE FUNCTION EXCEPTION-STATUS TO EC_STATUS
+            IF EC_STATUS EQUAL TO EC_SHOULD_BE
+                DISPLAY "    Case 1 status is properly " """" FUNCTION TRIM(EC_STATUS) """"
+            ELSE
+                DISPLAY "    Case 1 status is improperly " """" FUNCTION TRIM(EC_STATUS) """"
+            END-IF
+            IF FIX4DISPLAY EQUAL 0000
+               DISPLAY "    The case 1 result is properly " FIX4DISPLAY
+            ELSE
+               DISPLAY "    The case 1 result is improperly " FIX4DISPLAY
+            END-IF
+            DISPLAY "."
+
+            DISPLAY "Case 2: Simple addition 9999 + 1 overflow with ON SIZE error"
+            SET LAST EXCEPTION TO OFF
+            MOVE 9999   TO FIX4DISPLAY
+            ADD 1       TO FIX4DISPLAY
+                            ON SIZE ERROR DISPLAY "    Properly got SIZE ERROR"
+                        NOT ON SIZE ERROR DISPLAY "    Improperly got NOT SIZE ERROR"
+            END-ADD
+            MOVE FUNCTION EXCEPTION-STATUS TO EC_STATUS
+            IF EC_STATUS EQUAL TO EC_SHOULD_BE
+                DISPLAY "    Case 2 status is properly " """" FUNCTION TRIM(EC_STATUS) """"
+            ELSE
+                DISPLAY "    Case 2 status is improperly " """" FUNCTION TRIM(EC_STATUS) """"
+            END-IF
+            IF FIX4DISPLAY EQUAL 9999
+               DISPLAY "    The case 2 result is properly " FIX4DISPLAY
+            ELSE
+               DISPLAY "    The case 2 result is improperly " FIX4DISPLAY
+            END-IF
+            DISPLAY "."
+
+            DISPLAY "Case 3: Simple addition 9999 + 1 overflow with ON SIZE error and DECLARATIVE"
+            DISPLAY "        Not expecting the declarative because ON SIZE overrides"
+            >> TURN EC-SIZE-TRUNCATION CHECKING ON
+            SET LAST EXCEPTION TO OFF
+            MOVE 9999   TO FIX4DISPLAY
+            ADD 1       TO FIX4DISPLAY
+                            ON SIZE ERROR DISPLAY "    Properly got SIZE ERROR"
+                        NOT ON SIZE ERROR DISPLAY "    Improperly got NOT SIZE ERROR"
+            END-ADD
+            MOVE FUNCTION EXCEPTION-STATUS TO EC_STATUS
+            IF EC_STATUS EQUAL TO EC_SHOULD_BE
+                DISPLAY "    Case 3 status is properly " """" FUNCTION TRIM(EC_STATUS) """"
+            ELSE
+                DISPLAY "    Case 3 status is improperly " """" FUNCTION TRIM(EC_STATUS) """"
+            END-IF
+            IF FIX4DISPLAY EQUAL 9999
+               DISPLAY "    The case 3 result is properly " FIX4DISPLAY
+            ELSE
+               DISPLAY "    The case 3 result is improperly " FIX4DISPLAY
+            END-IF
+            DISPLAY "."
+
+            DISPLAY "Case 4: Simple addition 9999 + 1 overflow with DECLARATIVE"
+            DISPLAY "        Expecting the declarative"
+            >> TURN EC-SIZE-TRUNCATION CHECKING ON
+            SET LAST EXCEPTION TO OFF
+            MOVE 9999   TO FIX4DISPLAY
+            ADD 1       TO FIX4DISPLAY
+            END-ADD
+            MOVE FUNCTION EXCEPTION-STATUS TO EC_STATUS
+            IF EC_STATUS EQUAL TO EC_SHOULD_BE
+                DISPLAY "    Case 4 status is properly " """" FUNCTION TRIM(EC_STATUS) """"
+            ELSE
+                DISPLAY "    Case 4 status is improperly " """" FUNCTION TRIM(EC_STATUS) """"
+            END-IF
+            IF FIX4DISPLAY EQUAL 0000
+               DISPLAY "    The case 4 result is properly " FIX4DISPLAY
+            ELSE
+               DISPLAY "    The case 4 result is improperly " FIX4DISPLAY
+            END-IF
+            DISPLAY "."
+
+            STOP RUN.
+
+        END PROGRAM onsize.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [Case 0: Simple addition 1233 + 1, no overflow
+    Case 0 status is properly empty
+    The case 0 result is properly 1234
+.
+Case 1: Simple addition 9999 + 1 overflow
+    Case 1 status is properly "EC-SIZE-TRUNCATION"
+    The case 1 result is properly 0000
+.
+Case 2: Simple addition 9999 + 1 overflow with ON SIZE error
+    Properly got SIZE ERROR
+    Case 2 status is properly "EC-SIZE-TRUNCATION"
+    The case 2 result is properly 9999
+.
+Case 3: Simple addition 9999 + 1 overflow with ON SIZE error and DECLARATIVE
+        Not expecting the declarative because ON SIZE overrides
+    Properly got SIZE ERROR
+    Case 3 status is properly "EC-SIZE-TRUNCATION"
+    The case 3 result is properly 9999
+.
+Case 4: Simple addition 9999 + 1 overflow with DECLARATIVE
+        Expecting the declarative
+    Caught EC-SIZE-TRUNCATION at "onsize; REQUIRED-SECTION; prog.cob:101 "
+    Case 4 status is properly "EC-SIZE-TRUNCATION"
+    The case 4 result is properly 0000
+.
+], [])
+AT_CLEANUP
+
+AT_SETUP([DIVIDE by zero])
+AT_KEYWORDS([declaratives onsize size])
+AT_DATA([prog.cob], [
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. onsize.
+        DATA DIVISION.
+        WORKING-STORAGE SECTION.
+        01 FIX9DISPLAY                  PIC 9(9) DISPLAY VALUE 123454321.
+        01 FIX4DISPLAY                  PIC 9(4) DISPLAY.
+
+        01 EC_STATUS                    PIC X(32).
+        01 EC_SHOULD_BE                 PIC X(32) VALUE "EC-SIZE-ZERO-DIVIDE".
+        PROCEDURE       DIVISION.
+            DECLARATIVES.
+            DECL-ZERO-DIVIDE SECTION.
+                USE AFTER EXCEPTION CONDITION EC-SIZE-ZERO-DIVIDE.
+                DISPLAY "    Caught " FUNCTION TRIM(FUNCTION EXCEPTION-STATUS)
+                        " at "       FUNCTION TRIM (FUNCTION EXCEPTION-LOCATION)
+                RESUME NEXT STATEMENT.
+            DECL-TRUNCATION SECTION.
+                USE AFTER EXCEPTION CONDITION EC-SIZE-TRUNCATION.
+                DISPLAY "    Caught " FUNCTION TRIM(FUNCTION EXCEPTION-STATUS)
+                        " at "       FUNCTION TRIM (FUNCTION EXCEPTION-LOCATION)
+                RESUME NEXT STATEMENT.
+            END DECLARATIVES.
+            REQUIRED-SECTION SECTION.
+
+            DISPLAY "Case 1: Simple divide of 123454321 by zero"
+            SET LAST EXCEPTION TO OFF
+            MOVE     123454321 TO FIX9DISPLAY
+            MOVE          2468 TO FIX4DISPLAY
+            DIVIDE FIX9DISPLAY BY ZERO GIVING FIX4DISPLAY
+            MOVE FUNCTION EXCEPTION-STATUS TO EC_STATUS
+            IF EC_STATUS EQUAL TO EC_SHOULD_BE
+                DISPLAY "    Case 1 status is properly " """" FUNCTION TRIM(EC_STATUS) """"
+            ELSE
+                DISPLAY "    Case 1 status is improperly " """" FUNCTION TRIM(EC_STATUS) """"
+            END-IF
+            IF FIX4DISPLAY EQUAL 2468
+               DISPLAY "    The case 1 result is properly " FIX4DISPLAY
+            ELSE
+               DISPLAY "    The case 1 result is improperly " FIX4DISPLAY
+            END-IF
+            DISPLAY "."
+
+            DISPLAY "Case 1: Simple divide of 123454321 by ZERO with SIZE ERROR"
+            MOVE     123454321 TO FIX9DISPLAY
+            MOVE          2468 TO FIX4DISPLAY
+            DIVIDE FIX9DISPLAY BY ZERO GIVING FIX4DISPLAY
+                            ON SIZE ERROR DISPLAY "    Properly got SIZE ERROR"
+                        NOT ON SIZE ERROR DISPLAY "    Improperly got NOT SIZE ERROR"
+            END-DIVIDE
+            MOVE FUNCTION EXCEPTION-STATUS TO EC_STATUS
+            IF EC_STATUS EQUAL TO EC_SHOULD_BE
+                DISPLAY "    Case 2 status is properly " """" FUNCTION TRIM(EC_STATUS) """"
+            ELSE
+                DISPLAY "    Case 2 status is improperly " """" FUNCTION TRIM(EC_STATUS) """"
+            END-IF
+            IF FIX4DISPLAY EQUAL 2468
+               DISPLAY "    The case 2 result is properly " FIX4DISPLAY
+            ELSE
+               DISPLAY "    The case 2 result is improperly " FIX4DISPLAY
+            END-IF
+            DISPLAY "."
+
+            DISPLAY "Case 3: Simple divide of 123454321 by ZERO with ON SIZE error and DECLARATIVE"
+            DISPLAY "        Not expecting the declarative because ON SIZE overrides"
+            >> TURN EC-SIZE CHECKING ON
+            SET LAST EXCEPTION TO OFF
+            MOVE     123454321 TO FIX9DISPLAY
+            MOVE          2468 TO FIX4DISPLAY
+            DIVIDE FIX9DISPLAY BY ZERO GIVING FIX4DISPLAY
+                            ON SIZE ERROR DISPLAY "    Properly got SIZE ERROR"
+                        NOT ON SIZE ERROR DISPLAY "    Improperly got NOT SIZE ERROR"
+            END-DIVIDE
+            MOVE FUNCTION EXCEPTION-STATUS TO EC_STATUS
+            IF EC_STATUS EQUAL TO EC_SHOULD_BE
+                DISPLAY "    Case 3 status is properly " """" FUNCTION TRIM(EC_STATUS) """"
+            ELSE
+                DISPLAY "    Case 3 status is improperly " """" FUNCTION TRIM(EC_STATUS) """"
+            END-IF
+            IF FIX4DISPLAY EQUAL 2468
+               DISPLAY "    The case 3 result is properly " FIX4DISPLAY
+            ELSE
+               DISPLAY "    The case 3 result is improperly " FIX4DISPLAY
+            END-IF
+            DISPLAY "."
+
+            DISPLAY "Case 4: Simple divide of 123454321 by ZERO overflow with DECLARATIVE"
+            DISPLAY "        Expecting the declarative"
+            >> TURN EC-SIZE CHECKING ON
+            SET LAST EXCEPTION TO OFF
+            MOVE     123454321 TO FIX9DISPLAY
+            MOVE          2468 TO FIX4DISPLAY
+            DIVIDE FIX9DISPLAY BY ZERO GIVING FIX4DISPLAY
+            END-DIVIDE
+            MOVE FUNCTION EXCEPTION-STATUS TO EC_STATUS
+            IF EC_STATUS EQUAL TO EC_SHOULD_BE
+                DISPLAY "    Case 4 status is properly " """" FUNCTION TRIM(EC_STATUS) """"
+            ELSE
+                DISPLAY "    Case 4 status is improperly " """" FUNCTION TRIM(EC_STATUS) """"
+            END-IF
+            IF FIX4DISPLAY EQUAL 2468
+               DISPLAY "    The case 4 result is properly " FIX4DISPLAY
+            ELSE
+               DISPLAY "    The case 4 result is improperly " FIX4DISPLAY
+            END-IF
+            DISPLAY "."
+
+            STOP RUN.
+
+        END PROGRAM onsize.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [Case 1: Simple divide of 123454321 by zero
+    Case 1 status is properly "EC-SIZE-ZERO-DIVIDE"
+    The case 1 result is properly 2468
+.
+Case 1: Simple divide of 123454321 by ZERO with SIZE ERROR
+    Properly got SIZE ERROR
+    Case 2 status is properly "EC-SIZE-ZERO-DIVIDE"
+    The case 2 result is properly 2468
+.
+Case 3: Simple divide of 123454321 by ZERO with ON SIZE error and DECLARATIVE
+        Not expecting the declarative because ON SIZE overrides
+    Properly got SIZE ERROR
+    Case 3 status is properly "EC-SIZE-ZERO-DIVIDE"
+    The case 3 result is properly 2468
+.
+Case 4: Simple divide of 123454321 by ZERO overflow with DECLARATIVE
+        Expecting the declarative
+    Caught EC-SIZE-ZERO-DIVIDE at onsize; REQUIRED-SECTION; prog.cob:93
+    Case 4 status is properly "EC-SIZE-ZERO-DIVIDE"
+    The case 4 result is properly 2468
+.
+], [])
+AT_CLEANUP
+
+AT_SETUP([Simple DIVIDE])
+AT_KEYWORDS([declaratives onsize size])
+AT_DATA([prog.cob], [
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. onsize.
+        DATA DIVISION.
+        WORKING-STORAGE SECTION.
+        01 FIX9DISPLAY                  PIC 9(9) DISPLAY VALUE 123454321.
+        01 FIX4DISPLAY                  PIC 9(4) DISPLAY.
+
+        01 EC_STATUS                    PIC X(32).
+        01 EC_SHOULD_BE                 PIC X(32) VALUE "EC-SIZE-TRUNCATION".
+        PROCEDURE       DIVISION.
+            DECLARATIVES.
+            DECL-TRUNCATION SECTION.
+                USE AFTER EXCEPTION CONDITION EC-SIZE-TRUNCATION.
+                DISPLAY "    Caught " FUNCTION TRIM(FUNCTION EXCEPTION-STATUS)
+                        " at "       FUNCTION TRIM(FUNCTION EXCEPTION-LOCATION)
+                RESUME NEXT STATEMENT.
+            END DECLARATIVES.
+            REQUIRED-SECTION SECTION.
+
+            DISPLAY "Case 0: Simple divide of 1234321 by 1111, no overflow"
+            SET LAST EXCEPTION TO OFF
+            MOVE   1234321      TO FIX9DISPLAY
+            DIVIDE FIX9DISPLAY BY 1111 GIVING FIX4DISPLAY
+            MOVE FUNCTION EXCEPTION-STATUS TO EC_STATUS
+            IF EC_STATUS EQUAL TO SPACES
+                DISPLAY "    Case 0 status is properly empty"
+            ELSE
+                DISPLAY "    Case 0 status is improperly " """" FUNCTION TRIM(EC_STATUS) """"
+            END-IF
+            IF FIX4DISPLAY EQUAL 1111
+               DISPLAY "    The case 0 result is properly " FIX4DISPLAY
+            ELSE
+               DISPLAY "    The case 0 result is improperly " FIX4DISPLAY
+            END-IF
+            DISPLAY "."
+
+            DISPLAY "Case 1: Simple divide of 123454321 by 1111 overflow"
+            SET LAST EXCEPTION TO OFF
+            MOVE     123454321 TO FIX9DISPLAY
+            MOVE          2468 TO FIX4DISPLAY
+            DIVIDE FIX9DISPLAY BY 1111 GIVING FIX4DISPLAY
+            MOVE FUNCTION EXCEPTION-STATUS TO EC_STATUS
+            IF EC_STATUS EQUAL TO EC_SHOULD_BE
+                DISPLAY "    Case 1 status is properly " """" FUNCTION TRIM(EC_STATUS) """"
+            ELSE
+                DISPLAY "    Case 1 status is improperly " """" FUNCTION TRIM(EC_STATUS) """"
+            END-IF
+            IF FIX4DISPLAY EQUAL 1120
+               DISPLAY "    The case 1 result is properly " FIX4DISPLAY
+            ELSE
+               DISPLAY "    The case 1 result is improperly " FIX4DISPLAY
+            END-IF
+            DISPLAY "."
+
+            DISPLAY "Case 1: Simple divide of 123454321 by 1111 overflow with SIZE ERROR"
+            MOVE     123454321 TO FIX9DISPLAY
+            MOVE          2468 TO FIX4DISPLAY
+            DIVIDE FIX9DISPLAY BY 1111 GIVING FIX4DISPLAY
+                            ON SIZE ERROR DISPLAY "    Properly got SIZE ERROR"
+                        NOT ON SIZE ERROR DISPLAY "    Improperly got NOT SIZE ERROR"
+            END-DIVIDE
+            MOVE FUNCTION EXCEPTION-STATUS TO EC_STATUS
+            IF EC_STATUS EQUAL TO EC_SHOULD_BE
+                DISPLAY "    Case 2 status is properly " """" FUNCTION TRIM(EC_STATUS) """"
+            ELSE
+                DISPLAY "    Case 2 status is improperly " """" FUNCTION TRIM(EC_STATUS) """"
+            END-IF
+            IF FIX4DISPLAY EQUAL 2468
+               DISPLAY "    The case 2 result is properly " FIX4DISPLAY
+            ELSE
+               DISPLAY "    The case 2 result is improperly " FIX4DISPLAY
+            END-IF
+            DISPLAY "."
+
+            DISPLAY "Case 3: Simple divide of 123454321 by 1111 overflow with ON SIZE error and DECLARATIVE"
+            DISPLAY "        Not expecting the declarative because ON SIZE overrides"
+            >> TURN EC-SIZE-TRUNCATION CHECKING ON
+            SET LAST EXCEPTION TO OFF
+            MOVE     123454321 TO FIX9DISPLAY
+            MOVE          2468 TO FIX4DISPLAY
+            DIVIDE FIX9DISPLAY BY 1111 GIVING FIX4DISPLAY
+                            ON SIZE ERROR DISPLAY "    Properly got SIZE ERROR"
+                        NOT ON SIZE ERROR DISPLAY "    Improperly got NOT SIZE ERROR"
+            END-DIVIDE
+            MOVE FUNCTION EXCEPTION-STATUS TO EC_STATUS
+            IF EC_STATUS EQUAL TO EC_SHOULD_BE
+                DISPLAY "    Case 3 status is properly " """" FUNCTION TRIM(EC_STATUS) """"
+            ELSE
+                DISPLAY "    Case 3 status is improperly " """" FUNCTION TRIM(EC_STATUS) """"
+            END-IF
+            IF FIX4DISPLAY EQUAL 2468
+               DISPLAY "    The case 3 result is properly " FIX4DISPLAY
+            ELSE
+               DISPLAY "    The case 3 result is improperly " FIX4DISPLAY
+            END-IF
+            DISPLAY "."
+
+            DISPLAY "Case 4: Simple divide of 123454321 by 1111 overflow with DECLARATIVE"
+            DISPLAY "        Expecting the declarative"
+            >> TURN EC-SIZE-TRUNCATION CHECKING ON
+            SET LAST EXCEPTION TO OFF
+            MOVE     123454321 TO FIX9DISPLAY
+            MOVE          2468 TO FIX4DISPLAY
+            DIVIDE FIX9DISPLAY BY 1111 GIVING FIX4DISPLAY
+            END-DIVIDE
+            MOVE FUNCTION EXCEPTION-STATUS TO EC_STATUS
+            IF EC_STATUS EQUAL TO EC_SHOULD_BE
+                DISPLAY "    Case 4 status is properly " """" FUNCTION TRIM(EC_STATUS) """"
+            ELSE
+                DISPLAY "    Case 4 status is improperly " """" FUNCTION TRIM(EC_STATUS) """"
+            END-IF
+            IF FIX4DISPLAY EQUAL 1120
+               DISPLAY "    The case 4 result is properly " FIX4DISPLAY
+            ELSE
+               DISPLAY "    The case 4 result is improperly " FIX4DISPLAY
+            END-IF
+            DISPLAY "."
+
+            STOP RUN.
+
+        END PROGRAM onsize.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [Case 0: Simple divide of 1234321 by 1111, no overflow
+    Case 0 status is properly empty
+    The case 0 result is properly 1111
+.
+Case 1: Simple divide of 123454321 by 1111 overflow
+    Case 1 status is properly "EC-SIZE-TRUNCATION"
+    The case 1 result is properly 1120
+.
+Case 1: Simple divide of 123454321 by 1111 overflow with SIZE ERROR
+    Properly got SIZE ERROR
+    Case 2 status is properly "EC-SIZE-TRUNCATION"
+    The case 2 result is properly 2468
+.
+Case 3: Simple divide of 123454321 by 1111 overflow with ON SIZE error and DECLARATIVE
+        Not expecting the declarative because ON SIZE overrides
+    Properly got SIZE ERROR
+    Case 3 status is properly "EC-SIZE-TRUNCATION"
+    The case 3 result is properly 2468
+.
+Case 4: Simple divide of 123454321 by 1111 overflow with DECLARATIVE
+        Expecting the declarative
+    Caught EC-SIZE-TRUNCATION at onsize; REQUIRED-SECTION; prog.cob:105
+    Case 4 status is properly "EC-SIZE-TRUNCATION"
+    The case 4 result is properly 1120
+.
+], [])
+AT_CLEANUP
+
+AT_SETUP([Simple multiplication])
+AT_KEYWORDS([declaratives onsize size])
+AT_DATA([prog.cob], [
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. onsize.
+        DATA DIVISION.
+        WORKING-STORAGE SECTION.
+        01 FIX4DISPLAY                  PIC 9(4) DISPLAY.
+
+        01 EC_STATUS                    PIC X(32).
+        01 EC_SHOULD_BE                 PIC X(32) VALUE "EC-SIZE-TRUNCATION".
+        PROCEDURE       DIVISION.
+            DECLARATIVES.
+            DECL-TRUNCATION SECTION.
+                USE AFTER EXCEPTION CONDITION EC-SIZE-TRUNCATION.
+                DISPLAY "    Caught " FUNCTION TRIM(FUNCTION EXCEPTION-STATUS)
+                        " at "        FUNCTION TRIM(FUNCTION EXCEPTION-LOCATION)
+                RESUME NEXT STATEMENT.
+            END DECLARATIVES.
+            REQUIRED-SECTION SECTION.
+
+            DISPLAY "Case 0: Simple multiply of 1 by 1234, no overflow"
+            SET LAST EXCEPTION TO OFF
+            MOVE 1        TO FIX4DISPLAY
+            MULTIPLY 1234 BY FIX4DISPLAY
+            MOVE FUNCTION EXCEPTION-STATUS TO EC_STATUS
+            IF EC_STATUS EQUAL TO SPACES
+                DISPLAY "    Case 0 status is properly empty"
+            ELSE
+                DISPLAY "    Case 0 status is improperly " """" FUNCTION TRIM(EC_STATUS) """"
+            END-IF
+            IF FIX4DISPLAY EQUAL 1234
+               DISPLAY "    The case 0 result is properly " FIX4DISPLAY
+            ELSE
+               DISPLAY "    The case 0 result is improperly " FIX4DISPLAY
+            END-IF
+            DISPLAY "."
+
+            DISPLAY "Case 1: Simple multiply 1111 by 1111 overflow"
+            SET LAST EXCEPTION TO OFF
+            MOVE     1111 TO FIX4DISPLAY
+            MULTIPLY 1111 BY  FIX4DISPLAY
+            MOVE FUNCTION EXCEPTION-STATUS TO EC_STATUS
+            IF EC_STATUS EQUAL TO EC_SHOULD_BE
+                DISPLAY "    Case 1 status is properly " """" FUNCTION TRIM(EC_STATUS) """"
+            ELSE
+                DISPLAY "    Case 1 status is improperly " """" FUNCTION TRIM(EC_STATUS) """"
+            END-IF
+            IF FIX4DISPLAY EQUAL 4321
+               DISPLAY "    The case 1 result is properly " FIX4DISPLAY
+            ELSE
+               DISPLAY "    The case 1 result is improperly " FIX4DISPLAY
+            END-IF
+            DISPLAY "."
+
+            DISPLAY "Case 2: Simple multiply 1111 by 1111 overflow with ON SIZE error"
+            SET LAST EXCEPTION TO OFF
+            MOVE     1111 TO FIX4DISPLAY
+            MULTIPLY 1111 BY  FIX4DISPLAY
+                            ON SIZE ERROR DISPLAY "    Properly got SIZE ERROR"
+                        NOT ON SIZE ERROR DISPLAY "    Improperly got NOT SIZE ERROR"
+            END-MULTIPLY
+            MOVE FUNCTION EXCEPTION-STATUS TO EC_STATUS
+            IF EC_STATUS EQUAL TO EC_SHOULD_BE
+                DISPLAY "    Case 2 status is properly " """" FUNCTION TRIM(EC_STATUS) """"
+            ELSE
+                DISPLAY "    Case 2 status is improperly " """" FUNCTION TRIM(EC_STATUS) """"
+            END-IF
+            IF FIX4DISPLAY EQUAL 1111
+               DISPLAY "    The case 2 result is properly " FIX4DISPLAY
+            ELSE
+               DISPLAY "    The case 2 result is improperly " FIX4DISPLAY
+            END-IF
+            DISPLAY "."
+
+            DISPLAY "Case 3: Simple multiply 1111 by 1111 overflow with ON SIZE error and DECLARATIVE"
+            DISPLAY "        Not expecting the declarative because ON SIZE overrides"
+            >> TURN EC-SIZE-TRUNCATION CHECKING ON
+            SET LAST EXCEPTION TO OFF
+            MOVE     1111 TO FIX4DISPLAY
+            MULTIPLY 1111 BY  FIX4DISPLAY
+                            ON SIZE ERROR DISPLAY "    Properly got SIZE ERROR"
+                        NOT ON SIZE ERROR DISPLAY "    Improperly got NOT SIZE ERROR"
+            END-MULTIPLY
+            MOVE FUNCTION EXCEPTION-STATUS TO EC_STATUS
+            IF EC_STATUS EQUAL TO EC_SHOULD_BE
+                DISPLAY "    Case 3 status is properly " """" FUNCTION TRIM(EC_STATUS) """"
+            ELSE
+                DISPLAY "    Case 3 status is improperly " """" FUNCTION TRIM(EC_STATUS) """"
+            END-IF
+            IF FIX4DISPLAY EQUAL 1111
+               DISPLAY "    The case 3 result is properly " FIX4DISPLAY
+            ELSE
+               DISPLAY "    The case 3 result is improperly " FIX4DISPLAY
+            END-IF
+            DISPLAY "."
+
+            DISPLAY "Case 4: Simple multiply 1111 by 1111 overflow with DECLARATIVE"
+            DISPLAY "        Expecting the declarative"
+            >> TURN EC-SIZE-TRUNCATION CHECKING ON
+            SET LAST EXCEPTION TO OFF
+            MOVE     1111 TO FIX4DISPLAY
+            MULTIPLY 1111 BY  FIX4DISPLAY
+            END-MULTIPLY
+            MOVE FUNCTION EXCEPTION-STATUS TO EC_STATUS
+            IF EC_STATUS EQUAL TO EC_SHOULD_BE
+                DISPLAY "    Case 4 status is properly " """" FUNCTION TRIM(EC_STATUS) """"
+            ELSE
+                DISPLAY "    Case 4 status is improperly " """" FUNCTION TRIM(EC_STATUS) """"
+            END-IF
+            IF FIX4DISPLAY EQUAL 4321
+               DISPLAY "    The case 4 result is properly " FIX4DISPLAY
+            ELSE
+               DISPLAY "    The case 4 result is improperly " FIX4DISPLAY
+            END-IF
+            DISPLAY "."
+
+            STOP RUN.
+
+        END PROGRAM onsize.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [Case 0: Simple multiply of 1 by 1234, no overflow
+    Case 0 status is properly empty
+    The case 0 result is properly 1234
+.
+Case 1: Simple multiply 1111 by 1111 overflow
+    Case 1 status is properly "EC-SIZE-TRUNCATION"
+    The case 1 result is properly 4321
+.
+Case 2: Simple multiply 1111 by 1111 overflow with ON SIZE error
+    Properly got SIZE ERROR
+    Case 2 status is properly "EC-SIZE-TRUNCATION"
+    The case 2 result is properly 1111
+.
+Case 3: Simple multiply 1111 by 1111 overflow with ON SIZE error and DECLARATIVE
+        Not expecting the declarative because ON SIZE overrides
+    Properly got SIZE ERROR
+    Case 3 status is properly "EC-SIZE-TRUNCATION"
+    The case 3 result is properly 1111
+.
+Case 4: Simple multiply 1111 by 1111 overflow with DECLARATIVE
+        Expecting the declarative
+    Caught EC-SIZE-TRUNCATION at onsize; REQUIRED-SECTION; prog.cob:101
+    Case 4 status is properly "EC-SIZE-TRUNCATION"
+    The case 4 result is properly 4321
+.
+], [])
+AT_CLEANUP
+
+AT_SETUP([Simple subtraction])
+AT_KEYWORDS([declaratives onsize size])
+AT_DATA([prog.cob], [
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. onsize.
+        DATA DIVISION.
+        WORKING-STORAGE SECTION.
+        01 FIX4DISPLAY                  PIC S9(4) DISPLAY.
+
+        01 EC_STATUS                    PIC X(32).
+        01 EC_SHOULD_BE                 PIC X(32) VALUE "EC-SIZE-TRUNCATION".
+        PROCEDURE       DIVISION.
+            DECLARATIVES.
+            DECL-TRUNCATION SECTION.
+                USE AFTER EXCEPTION CONDITION EC-SIZE-TRUNCATION.
+                DISPLAY "    Caught " FUNCTION TRIM(FUNCTION EXCEPTION-STATUS)
+                        " at "        FUNCTION TRIM(FUNCTION EXCEPTION-LOCATION)
+                RESUME NEXT STATEMENT.
+            END DECLARATIVES.
+            REQUIRED-SECTION SECTION.
+
+            DISPLAY "Case 0: Simple subtraction -1233 - 1, no overflow"
+            SET LAST EXCEPTION TO OFF
+            MOVE -1233   TO FIX4DISPLAY
+            SUBTRACT 1 FROM FIX4DISPLAY
+            MOVE FUNCTION EXCEPTION-STATUS TO EC_STATUS
+            IF EC_STATUS EQUAL TO SPACES
+                DISPLAY "    Case 0 status is properly empty"
+            ELSE
+                DISPLAY "    Case 0 status is improperly " """" FUNCTION TRIM(EC_STATUS) """"
+            END-IF
+            IF FIX4DISPLAY EQUAL -1234
+               DISPLAY "    The case 0 result is properly " FIX4DISPLAY
+            ELSE
+               DISPLAY "    The case 0 result is improperly " FIX4DISPLAY
+            END-IF
+            DISPLAY "."
+
+            DISPLAY "Case 1: Simple addition -9999 - 1 overflow"
+            SET LAST EXCEPTION TO OFF
+            MOVE -9999   TO FIX4DISPLAY
+            SUBTRACT 1 FROM FIX4DISPLAY
+            MOVE FUNCTION EXCEPTION-STATUS TO EC_STATUS
+            IF EC_STATUS EQUAL TO EC_SHOULD_BE
+                DISPLAY "    Case 1 status is properly " """" FUNCTION TRIM(EC_STATUS) """"
+            ELSE
+                DISPLAY "    Case 1 status is improperly " """" FUNCTION TRIM(EC_STATUS) """"
+            END-IF
+            IF FIX4DISPLAY EQUAL 0000
+               DISPLAY "    The case 1 result is properly " FIX4DISPLAY
+            ELSE
+               DISPLAY "    The case 1 result is improperly " FIX4DISPLAY
+            END-IF
+            DISPLAY "."
+
+            DISPLAY "Case 2: Simple addition -9999 - 1 overflow with ON SIZE error"
+            SET LAST EXCEPTION TO OFF
+            MOVE -9999   TO FIX4DISPLAY
+            SUBTRACT 1 FROM FIX4DISPLAY
+                            ON SIZE ERROR DISPLAY "    Properly got SIZE ERROR"
+                        NOT ON SIZE ERROR DISPLAY "    Improperly got NOT SIZE ERROR"
+            END-SUBTRACT
+            MOVE FUNCTION EXCEPTION-STATUS TO EC_STATUS
+            IF EC_STATUS EQUAL TO EC_SHOULD_BE
+                DISPLAY "    Case 2 status is properly " """" FUNCTION TRIM(EC_STATUS) """"
+            ELSE
+                DISPLAY "    Case 2 status is improperly " """" FUNCTION TRIM(EC_STATUS) """"
+            END-IF
+            IF FIX4DISPLAY EQUAL -9999
+               DISPLAY "    The case 2 result is properly " FIX4DISPLAY
+            ELSE
+               DISPLAY "    The case 2 result is improperly " FIX4DISPLAY
+            END-IF
+            DISPLAY "."
+
+            DISPLAY "Case 3: Simple addition -9999 - 1 overflow with ON SIZE error and DECLARATIVE"
+            DISPLAY "        Not expecting the declarative because ON SIZE overrides"
+            >> TURN EC-SIZE-TRUNCATION CHECKING ON
+            SET LAST EXCEPTION TO OFF
+            MOVE -9999   TO FIX4DISPLAY
+            SUBTRACT 1 FROM FIX4DISPLAY
+                            ON SIZE ERROR DISPLAY "    Properly got SIZE ERROR"
+                        NOT ON SIZE ERROR DISPLAY "    Improperly got NOT SIZE ERROR"
+            END-SUBTRACT
+            MOVE FUNCTION EXCEPTION-STATUS TO EC_STATUS
+            IF EC_STATUS EQUAL TO EC_SHOULD_BE
+                DISPLAY "    Case 3 status is properly " """" FUNCTION TRIM(EC_STATUS) """"
+            ELSE
+                DISPLAY "    Case 3 status is improperly " """" FUNCTION TRIM(EC_STATUS) """"
+            END-IF
+            IF FIX4DISPLAY EQUAL -9999
+               DISPLAY "    The case 3 result is properly " FIX4DISPLAY
+            ELSE
+               DISPLAY "    The case 3 result is improperly " FIX4DISPLAY
+            END-IF
+            DISPLAY "."
+
+            DISPLAY "Case 4: Simple addition -9999 - 1 overflow with DECLARATIVE"
+            DISPLAY "        Expecting the declarative"
+            >> TURN EC-SIZE-TRUNCATION CHECKING ON
+            SET LAST EXCEPTION TO OFF
+            MOVE -9999   TO FIX4DISPLAY
+            SUBTRACT 1 FROM FIX4DISPLAY
+            END-SUBTRACT
+            MOVE FUNCTION EXCEPTION-STATUS TO EC_STATUS
+            IF EC_STATUS EQUAL TO EC_SHOULD_BE
+                DISPLAY "    Case 4 status is properly " """" FUNCTION TRIM(EC_STATUS) """"
+            ELSE
+                DISPLAY "    Case 4 status is improperly " """" FUNCTION TRIM(EC_STATUS) """"
+            END-IF
+            IF FIX4DISPLAY EQUAL 0000
+               DISPLAY "    The case 4 result is properly " FIX4DISPLAY
+            ELSE
+               DISPLAY "    The case 4 result is improperly " FIX4DISPLAY
+            END-IF
+            DISPLAY "."
+
+            STOP RUN.
+
+        END PROGRAM onsize.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [Case 0: Simple subtraction -1233 - 1, no overflow
+    Case 0 status is properly empty
+    The case 0 result is properly -1234
+.
+Case 1: Simple addition -9999 - 1 overflow
+    Case 1 status is properly "EC-SIZE-TRUNCATION"
+    The case 1 result is properly +0000
+.
+Case 2: Simple addition -9999 - 1 overflow with ON SIZE error
+    Properly got SIZE ERROR
+    Case 2 status is properly "EC-SIZE-TRUNCATION"
+    The case 2 result is properly -9999
+.
+Case 3: Simple addition -9999 - 1 overflow with ON SIZE error and DECLARATIVE
+        Not expecting the declarative because ON SIZE overrides
+    Properly got SIZE ERROR
+    Case 3 status is properly "EC-SIZE-TRUNCATION"
+    The case 3 result is properly -9999
+.
+Case 4: Simple addition -9999 - 1 overflow with DECLARATIVE
+        Expecting the declarative
+    Caught EC-SIZE-TRUNCATION at onsize; REQUIRED-SECTION; prog.cob:101
+    Case 4 status is properly "EC-SIZE-TRUNCATION"
+    The case 4 result is properly +0000
+.
+], [])
+AT_CLEANUP
+
+
+AT_BANNER([EC-ARGUMENT-FUNCTION tests])
+
+AT_SETUP([Mixed ARGUMENT-FUNCTION BOUND-SUBSCRIPT])
+AT_KEYWORDS([declaratives exception ec-bound-argument ec-bound-subscript declaratives ])
+AT_SKIP_IF(false)
+AT_DATA([prog.cob], [        IDENTIFICATION DIVISION.
+        PROGRAM-ID. prog.
+        DATA DIVISION.
+        WORKING-STORAGE SECTION.
+        01 VAL PIC S99V99.
+        01 FILLER VALUE "1234567890".
+           05 TABL  PIC X OCCURS 5.
+           05 TABL2 PIC X OCCURS 5.
+        01 VSIX   PIC 9 VALUE 6.
+        PROCEDURE DIVISION.
+        DECLARATIVES.
+        DECLARATIVES-EC-ARGUMENT-FUNCTION SECTION.
+            USE AFTER EXCEPTION CONDITION EC-ARGUMENT-FUNCTION.
+                DISPLAY "      DECLARATIVE FOR EC-ARGUMENT-FUNCTION".
+                RESUME NEXT STATEMENT.
+        DECLARATIVES-EC-ARGUMENT SECTION.
+            USE AFTER EXCEPTION CONDITION EC-ARGUMENT.
+                DISPLAY "      DECLARATIVE FOR EC-ARGUMENT".
+                RESUME NEXT STATEMENT.
+        DECLARATIVES-EC-ALL SECTION.
+            USE AFTER EXCEPTION CONDITION EC-ALL.
+                DISPLAY "      DECLARATIVE FOR EC-ALL".
+                RESUME NEXT STATEMENT.
+           END DECLARATIVES.
+
+        MAIN-SECTION SECTION.
+        PERFORM TEST1.
+        PERFORM TEST2.
+        PERFORM TEST3.
+        PERFORM TEST4.
+        PERFORM TEST5
+        GOBACK.
+
+        TEST1.
+        DISPLAY "Turning EC-ALL CHECKING OFF -- Expecting +00.00 from ACOS(-3)"
+        >>TURN EC-ALL CHECKING OFF
+        MOVE FUNCTION ACOS(-3) TO VAL.
+        DISPLAY "      " VAL WITH NO ADVANCING.
+        DISPLAY "      TABL(VSIX) is " TABL(VSIX).
+
+        TEST2.
+        DISPLAY "Turning EC-ARGUMENT-FUNCTION CHECKING ON"
+        DISPLAY "      " "Expecting +0.00 and DECLARATIVE FOR EC-ARGUMENT-FUNCTION"
+        >>TURN EC-ALL CHECKING OFF
+        >>TURN EC-ARGUMENT-FUNCTION CHECKING ON
+        MOVE FUNCTION ACOS(-3) TO VAL.
+        DISPLAY "      " VAL WITH NO ADVANCING.
+        DISPLAY "      TABL(VSIX) is " TABL(VSIX).
+
+        TEST3.
+        DISPLAY "Turning EC-ARGUMENT CHECKING ON"
+        DISPLAY "      " "Expecting +0.00 and DECLARATIVE FOR EC-ARGUMENT-FUNCTION"
+        >>TURN EC-ALL CHECKING OFF
+        >>TURN EC-ARGUMENT CHECKING ON
+        MOVE FUNCTION ACOS(-3) TO VAL.
+        DISPLAY "      " VAL WITH NO ADVANCING.
+        DISPLAY "      TABL(VSIX) is " TABL(VSIX).
+
+        TEST4.
+        DISPLAY "Turning EC-ALL CHECKING ON"
+        DISPLAY "      " "Expecting +0.00 and DECLARATIVE EC-ARGUMENT-FUNCTION"
+        DISPLAY "      " "Followed by DECLARATIVE EC-ALL FOR TABL(6) access"
+        >>TURN EC-ALL CHECKING OFF
+        >>TURN EC-ALL CHECKING ON
+        MOVE FUNCTION ACOS(-3) TO VAL.
+        DISPLAY "      " VAL WITH NO ADVANCING.
+        DISPLAY "      TABL(VSIX) is " TABL(VSIX).
+        >>TURN EC-ALL CHECKING OFF
+
+        TEST5.
+        DISPLAY "Turning EC-BOUND-SUBSCRIPT CHECKING ON - expecting default exit(1)"
+        >>TURN EC-ALL CHECKING OFF
+        >>TURN EC-BOUND-SUBSCRIPT CHECKING ON
+        MOVE FUNCTION ACOS(-3) TO VAL.
+        DISPLAY "      " VAL WITH NO ADVANCING.
+        DISPLAY "      TABL(VSIX) is " TABL(VSIX).
+
+        END PROGRAM prog.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [134], [Turning EC-ALL CHECKING OFF -- Expecting +00.00 from ACOS(-3)
+      +00.00      TABL(VSIX) is 6
+Turning EC-ARGUMENT-FUNCTION CHECKING ON
+      Expecting +0.00 and DECLARATIVE FOR EC-ARGUMENT-FUNCTION
+      DECLARATIVE FOR EC-ARGUMENT-FUNCTION
+      +00.00      TABL(VSIX) is 6
+Turning EC-ARGUMENT CHECKING ON
+      Expecting +0.00 and DECLARATIVE FOR EC-ARGUMENT-FUNCTION
+      DECLARATIVE FOR EC-ARGUMENT-FUNCTION
+      +00.00      TABL(VSIX) is 6
+Turning EC-ALL CHECKING ON
+      Expecting +0.00 and DECLARATIVE EC-ARGUMENT-FUNCTION
+      Followed by DECLARATIVE EC-ALL FOR TABL(6) access
+      DECLARATIVE FOR EC-ARGUMENT-FUNCTION
+      +00.00      TABL(VSIX) is 1
+      DECLARATIVE FOR EC-ALL
+Turning EC-BOUND-SUBSCRIPT CHECKING ON - expecting default exit(1)
+      +00.00      TABL(VSIX) is 1
+], [stderr-nolog])
+AT_CHECK([cat stderr | grep -vi aborted], [0],
+[a.out: fatal exception at prog.cob:76:DISPLAY EC-BOUND-SUBSCRIPT (Subscript out of bounds)
+])
+AT_CLEANUP
+
+AT_SETUP([EC-ARGUMENT-FUNCTION (NO LOCATION)])
+AT_KEYWORDS([declaratives turn ec-all exception ])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+
+       PROCEDURE DIVISION.
+       DECLARATIVES.
+       DECLARATIVES-1 SECTION.
+           USE AFTER EXCEPTION CONDITION EC-ARGUMENT-FUNCTION.
+             DISPLAY "DECLARATIVE FOR EC-ARGUMENT-FUNCTION".
+           GOBACK.
+       END DECLARATIVES.
+
+       MAIN-SECTION SECTION. 
+       DISPLAY "TURN EC-ARGUMENT-FUNCTION CHECKING ON".
+       >>TURN EC-ARGUMENT-FUNCTION CHECKING ON
+       PERFORM TEST1.
+
+       GOBACK.
+
+       TEST1.
+           DISPLAY FUNCTION ACOS(-3).
+
+       END PROGRAM prog.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [], [TURN EC-ARGUMENT-FUNCTION CHECKING ON
+DECLARATIVE FOR EC-ARGUMENT-FUNCTION
+], [ignore])
+AT_CLEANUP
+
+AT_SETUP([EC-ARGUMENT])
+AT_KEYWORDS([declaratives turn ec-all exception ])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+
+       PROCEDURE DIVISION.
+       DECLARATIVES.
+       DECLARATIVES-1 SECTION.
+           USE AFTER EXCEPTION CONDITION EC-ARGUMENT.
+             DISPLAY "DECLARATIVE FOR EC-ARGUMENT".
+           GOBACK.
+       END DECLARATIVES.
+       
+       MAIN-SECTION SECTION.
+       DISPLAY "TURN EC-ARGUMENT CHECKING ON".
+       >>TURN EC-ARGUMENT CHECKING ON
+       PERFORM TEST1.
+
+       GOBACK.
+
+       TEST1.
+           DISPLAY FUNCTION ACOS(-3).
+
+       END PROGRAM prog.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [], [TURN EC-ARGUMENT CHECKING ON
+DECLARATIVE FOR EC-ARGUMENT
+], [ignore])
+AT_CLEANUP
+
+AT_SETUP([EC-ALL])
+AT_KEYWORDS([declaratives turn ec-all exception ])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+
+       PROCEDURE DIVISION.
+       DECLARATIVES.
+       DECLARATIVES-1 SECTION.
+           USE AFTER EXCEPTION CONDITION EC-ALL.
+             DISPLAY "DECLARATIVE FOR EC-ALL".
+           GOBACK.           
+       END DECLARATIVES.
+
+       MAIN-SECTION SECTION.
+       DISPLAY "TURN EC-ALL CHECKING ON".    
+       >>TURN EC-ALL CHECKING ON
+       PERFORM TEST1.    
+           
+       GOBACK.
+
+       TEST1.
+           DISPLAY FUNCTION ACOS(-3).
+
+       END PROGRAM prog.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [], [TURN EC-ALL CHECKING ON
+DECLARATIVE FOR EC-ALL
+], [ignore])
+AT_CLEANUP
+
+AT_SETUP([NO EXCEPTION])
+AT_KEYWORDS([declaratives turn ec-all exception ])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+
+       PROCEDURE DIVISION.
+       PERFORM TEST1.    
+           
+       GOBACK.
+
+       TEST1.
+           DISPLAY FUNCTION ACOS(-3).
+
+       END PROGRAM prog.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [0
+], [])
+AT_CLEANUP
+
+AT_BANNER([EC-BOUND-ODO tests])
+
+AT_SETUP([EXCEPTION EC-BOUND-ODO FULL TEST])
+AT_KEYWORDS([expection ec-bound-odo declaratives ])
+AT_SKIP_IF(false)
+AT_DATA([prog.cob], [
+m4_include([declaratives.src/ec-bound-odo-full.cob])
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [TURN EC-BOUND-ODO CHECKING ON
+DECLARATIVE FOR EC-BOUND-ODO
+TURN EC-BOUND CHECKING ON
+DECLARATIVE FOR EC-BOUND-ODO
+TURN EC-ALL CHECKING ON
+DECLARATIVE FOR EC-BOUND-ODO
+], [ignore])
+AT_CLEANUP
+
+AT_SETUP([EXCEPTION EC-BOUND-ODO])
+AT_KEYWORDS([expection ec-bound-odo declaratives ])
+AT_DATA([prog.cob], [
+m4_include([declaratives.src/ec-bound-odo-1.cob])
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [TURN EC-BOUND-ODO CHECKING ON
+DECLARATIVE FOR EC-BOUND-ODO
+], [ignore])
+AT_CLEANUP
+
+AT_SETUP([EXCEPTION EC-BOUND])
+AT_KEYWORDS([expection ec-bound-odo declaratives ])
+AT_DATA([prog.cob], [
+m4_include([declaratives.src/ec-bound-odo-2.cob])
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [TURN EC-BOUND CHECKING ON
+DECLARATIVE FOR EC-BOUND
+], [ignore])
+AT_CLEANUP
+
+AT_SETUP([EXCEPTION EC-ALL])
+AT_KEYWORDS([expection ec-bound-odo declaratives ])
+AT_DATA([prog.cob], [
+m4_include([declaratives.src/ec-bound-odo-3.cob])
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [TURN EC-ALL CHECKING ON
+DECLARATIVE FOR EC-ALL
+], [ignore])
+AT_CLEANUP
+
+AT_SETUP([NO EXCEPTION])
+AT_KEYWORDS([expection ec-bound-odo declaratives ])
+AT_DATA([prog.cob], [
+m4_include([declaratives.src/ec-bound-odo-4.cob])
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [], [ignore])
+AT_CLEANUP
+
+AT_BANNER([EC-BOUND-REF-MOD tests])
+
+AT_SETUP([EXCEPTION EC-BOUND-REF-MOD FULL TEST])
+AT_KEYWORDS([expection ec-bound-ref-mod declaratives ])
+AT_DATA([prog.cob], [
+m4_include([declaratives.src/ec-bound-ref-mod-full.cob])
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [TURN EC-BOUND-REF-MOD CHECKING ON
+DECLARATIVE FOR EC-BOUND-REF-MOD
+TURN EC-BOUND CHECKING ON
+DECLARATIVE FOR EC-BOUND-REF-MOD
+TURN EC-ALL CHECKING ON
+DECLARATIVE FOR EC-BOUND-REF-MOD
+], [ignore])
+AT_CLEANUP
+
+AT_SETUP([EXCEPTION EC-BOUND-REF-MOD])
+AT_KEYWORDS([expection ec-bound-ref-mod declaratives ])
+AT_DATA([prog.cob], [
+m4_include([declaratives.src/ec-bound-ref-mod-1.cob])
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [TURN EC-BOUND-REF-MOD CHECKING ON
+DECLARATIVE FOR EC-BOUND-REF-MOD
+], [ignore])
+AT_CLEANUP
+
+AT_SETUP([EXCEPTION EC-BOUND])
+AT_KEYWORDS([expection ec-bound-ref-mod declaratives ])
+AT_DATA([prog.cob], [
+m4_include([declaratives.src/ec-bound-ref-mod-2.cob])
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [TURN EC-BOUND CHECKING ON
+DECLARATIVE FOR EC-BOUND
+], [ignore])
+AT_CLEANUP
+
+AT_SETUP([EXCEPTION EC-ALL])
+AT_KEYWORDS([expection ec-bound-ref-mod declaratives ])
+AT_DATA([prog.cob], [
+m4_include([declaratives.src/ec-bound-ref-mod-3.cob])
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [TURN EC-ALL CHECKING ON
+DECLARATIVE FOR EC-ALL
+], [ignore])
+AT_CLEANUP
+
+AT_SETUP([NO EXCEPTION])
+AT_KEYWORDS([expection ec-bound-ref-mod declaratives ])
+AT_DATA([prog.cob], [
+m4_include([declaratives.src/ec-bound-ref-mod-4.cob])
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [], [ignore])
+AT_CLEANUP
+
+AT_BANNER([EC-BOUND-SUBSCRIPT tests])
+
+AT_SETUP([EXCEPTION EC-BOUND-SUBSCRIPT FULL TEST])
+AT_KEYWORDS([expection ec-bound-subscript declaratives ])
+AT_DATA([prog.cob], [
+m4_include([declaratives.src/ec-bound-subscript-full.cob])
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [TURN EC-BOUND-SUBSCRIPT CHECKING ON
+DECLARATIVE FOR EC-BOUND-SUBSCRIPT
+TURN EC-BOUND CHECKING ON
+DECLARATIVE FOR EC-BOUND-SUBSCRIPT
+TURN EC-ALL CHECKING ON
+DECLARATIVE FOR EC-BOUND-SUBSCRIPT
+], [ignore])
+AT_CLEANUP
+
+AT_SETUP([EXCEPTION EC-BOUND-SUBSCRIPT])
+AT_KEYWORDS([expection ec-bound-subscript declaratives ])
+AT_DATA([prog.cob], [
+m4_include([declaratives.src/ec-bound-subscript-1.cob])
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [TURN EC-BOUND-SUBSCRIPT CHECKING ON
+DECLARATIVE FOR EC-BOUND-SUBSCRIPT
+], [ignore])
+AT_CLEANUP
+
+AT_SETUP([EXCEPTION EC-BOUND])
+AT_KEYWORDS([expection ec-bound-subscript declaratives ])
+AT_DATA([prog.cob], [
+m4_include([declaratives.src/ec-bound-subscript-2.cob])
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [TURN EC-BOUND CHECKING ON
+DECLARATIVE FOR EC-BOUND
+], [ignore])
+AT_CLEANUP
+
+AT_SETUP([EXCEPTION EC-ALL])
+AT_KEYWORDS([expection ec-bound-subscript declaratives ])
+AT_DATA([prog.cob], [
+m4_include([declaratives.src/ec-bound-subscript-3.cob])
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [TURN EC-ALL CHECKING ON
+DECLARATIVE FOR EC-ALL
+], [ignore])
+AT_CLEANUP
+
+AT_SETUP([NO EXCEPTION])
+AT_KEYWORDS([expection ec-bound-subscript declaratives ])
+AT_DATA([prog.cob], [
+m4_include([declaratives.src/ec-bound-subscript-4.cob])
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [], [ignore])
+AT_CLEANUP
+
+AT_BANNER([EC-SIZE-OVERFLOW tests])
+
+AT_SETUP([EXCEPTION EC-SIZE-OVERFLOW FULL TEST])
+AT_KEYWORDS([expection ec-size-overflow declaratives ])
+AT_DATA([prog.cob], [
+m4_include([declaratives.src/ec-size-overflow-full.cob])
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [TURN EC-SIZE-OVERFLOW CHECKING ON
+DECLARATIVE FOR EC-SIZE-OVERFLOW
+TURN EC-SIZE CHECKING ON
+DECLARATIVE FOR EC-SIZE-OVERFLOW
+TURN EC-ALL CHECKING ON
+DECLARATIVE FOR EC-SIZE-OVERFLOW
+], [])
+AT_CLEANUP
+
+AT_SETUP([EXCEPTION EC-SIZE-OVERFLOW])
+AT_KEYWORDS([expection ec-size-overflow declaratives ])
+AT_DATA([prog.cob], [
+m4_include([declaratives.src/ec-size-overflow-1.cob])
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [TURN EC-SIZE-OVERFLOW CHECKING ON
+DECLARATIVE FOR EC-SIZE-OVERFLOW
+], [])
+AT_CLEANUP
+
+AT_SETUP([EXCEPTION EC-SIZE])
+AT_KEYWORDS([expection ec-size-overflow declaratives ])
+AT_DATA([prog.cob], [
+m4_include([declaratives.src/ec-size-overflow-2.cob])
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [TURN EC-SIZE CHECKING ON
+DECLARATIVE FOR EC-SIZE
+], [])
+AT_CLEANUP
+
+AT_SETUP([EXCEPTION EC-ALL])
+AT_KEYWORDS([expection ec-size-overflow declaratives ])
+AT_DATA([prog.cob], [
+m4_include([declaratives.src/ec-size-overflow-3.cob])
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [TURN EC-ALL CHECKING ON
+DECLARATIVE FOR EC-ALL
+], [])
+AT_CLEANUP
+
+AT_SETUP([NO EXCEPTION])
+AT_KEYWORDS([expection ec-size-overflow declaratives ])
+AT_DATA([prog.cob], [
+m4_include([declaratives.src/ec-size-overflow-4.cob])
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([EXCEPTION ec-size-truncation])
+AT_KEYWORDS([exception ec-size ec-size-truncation])
+AT_DATA([prog.cob], [
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. Hello.
+        >>TURN EC-SIZE-TRUNCATION Checking ON
+        DATA DIVISION.
+         WORKING-STORAGE SECTION.
+           01 FP POINTER.
+           01 F REDEFINES FP PIC XXXX COMP-5.
+        PROCEDURE DIVISION.
+        display 'hello'.
+        Move 4294967294 to F.
+        display "after MOVE, f  is " f
+        display "after MOVE, fp is " FP
+        Compute F = F + 1.
+        display "after ADD,  f  is " f
+        display "after ADD,  fp is " FP
+        Compute F = F + 1.
+        display "after ADD,  f  is " f
+        display "after ADD,  fp is " FP
+        STOP RUN
+])
+AT_CHECK([$COMPILE -dialect mf prog.cob], [0], [], [])
+AT_CHECK([./a.out], [134], [hello
+after MOVE, f  is 4294967294
+after MOVE, fp is 0x00000000fffffffe
+after ADD,  f  is 4294967295
+after ADD,  fp is 0x00000000ffffffff
+], [ignore])
+AT_CLEANUP

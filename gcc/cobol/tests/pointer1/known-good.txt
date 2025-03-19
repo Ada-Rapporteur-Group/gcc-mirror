@@ -1,0 +1,14 @@
+000000259
+0x0000000000000103
+Faith       
+Hope        
+Charity     
+Pointers are correctly equal    
+Pointers are correctly different
+Pointers are correctly different
+Pointers are correctly different
+Pointers are correctly different
+Pointers are correctly equal    
+Pointers are correctly equal    
+Pointers are correctly equal    
+NOT EQUAL is correctly FALSE    

@@ -1,0 +1,29 @@
+
+             Popular Surname Report
+CountyName  Surname                  Count
+CARLOW      BOURKE                      32
+CAVAN       DOHERTY                  1,296
+CLARE       O'NEILL                     36
+CORK        COLLINS                     10
+DONEGAL     BROWN                        5
+DUBLIN      SAVAGE                       5
+GALWAY      LYONS                       36
+KERRY       COLLINS                      6
+KILDARE     BUCKELY                      5
+KILKENNY    COLLINS                      6
+LAOIS       COAKLEY                      7
+LIMERICK    MACDONAGH                   40
+LONGFORD    FINE                         5
+LOUTH       COLLINS                      5
+MAYO        BERRY                        4
+MEATH       BERRY                        5
+MONAGHAN    WHEALAN                      5
+ROSCOMMON   COLLINS                      7
+SLIGO       ASHTON                       4
+TIPPERARY   COLLINS                      6
+WATERFORD   COUGHLAN                    10
+WESTMEATH   AGNEW                        5
+WEXFORD     BOLGER                       6
+WICKLOW     RUTLAND                      6
+
+************* end of report ***************

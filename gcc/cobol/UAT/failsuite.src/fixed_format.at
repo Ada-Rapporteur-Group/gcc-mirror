@@ -1,0 +1,21 @@
+## Copyright (C) 2003-2012, 2014-2019 Free Software Foundation, Inc.
+## Copyright (C) 2020-2023 COBOLworx.
+## Written by Keisuke Nishida, Roger While, Simon Sobisch, Ron Norman,
+##    Marty Heyman, Nick Mower
+##
+## This file was copied from GnuCOBOL and modified for use with COBOL.
+## for GCC (gcobol).
+## The COBOL for GCC compiler is free software: you can redistribute it
+## and/or modify it under the terms of the Symas Open Licence. A copy
+## of that license is in the LICENSE file included in the distribution.
+##
+
+### COBOL for GCC Test Suite
+
+# FIXED FORMAT tests
+# $COMPILE_FIXED turns on `-findicator-column 7` for Reference
+# Format - Fixed Format
+
+AT_BANNER([Reference Fixed Format Tests])
+
+

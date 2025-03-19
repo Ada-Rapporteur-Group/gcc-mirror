@@ -1,0 +1,126 @@
+
+### GnuCOBOL Test Suite
+
+## Copyright (C) 2020-2023 COBOLworx.
+## Written by Keisuke Nishida, Roger While, Simon Sobisch, Ron Norman,
+##    Marty Heyman, Nick Mower
+##
+## This file was copied from GnuCOBOL and modified for use with COBOL.
+## for GCC (gcobol).
+## The COBOL for GCC compiler is free software: you can redistribute it
+## and/or modify it under the terms of the Symas Open Licence. A copy
+## of that license is in the LICENSE file included in the distribution.
+##
+
+### COBOL for GCC Test Suite
+
+AT_SETUP([DISPLAY: Sign ASCII])
+AT_KEYWORDS([display])
+# Comment out gnu -f test
+# TODO options (-f)
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 G.
+         02 X           PIC X(5).
+         02 X-9         REDEFINES X PIC 9(4).
+         02 X-S9        REDEFINES X PIC S9(4).
+         02 X-S9-L      REDEFINES X PIC S9(4) LEADING.
+         02 X-S9-LS     REDEFINES X PIC S9(4) LEADING SEPARATE.
+         02 X-S9-T      REDEFINES X PIC S9(4) TRAILING.
+         02 X-S9-TS     REDEFINES X PIC S9(4) TRAILING SEPARATE.
+       PROCEDURE        DIVISION.
+           MOVE ZERO TO X. MOVE  1234 TO X-9.     DISPLAY X
+           END-DISPLAY.
+           MOVE ZERO TO X. MOVE  1234 TO X-S9.    DISPLAY X
+           END-DISPLAY.
+           MOVE ZERO TO X. MOVE -1234 TO X-S9.    DISPLAY X
+           END-DISPLAY.
+           MOVE ZERO TO X. MOVE  1234 TO X-S9-L.  DISPLAY X
+           END-DISPLAY.
+           MOVE ZERO TO X. MOVE -1234 TO X-S9-L.  DISPLAY X
+           END-DISPLAY.
+           MOVE ZERO TO X. MOVE  1234 TO X-S9-LS. DISPLAY X
+           END-DISPLAY.
+           MOVE ZERO TO X. MOVE -1234 TO X-S9-LS. DISPLAY X
+           END-DISPLAY.
+           MOVE ZERO TO X. MOVE  1234 TO X-S9-T.  DISPLAY X
+           END-DISPLAY.
+           MOVE ZERO TO X. MOVE -1234 TO X-S9-T.  DISPLAY X
+           END-DISPLAY.
+           MOVE ZERO TO X. MOVE  1234 TO X-S9-TS. DISPLAY X
+           END-DISPLAY.
+           MOVE ZERO TO X. MOVE -1234 TO X-S9-TS. DISPLAY X
+           END-DISPLAY.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0],
+[12340
+12340
+123t0
+12340
+q2340
++1234
+-1234
+12340
+123t0
+1234+
+1234-
+])
+
+AT_CLEANUP
+
+AT_SETUP([DISPLAY: Sign ASCII (2)])
+AT_KEYWORDS([display])
+# Comment out gnu -f test
+# TODO options (-f)
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 G.
+         02 X           PIC X(10).
+         02 X-S99       REDEFINES X PIC S99.
+         02 X-S9        REDEFINES X PIC S9 OCCURS 10.
+       PROCEDURE        DIVISION.
+           MOVE 0 TO X-S9(1).
+           MOVE 1 TO X-S9(2).
+           MOVE 2 TO X-S9(3).
+           MOVE 3 TO X-S9(4).
+           MOVE 4 TO X-S9(5).
+           MOVE 5 TO X-S9(6).
+           MOVE 6 TO X-S9(7).
+           MOVE 7 TO X-S9(8).
+           MOVE 8 TO X-S9(9).
+           MOVE 9 TO X-S9(10).
+           DISPLAY X NO ADVANCING
+           END-DISPLAY.
+           MOVE -10 TO X-S99. MOVE X(2:1) TO X(1:1).
+           MOVE -1 TO X-S9(2).
+           MOVE -2 TO X-S9(3).
+           MOVE -3 TO X-S9(4).
+           MOVE -4 TO X-S9(5).
+           MOVE -5 TO X-S9(6).
+           MOVE -6 TO X-S9(7).
+           MOVE -7 TO X-S9(8).
+           MOVE -8 TO X-S9(9).
+           MOVE -9 TO X-S9(10).
+           DISPLAY X NO ADVANCING
+           END-DISPLAY.
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [0123456789pqrstuvwxy])
+
+AT_CLEANUP
+
+
+

@@ -1,0 +1,12 @@
+1=rock, 2=paper, 3=scissors
+Rock      versus Rock     : Draw
+Rock      versus Paper    : Player B wins
+Rock      versus Scissors : Player A wins
+ 
+Paper     versus Rock     : Player A wins
+Paper     versus Paper    : Draw
+Paper     versus Scissors : Player B wins
+ 
+Scissors  versus Rock     : Player B wins
+Scissors  versus Paper    : Player A wins
+Scissors  versus Scissors : Draw

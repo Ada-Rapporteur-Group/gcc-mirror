@@ -1,0 +1,26 @@
+
+AT_SETUP([Program FAILs with no period at end?])
+AT_KEYWORDS([unstring])
+AT_DATA([prog.cob], [
+m4_include(src/oddballs_001.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([Program FAILs with special character?])
+AT_KEYWORDS([unstring])
+AT_DATA([prog.cob], [
+m4_include(src/oddballs_002.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([Compile Succeeds. Should FAIL, no "." after PROGRAM-ID?])
+AT_KEYWORDS([unstring])
+AT_DATA([prog.cob], [
+m4_include(src/oddballs_003.cob)
+])
+AT_CHECK([$COMPILE prog.cob], [1], [
+error-message telling us about missing dot after program-id], [])
+AT_CLEANUP
+

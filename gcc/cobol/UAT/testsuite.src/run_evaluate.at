@@ -1,0 +1,290 @@
+AT_COPYRIGHT([Test cases Copyright (C) 2022 COBOLworx a subsidiary of Symas Corp.
+
+Written by Marty Heyman])
+
+### GnuCOBOL Test Suite
+
+AT_COLOR_TESTS
+
+AT_TESTED('$GCOBOL')
+
+AT_SETUP([EVALUATE condition (1)])
+AT_KEYWORDS([evaluate condition])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       77 var-1 PIC 99V9.
+           88 var-1-big VALUE 20 THRU 40.
+           88 var-1-huge VALUE 40 THRU 99.
+       PROCEDURE DIVISION.
+           EVALUATE TRUE *> not: var-1
+              WHEN var-1-big  DISPLAY "big"
+              WHEN var-1-huge DISPLAY "huge"
+              WHEN OTHER      DISPLAY "not"
+              END-EVALUATE.
+           END PROGRAM prog.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [not
+], [])
+AT_CLEANUP
+
+AT_SETUP([EVALUATE condition (2)])
+AT_KEYWORDS([evaluate condition])
+AT_DATA([prog.cob], [
+        IDENTIFICATION   DIVISION.
+        PROGRAM-ID.      prog.
+        DATA             DIVISION.
+        WORKING-STORAGE  SECTION.
+           01  XVAL PIC X VALUE '_'.
+               88  UNDERSCORE  VALUE '_'.
+        PROCEDURE        DIVISION.
+           DISPLAY 'Next line should be "UNDERSCORE evaluates to TRUE"'
+           EVALUATE TRUE
+              WHEN NOT UNDERSCORE
+                 DISPLAY
+                     "***IMPROPERLY*** NOT UNDERSCORE evaluates to TRUE"
+                 END-DISPLAY
+           END-EVALUATE.
+           EVALUATE TRUE
+              WHEN UNDERSCORE
+                 DISPLAY "UNDERSCORE evaluates to TRUE"
+                 END-DISPLAY
+           END-EVALUATE.
+
+           DISPLAY
+               'Next line should be "NOT UNDERSCORE evaluates to FALSE"'
+           EVALUATE FALSE
+              WHEN NOT UNDERSCORE
+                 DISPLAY "NOT UNDERSCORE evaluates to FALSE"
+                 END-DISPLAY
+           END-EVALUATE.
+           EVALUATE FALSE
+              WHEN UNDERSCORE
+                 DISPLAY
+                        "***IMPROPERLY*** UNDERSCORE evaluates to FALSE"
+                 END-DISPLAY
+           END-EVALUATE.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [Next line should be "UNDERSCORE evaluates to TRUE"
+UNDERSCORE evaluates to TRUE
+Next line should be "NOT UNDERSCORE evaluates to FALSE"
+NOT UNDERSCORE evaluates to FALSE
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([EVALUATE with WHEN using condition-1])
+# Gnu DOES NOT support condition names as Evaluate object
+# ISO 2023 doesn't either, per Table 15, Condition row. 
+AT_KEYWORDS([evaluate condition])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       77 var-1 PIC 99V9.
+           88 var-1-big VALUE 20 THRU 40.
+           88 var-1-huge VALUE 40 THRU 99.
+       PROCEDURE DIVISION.
+           EVALUATE TRUE *> not: var-1
+              WHEN var-1-big  DISPLAY "big"
+              WHEN var-1-huge DISPLAY "huge"
+              WHEN OTHER      DISPLAY "not"
+              END-EVALUATE.
+           END PROGRAM prog.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [],[])
+AT_CHECK([./a.out], [0], [not
+], [])
+AT_CLEANUP
+
+AT_SETUP([Complex EVALUATE (1)])
+AT_KEYWORDS([Complex EVALUATE])
+AT_DATA([prog.cob], [
+        identification      division.
+        function-id.        bumper.
+        data                division.
+        working-storage     section.
+        77 bump             pic 9999    value zero.
+        linkage             section.
+        77 bumped           pic 9999.
+        procedure division returning bumped.
+            add 1 to bump.
+            move bump to bumped.
+            goback.
+        end function        bumper.
+
+        identification      division.
+        program-id.         prog.
+        environment         division.
+        configuration       section.
+            repository.
+            function         bumper.
+        data division.
+        working-storage     section.
+        77 bump             pic 9999    value zero.
+        77 bump1            pic 9999    value zero.
+        77 bump2            pic 9999    value zero.
+        77 bump3            pic 9999    value zero.
+        procedure division.
+            move function bumper to bump
+            display bump
+            move function bumper to bump
+            display bump
+            move function bumper to bump
+            display bump
+            evaluate function bumper also function bumper also function bumper
+            when 4 also 5 also 6
+                display "properly 4 also 5 also 6"
+            when 7 also 8 also 9
+                display "IMPROPERLY 6 then 7 then 8"
+            when other
+                display "we don't know what's going on"
+            end-evaluate
+            goback.
+        end program prog.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [0001
+0002
+0003
+properly 4 also 5 also 6
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([Complex EVALUATE (2)])
+AT_KEYWORDS([bugs])
+AT_DATA([prog.cob], [
+        identification      division.
+        function-id.        bumper.
+        data                division.
+        working-storage     section.
+        77 bump             pic 9999    value zero.
+        linkage             section.
+        77 bumped           pic 9999.
+        procedure division returning bumped.
+            add 1 to bump.
+            move bump to bumped.
+            display "            bumper is returning " bumped
+            goback.
+        end function        bumper.
+
+        identification      division.
+        program-id.         prog.
+        environment         division.
+        configuration       section.
+            repository.
+            function         bumper.
+        data division.
+        working-storage     section.
+        77 bump             pic 9999    value zero.
+        procedure division.
+            display "            Prime the pump with three calls to bumper"
+            move function bumper to bump
+            move function bumper to bump
+            move function bumper to bump
+            display "            Three calls to BUMPER should follow"
+            evaluate function bumper also function bumper also function bumper
+            when 4 also 5 also 6
+                display "properly 4 also 5 also 6"
+            when 7 also 8 also 9
+                display "IMPROPERLY 7 also 8 also 9"
+            when other
+                display "IMPROPERLY we don't know what's going on"
+            end-evaluate
+            display "            Three more calls to BUMPER should follow"
+            evaluate function bumper also function bumper also function bumper
+            when 4 also 5 also 6
+                display "IMPROPERLY 4 also 5 also 6"
+            when 7 also 8 also 9
+                display "properly 7 also 8 also 9"
+            when other
+                display "IMPROPERLY we don't know what's going on"
+            end-evaluate
+            goback.
+        end program prog.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [            Prime the pump with three calls to bumper
+            bumper is returning 0001
+            bumper is returning 0002
+            bumper is returning 0003
+            Three calls to BUMPER should follow
+            bumper is returning 0004
+            bumper is returning 0005
+            bumper is returning 0006
+properly 4 also 5 also 6
+            Three more calls to BUMPER should follow
+            bumper is returning 0007
+            bumper is returning 0008
+            bumper is returning 0009
+properly 7 also 8 also 9
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([EVALUATE WHEN NEGATIVE])
+AT_KEYWORDS([bugs])
+AT_DATA([prog.cob], [
+        identification division.
+        program-id. prog.
+        data division.
+        working-storage section.
+        77 num pic s9.
+        procedure division.
+        move -1  to num
+        evaluate num
+        when negative
+            display "negative"
+        end-evaluate.
+        end program prog.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [], [negative
+], [])
+AT_CLEANUP
+
+AT_SETUP([EVALUATE doubled WHEN])
+AT_KEYWORDS([bugs])
+AT_DATA([prog.cob], [
+        identification division.
+        program-id. prog.
+        data division.
+        working-storage section.
+        77 eval pic x(4).
+        procedure division.
+            move "open" to eval
+            display "about to EVALUATE eval " """" eval """"
+            evaluate true
+            when eval = 'open'
+            when eval = 'OPEN'
+                display "Good: We got us an " """" eval """"
+            when other
+                display "BAD!!! It shoulda been " """" eval """"
+            end-evaluate
+            move "OPEN" to eval
+            display "about to EVALUATE eval " """" eval """"
+            evaluate true
+            when eval = 'open'
+            when eval = 'OPEN'
+                display "Good:     We got us an " """" eval """"
+            when other
+                display "BAD!!! It shoulda been " """" eval """"
+            end-evaluate
+            goback.
+        end program prog.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [about to EVALUATE eval "open"
+Good: We got us an "open"
+about to EVALUATE eval "OPEN"
+Good:     We got us an "OPEN"
+], [])
+AT_CLEANUP
+

@@ -1,0 +1,179 @@
+#! /usr/bin/awk -f
+
+BEGIN {
+  undocumented["IC112A"] = "X-014"
+  undocumented["IX108A"] = "X-083"
+  undocumented["IX205A"] = "X-086"
+  undocumented["IX209A"] = "X-024"
+  undocumented["IX210A"] = "X-024"
+  undocumented["IX211A"] = "X-024"
+  undocumented["IC115A"] = "X-014"
+  undocumented["IC227A"] = "X-014"
+
+  undocumented["IX212A"] = "X-024 X-055"
+  undocumented["IX212A"] = "X-024 X-055"
+  undocumented["IX213A"] = "X-024 X-055"
+  undocumented["IX214A"] = "X-024 X-055"
+
+  undocumented["NC103A"] = "X-081 X-051"
+  undocumented["NC108M"] = "X-051"
+  undocumented["NC174A"] = "X-051 X-052 X-081 X-090 X-091"
+  undocumented["NC254A"] = "X-051 X-052 X-081 X-090 X-091"
+  undocumented["NC211A"] = "X-051 X-052"
+  undocumented["NC220M"] = "X-056"
+  undocumented["NC302M"] = "X-082 X-083"
+
+  undocumented["RL104A"] = "X-022"
+  undocumented["RL111A"] = "X-022"
+  undocumented["RL112A"] = "X-022"
+  undocumented["RL113A"] = "X-022"
+  undocumented["RL114A"] = "X-022"
+  undocumented["RL115A"] = "X-022"
+  undocumented["RL204A"] = "X-022"
+
+  undocumented["ST101A"] = "X-001 X-027 X-069 X-074 X-075"
+  undocumented["ST102A"] = "X-001 X-002 X-027 X-069 X-074 X-075 X-076"
+  undocumented["ST103A"] = "X-002 X-069 X-074 X-076"
+  undocumented["ST104A"] = "X-001 X-069 X-074 X-075"
+  undocumented["ST105A"] = "X-001 X-002 X-027 X-069 X-074 X-075 X-076"
+  undocumented["ST106A"] = "X-001 X-027 X-069 X-074 X-075"
+  undocumented["ST107A"] = "X-001 X-069 X-074 X-075"
+  undocumented["ST108A"] = "X-027"
+  undocumented["ST109A"] = "X-001 X-069 X-074 X-075"
+  undocumented["ST110A"] = "X-001 X-002 X-027 X-069 X-074 X-075 X-076"
+  undocumented["ST111A"] = "X-002 X-069 X-074 X-076"
+  undocumented["ST112M"] = "X-006 X-069 X-074 X-079"
+  undocumented["ST113M"] = "X-001 X-006 X-027 X-069 X-074 X-075 X-079"
+  undocumented["ST114M"] = "X-001 X-069 X-074 X-075"
+  undocumented["ST115A"] = "X-065"
+  undocumented["ST116A"] = "X-001 X-002 X-027 X-069 X-074 X-075 X-076"
+  undocumented["ST117A"] = "X-002 X-065 X-069 X-074 X-076"
+  undocumented["ST118A"] = "X-027"
+  undocumented["ST119A"] = "X-001 X-027 X-069 X-074 X-075"
+
+  undocumented["ST120A"] = "X-001 X-002 X-027 X-069 X-074 X-075 X-076"
+  undocumented["ST121A"] = "X-002 X-069 X-074 X-076"
+  undocumented["ST122A"] = "X-001 X-069 X-074 X-075"
+  undocumented["ST123A"] = "X-001 X-002 X-027 X-069 X-074 X-075 X-076"
+  undocumented["ST124A"] = "X-002 X-069 X-074 X-076"
+  undocumented["ST125A"] = "X-001 X-002 X-003 X-027 X-069 X-074 X-075"
+  undocumented["ST126A"] = "X-001 X-002 X-003 X-069 X-074 X-075"
+  undocumented["ST127A"] = "X-027"
+  undocumented["ST131A"] = "X-001 X-014 X-015 X-027 X-028 X-029 X-074 X-075 X-076 X-077"
+
+  undocumented["ST132A"] = "X-006 X-027 X-028 X-069 X-074 X-075"
+  undocumented["ST133A"] = "X-001 X-002 X-027 X-028 X-069 X-074 X-075 X-076"
+  undocumented["ST134A"] = "X-001 X-002 X-027 X-069 X-074 X-075 X-076"
+  undocumented["ST135A"] = "X-001 X-002 X-003 X-004 X-027 X-069 " \
+                           "X-074 X-075 X-076 X-077 X-078"
+  undocumented["ST136A"] = "X-001 X-027 X-069 X-074 X-075"
+  undocumented["ST137A"] = "X-055 X-082 X-083" 
+  undocumented["ST139A"] = "X-014 X-015 X-016 X-027 X-069 X-074 X-075 X-076 X-077"
+  undocumented["ST140A"] = "X-008 X-009 X-014 X-015 X-027 X-069 " \
+                           "X-074 X-075 X-076 X-077 X-078"
+  undocumented["ST144A"] = "X-008 X-009 X-014 X-015 X-027 X-064 X-069 " \
+                           "X-074 X-075 X-076 X-077 X-078"
+  undocumented["ST146A"] = "X-014 X-015 X-027"
+}
+
+# Scrape X-cards from the conf file
+FILENAME ~ /conf$/ && /^X-0[0-9][0-9]/ {
+  key = substr($1, 1, 5) # X-123
+  xcards[key] = sprintf("%-7s %s", $1, substr($0, 9))
+}
+
+FILENAME ~ /conf$/ && /^[*]START/ {
+  starting  = $2
+}
+
+FILENAME ~ /conf$/ && /^[*]END-UPDATE/ {
+  starting  = ""
+}
+
+# pick up *START lines other than XXXX file names
+FILENAME ~ /conf$/ && /^[0-9]{6}/ && ! /"XX/ {
+  starts[starting] = starts[starting] $0 "\n"
+}
+
+FILENAME ~ /conf$/ { next }
+
+FILENAME !~ /cbl$/ {
+  print "do what with", FILENAME > "/dev/stderr"
+  exit 1
+}
+
+# Scrape the X-card notes from the .cbl
+/X-CARD/,/ENVIRONMENT +DIVISION/ {
+  if( / \yX-[0-9][0-9]\y/ ) {
+    xcard = ""
+    if( $2 ~ /X-[0-9][0-9]/ ) {
+      xcard = $2
+    }
+    if( $3 ~ /X-[0-9][0-9]/ ) {
+      xcard = $3
+    }
+    sub(/-/, "-0", xcard)
+    if( verbose ) { print FILENAME ":" FNR ": found X-card", xcard }
+  }
+
+  if( match($0, /X{3,}[DP]?[0-9]{2,3}/) ) {
+    verbatim = substr($0, RSTART, RLENGTH)
+    xcard = "X-0" substr(verbatim, RLENGTH-1,2)
+    if( verbose ) { print FILENAME ":" FNR ": found x-card", xcard, "from", verbatim }
+  }
+}
+
+/ENVIRONMENT +DIVISION/ && FILENAME ~ /NC302M/ {
+  xcard = "X-068"
+}
+
+/ENVIRONMENT +DIVISION/,/WORKING-STORAGE +SECTION/ {
+  # Some test files don't mention X-cards in the comments. 
+  if( FILENAME ~ /((IF|SQ|SM)[0-9]{3}[AM])/ ) {
+    if( match($0, /(XX[XPD]+[0-9]{2,3})|(XXX+0[0-9]{2})/) ) {
+      verbatim = substr($0, RSTART, RLENGTH)
+      xcard = "X-0" substr(verbatim, RLENGTH-1,2)
+      if( verbose ) { print "found x-card", xcard, "from", verbatim }
+    }
+  }
+}
+
+xcard {
+  prolog = "*SELECT-PROG %s\n" "*KILL-DELETIONS\n" "*NO-LIBRARY\n" "*NO-DATA\n"
+  postlog = "*END-MONITOR\n" "*BEGIN-UPDATE\n" "%s" "*END-UPDATE\n"
+
+
+  if( prog != FILENAME ) {
+    if( prog != "" ) {
+      amendments = starts[stem]? "*START " stem "\n" starts[stem] : ""
+      printf postlog, amendments
+    }
+    prog = FILENAME
+    pos = length(FILENAME) - 9
+    stem = substr(prog, pos, 6)
+
+    printf prolog, stem
+
+    if( stem in undocumented ) {
+      n = split(undocumented[stem], missing)
+      for(i=1; i <= n; i++ ) {
+        print xcards[missing[i]]
+      }
+    }
+  }
+
+  xvalue = xcards[xcard]
+  # report = sprintf("\"%s/%s.rpt\"", substr(stem, 1, 2), stem)
+  # sub(/REPORTT$/, report, xvalue )
+  if( ! xvalue ) {
+    print "no value for key '" xcard "'" > "/dev/null"
+  }
+  if( verbose ) { xvalue = xvalue  " (with key '" xcard "')" }
+  print xvalue
+  xcard = ""
+}
+
+END {
+  amendments = starts[stem]? "*START " stem "\n" starts[stem] : ""
+  printf postlog, amendments
+}

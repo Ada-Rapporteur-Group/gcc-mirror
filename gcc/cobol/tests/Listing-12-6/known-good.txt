@@ -1,0 +1,12 @@
+DEBUG4.  Sometimes I just don't stop
+Enter number 0-9 :--> Counter1 = 01  Result = 005
+Counter1 = 02  Result = 010
+Counter1 = 03  Result = 015
+Counter1 = 04  Result = 020
+Counter1 = 05  Result = 025
+Counter1 = 06  Result = 030
+Counter1 = 07  Result = 035
+Counter1 = 08  Result = 040
+Counter1 = 09  Result = 045
+Counter1 = 10  Result = 050
+Back in main paragraph now

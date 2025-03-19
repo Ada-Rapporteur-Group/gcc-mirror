@@ -1,0 +1,1399 @@
+## Copyright (C) 2003-2012, 2015-2018, 2020 Free Software Foundation, Inc.
+## Written by Keisuke Nishida, Roger While, Simon Sobisch
+##
+## This file is part of GnuCOBOL.
+##
+## The GnuCOBOL compiler is free software: you can redistribute it
+## and/or modify it under the terms of the GNU General Public License
+## as published by the Free Software Foundation, either version 3 of the
+## License, or (at your option) any later version.
+##
+## GnuCOBOL is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with GnuCOBOL.  If not, see <https://www.gnu.org/licenses/>.
+
+### GnuCOBOL Test Suite
+
+AT_SETUP([MOVE Omnibus])
+AT_KEYWORDS([MOVE])
+AT_DATA([prog.cob], [
+        IDENTIFICATION   DIVISION.
+        PROGRAM-ID.      prog.
+        DATA             DIVISION.
+        WORKING-STORAGE  SECTION.
+        01 X1 .
+          05 X2         PIC 99999999     DISPLAY VALUE 01234321.
+          05 X3         PIC 999V99  DISPLAY.
+          05 X4                     COMP-2.
+          05 X5                     COMP-2.
+          05 X6         PIC 999     COMP-3.
+          05 X7         PIC 999V99  COMP-3.
+          05 X8         PIC 999     COMP-4.
+          05 X9         PIC 999V99  COMP-4.
+          05 X10         PIC 999     COMP-5.
+          05 X11         PIC 999V99  COMP-5.
+          05 X12         PIC A(10).
+          05 X13         PIC X(10).
+          05 X14         PIC BBBA(10).
+          05 X15         PIC 999.999.
+          05 X16         PIC ZZZZZZ9.
+        01 Y1 .
+          05 Y2         PIC 99999999     DISPLAY.
+          05 Y3         PIC 999V99  DISPLAY.
+          05 Y4                     COMP-2.
+          05 Y5                     COMP-2.
+          05 Y6         PIC 999     COMP-3.
+          05 Y7         PIC 999V99  COMP-3.
+          05 Y8         PIC 999     COMP-4.
+          05 Y9         PIC 999V99  COMP-4.
+          05 Y10         PIC 999     COMP-5.
+          05 Y11         PIC 999V99  COMP-5.
+          05 Y12         PIC A(10).
+          05 Y13         PIC X(10).
+          05 Y14         PIC BBBA(10).
+          05 Y15         PIC 999.999.
+          05 Y16         PIC ZZZZZZ9.
+        PROCEDURE        DIVISION.
+        MOVE X1 TO Y1.
+        MOVE X1 TO Y2.
+        MOVE X1 TO Y3.
+        MOVE X1 TO Y4.
+        MOVE X1 TO Y5.
+        MOVE X1 TO Y6.
+        MOVE X1 TO Y7.
+        MOVE X1 TO Y8.
+        MOVE X1 TO Y9.
+        MOVE X1 TO Y10.
+        MOVE X1 TO Y11.
+        MOVE X1 TO Y12.
+        MOVE X1 TO Y13.
+        MOVE X1 TO Y14.
+        MOVE X1 TO Y15.
+        MOVE X1 TO Y16.
+        MOVE X2 TO Y1.
+        MOVE X2 TO Y2.
+        MOVE X2 TO Y3.
+        MOVE X2 TO Y4.
+        MOVE X2 TO Y5.
+        MOVE X2 TO Y6.
+        MOVE X2 TO Y7.
+        MOVE X2 TO Y8.
+        MOVE X2 TO Y9.
+        MOVE X2 TO Y10.
+        MOVE X2 TO Y11.
+        MOVE X2 TO Y12.
+        MOVE X2 TO Y13.
+        MOVE X2 TO Y14.
+        MOVE X2 TO Y15.
+        MOVE X2 TO Y16.
+        MOVE X3 TO Y1.
+        MOVE X3 TO Y2.
+        MOVE X3 TO Y3.
+        MOVE X3 TO Y4.
+        MOVE X3 TO Y5.
+        MOVE X3 TO Y6.
+        MOVE X3 TO Y7.
+        MOVE X3 TO Y8.
+        MOVE X3 TO Y9.
+        MOVE X3 TO Y10.
+        MOVE X3 TO Y11.
+        MOVE X3 TO Y12.
+        MOVE X3 TO Y13.
+        MOVE X3 TO Y14.
+        MOVE X3 TO Y15.
+        MOVE X3 TO Y16.
+        MOVE X4 TO Y1.
+        MOVE X4 TO Y2.
+        MOVE X4 TO Y3.
+        MOVE X4 TO Y4.
+        MOVE X4 TO Y5.
+        MOVE X4 TO Y6.
+        MOVE X4 TO Y7.
+        MOVE X4 TO Y8.
+        MOVE X4 TO Y9.
+        MOVE X4 TO Y10.
+        MOVE X4 TO Y11.
+        MOVE X4 TO Y12.
+        MOVE X4 TO Y13.
+        MOVE X4 TO Y14.
+        MOVE X4 TO Y15.
+        MOVE X4 TO Y16.
+        MOVE X5 TO Y1.
+        MOVE X5 TO Y2.
+        MOVE X5 TO Y3.
+        MOVE X5 TO Y4.
+        MOVE X5 TO Y5.
+        MOVE X5 TO Y6.
+        MOVE X5 TO Y7.
+        MOVE X5 TO Y8.
+        MOVE X5 TO Y9.
+        MOVE X5 TO Y10.
+        MOVE X5 TO Y11.
+        MOVE X5 TO Y12.
+        MOVE X5 TO Y13.
+        MOVE X5 TO Y14.
+        MOVE X5 TO Y15.
+        MOVE X5 TO Y16.
+        MOVE X6 TO Y1.
+        MOVE X6 TO Y2.
+        MOVE X6 TO Y3.
+        MOVE X6 TO Y4.
+        MOVE X6 TO Y5.
+        MOVE X6 TO Y6.
+        MOVE X6 TO Y7.
+        MOVE X6 TO Y8.
+        MOVE X6 TO Y9.
+        MOVE X6 TO Y10.
+        MOVE X6 TO Y11.
+        MOVE X6 TO Y12.
+        MOVE X6 TO Y13.
+        MOVE X6 TO Y14.
+        MOVE X6 TO Y15.
+        MOVE X6 TO Y16.
+        MOVE X7 TO Y1.
+        MOVE X7 TO Y2.
+        MOVE X7 TO Y3.
+        MOVE X7 TO Y4.
+        MOVE X7 TO Y5.
+        MOVE X7 TO Y6.
+        MOVE X7 TO Y7.
+        MOVE X7 TO Y8.
+        MOVE X7 TO Y9.
+        MOVE X7 TO Y10.
+        MOVE X7 TO Y11.
+        MOVE X7 TO Y12.
+        MOVE X7 TO Y13.
+        MOVE X7 TO Y14.
+        MOVE X7 TO Y15.
+        MOVE X7 TO Y16.
+        MOVE X8 TO Y1.
+        MOVE X8 TO Y2.
+        MOVE X8 TO Y3.
+        MOVE X8 TO Y4.
+        MOVE X8 TO Y5.
+        MOVE X8 TO Y6.
+        MOVE X8 TO Y7.
+        MOVE X8 TO Y8.
+        MOVE X8 TO Y9.
+        MOVE X8 TO Y10.
+        MOVE X8 TO Y11.
+        MOVE X8 TO Y12.
+        MOVE X8 TO Y13.
+        MOVE X8 TO Y14.
+        MOVE X8 TO Y15.
+        MOVE X8 TO Y16.
+        MOVE X9 TO Y1.
+        MOVE X9 TO Y2.
+        MOVE X9 TO Y3.
+        MOVE X9 TO Y4.
+        MOVE X9 TO Y5.
+        MOVE X9 TO Y6.
+        MOVE X9 TO Y7.
+        MOVE X9 TO Y8.
+        MOVE X9 TO Y9.
+        MOVE X9 TO Y10.
+        MOVE X9 TO Y11.
+        MOVE X9 TO Y12.
+        MOVE X9 TO Y13.
+        MOVE X9 TO Y14.
+        MOVE X9 TO Y15.
+        MOVE X9 TO Y16.
+        MOVE X10 TO Y1.
+        MOVE X10 TO Y2.
+        MOVE X10 TO Y3.
+        MOVE X10 TO Y4.
+        MOVE X10 TO Y5.
+        MOVE X10 TO Y6.
+        MOVE X10 TO Y7.
+        MOVE X10 TO Y8.
+        MOVE X10 TO Y9.
+        MOVE X10 TO Y10.
+        MOVE X10 TO Y11.
+        MOVE X10 TO Y12.
+        MOVE X10 TO Y13.
+        MOVE X10 TO Y14.
+        MOVE X10 TO Y15.
+        MOVE X10 TO Y16.
+        MOVE X11 TO Y1.
+        MOVE X11 TO Y2.
+        MOVE X11 TO Y3.
+        MOVE X11 TO Y4.
+        MOVE X11 TO Y5.
+        MOVE X11 TO Y6.
+        MOVE X11 TO Y7.
+        MOVE X11 TO Y8.
+        MOVE X11 TO Y9.
+        MOVE X11 TO Y10.
+        MOVE X11 TO Y11.
+        MOVE X11 TO Y12.
+        MOVE X11 TO Y13.
+        MOVE X11 TO Y14.
+        MOVE X11 TO Y15.
+        MOVE X11 TO Y16.
+        MOVE X12 TO Y1.
+        MOVE X12 TO Y2.
+        MOVE X12 TO Y3.
+        MOVE X12 TO Y4.
+        MOVE X12 TO Y5.
+        MOVE X12 TO Y6.
+        MOVE X12 TO Y7.
+        MOVE X12 TO Y8.
+        MOVE X12 TO Y9.
+        MOVE X12 TO Y10.
+        MOVE X12 TO Y11.
+        MOVE X12 TO Y12.
+        MOVE X12 TO Y13.
+        MOVE X12 TO Y14.
+        MOVE X12 TO Y15.
+        MOVE X12 TO Y16.
+        MOVE X13 TO Y1.
+        MOVE X13 TO Y2.
+        MOVE X13 TO Y3.
+        MOVE X13 TO Y4.
+        MOVE X13 TO Y5.
+        MOVE X13 TO Y6.
+        MOVE X13 TO Y7.
+        MOVE X13 TO Y8.
+        MOVE X13 TO Y9.
+        MOVE X13 TO Y10.
+        MOVE X13 TO Y11.
+        MOVE X13 TO Y12.
+        MOVE X13 TO Y13.
+        MOVE X13 TO Y14.
+        MOVE X13 TO Y15.
+        MOVE X13 TO Y16.
+        MOVE X14 TO Y1.
+        MOVE X14 TO Y2.
+        MOVE X14 TO Y3.
+        MOVE X14 TO Y4.
+        MOVE X14 TO Y5.
+        MOVE X14 TO Y6.
+        MOVE X14 TO Y7.
+        MOVE X14 TO Y8.
+        MOVE X14 TO Y9.
+        MOVE X14 TO Y10.
+        MOVE X14 TO Y11.
+        MOVE X14 TO Y12.
+        MOVE X14 TO Y13.
+        MOVE X14 TO Y14.
+        MOVE X14 TO Y15.
+        MOVE X14 TO Y16.
+        MOVE X15 TO Y1.
+        MOVE X15 TO Y2.
+        MOVE X15 TO Y3.
+        MOVE X15 TO Y4.
+        MOVE X15 TO Y5.
+        MOVE X15 TO Y6.
+        MOVE X15 TO Y7.
+        MOVE X15 TO Y8.
+        MOVE X15 TO Y9.
+        MOVE X15 TO Y10.
+        MOVE X15 TO Y11.
+        MOVE X15 TO Y12.
+        MOVE X15 TO Y13.
+        MOVE X15 TO Y14.
+        MOVE X15 TO Y15.
+        MOVE X15 TO Y16.
+        MOVE X16 TO Y1.
+        MOVE X16 TO Y2.
+        MOVE X16 TO Y3.
+        MOVE X16 TO Y4.
+        MOVE X16 TO Y5.
+        MOVE X16 TO Y6.
+        MOVE X16 TO Y7.
+        MOVE X16 TO Y8.
+        MOVE X16 TO Y9.
+        MOVE X16 TO Y10.
+        MOVE X16 TO Y11.
+        MOVE X16 TO Y12.
+        MOVE X16 TO Y13.
+        MOVE X16 TO Y14.
+        MOVE X16 TO Y15.
+        MOVE X16 TO Y16.
+        STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [1], [], [prog.cob:66:14: error: cannot MOVE 'X2' (FldNumericDisplay) to 'Y12' (FldAlphabetic)
+   66 |         MOVE X2 TO Y12.
+      |              ^
+prog.cob:82:14: error: cannot MOVE 'X3' (FldNumericDisplay.2) to 'Y12' (FldAlphabetic)
+   82 |         MOVE X3 TO Y12.
+      |              ^
+prog.cob:83:14: error: cannot MOVE 'X3' (FldNumericDisplay.2) to 'Y13' (FldAlphanumeric)
+   83 |         MOVE X3 TO Y13.
+      |              ^
+prog.cob:84:14: error: cannot MOVE 'X3' (FldNumericDisplay.2) to 'Y14' (FldAlphaEdited)
+   84 |         MOVE X3 TO Y14.
+      |              ^
+prog.cob:98:14: error: cannot MOVE 'X4' (FldFloat) to 'Y12' (FldAlphabetic)
+   98 |         MOVE X4 TO Y12.
+      |              ^
+prog.cob:99:14: error: cannot MOVE 'X4' (FldFloat) to 'Y13' (FldAlphanumeric)
+   99 |         MOVE X4 TO Y13.
+      |              ^
+prog.cob:100:14: error: cannot MOVE 'X4' (FldFloat) to 'Y14' (FldAlphaEdited)
+  100 |         MOVE X4 TO Y14.
+      |              ^
+prog.cob:114:14: error: cannot MOVE 'X5' (FldFloat) to 'Y12' (FldAlphabetic)
+  114 |         MOVE X5 TO Y12.
+      |              ^
+prog.cob:115:14: error: cannot MOVE 'X5' (FldFloat) to 'Y13' (FldAlphanumeric)
+  115 |         MOVE X5 TO Y13.
+      |              ^
+prog.cob:116:14: error: cannot MOVE 'X5' (FldFloat) to 'Y14' (FldAlphaEdited)
+  116 |         MOVE X5 TO Y14.
+      |              ^
+prog.cob:130:14: error: cannot MOVE 'X6' (FldPacked) to 'Y12' (FldAlphabetic)
+  130 |         MOVE X6 TO Y12.
+      |              ^
+prog.cob:146:14: error: cannot MOVE 'X7' (FldPacked.2) to 'Y12' (FldAlphabetic)
+  146 |         MOVE X7 TO Y12.
+      |              ^
+prog.cob:147:14: error: cannot MOVE 'X7' (FldPacked.2) to 'Y13' (FldAlphanumeric)
+  147 |         MOVE X7 TO Y13.
+      |              ^
+prog.cob:148:14: error: cannot MOVE 'X7' (FldPacked.2) to 'Y14' (FldAlphaEdited)
+  148 |         MOVE X7 TO Y14.
+      |              ^
+prog.cob:162:14: error: cannot MOVE 'X8' (FldNumericBinary) to 'Y12' (FldAlphabetic)
+  162 |         MOVE X8 TO Y12.
+      |              ^
+prog.cob:178:14: error: cannot MOVE 'X9' (FldNumericBinary.2) to 'Y12' (FldAlphabetic)
+  178 |         MOVE X9 TO Y12.
+      |              ^
+prog.cob:179:14: error: cannot MOVE 'X9' (FldNumericBinary.2) to 'Y13' (FldAlphanumeric)
+  179 |         MOVE X9 TO Y13.
+      |              ^
+prog.cob:180:14: error: cannot MOVE 'X9' (FldNumericBinary.2) to 'Y14' (FldAlphaEdited)
+  180 |         MOVE X9 TO Y14.
+      |              ^
+prog.cob:194:14: error: cannot MOVE 'X10' (FldNumericBin5) to 'Y12' (FldAlphabetic)
+  194 |         MOVE X10 TO Y12.
+      |              ^
+prog.cob:210:14: error: cannot MOVE 'X11' (FldNumericBin5.2) to 'Y12' (FldAlphabetic)
+  210 |         MOVE X11 TO Y12.
+      |              ^
+prog.cob:211:14: error: cannot MOVE 'X11' (FldNumericBin5.2) to 'Y13' (FldAlphanumeric)
+  211 |         MOVE X11 TO Y13.
+      |              ^
+prog.cob:212:14: error: cannot MOVE 'X11' (FldNumericBin5.2) to 'Y14' (FldAlphaEdited)
+  212 |         MOVE X11 TO Y14.
+      |              ^
+prog.cob:216:14: error: cannot MOVE 'X12' (FldAlphabetic) to 'Y2' (FldNumericDisplay)
+  216 |         MOVE X12 TO Y2.
+      |              ^
+prog.cob:217:14: error: cannot MOVE 'X12' (FldAlphabetic) to 'Y3' (FldNumericDisplay.2)
+  217 |         MOVE X12 TO Y3.
+      |              ^
+prog.cob:218:14: error: cannot MOVE 'X12' (FldAlphabetic) to 'Y4' (FldFloat)
+  218 |         MOVE X12 TO Y4.
+      |              ^
+prog.cob:219:14: error: cannot MOVE 'X12' (FldAlphabetic) to 'Y5' (FldFloat)
+  219 |         MOVE X12 TO Y5.
+      |              ^
+prog.cob:220:14: error: cannot MOVE 'X12' (FldAlphabetic) to 'Y6' (FldPacked)
+  220 |         MOVE X12 TO Y6.
+      |              ^
+prog.cob:221:14: error: cannot MOVE 'X12' (FldAlphabetic) to 'Y7' (FldPacked.2)
+  221 |         MOVE X12 TO Y7.
+      |              ^
+prog.cob:222:14: error: cannot MOVE 'X12' (FldAlphabetic) to 'Y8' (FldNumericBinary)
+  222 |         MOVE X12 TO Y8.
+      |              ^
+prog.cob:223:14: error: cannot MOVE 'X12' (FldAlphabetic) to 'Y9' (FldNumericBinary.2)
+  223 |         MOVE X12 TO Y9.
+      |              ^
+prog.cob:224:14: error: cannot MOVE 'X12' (FldAlphabetic) to 'Y10' (FldNumericBin5)
+  224 |         MOVE X12 TO Y10.
+      |              ^
+prog.cob:225:14: error: cannot MOVE 'X12' (FldAlphabetic) to 'Y11' (FldNumericBin5.2)
+  225 |         MOVE X12 TO Y11.
+      |              ^
+prog.cob:229:14: error: cannot MOVE 'X12' (FldAlphabetic) to 'Y15' (FldNumericEdited.3)
+  229 |         MOVE X12 TO Y15.
+      |              ^
+prog.cob:230:14: error: cannot MOVE 'X12' (FldAlphabetic) to 'Y16' (FldNumericEdited)
+  230 |         MOVE X12 TO Y16.
+      |              ^
+prog.cob:248:14: error: cannot MOVE 'X14' (FldAlphaEdited) to 'Y2' (FldNumericDisplay)
+  248 |         MOVE X14 TO Y2.
+      |              ^
+prog.cob:249:14: error: cannot MOVE 'X14' (FldAlphaEdited) to 'Y3' (FldNumericDisplay.2)
+  249 |         MOVE X14 TO Y3.
+      |              ^
+prog.cob:250:14: error: cannot MOVE 'X14' (FldAlphaEdited) to 'Y4' (FldFloat)
+  250 |         MOVE X14 TO Y4.
+      |              ^
+prog.cob:251:14: error: cannot MOVE 'X14' (FldAlphaEdited) to 'Y5' (FldFloat)
+  251 |         MOVE X14 TO Y5.
+      |              ^
+prog.cob:252:14: error: cannot MOVE 'X14' (FldAlphaEdited) to 'Y6' (FldPacked)
+  252 |         MOVE X14 TO Y6.
+      |              ^
+prog.cob:253:14: error: cannot MOVE 'X14' (FldAlphaEdited) to 'Y7' (FldPacked.2)
+  253 |         MOVE X14 TO Y7.
+      |              ^
+prog.cob:254:14: error: cannot MOVE 'X14' (FldAlphaEdited) to 'Y8' (FldNumericBinary)
+  254 |         MOVE X14 TO Y8.
+      |              ^
+prog.cob:255:14: error: cannot MOVE 'X14' (FldAlphaEdited) to 'Y9' (FldNumericBinary.2)
+  255 |         MOVE X14 TO Y9.
+      |              ^
+prog.cob:256:14: error: cannot MOVE 'X14' (FldAlphaEdited) to 'Y10' (FldNumericBin5)
+  256 |         MOVE X14 TO Y10.
+      |              ^
+prog.cob:257:14: error: cannot MOVE 'X14' (FldAlphaEdited) to 'Y11' (FldNumericBin5.2)
+  257 |         MOVE X14 TO Y11.
+      |              ^
+prog.cob:261:14: error: cannot MOVE 'X14' (FldAlphaEdited) to 'Y15' (FldNumericEdited.3)
+  261 |         MOVE X14 TO Y15.
+      |              ^
+prog.cob:262:14: error: cannot MOVE 'X14' (FldAlphaEdited) to 'Y16' (FldNumericEdited)
+  262 |         MOVE X14 TO Y16.
+      |              ^
+prog.cob:274:14: error: cannot MOVE 'X15' (FldNumericEdited.3) to 'Y12' (FldAlphabetic)
+  274 |         MOVE X15 TO Y12.
+      |              ^
+prog.cob:290:14: error: cannot MOVE 'X16' (FldNumericEdited) to 'Y12' (FldAlphabetic)
+  290 |         MOVE X16 TO Y12.
+      |              ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([MOVE Omnibus - P-scaled variables])
+AT_KEYWORDS([MOVE])
+AT_DATA([prog.cob], [        IDENTIFICATION   DIVISION.
+        PROGRAM-ID.      prog.
+        DATA             DIVISION.
+        WORKING-STORAGE  SECTION.
+        01 X1 .
+          05 X2         PIC 9999PPP     DISPLAY VALUE 01234321.
+          05 X3         PIC PPP9999  DISPLAY.
+          05 X4                     COMP-2.
+          05 X5                     COMP-2.
+          05 X6         PIC 9999PPP     COMP-3.
+          05 X7         PIC PPP9999  COMP-3.
+          05 X8         PIC 9999PPP     COMP-4.
+          05 X9         PIC PPP9999  COMP-4.
+          05 X10         PIC 9999PPP     COMP-5.
+          05 X11         PIC PPP9999  COMP-5.
+          05 X12         PIC A(10).
+          05 X13         PIC X(10).
+          05 X14         PIC BBBA(10).
+          05 X15         PIC 999.999.
+          05 X16         PIC ZZZZZZ9.
+        01 Y1 .
+          05 Y2         PIC 9999PPP     DISPLAY.
+          05 Y3         PIC PPP9999  DISPLAY.
+          05 Y4                     COMP-2.
+          05 Y5                     COMP-2.
+          05 Y6         PIC 9999PPP     COMP-3.
+          05 Y7         PIC PPP9999  COMP-3.
+          05 Y8         PIC 9999PPP     COMP-4.
+          05 Y9         PIC PPP9999  COMP-4.
+          05 Y10         PIC 9999PPP     COMP-5.
+          05 Y11         PIC PPP9999  COMP-5.
+          05 Y12         PIC A(10).
+          05 Y13         PIC X(10).
+          05 Y14         PIC BBBA(10).
+          05 Y15         PIC 999.999.
+          05 Y16         PIC ZZZZZZ9.
+        PROCEDURE        DIVISION.
+        MOVE X1 TO Y1.
+        MOVE X1 TO Y2.
+        MOVE X1 TO Y3.
+        MOVE X1 TO Y4.
+        MOVE X1 TO Y5.
+        MOVE X1 TO Y6.
+        MOVE X1 TO Y7.
+        MOVE X1 TO Y8.
+        MOVE X1 TO Y9.
+        MOVE X1 TO Y10.
+        MOVE X1 TO Y11.
+        MOVE X1 TO Y12.
+        MOVE X1 TO Y13.
+        MOVE X1 TO Y14.
+        MOVE X1 TO Y15.
+        MOVE X1 TO Y16.
+        MOVE X2 TO Y1.
+        MOVE X2 TO Y2.
+        MOVE X2 TO Y3.
+        MOVE X2 TO Y4.
+        MOVE X2 TO Y5.
+        MOVE X2 TO Y6.
+        MOVE X2 TO Y7.
+        MOVE X2 TO Y8.
+        MOVE X2 TO Y9.
+        MOVE X2 TO Y10.
+        MOVE X2 TO Y11.
+        MOVE X2 TO Y12.
+        MOVE X2 TO Y13.
+        MOVE X2 TO Y14.
+        MOVE X2 TO Y15.
+        MOVE X2 TO Y16.
+        MOVE X3 TO Y1.
+        MOVE X3 TO Y2.
+        MOVE X3 TO Y3.
+        MOVE X3 TO Y4.
+        MOVE X3 TO Y5.
+        MOVE X3 TO Y6.
+        MOVE X3 TO Y7.
+        MOVE X3 TO Y8.
+        MOVE X3 TO Y9.
+        MOVE X3 TO Y10.
+        MOVE X3 TO Y11.
+        MOVE X3 TO Y12.
+        MOVE X3 TO Y13.
+        MOVE X3 TO Y14.
+        MOVE X3 TO Y15.
+        MOVE X3 TO Y16.
+        MOVE X4 TO Y1.
+        MOVE X4 TO Y2.
+        MOVE X4 TO Y3.
+        MOVE X4 TO Y4.
+        MOVE X4 TO Y5.
+        MOVE X4 TO Y6.
+        MOVE X4 TO Y7.
+        MOVE X4 TO Y8.
+        MOVE X4 TO Y9.
+        MOVE X4 TO Y10.
+        MOVE X4 TO Y11.
+        MOVE X4 TO Y12.
+        MOVE X4 TO Y13.
+        MOVE X4 TO Y14.
+        MOVE X4 TO Y15.
+        MOVE X4 TO Y16.
+        MOVE X5 TO Y1.
+        MOVE X5 TO Y2.
+        MOVE X5 TO Y3.
+        MOVE X5 TO Y4.
+        MOVE X5 TO Y5.
+        MOVE X5 TO Y6.
+        MOVE X5 TO Y7.
+        MOVE X5 TO Y8.
+        MOVE X5 TO Y9.
+        MOVE X5 TO Y10.
+        MOVE X5 TO Y11.
+        MOVE X5 TO Y12.
+        MOVE X5 TO Y13.
+        MOVE X5 TO Y14.
+        MOVE X5 TO Y15.
+        MOVE X5 TO Y16.
+        MOVE X6 TO Y1.
+        MOVE X6 TO Y2.
+        MOVE X6 TO Y3.
+        MOVE X6 TO Y4.
+        MOVE X6 TO Y5.
+        MOVE X6 TO Y6.
+        MOVE X6 TO Y7.
+        MOVE X6 TO Y8.
+        MOVE X6 TO Y9.
+        MOVE X6 TO Y10.
+        MOVE X6 TO Y11.
+        MOVE X6 TO Y12.
+        MOVE X6 TO Y13.
+        MOVE X6 TO Y14.
+        MOVE X6 TO Y15.
+        MOVE X6 TO Y16.
+        MOVE X7 TO Y1.
+        MOVE X7 TO Y2.
+        MOVE X7 TO Y3.
+        MOVE X7 TO Y4.
+        MOVE X7 TO Y5.
+        MOVE X7 TO Y6.
+        MOVE X7 TO Y7.
+        MOVE X7 TO Y8.
+        MOVE X7 TO Y9.
+        MOVE X7 TO Y10.
+        MOVE X7 TO Y11.
+        MOVE X7 TO Y12.
+        MOVE X7 TO Y13.
+        MOVE X7 TO Y14.
+        MOVE X7 TO Y15.
+        MOVE X7 TO Y16.
+        MOVE X8 TO Y1.
+        MOVE X8 TO Y2.
+        MOVE X8 TO Y3.
+        MOVE X8 TO Y4.
+        MOVE X8 TO Y5.
+        MOVE X8 TO Y6.
+        MOVE X8 TO Y7.
+        MOVE X8 TO Y8.
+        MOVE X8 TO Y9.
+        MOVE X8 TO Y10.
+        MOVE X8 TO Y11.
+        MOVE X8 TO Y12.
+        MOVE X8 TO Y13.
+        MOVE X8 TO Y14.
+        MOVE X8 TO Y15.
+        MOVE X8 TO Y16.
+        MOVE X9 TO Y1.
+        MOVE X9 TO Y2.
+        MOVE X9 TO Y3.
+        MOVE X9 TO Y4.
+        MOVE X9 TO Y5.
+        MOVE X9 TO Y6.
+        MOVE X9 TO Y7.
+        MOVE X9 TO Y8.
+        MOVE X9 TO Y9.
+        MOVE X9 TO Y10.
+        MOVE X9 TO Y11.
+        MOVE X9 TO Y12.
+        MOVE X9 TO Y13.
+        MOVE X9 TO Y14.
+        MOVE X9 TO Y15.
+        MOVE X9 TO Y16.
+        MOVE X10 TO Y1.
+        MOVE X10 TO Y2.
+        MOVE X10 TO Y3.
+        MOVE X10 TO Y4.
+        MOVE X10 TO Y5.
+        MOVE X10 TO Y6.
+        MOVE X10 TO Y7.
+        MOVE X10 TO Y8.
+        MOVE X10 TO Y9.
+        MOVE X10 TO Y10.
+        MOVE X10 TO Y11.
+        MOVE X10 TO Y12.
+        MOVE X10 TO Y13.
+        MOVE X10 TO Y14.
+        MOVE X10 TO Y15.
+        MOVE X10 TO Y16.
+        MOVE X11 TO Y1.
+        MOVE X11 TO Y2.
+        MOVE X11 TO Y3.
+        MOVE X11 TO Y4.
+        MOVE X11 TO Y5.
+        MOVE X11 TO Y6.
+        MOVE X11 TO Y7.
+        MOVE X11 TO Y8.
+        MOVE X11 TO Y9.
+        MOVE X11 TO Y10.
+        MOVE X11 TO Y11.
+        MOVE X11 TO Y12.
+        MOVE X11 TO Y13.
+        MOVE X11 TO Y14.
+        MOVE X11 TO Y15.
+        MOVE X11 TO Y16.
+        MOVE X12 TO Y1.
+        MOVE X12 TO Y2.
+        MOVE X12 TO Y3.
+        MOVE X12 TO Y4.
+        MOVE X12 TO Y5.
+        MOVE X12 TO Y6.
+        MOVE X12 TO Y7.
+        MOVE X12 TO Y8.
+        MOVE X12 TO Y9.
+        MOVE X12 TO Y10.
+        MOVE X12 TO Y11.
+        MOVE X12 TO Y12.
+        MOVE X12 TO Y13.
+        MOVE X12 TO Y14.
+        MOVE X12 TO Y15.
+        MOVE X12 TO Y16.
+        MOVE X13 TO Y1.
+        MOVE X13 TO Y2.
+        MOVE X13 TO Y3.
+        MOVE X13 TO Y4.
+        MOVE X13 TO Y5.
+        MOVE X13 TO Y6.
+        MOVE X13 TO Y7.
+        MOVE X13 TO Y8.
+        MOVE X13 TO Y9.
+        MOVE X13 TO Y10.
+        MOVE X13 TO Y11.
+        MOVE X13 TO Y12.
+        MOVE X13 TO Y13.
+        MOVE X13 TO Y14.
+        MOVE X13 TO Y15.
+        MOVE X13 TO Y16.
+        MOVE X14 TO Y1.
+        MOVE X14 TO Y2.
+        MOVE X14 TO Y3.
+        MOVE X14 TO Y4.
+        MOVE X14 TO Y5.
+        MOVE X14 TO Y6.
+        MOVE X14 TO Y7.
+        MOVE X14 TO Y8.
+        MOVE X14 TO Y9.
+        MOVE X14 TO Y10.
+        MOVE X14 TO Y11.
+        MOVE X14 TO Y12.
+        MOVE X14 TO Y13.
+        MOVE X14 TO Y14.
+        MOVE X14 TO Y15.
+        MOVE X14 TO Y16.
+        MOVE X15 TO Y1.
+        MOVE X15 TO Y2.
+        MOVE X15 TO Y3.
+        MOVE X15 TO Y4.
+        MOVE X15 TO Y5.
+        MOVE X15 TO Y6.
+        MOVE X15 TO Y7.
+        MOVE X15 TO Y8.
+        MOVE X15 TO Y9.
+        MOVE X15 TO Y10.
+        MOVE X15 TO Y11.
+        MOVE X15 TO Y12.
+        MOVE X15 TO Y13.
+        MOVE X15 TO Y14.
+        MOVE X15 TO Y15.
+        MOVE X15 TO Y16.
+        MOVE X16 TO Y1.
+        MOVE X16 TO Y2.
+        MOVE X16 TO Y3.
+        MOVE X16 TO Y4.
+        MOVE X16 TO Y5.
+        MOVE X16 TO Y6.
+        MOVE X16 TO Y7.
+        MOVE X16 TO Y8.
+        MOVE X16 TO Y9.
+        MOVE X16 TO Y10.
+        MOVE X16 TO Y11.
+        MOVE X16 TO Y12.
+        MOVE X16 TO Y13.
+        MOVE X16 TO Y14.
+        MOVE X16 TO Y15.
+        MOVE X16 TO Y16.
+        STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [1], [], [prog.cob:65:14: error: cannot MOVE 'X2' (FldNumericDisplay) to 'Y12' (FldAlphabetic)
+   65 |         MOVE X2 TO Y12.
+      |              ^
+prog.cob:81:14: error: cannot MOVE 'X3' (FldNumericDisplay) to 'Y12' (FldAlphabetic)
+   81 |         MOVE X3 TO Y12.
+      |              ^
+prog.cob:97:14: error: cannot MOVE 'X4' (FldFloat) to 'Y12' (FldAlphabetic)
+   97 |         MOVE X4 TO Y12.
+      |              ^
+prog.cob:98:14: error: cannot MOVE 'X4' (FldFloat) to 'Y13' (FldAlphanumeric)
+   98 |         MOVE X4 TO Y13.
+      |              ^
+prog.cob:99:14: error: cannot MOVE 'X4' (FldFloat) to 'Y14' (FldAlphaEdited)
+   99 |         MOVE X4 TO Y14.
+      |              ^
+prog.cob:113:14: error: cannot MOVE 'X5' (FldFloat) to 'Y12' (FldAlphabetic)
+  113 |         MOVE X5 TO Y12.
+      |              ^
+prog.cob:114:14: error: cannot MOVE 'X5' (FldFloat) to 'Y13' (FldAlphanumeric)
+  114 |         MOVE X5 TO Y13.
+      |              ^
+prog.cob:115:14: error: cannot MOVE 'X5' (FldFloat) to 'Y14' (FldAlphaEdited)
+  115 |         MOVE X5 TO Y14.
+      |              ^
+prog.cob:129:14: error: cannot MOVE 'X6' (FldPacked) to 'Y12' (FldAlphabetic)
+  129 |         MOVE X6 TO Y12.
+      |              ^
+prog.cob:145:14: error: cannot MOVE 'X7' (FldPacked) to 'Y12' (FldAlphabetic)
+  145 |         MOVE X7 TO Y12.
+      |              ^
+prog.cob:161:14: error: cannot MOVE 'X8' (FldNumericBinary) to 'Y12' (FldAlphabetic)
+  161 |         MOVE X8 TO Y12.
+      |              ^
+prog.cob:177:14: error: cannot MOVE 'X9' (FldNumericBinary) to 'Y12' (FldAlphabetic)
+  177 |         MOVE X9 TO Y12.
+      |              ^
+prog.cob:193:14: error: cannot MOVE 'X10' (FldNumericBin5) to 'Y12' (FldAlphabetic)
+  193 |         MOVE X10 TO Y12.
+      |              ^
+prog.cob:209:14: error: cannot MOVE 'X11' (FldNumericBin5) to 'Y12' (FldAlphabetic)
+  209 |         MOVE X11 TO Y12.
+      |              ^
+prog.cob:215:14: error: cannot MOVE 'X12' (FldAlphabetic) to 'Y2' (FldNumericDisplay)
+  215 |         MOVE X12 TO Y2.
+      |              ^
+prog.cob:216:14: error: cannot MOVE 'X12' (FldAlphabetic) to 'Y3' (FldNumericDisplay)
+  216 |         MOVE X12 TO Y3.
+      |              ^
+prog.cob:217:14: error: cannot MOVE 'X12' (FldAlphabetic) to 'Y4' (FldFloat)
+  217 |         MOVE X12 TO Y4.
+      |              ^
+prog.cob:218:14: error: cannot MOVE 'X12' (FldAlphabetic) to 'Y5' (FldFloat)
+  218 |         MOVE X12 TO Y5.
+      |              ^
+prog.cob:219:14: error: cannot MOVE 'X12' (FldAlphabetic) to 'Y6' (FldPacked)
+  219 |         MOVE X12 TO Y6.
+      |              ^
+prog.cob:220:14: error: cannot MOVE 'X12' (FldAlphabetic) to 'Y7' (FldPacked)
+  220 |         MOVE X12 TO Y7.
+      |              ^
+prog.cob:221:14: error: cannot MOVE 'X12' (FldAlphabetic) to 'Y8' (FldNumericBinary)
+  221 |         MOVE X12 TO Y8.
+      |              ^
+prog.cob:222:14: error: cannot MOVE 'X12' (FldAlphabetic) to 'Y9' (FldNumericBinary)
+  222 |         MOVE X12 TO Y9.
+      |              ^
+prog.cob:223:14: error: cannot MOVE 'X12' (FldAlphabetic) to 'Y10' (FldNumericBin5)
+  223 |         MOVE X12 TO Y10.
+      |              ^
+prog.cob:224:14: error: cannot MOVE 'X12' (FldAlphabetic) to 'Y11' (FldNumericBin5)
+  224 |         MOVE X12 TO Y11.
+      |              ^
+prog.cob:228:14: error: cannot MOVE 'X12' (FldAlphabetic) to 'Y15' (FldNumericEdited.3)
+  228 |         MOVE X12 TO Y15.
+      |              ^
+prog.cob:229:14: error: cannot MOVE 'X12' (FldAlphabetic) to 'Y16' (FldNumericEdited)
+  229 |         MOVE X12 TO Y16.
+      |              ^
+prog.cob:247:14: error: cannot MOVE 'X14' (FldAlphaEdited) to 'Y2' (FldNumericDisplay)
+  247 |         MOVE X14 TO Y2.
+      |              ^
+prog.cob:248:14: error: cannot MOVE 'X14' (FldAlphaEdited) to 'Y3' (FldNumericDisplay)
+  248 |         MOVE X14 TO Y3.
+      |              ^
+prog.cob:249:14: error: cannot MOVE 'X14' (FldAlphaEdited) to 'Y4' (FldFloat)
+  249 |         MOVE X14 TO Y4.
+      |              ^
+prog.cob:250:14: error: cannot MOVE 'X14' (FldAlphaEdited) to 'Y5' (FldFloat)
+  250 |         MOVE X14 TO Y5.
+      |              ^
+prog.cob:251:14: error: cannot MOVE 'X14' (FldAlphaEdited) to 'Y6' (FldPacked)
+  251 |         MOVE X14 TO Y6.
+      |              ^
+prog.cob:252:14: error: cannot MOVE 'X14' (FldAlphaEdited) to 'Y7' (FldPacked)
+  252 |         MOVE X14 TO Y7.
+      |              ^
+prog.cob:253:14: error: cannot MOVE 'X14' (FldAlphaEdited) to 'Y8' (FldNumericBinary)
+  253 |         MOVE X14 TO Y8.
+      |              ^
+prog.cob:254:14: error: cannot MOVE 'X14' (FldAlphaEdited) to 'Y9' (FldNumericBinary)
+  254 |         MOVE X14 TO Y9.
+      |              ^
+prog.cob:255:14: error: cannot MOVE 'X14' (FldAlphaEdited) to 'Y10' (FldNumericBin5)
+  255 |         MOVE X14 TO Y10.
+      |              ^
+prog.cob:256:14: error: cannot MOVE 'X14' (FldAlphaEdited) to 'Y11' (FldNumericBin5)
+  256 |         MOVE X14 TO Y11.
+      |              ^
+prog.cob:260:14: error: cannot MOVE 'X14' (FldAlphaEdited) to 'Y15' (FldNumericEdited.3)
+  260 |         MOVE X14 TO Y15.
+      |              ^
+prog.cob:261:14: error: cannot MOVE 'X14' (FldAlphaEdited) to 'Y16' (FldNumericEdited)
+  261 |         MOVE X14 TO Y16.
+      |              ^
+prog.cob:273:14: error: cannot MOVE 'X15' (FldNumericEdited.3) to 'Y12' (FldAlphabetic)
+  273 |         MOVE X15 TO Y12.
+      |              ^
+prog.cob:289:14: error: cannot MOVE 'X16' (FldNumericEdited) to 'Y12' (FldAlphabetic)
+  289 |         MOVE X16 TO Y12.
+      |              ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([MOVE alphabetic TO 9])
+AT_KEYWORDS([move])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC A.
+       01 Y-A           PIC A.
+       01 Y-X           PIC X.
+       01 Y-BX          PIC BX.
+       01 Y-9           PIC 9.
+       01 Y-09          PIC 09.
+       PROCEDURE        DIVISION.
+           MOVE X TO Y-A.
+           MOVE X TO Y-X.
+           MOVE X TO Y-BX.
+           MOVE X TO Y-9.
+           MOVE X TO Y-09.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [1], [],
+[prog.cob:16:17: error: cannot MOVE 'X' (FldAlphabetic) to 'Y-9' (FldNumericDisplay)
+   16 |            MOVE X TO Y-9.
+      |                 ^
+prog.cob:17:17: error: cannot MOVE 'X' (FldAlphabetic) to 'Y-09' (FldNumericEdited)
+   17 |            MOVE X TO Y-09.
+      |                 ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+
+AT_SETUP([MOVE alphanumeric-edited TO x])
+AT_KEYWORDS([move editing])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC BX.
+       01 Y-A           PIC A.
+       01 Y-X           PIC X.
+       01 Y-BX          PIC BX.
+       01 Y-9           PIC 9.
+       01 Y-09          PIC 09.
+       PROCEDURE        DIVISION.
+           MOVE X TO Y-A.
+           MOVE X TO Y-X.
+           MOVE X TO Y-BX.
+           MOVE X TO Y-9.
+           MOVE X TO Y-09.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:16:17: error: cannot MOVE 'X' (FldAlphaEdited) to 'Y-9' (FldNumericDisplay)
+   16 |            MOVE X TO Y-9.
+      |                 ^
+prog.cob:17:17: error: cannot MOVE 'X' (FldAlphaEdited) to 'Y-09' (FldNumericEdited)
+   17 |            MOVE X TO Y-09.
+      |                 ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+
+AT_SETUP([MOVE numeric (integer) TO x])
+AT_KEYWORDS([move])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC 9.
+       01 Y-A           PIC A.
+       01 Y-X           PIC X.
+       01 Y-BX          PIC BX.
+       01 Y-9           PIC 9.
+       01 Y-09          PIC 09.
+       PROCEDURE        DIVISION.
+           MOVE X TO Y-A.
+           MOVE X TO Y-X.
+           MOVE X TO Y-BX.
+           MOVE X TO Y-9.
+           MOVE X TO Y-09.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:13:17: error: cannot MOVE 'X' (FldNumericDisplay) to 'Y-A' (FldAlphabetic)
+   13 |            MOVE X TO Y-A.
+      |                 ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+
+AT_SETUP([MOVE numeric (non-integer) TO x])
+AT_KEYWORDS([move])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC 9V9.
+       01 Y-A           PIC A.
+       01 Y-X           PIC X.
+       01 Y-BX          PIC BX.
+       01 Y-9           PIC 9.
+       01 Y-09          PIC 09.
+       PROCEDURE        DIVISION.
+           MOVE X TO Y-A.
+           MOVE X TO Y-X.
+           MOVE X TO Y-BX.
+           MOVE X TO Y-9.
+           MOVE X TO Y-09.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:13:17: error: cannot MOVE 'X' (FldNumericDisplay.1) to 'Y-A' (FldAlphabetic)
+   13 |            MOVE X TO Y-A.
+      |                 ^
+prog.cob:14:17: error: cannot MOVE 'X' (FldNumericDisplay.1) to 'Y-X' (FldAlphanumeric)
+   14 |            MOVE X TO Y-X.
+      |                 ^
+prog.cob:15:17: error: cannot MOVE 'X' (FldNumericDisplay.1) to 'Y-BX' (FldAlphaEdited)
+   15 |            MOVE X TO Y-BX.
+      |                 ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+
+AT_SETUP([MOVE numeric-edited TO x])
+AT_KEYWORDS([move editing])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC 09.
+       01 Y-A           PIC A.
+       01 Y-X           PIC X.
+       01 Y-BX          PIC BX.
+       01 Y-9           PIC 9.
+       01 Y-09          PIC 09.
+       PROCEDURE        DIVISION.
+           MOVE X TO Y-A.
+           MOVE X TO Y-X.
+           MOVE X TO Y-BX.
+           MOVE X TO Y-9.
+           MOVE X TO Y-09.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:13:17: error: cannot MOVE 'X' (FldNumericEdited) to 'Y-A' (FldAlphabetic)
+   13 |            MOVE X TO Y-A.
+      |                 ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+
+AT_SETUP([CORRESPONDING - Operands must be groups])
+AT_KEYWORDS([move])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 G-1.
+         02 X           PIC X.
+       01 G-2.
+         02 Y           PIC X.
+       PROCEDURE        DIVISION.
+           MOVE CORR X TO G-1.
+           MOVE CORR G-1 TO X.
+           MOVE CORR G-1(1:1) TO G-2.
+           MOVE CORR G-1 TO G-2(1:1).
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:11:22: error: X does not name a group
+   11 |            MOVE CORR X TO G-1.
+      |                      ^
+prog.cob:12:29: error: X does not name a group
+   12 |            MOVE CORR G-1 TO X.
+      |                             ^
+prog.cob:13:12: warning: G-1 and G-2 have no corresponding fields
+   13 |            MOVE CORR G-1(1:1) TO G-2.
+      |            ^
+prog.cob:14:12: warning: G-1 and G-2 have no corresponding fields
+   14 |            MOVE CORR G-1 TO G-2(1:1).
+      |            ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([MOVE SPACE TO numeric should be a syntax error])
+AT_KEYWORDS([move editing])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC 9 .
+       01 Y             PIC 0.9 .
+       PROCEDURE        DIVISION.
+           MOVE SPACE TO X.
+           MOVE SPACE TO Y.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:9:17: error: cannot MOVE SPACE to numeric receiving field X
+    9 |            MOVE SPACE TO X.
+      |                 ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+### ISO+IEC+1989-2002 14.8.24 MOVE statement
+
+## 14.8.24.2 Syntax rules
+
+AT_SETUP([CORRESPONDING - Target has no matching items])
+AT_KEYWORDS([move])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 G-1.
+         02 X           PIC X.
+       01 G-2.
+         02 Y           PIC X.
+       PROCEDURE        DIVISION.
+           MOVE CORR G-1 TO G-2.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [0], [],
+[prog.cob:11:12: warning: G-1 and G-2 have no corresponding fields
+   11 |            MOVE CORR G-1 TO G-2.
+      |            ^
+])
+AT_CLEANUP
+
+
+AT_SETUP([MOVE to erroneous field])
+AT_KEYWORDS([move])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 INVALID-ITEM.
+       01 I             PIC 9(3).
+       PROCEDURE        DIVISION.
+           MOVE 1 TO INVALID-ITEM.
+           MOVE SPACE TO I(1:2).
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [], [ignore])
+AT_CLEANUP
+
+
+AT_SETUP([Overlapping MOVE])
+AT_KEYWORDS([move])
+AT_DATA([prog.cob], [
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. prog.
+        DATA DIVISION.
+        WORKING-STORAGE SECTION.
+        01  STRUCTURE1.
+            05 FIELD1-1  PIC X(5).
+            05 FIELD1-2  PIC X(10).
+        01  STRUCTURE2   REDEFINES STRUCTURE1.
+            05 FIELD2-1  PIC X(10).
+            05 FIELD2-2  PIC X(5).
+        01  FILLER       REDEFINES STRUCTURE1.
+            05 FILLER    PIC X(01).
+            05 FIELD     PIC X(02) OCCURS 7.
+        01  FILLER.
+            05 FIELDO    PIC X(02) OCCURS 7.
+        77  NUMVAR       PIC 9(02) VALUE 1.
+        78  CONST4       VALUE 4.
+        PROCEDURE DIVISION.
+           MOVE FIELD1-2 TO STRUCTURE1
+           MOVE FIELD1-2 TO FIELD1-1
+           MOVE FIELD1-1 TO FIELD1-2, FIELD2-2
+           MOVE FIELD1-2 TO FIELD2-1
+           MOVE FIELD2-1 TO FIELD2-2
+           MOVE FIELD2-1   (2:5) TO FIELD1-2
+           MOVE STRUCTURE1 (2:4) TO STRUCTURE1 (5:4)
+           MOVE STRUCTURE1 (2:4) TO STRUCTURE1 (6:4)
+           MOVE STRUCTURE1 (1:NUMVAR)  TO STRUCTURE1 (3:13)
+           MOVE STRUCTURE1 (NUMVAR:1)  TO STRUCTURE1 (3:13)
+           MOVE STRUCTURE1 (3:13)      TO STRUCTURE1 (1:NUMVAR)
+           MOVE STRUCTURE1 (3:13)      TO STRUCTURE1 (NUMVAR:1)
+           MOVE STRUCTURE1 (CONST4:2)  TO STRUCTURE1 (3:2)
+           MOVE STRUCTURE1 (6:4)       TO STRUCTURE1 (2:4)
+           MOVE STRUCTURE1 (6:4)       TO STRUCTURE1 (2: )
+           MOVE FIELD (6)         TO STRUCTURE1 (13:2)
+           MOVE FIELD (5)         TO STRUCTURE1 (13:2)
+           MOVE FIELD (NUMVAR)    TO STRUCTURE1 (13:2)
+           MOVE FIELD (CONST4)    TO STRUCTURE1 (13:2)
+           MOVE FIELDO (1)        TO FIELDO (1)
+           MOVE FIELDO (CONST4)   TO FIELDO (CONST4)
+           MOVE FIELDO (1)        TO FIELDO (2)
+           MOVE FIELDO (4)        TO FIELDO (CONST4)
+           MOVE FIELDO (CONST4)   TO FIELDO (4)
+           MOVE FIELDO (4)        TO FIELDO (NUMVAR)
+           MOVE FIELDO (NUMVAR)   TO FIELDO (4)
+           MOVE FIELDO (NUMVAR)   TO FIELDO (NUMVAR)
+           MOVE FIELDO (NUMVAR) (1:1) TO FIELDO (NUMVAR) (2:1)
+           MOVE FIELDO (NUMVAR) (2:1) TO FIELDO (NUMVAR)
+           MOVE FIELDO (4) (2:1)  TO FIELDO (CONST4)
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_ONLY -w -dialect mf prog.cob], [0], [], [])
+AT_CLEANUP
+
+
+AT_SETUP([invalid target for MOVE])
+AT_KEYWORDS([move constant label program-prototype])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT      DIVISION.
+       CONFIGURATION    SECTION.
+       REPOSITORY.
+      *     PROGRAM repo-prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       78 DEFINED-CONST VALUE 'A'.
+       77 MAIN-VAR      PIC X(3).
+       PROCEDURE        DIVISION.
+       MAIN.
+           MOVE 'A' TO MAIN-VAR.
+           MOVE 'B' TO MAIN.
+           MOVE 'C' TO repo-prog.
+           MOVE 'D' TO QUOTE.
+           MOVE 'E' TO DEFINED-CONST.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY -dialect mf prog.cob], [1], [],
+[prog.cob:15:24: error: DATA-ITEM 'MAIN' not found
+   15 |            MOVE 'B' TO MAIN.
+      |                        ^
+prog.cob:15:24: error: invalid receiving operand
+prog.cob:16:24: error: DATA-ITEM 'repo-prog' not found
+   16 |            MOVE 'C' TO repo-prog.
+      |                        ^
+prog.cob:16:24: error: invalid receiving operand
+prog.cob:17:24: error: syntax error, unexpected QUOTE
+   17 |            MOVE 'D' TO QUOTE.
+      |                        ^
+prog.cob:17:24: error: invalid receiving operand
+prog.cob:18:24: error: DEFINED-CONST is a constant
+   18 |            MOVE 'E' TO DEFINED-CONST.
+      |                        ^
+cobol1: error: failed compiling prog.cob
+],
+[])
+AT_CLEANUP
+
+
+AT_SETUP([invalid source for MOVE (2)])
+AT_KEYWORDS([move label program-prototype])
+# cobc is wrong: repo-prog is an error, not warning.  It must have
+# been previously defined, or exist as a program-prototype (which we
+# don't support). gcobol stops compiling instead of continuing on to
+# identify the MOVE errors.
+AT_DATA([prog.cob], [       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       ENVIRONMENT      DIVISION.
+       CONFIGURATION    SECTION.
+       REPOSITORY.
+           PROGRAM repo-prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       77 MAIN-VAR      PIC X(3).
+       PROCEDURE        DIVISION.
+       MAIN.
+           MOVE MAIN TO MAIN-VAR.
+           MOVE repo-prog TO MAIN.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:6:29: error: 'repo-prog' does not name an earlier program
+    6 |            PROGRAM repo-prog.
+      |                             ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([SET error])
+AT_KEYWORDS([move SET-MOVE])
+AT_DATA([prog.cob], [
+       program-id. prog.
+       data division.
+       working-storage section.
+       01 default-float usage float-long.
+       01 no-pointer    pic s9(9) comp.
+
+       linkage section.
+       01 float-var usage float-long.
+
+       procedure division .
+      *> previously generated error message about invalid MOVE statement,
+      *> see bug #255 and an internal compiler error, see bug #295:
+           set address of float-var to default-float
+           set no-pointer to address of default-float
+      *> all fine...
+           set address of float-var to address of default-float
+           goback.
+       end program prog .
+])
+
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:9:8: error: float-var is a pointer
+    9 |        01 float-var usage float-long.
+      |        ^
+prog.cob:6:8: error: no-pointer is not a pointer
+    6 |        01 no-pointer    pic s9(9) comp.
+      |        ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+
+AT_SETUP([MOVE FIGURATIVE to NUMERIC])
+AT_KEYWORDS([MOVE])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID. prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  MYFLD        PIC 9(4) VALUE 96.
+       01  BIGFLT       COMP-1 VALUE 543.12345E10.
+       PROCEDURE        DIVISION.
+       MAIN-1.
+           MOVE BIGFLT TO MYFLD.
+           MOVE SPACES TO MYFLD.
+           MOVE LOW-VALUES TO MYFLD.
+           MOVE HIGH-VALUES TO MYFLD.
+           MOVE QUOTE TO MYFLD.
+           MOVE ALL '*' TO MYFLD.
+           MOVE ALL '0' TO MYFLD.
+           MOVE ALL 'A1' TO MYFLD.
+           MOVE ALL '21' TO MYFLD.
+           SET MYFLD TO HIGH-VALUES.
+           SET MYFLD TO SPACES.
+           MOVE HIGH-VALUES TO MYFLD (1:).
+
+           MOVE HIGH-VALUES TO BIGFLT.
+           MOVE QUOTE TO BIGFLT.
+           MOVE ALL '*' TO BIGFLT.
+           MOVE ALL '21' TO BIGFLT.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:11:17: error: cannot MOVE SPACE to numeric receiving field MYFLD
+   11 |            MOVE SPACES TO MYFLD.
+      |                 ^
+prog.cob:12:17: error: cannot MOVE LOW_VALUES to numeric receiving field MYFLD
+   12 |            MOVE LOW-VALUES TO MYFLD.
+      |                 ^
+prog.cob:13:17: error: cannot MOVE HIGH_VALUES to numeric receiving field MYFLD
+   13 |            MOVE HIGH-VALUES TO MYFLD.
+      |                 ^
+prog.cob:14:17: error: cannot MOVE QUOTES to numeric receiving field MYFLD
+   14 |            MOVE QUOTE TO MYFLD.
+      |                 ^
+prog.cob: error: cannot MOVE '*' (FldLiteralA) to 'MYFLD' (FldNumericDisplay)
+prog.cob: error: cannot MOVE 'A1' (FldLiteralA) to 'MYFLD' (FldNumericDisplay)
+prog.cob:19:16: error: invalid value for SET TO
+   19 |            SET MYFLD TO HIGH-VALUES.
+      |                ^
+prog.cob:20:16: error: invalid value for SET TO
+   20 |            SET MYFLD TO SPACES.
+      |                ^
+prog.cob:21:17: error: cannot MOVE HIGH_VALUES to numeric receiving field MYFLD
+   21 |            MOVE HIGH-VALUES TO MYFLD (1:).
+      |                 ^
+prog.cob:23:17: error: cannot MOVE HIGH_VALUES to numeric receiving field BIGFLT
+   23 |            MOVE HIGH-VALUES TO BIGFLT.
+      |                 ^
+prog.cob:24:17: error: cannot MOVE QUOTES to numeric receiving field BIGFLT
+   24 |            MOVE QUOTE TO BIGFLT.
+      |                 ^
+prog.cob: error: cannot MOVE '*' (FldLiteralA) to 'BIGFLT' (FldFloat)
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP
+
+AT_SETUP([MOVE 123 TO POINTER is properly not valid])
+AT_KEYWORDS([bugs])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       77 varp pointer.
+       PROCEDURE DIVISION.
+       move 123 to varp.
+       end program prog.
+])
+AT_CHECK([$COMPILE prog.cob], [1], [], ignore)
+AT_CLEANUP
+
+

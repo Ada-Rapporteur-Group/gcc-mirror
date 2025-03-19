@@ -1,0 +1,6 @@
+*.so
+*.o
+main
+o
+s
+timedir

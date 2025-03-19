@@ -1,0 +1,18 @@
+# This file is processed by the prepare-gcc-cobol script. It lists
+# commands and libraries that must be present to build gcobol, along
+# with known-working versions, if any.  The package names are taken
+# from Linux Rocky 8.
+#
+# type filename package
+cmd	cc	gcc (GCC) 8.5.0 20210514 (Red Hat 8.5.0-20)
+cmd	c++	gcc-c++ (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0
+cmd	bison	bison (GNU Bison) 3.8.2
+cmd	flex	flex 2.6.4
+cmd	make	make (GNU Make) 4.3
+cmd	git	git version 2.34.1
+cmd	pax	spax
+cmd	tar	tar
+lib	gmp.h	gmp-devel
+lib	mpfr.h	mpfr-devel
+lib	mpc.h	libmpc-devel
+lib	zlib.h	zlib

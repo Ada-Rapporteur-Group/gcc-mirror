@@ -1,0 +1,160 @@
+#!/usr/bin/python
+
+import sys
+
+fout = None
+
+def xprint(str):
+  global fout
+  # print(str)
+  fout.write(str.rstrip())
+  fout.write("\n")
+
+def cobol_code():
+  global fout
+  # print("We are doing ", sys.argv[1])
+  nlines = int(sys.argv[1])
+
+  fout = open("test.cbl", "w")
+
+  xprint("        identification division.")
+  xprint("        program-id. nlines_cobol.")
+  xprint("        data division.")
+  xprint("        working-storage section.")
+
+  for i in range(1, nlines+1):
+    xprint("        77 var{:d} pic 9999v9999 comp-5.".format(i))
+
+  xprint("        procedure division.")
+
+  for i in range(1, nlines+1):
+    xprint("        display var{:d}".format(i))
+
+  xprint("        stop run.")
+  xprint("        end program nlines_cobol.")
+
+  fout.close();
+
+def c_code():
+  global fout
+
+  # To make the generation of C similar to the generation of COBOL, we add 14
+  # variables to compensate for the COBOL boilerplate of 
+  #   counter 1  DEBUG-ITEM
+  #   counter 2  DEBUG-LINE
+  #   counter 3  FILLER
+  #   counter 4  DEBUG-NAME
+  #   counter 5  FILLER
+  #   counter 6  DEBUG-SUB-1
+  #   counter 7  FILLER
+  #   counter 8  DEBUG-SUB-2
+  #   counter 9  FILLER
+  #   counter 10 DEBUG-SUB-3
+  #   counter 11 FILLER
+  #   counter 12 DEBUG-CONTENTS
+  #   counter 13 _literaln_1 "1"
+  #   counter 14 _literaln_2 "0"
+  nlines = int(sys.argv[1]) + 14
+
+  fout = open("ccc.c", "w")
+
+  xprint("#include <stdio.h>")
+  xprint("#include <stdlib.h>")
+  xprint("#include <string.h>")
+
+    # Establish the structure                                                                                      ")
+  xprint("typedef struct cblc_field_t                                                                              ")
+  xprint("    {                                                                                                    ")
+  xprint("    // This structure must match the code in structs.cc                                                  ")
+  xprint("    unsigned char *data;              // The runtime data. There is no null terminator                   ")
+  xprint("    unsigned long  capacity;          // The size of data                                                ")
+  xprint("    unsigned long  allocated;         // The number of bytes available for capacity                      ")
+  xprint("    unsigned long  offset;            // Offset from our ancestor (see note below)                       ")
+  xprint("    char          *name;              // The null-terminated name of this variable                       ")
+  xprint("    char          *picture;           // The null-terminated picture string.                             ")
+  xprint("    char          *initial;           // The null_terminated initial value                               ")
+  xprint("    struct cblc_field_t *parent;      // This field's immediate parent field                             ")
+  xprint("    struct cblc_field_t *depending_on;// The subject of a DEPENDING ON clause                            ")
+  xprint("    struct cblc_field_t *depends_on;  // Points downward in heirachy to the subordinate DEPENDING ON     ")
+  xprint("    unsigned long occurs_lower;       // non-zero for a table                                            ")
+  xprint("    unsigned long occurs_upper;       // non-zero for a table                                            ")
+  xprint("    unsigned long attr;               // See cbl_field_attr_t                                            ")
+  xprint("    signed char type;                 // A one-byte copy of cbl_field_type_t                             ")
+  xprint("    signed char level;                // This variable's level in the naming heirarchy                   ")
+  xprint("    signed char digits;               // Digits specified in PIC string; e.g. 5 for 99v999               ")
+  xprint("    signed char rdigits;              // Digits to the right of the decimal point. 3 for 99v999          ")
+  xprint("    int         dummy;                // Fills out to a four-byte boundary                               ")
+  xprint("    } cblc_field_t;                                                                                      ")
+
+  # Establish the initializer
+  xprint("unsigned long                                                                                            ")
+  xprint("__gg__initialize_variable(cblc_field_t *var_ref,                                                         ")
+  xprint("                          int           is_redefined,                                                    ")
+  xprint("                          unsigned int  nsubscripts,                                                     ")
+  xprint("                          int           explicitly)                                                      ")
+  xprint("  {                                                                                                      ")
+  xprint("#if 1                                                                                                    ")
+  xprint("  // This code emulates the call GCOBOL has to make to libgcobol.so in order                             ")
+  xprint("  // to create and iniailize a variable                                                                  ")
+  xprint("  // It is based on an environment variable, which means that the                                        ")
+  xprint("  // C optimizer can't easily just wish it away.                                                         ")
+  xprint("  unsigned long retval;                                                                                  ")
+  xprint("  int n = atoi(getenv(\"banana\"));                                                                      ")
+  xprint("  switch(n)                                                                                              ")
+  xprint("    {                                                                                                    ")
+  xprint("    case 1:                                                                                              ")
+  xprint("      retval = (unsigned long)(&var_ref);                                                                ")
+  xprint("      break;                                                                                             ")
+  xprint("    case 2:                                                                                              ")
+  xprint("      retval = is_redefined;                                                                             ")
+  xprint("      break;                                                                                             ")
+  xprint("    case 3:                                                                                              ")
+  xprint("      retval = nsubscripts;                                                                              ")
+  xprint("      break;                                                                                             ")
+  xprint("    default:                                                                                             ")
+  xprint("      retval = explicitly;                                                                               ")
+  xprint("      break;                                                                                             ")
+  xprint("    }                                                                                                    ")
+  xprint("#endif                                                                                                   ")
+  xprint("  }                                                                                                      ")
+
+  # Establish the principal routine()
+  xprint("int nlines_c()")
+  xprint("  {")
+  xprint("  int i = atoi(getenv(\"banana\"));")
+
+  for i in range(1, nlines+1):
+    xprint("  static unsigned char vardata{:d}[4];".format(i))
+
+  for i in range(1, nlines+1):
+    xprint("  static unsigned char var_{:d}[sizeof(cblc_field_t)];".format(i))
+
+  for i in range(1, nlines+1):
+    xprint("  static cblc_field_t *var{0:d} = (cblc_field_t *)(&var_{0:d});".format(i))
+
+
+  for i in range(1, nlines+1):
+    xprint("  var{0:d}->data = vardata{0:d};".format(i))
+#
+#  xprint("  unsigned long n = 0;")
+#  xprint("  n += 0")
+#
+#  for i in range(1, nlines+1):
+#    xprint("        + __gg__initialize_variable(var{:d}, i?1:0, 3, i?4:5)".format(i))
+#  xprint("    ;")
+#  xprint("  return n")
+#
+#  for i in range(1, nlines+1):
+#    xprint("        + (unsigned long)(&var{:d}) ".format(i))
+#  xprint("         ;")
+  xprint("  }")
+
+  xprint("")
+  xprint("int main(){nlines_c();}")
+  xprint("")
+
+  fout.close();
+
+cobol_code()
+c_code()
+

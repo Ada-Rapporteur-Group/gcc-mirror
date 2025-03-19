@@ -1,0 +1,13 @@
+gc
+a.out
+test
+*.s
+under-test.txt
+dump.txt
+*.rpt
+*.lst
+*.nodes
+*.html
+XXXXX*
+REPORTT
+simon/

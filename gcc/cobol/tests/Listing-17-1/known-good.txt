@@ -1,0 +1,60 @@
+Enter read type: 1 for RANDOM, 2 for SEQUENTIAL
+SEQUENTIAL read of entire file:
+     0001  Roadster                   Tesla Motors        
+     0002  Volt                       Chevrolet           
+     0005  ZOE                        Renault             
+     0007  Focus Electric             Ford                
+     0011  Fit EV                     Honda               
+     0016  Model S                    Tesla Motors        
+     0017  FCV  +valid update         Toyota              
+     0018  Spark EV                   Chevrolet           
+     0113  i-MiEV                     Mitsubishi          
+     0124  Twizzy                     Renault             
+     0126  BMW i3                     BMW                 
+     0133  Fluence Z.E                Renault             
+     0136  Model X                    Tesla Motors        
+     0200  Leaf                       Nissan              
+     0205  Model C +valid insert      Tesla Motors        
+     0210  e-Golf                     Volkswagen          
+     0230  iON                        Peugeot             
+Enter read type: 1 for RANDOM, 2 for SEQUENTIAL
+RANDOM Read of one record:
+Enter vehicle key (4 digits) --> Desired VehicleKey is 0124
+     0124  Twizzy                     Renault             
+Enter read type: 1 for RANDOM, 2 for SEQUENTIAL
+RANDOM Read of one record:
+Enter vehicle key (4 digits) --> Desired VehicleKey is 0003
+     Record not found, because vehicle file status = 23
+Enter read type: 1 for RANDOM, 2 for SEQUENTIAL
+RANDOM Read of one record:
+Enter vehicle key (4 digits) --> Desired VehicleKey is 0002
+     0002  Volt                       Chevrolet           
+Enter read type: 1 for RANDOM, 2 for SEQUENTIAL
+RANDOM Read of one record:
+Enter vehicle key (4 digits) --> Desired VehicleKey is 0001
+     0001  Roadster                   Tesla Motors        
+Enter read type: 1 for RANDOM, 2 for SEQUENTIAL
+RANDOM Read of one record:
+Enter vehicle key (4 digits) --> Desired VehicleKey is 0000
+     Record not found, because vehicle file status = 23
+Enter read type: 1 for RANDOM, 2 for SEQUENTIAL
+RANDOM Read of one record:
+Enter vehicle key (4 digits) --> Desired VehicleKey is 9999
+     Record not found, because vehicle file status = 23
+Enter read type: 1 for RANDOM, 2 for SEQUENTIAL
+RANDOM Read of one record:
+Enter vehicle key (4 digits) --> Desired VehicleKey is 0133
+     0133  Fluence Z.E                Renault             
+Enter read type: 1 for RANDOM, 2 for SEQUENTIAL
+RANDOM Read of one record:
+Enter vehicle key (4 digits) --> Desired VehicleKey is 0123
+     Record not found, because vehicle file status = 23
+Enter read type: 1 for RANDOM, 2 for SEQUENTIAL
+RANDOM Read of one record:
+Enter vehicle key (4 digits) --> Desired VehicleKey is 0230
+     0230  iON                        Peugeot             
+Enter read type: 1 for RANDOM, 2 for SEQUENTIAL
+RANDOM Read of one record:
+Enter vehicle key (4 digits) --> Desired VehicleKey is 0231
+     Record not found, because vehicle file status = 23
+Enter read type: 1 for RANDOM, 2 for SEQUENTIAL

@@ -1,0 +1,68 @@
+## Copyright (C) 2003-2012, 2014-2015, 2017-2018, 2020 Free Software Foundation, Inc.
+## Written by Keisuke Nishida, Roger While, Simon Sobisch
+##
+## This file is part of GnuCOBOL.
+##
+## The GnuCOBOL compiler is free software: you can redistribute it
+## and/or modify it under the terms of the GNU General Public License
+## as published by the Free Software Foundation, either version 3 of the
+## License, or (at your option) any later version.
+##
+## GnuCOBOL is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with GnuCOBOL.  If not, see <https://www.gnu.org/licenses/>.
+
+### GnuCOBOL Test Suite
+
+### ISO+IEC+1989-2002 8.4.2.3 Reference-modification
+
+## 8.4.2.3.3 General rules
+
+AT_SETUP([constant-folding out of bounds])
+AT_KEYWORDS([refmod expression])
+# mheyman 2023-1-4: Skipping. Warnings test. No warnings implemented.
+AT_SKIP_IF(false)
+AT_XFAIL_IF(true)
+# GNU -f
+# GNU -W
+
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       78 VAR-LEN       VALUE 4.
+       01 X             PIC X(VAR-LEN).
+       PROCEDURE        DIVISION.
+           IF VAR-LEN < 4
+              DISPLAY X(4 - VAR-LEN:1)
+              END-DISPLAY
+              DISPLAY X(1: 4 - VAR-LEN)
+              END-DISPLAY
+              DISPLAY X(9 - VAR-LEN:1)
+              END-DISPLAY
+              DISPLAY X(1:9 - VAR-LEN)
+              END-DISPLAY
+      *>      special test...
+              INSPECT X CONVERTING "DEF"  TO X (1:0 + VAR-LEN)
+           END-IF
+           STOP RUN.
+])
+
+AT_CHECK([$COMPILE_ONLY -fdiagnostics-show-option -Wno-constant-expr prog.cob], [0], [],
+[prog.cob:10: warning: offset of 'X' out of bounds: 0 [[-Wignored-error]]
+prog.cob:12: warning: length of 'X' out of bounds: 0 [[-Wignored-error]]
+prog.cob:14: warning: offset of 'X' out of bounds: 5 [[-Wignored-error]]
+prog.cob:16: warning: length of 'X' out of bounds: 5 [[-Wignored-error]]
+prog.cob:19: warning: CONVERTING operands differ in size [[-Wignored-error]]
+])
+AT_CHECK([$COMPILE_ONLY -Wno-constant-expr  -fno-constant-folding prog.cob],
+[0], [], [])
+
+AT_CLEANUP
+
+

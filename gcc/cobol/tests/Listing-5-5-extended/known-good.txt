@@ -1,0 +1,8 @@
+Country Code is 002: Does not use pound sterling
+Country Code is 003: Uses pound sterling
+Country Code is 006: Does not use pound sterling
+Country Code is 007: Uses pound sterling
+Country Code is 009: Does not use pound sterling
+Country Code is 010: Uses pound sterling
+Country Code is 014: Does not use pound sterling
+Country Code is 015: Uses pound sterling

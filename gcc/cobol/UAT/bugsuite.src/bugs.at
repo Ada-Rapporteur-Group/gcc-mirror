@@ -1,0 +1,279 @@
+AT_COPYRIGHT([Test cases Copyright (C) 2022 COBOLworx a subsidiary of Symas Corp.
+
+Written by Marty Heyman])
+
+### GnuCOBOL Test Suite
+
+AT_BANNER([Bugs Bugs Bugs!])
+
+#AT_SETUP([There are currently no specific bugs])
+#AT_KEYWORDS([bugs])
+#AT_DATA([prog.cob], [])
+#AT_CHECK([$COMPILE prog.cob], [0], [], [])
+#AT_CHECK([./a.out], [1], [], [])
+#AT_CLEANUP
+
+AT_SETUP([EVALUATE 'A' OR 'a'])
+AT_KEYWORDS([bugs])
+AT_DATA([prog.cob], [
+        program-id. prog.
+        data division.
+        working-storage section.
+        77 answer pic x.
+        procedure division.
+        move 'a' to answer
+        evaluate answer
+        when = "A" or "a"
+            display "answer is '" answer "'"
+        when other
+            display answer"  is neither 'A' nor 'a' " 
+        end-evaluate.
+
+        move 'A' to answer
+        evaluate answer
+        when = "A" or "a"
+            display "answer is '" answer "'"
+        when other
+            display answer"  is neither 'A' nor 'a' " 
+        end-evaluate.
+        end program prog.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [answer is 'a'
+answer is 'A'
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([PICTURE X(2) COMP-5])
+AT_KEYWORDS([Simon])
+AT_DATA([prog.cob], [
+        identification division.
+        program-id. wrapper.
+        data division.
+        working-storage section.
+        *> parser_symbol_add() is called with data::digits set to two.
+        *> It should be five, since X(2) COMP-5 can hold 0 through 65535
+        01 memx pic x(2) comp-5.
+      * Also, do we initialize pointers? 
+        77 ptr usage pointer.
+        procedure division.
+        Initialize ptr.display "LENGTH OF X(2) is " length of memx
+        move 12345 to memx
+        display memx
+        IF ptr <> NULL then display 'bad pointer'.
+        goback.
+        end program wrapper.
+])
+AT_CHECK([$COMPILE -dialect mf prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [12345
+], [])
+AT_CLEANUP
+
+AT_SETUP([Simon environment exception])
+AT_XFAIL_IF(true)
+AT_KEYWORDS([Simon environment exception])
+AT_DATA([prog.cob], [
+        identification division.
+        program-id. wrapper.
+        data division.
+        working-storage section.
+        01 W992-ENVIRO          pic x(32).
+        01 W992-VALUE          pic x(32).
+        procedure division.
+        *> As a bug report, this is pretty weak.  But this is what Simon gave us
+        DISPLAY W992-ENVIRO UPON ENVIRONMENT-NAME.
+        ACCEPT W992-VALUE FROM ENVIRONMENT-VALUE
+           ON EXCEPTION
+              display "got exception"
+        END-ACCEPT.
+        goback.
+        end program wrapper.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CLEANUP
+
+
+AT_SETUP([Simon environment exception])
+AT_XFAIL_IF(true)
+AT_KEYWORDS([Simon environment exception])
+AT_DATA([prog.cob], [
+        identification division.
+        program-id. wrapper.
+        data division.
+        working-storage section.
+        01 W992-ENVIRO          pic x(32).
+        01 W992-VALUE          pic x(32).
+        procedure division.
+        *> As a bug report, this is pretty weak.  But this is what Simon gave us
+        DISPLAY W992-ENVIRO UPON ENVIRONMENT-NAME.
+        ACCEPT W992-VALUE FROM ENVIRONMENT-VALUE
+           ON EXCEPTION
+              display "got exception"
+        END-ACCEPT.
+        goback.
+        end program wrapper.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([INSPECT CONVERTING size mismatch should be a syntax error])
+AT_KEYWORDS([bugs])
+AT_DATA([prog.cob], [
+        program-id.         prog.
+        data                division.
+        working-storage     section.
+        01 item pic x(64).
+        procedure division.
+
+        move "the quick brown fox jumps over the lazy dog" to item
+        display function trim(item)
+        inspect item converting 
+                "abcdefghijklmnopqrstuvwxyz"
+            TO  "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        display function trim(item)
+
+        *> These are syntax errors; literal-4 and literal-5 need to be the
+        *> same size
+        move "the quick brown fox jumps over the lazy dog" to item
+        display function trim(item)
+        inspect item converting 
+                "abcdefghijklmnopqrstuvwxyzx"
+            TO  "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        display function trim(item)
+
+        move "the quick brown fox jumps over the lazy dog" to item
+        display function trim(item)
+        inspect item converting 
+                "abcdefghijklmnopqrstuvwxyz"
+            TO  "ABCDEFGHIJKLMNOPQRSTUVWXYZx"
+        display function trim(item)
+
+        goback.
+        end program prog.
+])
+AT_CHECK([$COMPILE prog.cob], [1], [], [])
+AT_CLEANUP
+
+
+AT_SETUP([The parser is too permissive])
+AT_KEYWORDS([bugs])
+AT_DATA([prog.cob], [
+        program-id.         prog.
+        data                division.
+        working-storage     section.
+        procedure division.
+//        display "Care to explain THIS!"
+*?        display "Or this?"
+        goback.
+        end program prog.
+])
+AT_CHECK([$COMPILE prog.cob], [1], [], [])
+AT_CLEANUP
+
+AT_SETUP([ISO Inspect Examples])
+AT_KEYWORDS([inspect])
+AT_DATA([prog.cob], [
+        Identification Division.
+        Program-Id. Clouseau.
+        Data Division.
+        Working-Storage Section.
+        01 inputs.
+           05 row occurs 10 times indexed by counter.
+              10 star  PIC X.
+              10 input PIC X(20).
+              10 count PIC 99 occurs 3 times.
+              10 output PIC X(20).
+        77 len PIC 9(8).   
+
+        Procedure Division.
+        Move ' BBEABDABABBCABE     030002BBEXYZXYXYZCABV' to row(1).
+        Move ' ADDDDC              000004AZZZZC'  to row(3).
+        Move ' ADDDDA              000005AZZZZZ'  to row(5).
+        Move ' CDDDDC              000000CDDDDC'  to row(7).
+        Move ' BDBBBDB             000300BDWWWDB' to row(9).
+`
+        Display '  INPUT                C1 C2 C3 OUTPUT'
+        Display '  -------------------- -- -- -- --------------------'
+        Perform Example-3 with test after 
+            varying counter from 1 by 2 until counter = 9.
+
+        Goback.
+        
+        Inspection Section.
+        Example-3.
+        Move row(counter) to row(counter + 1)
+        Move input(counter) to output(counter)
+        Move Zero to count(counter 1)
+        Move Zero to count(counter 2)
+        Move Zero to count(counter 3)
+
+        Move function length( function trim(input(counter)) ) to len.
+        INSPECT OUTPUT(COUNTER)(1:len) TALLYING
+             COUNT(counter 1) FOR ALL "AB" BEFORE "BC"
+             COUNT(counter 2) FOR LEADING "B" AFTER "D"
+             COUNT(counter 3) FOR CHARACTERS AFTER "A" BEFORE "C";
+        INSPECT OUTPUT(COUNTER)(1:len) REPLACING
+             ALL "AB" BY "XY" BEFORE "BC"
+             LEADING "B" BY "W" AFTER "D"
+             FIRST "E" BY "V" AFTER "D"
+             CHARACTERS BY "Z" AFTER "A" BEFORE "C"
+
+       If row(counter) = row(counter + 1) then
+          Move '*' to star(counter + 1)
+       Else
+          Move '!' to star(counter + 1).
+
+       Display star(counter)   ' '
+                input(counter)   ' ' 
+                count(counter 1) ' '
+                count(counter 2) ' '
+                count(counter 3) ' '
+               output(counter)  ' '
+        Display star(1 + counter)   ' '
+                input(1 + counter)   ' ' 
+                count(1 + counter 1) ' '
+                count(1 + counter 2) ' '
+                count(1 + counter 3) ' '
+               output(1 + counter)  ' '
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], 
+[  INPUT                C1 C2 C3 OUTPUT
+  -------------------- -- -- -- --------------------
+  BBEABDABABBCABE      03 00 02 BBEXYZXYXYZCABV      
+* BBEABDABABBCABE      03 00 02 BBEXYZXYXYZCABV      
+  ADDDDC               00 00 04 AZZZZC               
+* ADDDDC               00 00 04 AZZZZC               
+  ADDDDA               00 00 05 AZZZZZ               
+* ADDDDA               00 00 05 AZZZZZ               
+  CDDDDC               00 00 00 CDDDDC               
+* CDDDDC               00 00 00 CDDDDC               
+  BDBBBDB              00 00 30 BDWWWDB              
+* BDBBBDB              00 00 30 BDWWWDB              
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([Multiple INDEXED BY variables with the same name])
+#
+# This compilation should succeed
+#
+AT_KEYWORDS([bugs])
+AT_DATA([prog.cob], [       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  GROUP-1-TABLE.
+           05  TABLE-LEVEL-1.
+               06  TABLE-ITEM PICTURE X OCCURS 15 TIMES INDEXED BY IND.
+               88  EQUALS-M   VALUE "M".
+       01  GROUP-2-TABLE.
+           05  TABLE-LEVEL-1.
+               06  TABLE-ITEM PICTURE X OCCURS 15 TIMES INDEXED BY IND.
+               88  EQUALS-M   VALUE "M".
+       PROCEDURE DIVISION.
+            goback.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CLEANUP

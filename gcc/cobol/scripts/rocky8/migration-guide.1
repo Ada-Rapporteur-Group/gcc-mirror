@@ -1,0 +1,540 @@
+.ds lang COBOL
+.ds gcobol GCC\ \*[lang]\ Front-end
+.Dd \& May 2024
+.Dt GCOBOL MIGRATION GUIDE 7\& "GCC \*[lang] Compiler"
+.Os Linux
+.Sh NAME
+.Nm gcobol-migration
+.Nd feature and option comparison with GnuCOBOL and other \*[lang] compilers
+.
+.Sh DESCRIPTION
+The GCC \*[lang] compiler, gcobol, is a gcc front-end, meaning it
+parses ISO \*[lang] source code and produces executable code using the
+gcc back-end.  Because it's a gcc compiler, gcobol accepts all gcc
+options that control code generation and linking.  There is a small
+set of options and environment variables unique to gcobol itself.
+.Pp
+Being part of gcc means gcobol works like gcc, and not necessarily how
+other \*[lang] compilers work.  This guide describes features of
+GnuCOBOL and gcobol, showing how they are similar and different:
+.Pp
+.Bl -tag -width identical -compact
+.It identical
+The feature has the same effect in both compilers.
+.It mappable
+The feature in one compiler has a similar/matching feature in the other.
+.It unique
+The feature has no comparable feature in the other compiler.
+Sometimes the same or similar effect can be obtained by other means.
+.El
+.
+.Sh COMMAND-LINE OPTIONS
+.Ss Help options
+.Bl -tag -width Identical -compact
+.It Identical
+.Fl Fl help
+.Fl Fl version
+.Fl Fl verbose
+.Fl v
+.Ef
+.It Mappable
+.Bl -column ".Sy GNU\0\0\0\0" ".Sy GCC" -compact 
+.It Sy GNU Ta Sy GCC
+.It Fl h Ta Fl Fl help
+.El
+.It GnuCOBOL Only
+.Fl Fl info
+.Fl Fl list-reserved
+.Fl Fl list-intrinsics
+.Fl Fl list-system
+.Fl Fl list-mnemonics
+.El
+.Ss Build target
+.Bl -tag -width Identical -compact
+.It Identical
+.Bl -tag -width "-E" -compact
+.It Fl c
+compile each \*[lang] file to object code.  Do not link. 
+.It Fl D Ar name Ns = Ns Ar value
+Define CDF user-defined word
+.Ar name
+as representing the string or number
+.Ar value .
+.It Fl E
+gcobol continues with compilation.  To prevent compilation, use
+.D1 -preprocess false
+because nonzero status from any preprocessor prevents
+compilation. gcobol also writes to standard output, not to a .i file.
+.It Fl I Ar pathname
+Add
+.Ar pathname
+to the search path for copybooks.  If
+.Ar pathname
+does not begin with
+.Ql / ,
+it is interpreted as relative to the current working directory for the
+gcobol process.
+.It Fl L Ar pathname
+Library search path
+.It Fl l Ar libname
+Link with library
+Ar libname .
+.It Fl o Ar filename
+Write the compiled output to
+.Ar filename .
+.It Fl S
+Stop after the stage of compilation proper; do not assemble.
+Output is assembler code file for each non-assembler input file.  
+.El
+.It Mappable
+.Bl -column ".Sy GNU" ".Sy GCC" -compact 
+.It Sy GNU Ta Sy GCC
+.It Fl m , Fl b Ta Fl shared
+.El
+.It gcobol  Only
+.Bl -tag -compact
+.It Fl main Ar filename Ns , Fl nomain
+controls whether a
+.Fn main
+function is generated for
+.Ar filename.
+.El
+.It GnuCOBOL Only
+.Bl -tag -compact
+.It Fl C
+gcobol does not translate to C.
+.It Fl x
+Inapplicable because,
+like gcc, by default gcobol produces an executable binary.
+.It Fl j Fl job
+gcobol has no job control
+.El
+.El
+.
+.Ss Source format
+.Bl -tag -width Identical -compact
+.It Identical
+None identified. 
+.It Mappable
+.Bl -column ".Sy GNU\0\0\0\0" ".Sy GCC" -compact 
+.It Sy GNU Ta Sy GCC
+.It Fl free  , Fl F Ta Fl ffree-form
+.It Fl fixed Ta Fl ffixed-form
+.br
+gcobol truncates lines at column 72,
+i.e. strict Reference Format.  For Extended Reference Format, use
+.D1 Fl indicator-column Li 7 
+which places the indicator area in its standard position, and imposes
+no line length limit.
+.El
+.It GnuCOBOL Only
+None identified.
+.El
+.
+.Ss Warning options
+.Bl -tag -width Identical -compact
+.It Identical
+.Fl fsyntax-only
+.Fl fmax-errors Ns = Ns Ar N
+.Pp
+The following warning option are not yet implemented, but will be during gcc integration:
+.Fl w
+.Fl Werror
+.Fl Werror Ns = Ns Li  WARNING
+.It GnuCOBOL Only
+.Fl Wfatal-errors
+.Fl Wall
+.Fl Wextra Ns , Fl W
+.Fl W Ns Ar WARNING
+.Fl Wno- Ns Ar WARNING
+.Fl Warchaic
+.Fl Wcall-params
+.Fl Wcolumn-overflow
+.Fl Wconstant
+.Fl Wimplicit-define
+.Fl Wlinkage
+.Fl Wobsolete
+.Fl Wparentheses
+.Fl Wredefinition
+.Fl Wstrict-typing
+.Fl Wterminator
+.Fl Wtruncate
+.Fl Wconstant-expression
+.Fl Wconstant-numlit-expression
+.Fl Wunreachable
+.Fl Wadditional
+.El
+.Ss Configuration options
+.Bl -tag -width Identical -compact
+.It Identical
+.It Mappable
+.Bl -column ".Sy GNU\0\0\0\0" ".Sy GCC" -compact 
+.It Sy GNU Ta Sy GCC
+.It Fl std Ns = Ns Li mvs Ta Fl dialect Li ibm
+.It Fl std Ns = Ns Li mf Ta Fl dialect Li mf
+.El
+gcobol is an ISO-standard compiler with relatively little support for nonstandard syntax. Some common syntax extensions are supported using the
+.Fl dialect
+option. For details see
+.Xr gcobol 1 .
+.
+.It GnuCOBOL Only
+.Fl std Ns = Ns Li DIALECT
+.Fl std Ns = Ns Li default
+.Fl std Ns = Ns Li cobol85
+.Fl std Ns = Ns Li xopen
+.Fl std Ns = Ns Li cobol2002 , Fl std Ns = Ns Li cobol2014
+.Fl std Ns = Ns Li ibm-strict , Fl std Ns = Ns Li ibm
+.Fl std Ns = Ns Li mvs-strict , Fl std Ns = Ns Li mvs
+.Fl std Ns = Ns Li mf-strict 
+.Fl std Ns = Ns Li bs2000-strict , Fl std Ns = Ns Li bs2000
+.Fl std Ns = Ns Li acu-strict , Fl std Ns = Ns Li acu
+.Fl std Ns = Ns Li rm-strict , Fl std Ns = Ns Li rm
+.Fl std Ns = Ns Li realia-strict , Fl std Ns = Ns Li realia
+.Fl std Ns = Ns Li gcos-strict , Fl std Ns = Ns Li gcos
+.Fl freserved-words Ns = Ns Li DIALECT
+.Fl conf Ns = Ns Li <file>
+.Fl febcdic-table Ns = Ns Li CCONV-TABLE/FILE
+.Pp
+GnuCOBOL has numerous specific options controlling acceptable syntax.  gcobol has no such options.  
+.El
+.
+.Ss Listing options
+gcobol produces no listing file.
+.
+.Ss Debug switches
+.Bl -tag -width Identical -compact
+.It Identical
+.Bl -tag -compact
+.It Fl g
+gcobol supports all forms of the gcc
+.Fl g
+option, including
+.Fl ggdb ,
+which can be very useful.
+.El
+.It Mappable
+.Bl -tag -compact
+.It Fl O Ns , Fl O2 Ns , Fl \&Os Ns
+It's not clear how exactly to map these GnuCOBOL optimization options. 
+gcobol supports the gcc
+.Fl \&O
+options, from
+.Fl O Ns 0
+to
+.Fl O Ns 3 ,
+with
+.Fl O Ns 2
+being perhaps the most commonly used.  For debugging,
+.Fl O Ns 0
+(no optimization) probably yields the best experience.
+.It  Fl fec Ns = Ns Li exception-name Ns , Fl fno Ns = Ns Li ec Ns = Ns Li exception-name
+In addition to the CDF
+.Sy >>TURN
+directive, gcobol supports 
+.Fl fcobol-exceptions Ar mask ,
+where
+.Ar mask
+is hexadecimal number, as described in
+.Xr gcobol 1 .
+.It Fl Fl debug
+maps to
+.Fl d .
+.It Fl fstack-check
+may correspond to the gcc option of the same name. 
+.El
+.It gcobol Only
+.Bl -tag -compact
+.It Fl preprocess Ar filter-name
+Between gathering the COBOL source file and copybooks, and sending them to the compiler, this options passes the normalized input through
+.Ar filter-name .
+More than one 
+.Fl preprocess
+option can be used; they are applied in order. 
+.It Fl fflex-debug Ns , Fl fyacc-debug
+produce messages useful for compiler development.
+.El
+.It GnuCOBOL Only
+.Fl fmemory-check Ns = Ns Li scope
+.Fl fsource-location
+.Fl ftrace
+.Fl ftraceall
+.Fl fdebugging-line
+.Fl fnotrunc
+.Pp
+gcobol has no trace functionality.  Any runtime bounds checking is
+enabled via Exception Conditions. gcobol's support for debugging lines
+has not been thoroughly tested.  The feature is deprecated in ISO, but
+is still supported by IBM's compiler.  If the user needs support for
+such code, the gcobol developers will enable the NIST DB module for testing. 
+.El
+.Ss Miscellaneous
+.Bl -tag -width Identical -compact
+.It Mappable
+The GnuCOBOL option
+.Fl save-temps Ns Op = Ns Ar dir
+can be emulated in gcobol using the
+.Ev GCOBOL_TEMPDIR
+environment variable, as described in
+.Xr gcobol 1 .
+.It GnuCOBOL Only
+.Fl ext Ar extension
+.Fl fintrinsics Ns = Ns  Op ALL|name Op ,name,...
+.Fl ffold-copy Ns = Ns Li LOWER
+.Fl ffold-copy Ns = Ns Li UPPER
+.Fl fimplicit-init
+.El
+.
+.Sh Multiple Sources
+gcobol treats multiple sources in the way any gcc compiler does.
+Multiple source code files, object files, and libraries may appear on
+the command line.  By default they are combined to produce one
+executable.  If
+.Fl shared
+is used, the product is a shared object with a
+.Pa \&.so
+extension.  If
+.Fl c
+is used, each source file produces a corresponding object file with a
+.Pa \&.o
+extension.
+.Ss Linkage
+As a gcc compiler, gcobol by default links with any libraries at build
+time.  This differs from the GnuCOBOL default, which always defers
+.Sy CALL
+for dynamic, runtime resolution.  See
+.Fl static-call
+in
+.Xr gcobol 1
+for details.  gcobol also differs in how/where the produced executable
+searches for libraries. The conventional (gcc) approach is to link any
+libraries that will be needed.  This applies even with
+.Fl no-static-call .
+For the linked library to be found at runtime by the dynamic linker,
+.Xr ld.so 8 ,
+the library must either be
+.Pp
+.Bl -enum -compact
+.It 
+in the linker's default search path, or
+.It
+in the executable's RPATH
+.Fl Wl, Ns Ar path .
+.El
+.Pp
+The library search path can be further extended with the environment variables
+.Ev COBPATH ,
+which is specific to gcobol-produced executables, and
+.Ev LD_LIBRARY_PATH ,
+which is a feature of the dynamic linker. 
+.
+.Sh C interface
+This section has two parts:
+.Pp
+.Bl -enum -compact
+.It
+how \*[lang] symbols in programs compiled
+with gcobol appear in the object code
+.It how to call C functions
+from a \*[lang] compiled with gcobol
+.El
+.Ss gcobol symbols
+.Pp
+gcobol binaries use ordinary C linkage.  Each top-level PROGRAM-ID
+creates a symbol in the object code by the same name.  A COBOL Program
+can be called from C as a function, and returns a value to a C caller
+just as a C function does.
+.Pp
+An EXTERNAL data item is manifested in the object code as a name with external linkage, accessible to the linker.  A C program may reference it using the 
+.Ql extern
+keyword.  
+.Pp
+Contained programs and data items not using the EXTERNAL phrase do not
+have external linkage.  gcobol has no support for the ENTRY statement. 
+.
+.Ss Name mangling
+To facilitate case-insensitive name matches as mandated by the ISO
+standard, all \*[lang] symbol names appear in the object file in 
+.Em "lower case" .
+This differs from the GnuCOBOL practice of using upper case symbol names.
+.Pp
+The x64 ABI used by Linux does not allow for hyphens in a symbol name,
+which is restricted to letters, digits, and underscores,
+.Pq regex Bo Bo :alnum: Bc Ns \&_ Bc .
+For this reason, names that include hyphens are
+.Dq mangled .
+The exact algorithm is too tedious to describe here.  If you wish to
+access such names from C, though, it is possible.  Contact the
+developers for details.
+.Ss Parameters
+In gcobol, program's parameters and return value are always 64-bit
+entities.  If a program returns a numeric value, it is returned as a
+64-bit integer or floating point value, (C
+.Vt int64_t
+or
+.Vt double Ns ).
+Strings are always represented by pointers. An OPTIONAL parameter is
+represented by a NULL pointer.  There is no way for a C program to
+indicate a missing parameter for which USING BY VALUE is specified.
+.Pp
+gcobol provides no functions for C programs to manipulate \*[lang]
+variables.  Intrinsic functions are likewise inaccessible from C
+because their parameters do not follow the above scheme.  Because they
+are designed to be called from \*[lang], they are designed to accept
+and return \*[lang] data.
+.
+.Ss Calling C functions from gcobol
+By default, gcobol assumes the target of a CALL statement is a
+\*[lang] program compiled by gcobol.  It therefore converts the name
+of the CALL target to lower case (and applies the name-mangling
+algorithm).  Also by default, if the target is a compile-time
+constant, static linking is used.  That is, the name is manifested in
+the object code as an external reference for the linker to resolve.
+Both these defaults can be changed.
+.Pp
+To prevent a name from being converted to lowercase form, use the CDF
+.D1 >>CALL-CONVENTION VERBATIM
+directive.  With that in force, the name provided will be the name
+used, without change.  It remains in force until
+.D1 >>CALL-CONVENTION COBOL
+is encountered. 
+.Pp
+To prevent static linking, use the command-line option
+.Dl Fl fno-static-call
+With that option, no CALL target is ever manifested as an external reference in the object code.  All references are resolved at runtime using
+.Xr dlopen 3
+and
+.Xr dlsym 3 .
+.Pp
+These features are independent.  One can have static linking or not
+with either call-convention.
+.Ss How links the linker
+The term
+.Dq "static linking"
+used here can be misleading, and should not be confused with static
+libraries. It means only that a name known at compile time is resolved by 
+.Dq "the linker" ,
+not the gcobol runtime library.  At build time, the static linker,
+.Xr ld 1 ,
+verifies that each external reference is supplied by a library named
+on the command line.  That library
+.Em might 
+be a static library, in which case the function (say) is incorporated
+into the produced binary.  More commonly the library is a shared
+object, in which case the linker adds the library's name to the set
+required by the produced binary.  When the program runs, the runtime linker,
+.Xr ld.so 8 ,
+actually resolves the external symbols from those named libraries.
+.Pp
+For the runtime linker to do its work, it must be able to find those
+libraries.  That is where the ELF RPATH comes in.  If the library does not reside in the default search path for
+.Xr ld.so 8 ,
+it will inspect directories in the RPATH, a property of the
+executable.  In gcc, the RPATH is conventionally set with
+.D1 Fl Wl, Ns Fl rpath Ns = Ns Ar pathname
+The search can be further extended using
+.Ev LD_LIBRARY_PATH
+at time of execution.  See
+.Xr ld.so 8
+for more information.
+.
+.Ss Extending runtime linking with Ev COBPATH 
+When searching for a CALL target, unlike GnuCOBOL, gcobol assumes no
+relationship between the name of the target the name of the library
+that might house it. Normally, the names of all required libraries are
+defined at build time.  Those libraries must be found by the runtime
+linker, and no other libraries are consulted.  There is an escape
+hatch, though: the
+.Ev COBPATH
+environment variable.
+.Pp
+As described in
+.Xr gcobol 1 ,
+the value of
+.Ev COBPATH
+is a colon-separated list of directory names.  If present, the gcobol runtime library,
+.Pa libgcobol.so ,
+will attempt to resolve a CALL target by searching all libraries in
+each named directory.  For example,
+.D1 COBPATH=.
+makes all shared objects in the process's current working directory
+eligible to supply symbols to the program.
+.
+.Sh ENVIRONMENT
+.Ss Compile-time variables
+gcobol recognizes environment variables for copybooks.  Given
+.D1 COPY Ar copybook Ar library
+gcobol will examine the environment for variables named
+.Ql copybook ,
+.Ql COPYBOOK ,
+.Ql library ,
+and 
+.Ql LIBRARY .
+If found, the values of those variables are used instead of the literal.
+.Pp
+Consistent with gcc practice, gcobol uses no environment variables to
+control the compiler itself, other than a few easter eggs used by the
+developers to display details of the compilation process.
+.Ss Run-time variables
+The environment is consulted at runtime to resolve file names.  See
+.Xr FILES
+below.  
+.
+.Sh FILES
+gcobol uses no files for configuration.
+.Pp
+Programs compiled by gcobol consult the environment to resolve file names.  For
+.D1 SELECT Ar name Li ASSIGN Ar filename
+.Ar filename
+may be a \*[lang] word or an alphanumeric literal.  If it is a
+literal, it is interpreted literally; relative paths are interpreted
+as relative to the current working directory of the executing process.  If
+.Ar filename
+is a \*[lang] word, the gcobol runtime support queries the environment for
+an uppercase form of the
+.Ar filename .
+If found, the value of the variable is used as the filename, with
+relative paths being interpreted just as literal names are.
+If no environment variable is found,
+.Ar filename
+is treated as a literal.
+.Pp
+The process of interpreting
+.Ar filename
+is performed for each OPEN operation.  Although the functionality has
+never been tested, in theory it should be possible to OPEN
+.Ar filename ,
+operate on it, CLOSE it, change the value of
+.Ar filename
+in the environment, and then OPEN a different file.
+.Pp
+No transformation done on the text of
+.Ar filename .
+No prefix is implied and no path is searched.
+.
+.Ss Compatibility
+The on-disk format of files written by programs compiled with gcobol
+is unique to gcobol.  They are incompatible with the on-disk format of
+any file system supported by GnuCOBOL.  Their sole claim is to support
+the file semantics defined in the ISO standard.
+.Pp
+It is an aspiration of the gcobol developers to provide support for
+I/O plug-in modules in the form of shared objects that implement a
+defined interface.  
+.
+.\" .Sh EXAMPLES
+.\" .Sh DIAGNOSTICS
+.\" .Sh COMPATIBILITY
+.Sh SEE ALSO
+.Bl -tag -compact
+.It Xr ld 1
+.It Xr ld.so 8
+.It Xr gcobol 1
+.It GnuCOBOL Programmer’s Guide
+.El
+.\" .Sh STANDARDS
+.\" .Sh HISTORY
+.\" .Sh AUTHORS
+.\" .Sh CAVEATS
+.\" .Sh BUGS
+

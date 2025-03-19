@@ -1,0 +1,9 @@
+Debug3
+Enter list of Surnames.
+Press RETURN after each name.
+To finish press return with no value.
+This will fill Surname with spaces
+Name -> Name -> Name -> Name -> Dubner    
+Heyman    
+Lowden    
+Odd number of people

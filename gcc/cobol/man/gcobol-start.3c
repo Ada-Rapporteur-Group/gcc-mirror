@@ -1,0 +1,384 @@
+.fzoom CW 900
+.ds lang COBOL
+.ds gcobol GCC\ \*[lang]\ Front-end
+.Dd \& June 2023
+.Dt GCOBOL-START 3c\& "GCC \*[lang]"
+.Os Linux
+.Sh NAME
+.Nm START
+.Nd position file for reading
+.\" .Sh LIBRARY
+.Sh SYNOPSIS
+.PS
+boxht =  1/6 + 1/16
+boxrad = 1/16
+arcrad = 1/16
+circlerad = 1/24
+
+E0: circle
+line right
+
+Start: box "\f[CW]START\f[]"
+line right
+Filename: box "\f[I]filename\f[]"
+arrow right to (5.0, Here.y)
+
+line invis down 2/6 from E0.c
+E0: arrow right 1/16
+line
+
+First: box "\f[CW]FIRST\f[]"
+arc cw from E0.start
+E1: line down 1/6
+arc ccw
+line right linewid - arcrad
+Last: box "\f[CW]LAST\f[]"
+E2: line down 1/6 + 2 * arcrad from E1.end
+arc ccw
+line right linewid - arcrad
+Key: box "\f[CW]KEY\f[]"
+arc cw
+line down 1/6
+arc ccw
+Is: box "\f[CW]IS\f[]"
+arc ccw
+dist = Key.e.y - (Here.y + arcrad)
+line up dist
+arc cw
+line from Key.e to Here
+CompareOperator: box rad 0 height boxht * 1.5 dashed 1/32 \
+        "\f[B]compare" "operator\f[]"
+line right
+Name: box "\f[I]name\f[]"
+arc ccw
+line to (Here.x, Last.e.y + arcrad)
+arc cw down
+line from Last.e to Here
+move to last arc .start
+line to (Here.x, First.w.y - arcrad)
+arc up cw
+line from First.e to Here
+arrow right to (5.0, Here.y)
+
+line invis down 7/6 from E0.start
+E0: arrow right 1/16
+
+arc cw
+line down 1/8 + 1/6
+arc ccw
+line right linewid - arcrad
+Key: box "\f[CW]WITH\f[]"
+arc right ccw
+line up 1/6 - arcrad
+arc cw
+Length: box "\f[CW]LENGTH\f[]"
+line right 2 * arcrad
+Statements: box "\f[I]expr\f[]"
+arc ccw
+line to (Here.x, E0.end.y - arcrad)
+arc up cw
+line from E0.end to Here
+arrow right to (5.0, Here.y)
+
+line invis down 5/6 from E0.start
+E0: arrow right 1/16
+
+arc cw
+line down 1/6
+arc ccw
+line right linewid - arcrad
+Invalid: box "\f[CW]INVALID\f[]"
+arc cw
+line down 1/6
+arc ccw
+Key: box "\f[CW]KEY\f[]"
+arc right ccw
+line to (Here.x, Invalid.e.y - arcrad)
+arc cw
+line from Invalid.e to Here
+Statements: box width 1.5 * boxwid "\f[I]error-statements\f[]"
+arc ccw
+line to (Here.x, E0.end.y - arcrad)
+arc up cw
+line from E0.end to Here
+arrow right to (5.0, Here.y)
+
+line invis down 5/6 from E0.start
+E0: arrow right 1/16
+
+arc cw
+line down 1/6
+arc ccw
+line right linewid - arcrad
+NotInvalid: box height boxht * 1.5 "\f[CW]NOT" "INVALID\f[]"
+arc cw
+line down 1/6
+arc ccw
+Key: box "\f[CW]KEY\f[]"
+arc right ccw
+line to (Here.x, NotInvalid.e.y - arcrad)
+arc cw
+line from NotInvalid.e to Here
+Statements: box width 1.5 * boxwid "\f[I]valid-statements\f[]"
+arc ccw
+line to (Here.x, E0.end.y - arcrad)
+arc up cw
+End: line from E0.end to Here
+arc cw right
+line down 1/6
+arc ccw down
+box width 1.5 * boxwid "\f[CW]END-START\f[]"
+arc ccw right
+line up 1/6
+arc cw up
+line from End.end to (5.5, Here.y)
+circle
+.PE
+.
+.Sh DESCRIPTION
+.Nm
+sets the position within
+.Ar filename
+where the next sequential READ will read a record by applying
+.Ar "compare operator"
+(see below)
+to a key for the file.
+.Ar filename
+is an
+.Li FD
+entry in
+.Li "DATA DIVISION" .
+.Pp
+When none of
+.Li FIRST ,
+.Li LAST ,
+or
+.Li KEY ,
+is specified,
+.Nm
+defaults to
+.Li "KEY EQUAL"
+with the primary key of
+.Ar filename
+as the key.  If
+.Li KEY
+is used,
+.Ar name
+specifies the name of a key field or named key for
+.Ar filename .
+Alternatively,
+.Ar name
+may specify a field whose leftmost character is at the beginning
+of a key for
+.Ar filename .
+.Pp
+.Li FIRST
+and
+.Li LAST
+are valid for files whose
+.Li ORGANIZATION
+is
+.Li RELATIVE ,
+or
+.Li INDEXED .
+For
+.Li SEQUENTIAL
+files, one of
+.Li FIRST
+or
+.Li LAST
+is required.
+.Li FIRST
+positions the file at the first record according the file's key (or, for
+.Li SEQUENTIAL ,
+at the first physical record);
+.Li LAST
+similarly positions the file at the last record.
+If the file is empty,
+.Li FIRST
+and
+.Li LAST
+produce an error condition, with
+.Li FILE-STATUS
+set according the file's organization.
+.Pp
+.Li LENGTH
+is valid only for a file with
+.Li INDEXED
+organization.
+The whole key is used unless
+.Li LENGTH
+is used, in which case
+.Ar expr
+is an arithmetic expression resulting in an integer value constituting
+the size of the key.
+.Pp
+In its conditional form,
+.Nm
+may include either or both of
+.Li "INVALID KEY"
+and
+.Li "NOT INVALID KEY" .
+.Ar error-statements
+and
+.Ar valid-statements
+are blocks of statements.
+If no record exists matching the
+.Li KEY
+criteria,
+.Ar error-statements
+are executed.  If a matching record is found,
+.Ar valid-statements
+are executed.
+.Pp
+.Li END-START
+marks the end of the
+.Nm
+statement.  It can be required when
+.Nm
+appears in a conditional statement.
+.
+.bp
+.Ss compare operator:
+.PS
+E0: arrow 1/16
+arc cw
+line down 1/6
+arc ccw
+Is: box "\f[CW]IS\f[]"
+arc ccw
+line to (Here.x, E0.end.y - arcrad)
+arc up cw; arc cw
+line down 1/6
+
+arc ccw
+Not: box "\f[CW]NOT\f[]"
+Not_end: arc right cw
+arc cw right from (Not.e.x, E0.end.y)
+line to Not_end.end
+move to (Here.x, E0.end.y)
+line from E0.end to Here
+
+# "="
+E0: line right arcrad
+Equal: box "\f[CW]EQUAL\f[]"
+arc cw
+line down 1/6
+arc ccw
+To: box "\f[CW]TO\f[]"
+arc right ccw
+line to (Here.x, Equal.c.y - arcrad)
+arc up cw
+line from Equal.e to Here
+arrow to (6.0, Here.y)
+
+# "< <= = > >= symbolically"
+E0: line from Not_end.end down 2/6 + 2 * arcrad
+arc ccw
+## line right 1/4 - 2 * arcrad
+Less: box "<"
+line right boxwid + 2 * arcrad
+Less_end: arc right ccw
+line to (Here.x, To.e.y + arcrad)
+
+E0: line down 2/6 + 2 * arcrad from E0.end
+arc ccw
+## line right 1/4 - 2 * arcrad
+Lt: box "<="
+line right boxwid + 2 * arcrad
+Lt_end: arc right ccw
+line to (Here.x, E0.start.y)
+
+E0: line down 2/6 + 2 * arcrad from E0.end
+arc ccw
+## line right 1/4 - 2 * arcrad
+EqSym: box "="
+line right boxwid + 2 * arcrad
+Equal_end: arc right ccw
+line to (Here.x, E0.start.y)
+
+E0: line down 2/6 + 2 * arcrad from E0.end
+arc ccw
+## line right 1/4 - 2 * arcrad
+Gt: box ">="
+line right boxwid + 2 * arcrad
+Gt_end: arc right ccw
+line to (Here.x, E0.start.y)
+
+E0: line down 2/6 + 2 * arcrad from E0.end
+arc ccw
+## line right 1/4 - 2 * arcrad
+Greater: box ">"
+line right boxwid + 2 * arcrad
+Greater_end: arc right ccw
+line to (Here.x, E0.start.y)
+
+
+# "< and <="
+E0: line down 2/6 from E0.end
+arc ccw
+## line right 1/4 - 2 * arcrad
+Less: box "\f[CW]LESS\f[]"
+arc cw
+line down 1/6
+arc ccw
+Than: box "\f[CW]THAN\f[]"
+Than_end: arc right ccw
+line to (Here.x, Less.c.y - arcrad)
+arc up cw
+arc right cw
+line down 1/6
+arc ccw
+OrEq: box "\f[CW]OR EQUAL\f[]"
+arc cw
+line down 1/6
+arc ccw
+To: box "\f[CW]TO\f[]"
+arc right ccw
+line from OrEq.e to (To.e.x, OrEq.e.y)
+arc right ccw
+line from Less.e to (To.e.x, Less.e.y)
+arc right ccw
+
+# "> and >="
+E0: line down 5/6 from E0.end
+arc ccw
+## line right 1/4 - 2 * arcrad
+Greater: box "\f[CW]GREATER\f[]"
+arc cw
+line down 1/6
+arc ccw
+Than: box "\f[CW]THAN\f[]"
+Than_end: arc right ccw
+line to (Here.x, Greater.c.y - arcrad)
+arc up cw
+arc right cw
+line down 1/6
+arc ccw
+OrEq: box "\f[CW]OR EQUAL\f[]"
+arc cw
+line down 1/6
+arc ccw
+To: box "\f[CW]TO\f[]"
+To_end: arc right ccw
+line from OrEq.e to (To.e.x, OrEq.e.y)
+arc right ccw
+line from Greater.e to (To.e.x, Greater.e.y)
+arc right ccw
+
+line from To_end.end to (Here.x, Equal.c.y - arcrad)
+arc up cw
+
+
+
+.PE
+.
+.\" This next command is for sections 2, 3, 4, and 9 only
+.\"     (settings of the errno variable).
+.\" .Sh ERRORS
+.\" .Sh SEE ALSO
+.\" .Sh STANDARDS
+.\" .Sh HISTORY
+.\" .Sh AUTHORS
+.\" .Sh CAVEATS
+.\" .Sh BUGS

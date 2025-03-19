@@ -1,0 +1,2 @@
+Enter 10 two digit numbers 
+Enter number -  Enter number -  Enter number -  Enter number -  Enter number -  Enter number -  Enter number -  Enter number -  Enter number -  Enter number -  Odd number of non-zeros between zeros

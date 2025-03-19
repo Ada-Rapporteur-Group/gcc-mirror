@@ -1,0 +1,659 @@
+## Copyright (C) 2003-2012, 2014-2015, 2017-2020 Free Software Foundation, Inc.
+## Written by Keisuke Nishida, Roger While, Simon Sobisch, Edward Hart,
+## Ron Norman
+##
+## This file is part of GnuCOBOL.
+##
+## The GnuCOBOL compiler is free software: you can redistribute it
+## and/or modify it under the terms of the GNU General Public License
+## as published by the Free Software Foundation, either version 3 of the
+## License, or (at your option) any later version.
+##
+## GnuCOBOL is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with GnuCOBOL.  If not, see <https://www.gnu.org/licenses/>.
+
+### GnuCOBOL Test Suite
+
+### MOVE Tests
+
+
+AT_SETUP([MOVE to edited item (1)])
+AT_KEYWORDS([editing])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  SRC-1        PIC S99V99  VALUE   1.10.
+       01  SRC-2        PIC S99V99  VALUE   0.02.
+       01  SRC-3        PIC S99V99  VALUE  -0.03.
+       01  SRC-4        PIC S99V99  VALUE  -0.04.
+       01  SRC-5        PIC S99V99  VALUE  -0.05.
+       01  EDT-1        PIC -(04)9.
+       01  EDT-2        PIC -(04)9.
+       01  EDT-3        PIC -(04)9.
+       01  EDT-4        PIC +(04)9.
+       01  EDT-5        PIC -(05).
+       PROCEDURE        DIVISION.
+           MOVE SRC-1   TO EDT-1.
+           MOVE SRC-2   TO EDT-2.
+           MOVE SRC-3   TO EDT-3.
+           MOVE SRC-4   TO EDT-4.
+           MOVE SRC-5   TO EDT-5.
+           DISPLAY '>' EDT-1 '<'
+           END-DISPLAY.
+           DISPLAY '>' EDT-2 '<'
+           END-DISPLAY.
+           DISPLAY '>' EDT-3 '<'
+           END-DISPLAY.
+           DISPLAY '>' EDT-4 '<'
+           END-DISPLAY.
+           DISPLAY '>' EDT-5 '<'
+           END-DISPLAY.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0],
+[>    1<
+>    0<
+>    0<
+>   +0<
+>     <
+])
+AT_CLEANUP
+
+
+AT_SETUP([MOVE to edited item (2)])
+AT_KEYWORDS([editing])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  SRC-1        PIC S99V99  VALUE  -0.06.
+       01  SRC-2        PIC S99V99  VALUE  -0.07.
+       01  SRC-3        PIC S99V99  VALUE  -0.08.
+       01  SRC-4        PIC S99V99  VALUE  -0.09.
+       01  SRC-5        PIC S99V99  VALUE  -1.10.
+       01  EDT-1        PIC 9(04)-.
+       01  EDT-2        PIC 9(04)+.
+       01  EDT-3        PIC Z(04)+.
+       01  EDT-4        PIC 9(04)DB.
+       01  EDT-5        PIC 9(04)DB.
+       PROCEDURE        DIVISION.
+           MOVE SRC-1   TO EDT-1.
+           MOVE SRC-2   TO EDT-2.
+           MOVE SRC-3   TO EDT-3.
+           MOVE SRC-4   TO EDT-4.
+           MOVE SRC-5   TO EDT-5.
+           DISPLAY '>' EDT-1 '<'
+           END-DISPLAY.
+           DISPLAY '>' EDT-2 '<'
+           END-DISPLAY.
+           DISPLAY '>' EDT-3 '<'
+           END-DISPLAY.
+           DISPLAY '>' EDT-4 '<'
+           END-DISPLAY.
+           DISPLAY '>' EDT-5 '<'
+           END-DISPLAY.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0],
+[>0000 <
+>0000+<
+>     <
+>0000  <
+>0001DB<
+])
+AT_CLEANUP
+
+
+
+AT_SETUP([MOVE to item with simple and floating insertion])
+AT_KEYWORDS([edited editing])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  num-1 PIC -*B*99.
+       01  num-2 PIC $BB**,***.**.
+       01  num-3 PIC $BB--,---.--.
+
+       PROCEDURE DIVISION.
+           MOVE -123 TO num-1
+           DISPLAY ">" num-1 "<"
+
+           MOVE 1234.56 TO num-2
+           DISPLAY ">" num-2 "<"
+
+           MOVE 1234.56 TO num-3
+           DISPLAY ">" num-3 "<"
+           .
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0],
+[>-**123<
+>$  *1,234.56<
+>$   1,234.56<
+])
+AT_CLEANUP
+
+AT_SETUP([MOVE integer literal to alphanumeric])
+AT_KEYWORDS([MOVE])
+AT_DATA([prog.cob], [
+
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  X            PIC X(04) VALUE SPACES.
+       PROCEDURE        DIVISION.
+           MOVE 0 TO X.
+           DISPLAY X NO ADVANCING
+           END-DISPLAY.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [0   ])
+# FLOAT-LONG not ISO
+AT_CLEANUP
+
+
+AT_SETUP([Overlapping MOVE])
+AT_KEYWORDS([MOVE])
+AT_DATA([prog.cob], [
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. prog.
+        DATA DIVISION.
+        WORKING-STORAGE SECTION.
+        01 STRUCTURE.
+            05 FIELD1 PIC X(5).
+            05 FIELD2 PIC X(10).
+        PROCEDURE DIVISION.
+           MOVE "Hallo" TO FIELD1.
+           MOVE "1234567890" TO FIELD2.
+
+           MOVE FIELD2 TO STRUCTURE.
+           IF FIELD1 not = "12345"
+              DISPLAY "error:1: " FIELD1
+              END-DISPLAY
+           END-IF
+           IF FIELD2 not = "67890     "
+              DISPLAY "error:2: " FIELD2
+              END-DISPLAY
+           END-IF
+           MOVE "Hallo" TO FIELD1.
+           MOVE "1234567890" TO FIELD2.
+           CALL "subprog" USING BY REFERENCE FIELD2 STRUCTURE
+           END-CALL
+           STOP RUN.
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. subprog.
+        DATA DIVISION.
+        WORKING-STORAGE SECTION.
+        LINKAGE SECTION.
+        01 F1 PIC X(10).
+        01 F2 PIC X(15).
+        PROCEDURE DIVISION USING F1 F2.
+        MOVE F2(1:6) TO F1 (1:8).
+        IF F1 not = "Hallo1  90"
+           DISPLAY "error:3: " F1
+           END-DISPLAY
+        END-IF
+        GOBACK.
+])
+AT_DATA([prog2.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog2.
+       DATA  DIVISION.
+       WORKING-STORAGE SECTION.
+       01  FILLER.
+         05  TSTMOV1 PIC X(479).
+         05  TSTMOV2 PIC X(10).
+       PROCEDURE DIVISION.
+           MOVE "0123456789" TO TSTMOV2.
+           MOVE TSTMOV2 (2:9) TO TSTMOV2 (1:9)
+           IF TSTMOV2 NOT = "1234567899"
+              DISPLAY "  PROBLEM MOVE: " TSTMOV2
+           ELSE
+              DISPLAY "  OK with MOVE: " TSTMOV2.
+           MOVE "0123456789" TO TSTMOV2.
+           MOVE TSTMOV2 (1:8) TO TSTMOV2 (2:8)
+           IF TSTMOV2 = "0000000009"
+              DISPLAY "IBM style MOVE: " TSTMOV2
+           ELSE IF TSTMOV2 NOT = "0012345679"
+              DISPLAY "  PROBLEM MOVE: " TSTMOV2
+           ELSE
+              DISPLAY "  OK with MOVE: " TSTMOV2.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE -o prog prog.cob], [0], [], [])
+AT_CHECK([./prog], [0], [], [])
+AT_CHECK([$COMPILE -o prog2 prog2.cob], [0], [], [])
+AT_CHECK([./prog2], [0],
+[  OK with MOVE: 1234567899
+  OK with MOVE: 0012345679
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([MOVE to JUSTIFIED item])
+AT_KEYWORDS([justified])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  SRC-1        PIC S9(04)          VALUE  11.
+       01  SRC-2        PIC S9(04) COMP     VALUE  22.
+       01  SRC-3        PIC S9(04) COMP-5   VALUE  33.
+       01  SRC-4        PIC S9(04)PP        VALUE  4400.
+       01  SRC-5        PIC S9(04)PPPPP     VALUE  55500000.
+       01  EDT-FLD      PIC X(07)           JUSTIFIED RIGHT.
+       PROCEDURE        DIVISION.
+           MOVE SRC-1   TO EDT-FLD.
+           DISPLAY '>' EDT-FLD '<'
+           END-DISPLAY.
+           MOVE SRC-2   TO EDT-FLD.
+           DISPLAY '>' EDT-FLD '<'
+           END-DISPLAY.
+           MOVE SRC-3   TO EDT-FLD.
+           DISPLAY '>' EDT-FLD '<'
+           END-DISPLAY.
+           MOVE SRC-4   TO EDT-FLD.
+           DISPLAY '>' EDT-FLD '<'
+           END-DISPLAY.
+           MOVE SRC-5   TO EDT-FLD.
+           DISPLAY '>' EDT-FLD '<'
+           END-DISPLAY.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0],
+[>   0011<
+>   0022<
+>   0033<
+> 004400<
+>5500000<
+])
+AT_CLEANUP
+
+
+## MOVE statement
+
+AT_SETUP([MOVE to itself])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC 99 VALUE 12.
+       PROCEDURE        DIVISION.
+           MOVE X TO X.
+           IF X NOT = 12
+              DISPLAY X NO ADVANCING
+              END-DISPLAY
+           END-IF.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+AT_CLEANUP
+
+
+AT_SETUP([MOVE with refmod])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC 9(4) VALUE 0.
+       PROCEDURE        DIVISION.
+           MOVE "1" TO X(1:1).
+           IF X NOT = 1000
+              DISPLAY X NO ADVANCING
+              END-DISPLAY
+           END-IF.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+AT_CLEANUP
+
+
+AT_SETUP([MOVE with refmod (variable)])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC X(4) VALUE "1234".
+       01 Y             PIC X(4) VALUE "abcd".
+       01 I             PIC 9 VALUE 1.
+       PROCEDURE        DIVISION.
+           MOVE X(1:I) TO Y.
+           IF Y NOT = "1   "
+              DISPLAY Y NO ADVANCING
+              END-DISPLAY
+           END-IF.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+AT_CLEANUP
+
+
+AT_SETUP([MOVE with group refmod])
+AT_KEYWORDS([misc])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 G.
+         02 X           PIC 9999 VALUE 1234.
+       PROCEDURE        DIVISION.
+           MOVE "99" TO G(3:2).
+           IF G NOT = "1299"
+              DISPLAY G NO ADVANCING
+              END-DISPLAY
+           END-IF.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+AT_CLEANUP
+
+
+AT_SETUP([MOVE indexes])
+AT_KEYWORDS([misc])
+# moving INDEX items violate ISO
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 G.
+         02 X           PIC X OCCURS 10 INDEXED I.
+       PROCEDURE        DIVISION.
+           SET I TO ZERO.
+           SET X(1) TO I
+           IF X(1) NOT = "0"
+              DISPLAY X(1) NO ADVANCING
+              END-DISPLAY
+           END-IF.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [], [])
+AT_CLEANUP
+
+
+AT_SETUP([MOVE X'00'])
+AT_KEYWORDS([misc hex])
+AT_DATA([dump.c], [
+#include <stdio.h>
+int
+dump (unsigned char *data)
+{
+  printf ("%02x%02x%02x", data[[0]], data[[1]], data[[2]]);
+  return 0;
+}
+])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC XXX.
+       PROCEDURE        DIVISION.
+           MOVE X"000102" TO X.
+           CALL "dump" USING X
+           END-CALL.
+           STOP RUN.
+])
+# AT_CHECK([$COMPILE -c -o dump.o dump.c], [0], [], [])
+AT_CHECK([gcc -c -o dump.o dump.c], [0], [], [])
+AT_CHECK([$COMPILE prog.cob dump.o], [0], [], [])
+AT_CHECK([./a.out], [0], [000102])
+AT_CLEANUP
+
+AT_SETUP([Complex HEX: VALUE and MOVE])
+AT_KEYWORDS([misc hex])
+AT_DATA([prog.cob], [
+        identification division.
+        program-id. hex-init.
+        data division.
+        working-storage section.
+        01  var-01020304.
+            05 filler1.
+                10 filler2      pic x(2) VALUE "33".
+                10 as-value     pic x(4) VALUE  X'01020304'.
+                10 filler3      pic x(2) VALUE "33".
+            05 as-pointer redefines filler1 usage pointer.
+
+        01  var-low.
+            05 filler1.
+                10 filler2      pic x(2) VALUE "33".
+                10 as-value     pic x(4) VALUE  LOW-VALUES.
+                10 filler3      pic x(2) VALUE "33".
+            05 as-pointer redefines filler1 usage pointer.
+        01  var-space.
+            05 filler1.
+                10 filler2      pic x(2) VALUE "33".
+                10 as-value     pic x(4) VALUE  SPACE.
+                10 filler3      pic x(2) VALUE "33".
+            05 as-pointer redefines filler1 usage pointer.
+        01  var-quote.
+            05 filler1.
+                10 filler2      pic x(2) VALUE "33".
+                10 as-value     pic x(4) VALUE  QUOTE.
+                10 filler3      pic x(2) VALUE "33".
+            05 as-pointer redefines filler1 usage pointer.
+        01  var-zero.
+            05 filler1.
+                10 filler2      pic x(2) VALUE "33".
+                10 as-value     pic x(4) VALUE  ZERO.
+                10 filler3      pic x(2) VALUE "33".
+            05 as-pointer redefines filler1 usage pointer.
+        01  var-high.
+            05 filler1.
+                10 filler2      pic x(2) VALUE "33".
+                10 as-value     pic x(4) VALUE  HIGH-VALUES.
+                10 filler3      pic x(2) VALUE "33".
+            05 as-pointer redefines filler1 usage pointer.
+        01  move-target.
+            05 filler1.
+                10 filler2      pic x(2) VALUE "33".
+                10 as-value     pic x(4) VALUE "3333".
+                10 filler3      pic x(2) VALUE "33".
+            05 as-pointer redefines filler1 usage pointer.
+        procedure division.
+        display "the value is    " as-pointer of var-01020304.
+        display "should be       0x3333040302013333"
+        display "var-low  :      " as-pointer of var-low
+        display "var-space:      " as-pointer of var-space
+        display "var-quote:      " as-pointer of var-quote
+        display "var-zero :      " as-pointer of var-zero
+        display "var-high :      " as-pointer of var-high
+        display "initial         " as-pointer of move-target
+        move low-value to as-value of move-target
+        display "low-value       " as-pointer of move-target
+        move space to as-value of move-target
+        display "space           " as-pointer of move-target
+        move quote to as-value of move-target
+        display "quote           " as-pointer of move-target
+        move zeroes to as-value of move-target
+        display "zeroes          " as-pointer of move-target
+        move high-value to as-value of move-target
+        display "high-value      " as-pointer of move-target
+        move X'01020304' to as-value of move-target
+        display "01020304        " as-pointer of move-target
+        move "33333333" to move-target
+        move X'00' to filler3 of move-target(1:1)
+        display "ref-mod         " as-pointer of move-target
+        stop run.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [the value is    0x3333040302013333
+should be       0x3333040302013333
+var-low  :      0x3333000000003333
+var-space:      0x3333202020203333
+var-quote:      0x3333222222223333
+var-zero :      0x3333303030303333
+var-high :      0x3333ffffffff3333
+initial         0x3333333333333333
+low-value       0x3333000000003333
+space           0x3333202020203333
+quote           0x3333222222223333
+zeroes          0x3333303030303333
+high-value      0x3333ffffffff3333
+01020304        0x3333040302013333
+ref-mod         0x3300333333333333
+])
+AT_CLEANUP
+
+
+AT_SETUP([Alphanumeric MOVE with truncation])
+AT_KEYWORDS([misc fundamental size])
+AT_DATA([prog.cob], [
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. prog.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01  x-left  PIC X(03).
+       01  x-right PIC X(03) JUSTIFIED RIGHT.
+       PROCEDURE DIVISION.
+           MOVE '1234' TO x-left, x-right
+           DISPLAY """" x-left """" space """" x-right """"
+           IF x-left  not = '123'
+           OR x-right not = '234'
+              DISPLAY 'error with "1234":'
+              END-DISPLAY
+              DISPLAY x-left
+              END-DISPLAY
+              DISPLAY x-right
+              END-DISPLAY
+           END-IF
+           MOVE '   3' TO x-left, x-right
+           DISPLAY """" x-left """" space """" x-right """"
+           IF x-left  not = spaces
+           OR x-right not = '  3'
+              DISPLAY 'error with "   3":'
+              END-DISPLAY
+              DISPLAY x-left
+              END-DISPLAY
+              DISPLAY x-right
+              END-DISPLAY
+           END-IF
+           MOVE '3   ' TO x-left, x-right
+           DISPLAY """" x-left """" space """" x-right """"
+           IF x-left  not = '3'
+           OR x-right not = spaces
+              DISPLAY 'error with "3   ":'
+              END-DISPLAY
+              DISPLAY x-left
+              END-DISPLAY
+              DISPLAY x-right
+              END-DISPLAY
+           END-IF.
+])
+AT_CHECK([$COMPILE -Wno-truncate prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], ["123" "234"
+"   " "  3"
+"3  " "   "
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([Multi-target MOVE with subscript re-evaluation])
+AT_KEYWORDS([bugs])
+AT_DATA([prog.cob], [
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID.  mover.
+        DATA DIVISION.
+        WORKING-STORAGE SECTION.
+        01 FILLER.
+          02 ADATA VALUE "654321".
+          02 A REDEFINES ADATA PIC 9 OCCURS 6 TIMES.
+          02 B PIC 9.
+          02 CDATA VALUE "999999".
+          02 C REDEFINES CDATA PIC 9 OCCURS 6 TIMES.
+        01 TEMP PIC 9.
+        PROCEDURE DIVISION.
+        INITIALIZE CDATA ALL TO VALUE
+        MOVE 2 TO B
+        MOVE A(B) TO B, C(B)
+      *> That should pick up 5, move it to B, and then move 5 to C(5),
+        IF CDATA NOT EQUAL TO "999959"
+            DISPLAY CDATA " Should be ""999959"", but isn't"
+        ELSE
+            DISPLAY CDATA " Should be ""999959""".
+      *> See 14.9.25.4 MOVE General Rules
+        INITIALIZE CDATA ALL TO VALUE
+        MOVE 2 TO B
+        MOVE A(B) TO TEMP
+        MOVE TEMP TO B
+        MOVE TEMP TO C(B)
+        IF CDATA NOT EQUAL TO "999959"
+            DISPLAY CDATA " Should be ""999959"", but isn't"
+        ELSE
+            DISPLAY CDATA " Should be ""999959""".
+        STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [999959 Should be "999959"
+999959 Should be "999959"
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([MOVE Z'literal'])
+AT_KEYWORDS([misc literal])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01  X            PIC XXXX.
+       01  XRED REDEFINES X.
+           03  XBYTE1   PIC X.
+           03  XBYTE2   PIC X.
+           03  XBYTE3   PIC X.
+           03  XBYTE4   PIC X.
+       PROCEDURE        DIVISION.
+           MOVE Z"012" TO X.
+           IF XBYTE1 = "0" AND
+              XBYTE2 = "1" AND
+              XBYTE3 = "2" AND
+              XBYTE4 = LOW-VALUE
+              DISPLAY "OK" NO ADVANCING
+              END-DISPLAY
+           ELSE
+              DISPLAY "X = " X (1:3) NO ADVANCING
+              END-DISPLAY
+              IF XBYTE4 = LOW-VALUE
+                 DISPLAY " WITH LOW-VALUE"
+                 END-DISPLAY
+              ELSE
+                 DISPLAY " WITHOUT LOW-VALUE BUT '" XBYTE4 "'"
+                 END-DISPLAY
+              END-IF
+           END-IF.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([$COBCRUN_DIRECT ./a.out], [0], [OK], [])
+AT_CLEANUP
+

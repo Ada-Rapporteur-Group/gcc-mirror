@@ -1,0 +1,25 @@
+This is the first packaged release of gcobol since the project was
+announced in the fall of 2021. At that time, the compiler implemented
+a textbook-version of COBOL, and had compiled 1000 lines of
+pedagogical COBOL. Today, gcobol has compiled 10,000 lines of COBOL,
+primarily from the NIST CCVS-85 test suite.
+
+Features of gcobol now include:
+
+It passes the Nucleus of the CCVS-85 test suite.
+
+It supports free format, Reference Format, and Extended Reference Format.
+
+It is documented in a man page, gcobol.1, included with this
+distribution.
+
+The user has COBOL access to the command line, and to environment variables.
+
+The list of USAGE types for data items has been extended to include
+most COBOL 2014 types.
+
+Several command-line options now make the compiler more flexible and
+easier to use.
+
+CDF support includes COPY and conditional compilation.
+

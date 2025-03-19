@@ -1,0 +1,47 @@
+## Copyright (C) 2003-2012, 2014, 2017-2018 Free Software Foundation, Inc.
+## Written by Keisuke Nishida, Roger While, Simon Sobisch
+##
+## This file is part of GnuCOBOL.
+##
+## The GnuCOBOL compiler is free software: you can redistribute it
+## and/or modify it under the terms of the GNU General Public License
+## as published by the Free Software Foundation, either version 3 of the
+## License, or (at your option) any later version.
+##
+## GnuCOBOL is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with GnuCOBOL.  If not, see <https://www.gnu.org/licenses/>.
+
+### GnuCOBOL Test Suite
+
+### ISO+IEC+1989-2002 14.8.35 SET statement
+
+AT_SETUP([SET item TO 88-level])
+AT_KEYWORDS([set])
+AT_DATA([prog.cob], [
+       IDENTIFICATION   DIVISION.
+       PROGRAM-ID.      prog.
+
+       DATA             DIVISION.
+       WORKING-STORAGE  SECTION.
+       01 X             PIC 9.
+          88 x-wrong-init   value space.
+       01 Y             PIC X.
+          88 y-wrong-init   value low-value.
+
+       PROCEDURE        DIVISION.
+           SET x-wrong-init  TO TRUE.
+           SET y-wrong-init  TO TRUE.
+           STOP RUN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [1], [],
+[prog.cob:8:14: error: 88 x-wrong-init invalid VALUE for numeric type X
+    8 |           88 x-wrong-init   value space.
+      |              ^
+cobol1: error: failed compiling prog.cob
+])
+AT_CLEANUP

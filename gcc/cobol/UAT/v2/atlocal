@@ -1,0 +1,12 @@
+### Part of the test suite for COBOL for GCC (gcobol) V2
+### Copyright (c) 2022, COBOLworx, a subsidiary of Symas Corp.
+### Developed by Marty Heyman
+
+COB_FIXED="-findicator-column 7"
+GCOBOL="/usr/bin/gcobol"
+GCOBOL_FLAGS=""
+TEST_PROGRAM="a.out"
+COMPILE_FIXED="${GCOBOL} ${COB_FIXED} ${GCOBOL_FLAGS}"
+COMPILE="${GCOBOL} ${GCOBOL_FLAGS}"
+COMPILE_MODULE="${GCOBOL} --shared -fPIC ${GCOBOL_FLAGS}"
+COMPILE_ONLY="${GCOBOL} -c ${GCOBOL_FLAGS}"

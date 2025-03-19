@@ -1,0 +1,252 @@
+AT_SETUP([CDF2 - DEFINE FOO AS literal-1])
+AT_KEYWORDS([cdf define])
+AT_DATA([prog.cob], [       >>DEFINE FOO AS "on"
+       id division.
+       program-id. prog.
+       procedure division.
+           >>IF FOO = "on"
+           DISPLAY "FOO is on.".
+           >>END-IF
+           DISPLAY "gratuitous display.".
+       goback.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [FOO is on.
+gratuitous display.
+], [])
+AT_CLEANUP
+
+AT_SETUP([CDF4 ])
+AT_KEYWORDS([cdf ])
+AT_DATA([prog.cob], [
+       >>DEFINE FOO AS 1
+      *> Only the gratuitous display message shows. The message
+      *> enclosed in the IF does not.
+       id division.
+       program-id. prog.
+       procedure division.
+           >>IF FOO = 1
+           DISPLAY "FOO is one.".
+           >>END-IF
+           DISPLAY "gratuitous display.".
+       goback.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [FOO is one.
+gratuitous display.
+], [])
+AT_CLEANUP
+
+AT_SETUP([CDF Feature ])
+AT_KEYWORDS([cdf ])
+AT_DATA([prog.cob], [
+       id division.
+       program-id. prog.
+       Data Division.
+       Working-Storage Section.
+         77 X PIC 9 value 1.
+       procedure division.
+           >>IF %64-BIT-POINTER DEFINED
+           DISPLAY '64-bit-pointer mode ON'
+           >>END-IF
+           >>IF %EBCDIC-MODE DEFINED
+           DISPLAY '-finternal-ebcdic mode ON'
+           >>END-IF
+           >>DEFINE %64-BIT-POINTER OFF
+           >>IF %64-BIT-POINTER DEFINED
+           DISPLAY '64-bit-pointer mode still ON'
+           >>END-IF
+           >>IF not-ok IS DEFINED
+             >>DEFINE %EBCDIC-MODE OFF
+             >>IF %EBCDIC-MODE DEFINED
+               DISPLAY '-finternal-ebcdic mode still ON'
+             >>END-IF
+           >>END-IF
+])
+## Fails incorrectly on CDF nesting, todo. 
+#T_CHECK([$COMPILE -finternal-ebcdic -dialect ibm -Dnot-ok prog.cob], [1], [], [])
+AT_CHECK([$COMPILE -finternal-ebcdic -dialect ibm prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [64-bit-pointer mode ON
+-finternal-ebcdic mode ON
+], [])
+AT_CLEANUP
+
+AT_SETUP([CDF (1) IF = <text>])
+AT_KEYWORDS([cdf])
+AT_DATA([prog.cob],[
+       >>DEFINE FOO AS "on"
+       id division.
+       program-id. prog.
+       Data Division.
+       Working-Storage Section.
+         77 X PIC 9 value 1.
+       procedure division.
+           >>IF FOO = "on"
+           DISPLAY "                 FOO is on.".
+           >>END-IF
+           DISPLAY "Should have seen FOO is on.".
+           >>IF FOO = "off"
+           DISPLAY "                 FOO is off.".
+           >>END-IF
+           DISPLAY "Shouldn't see    FOO is off.".
+         a-paragraph.
+           EJECT
+         a-paragraph.
+           add 1 to X.
+           EJECT
+         a-paragraph.
+           EJECT
+         b-paragraph.
+           goback.
+])
+AT_CHECK([$COMPILE -dialect ibm prog.cob], [0], [],[])
+AT_CHECK([./a.out], [0], [                 FOO is on.
+Should have seen FOO is on.
+Shouldn't see    FOO is off.
+], [])
+AT_CLEANUP
+
+AT_SETUP([CDF (2) IF = <number>])
+AT_KEYWORDS([cdf])
+AT_DATA([prog.cob],[
+       >>DEFINE FOO AS 1
+       id division.
+       program-id. prog.
+       procedure division.
+           >>IF FOO = 1
+           DISPLAY "                 FOO is 1.".
+           >>END-IF
+           DISPLAY "Should have seen FOO is 1.".
+           >>IF FOO = 2
+           DISPLAY "                 FOO is 2.".
+           >>END-IF
+           DISPLAY "Shouldn't see    FOO is 2.".
+       goback.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [],[])
+AT_CHECK([./a.out], [0], [                 FOO is 1.
+Should have seen FOO is 1.
+Shouldn't see    FOO is 2.
+], [])
+AT_CLEANUP
+
+AT_SETUP([CDF (3) ALL NUMERIC COMPARISONS])
+AT_KEYWORDS([cdf])
+AT_DATA([prog.cob],[
+        >>DEFINE ONE AS 1
+        >>DEFINE TWO AS 2
+        >>DEFINE WUN AS 1
+        id division.
+        program-id. prog.
+        procedure division.
+            >>IF ONE = TWO
+            DISPLAY "??? ONE =  TWO ???"
+            >>END-IF
+            >>IF ONE <> TWO
+            DISPLAY "ONE <> TWO"
+            >>END-IF
+            >>IF ONE < TWO
+            DISPLAY "ONE <  TWO"
+            >>END-IF
+            >>IF ONE <= TWO
+            DISPLAY "ONE <= TWO"
+            >>END-IF
+            >>IF ONE >= TWO
+            DISPLAY "??? ONE >= TWO ???"
+            >>END-IF
+            >>IF ONE > TWO
+            DISPLAY "??? ONE > TWO ???"
+            >>END-IF
+            >>IF ONE = WUN
+            DISPLAY "ONE =  ONE"
+            >>END-IF
+            >>IF ONE <> WUN
+            DISPLAY "??? ONE <> ONE ???"
+            >>END-IF
+            >>IF ONE < WUN
+            DISPLAY "??? ONE <  ONE ???"
+            >>END-IF
+            >>IF ONE <= WUN
+            DISPLAY "ONE <= ONE"
+            >>END-IF
+            >>IF ONE >= WUN
+            DISPLAY "ONE >= ONE"
+            >>END-IF
+            >>IF ONE > WUN
+            DISPLAY "??? ONE > ONE ???"
+            >>END-IF
+        goback.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [],[])
+AT_CHECK([./a.out], [0], [ONE <> TWO
+ONE <  TWO
+ONE <= TWO
+ONE =  ONE
+ONE <= ONE
+ONE >= ONE
+], [])
+AT_CLEANUP
+
+
+AT_SETUP([CDF2 Trouble with >>IF (1)])
+AT_KEYWORDS([cdf define])
+AT_DATA([prog.cob], [
+      *> This compiles correctly; there should be no period after "prog"
+      *> and there should be a period after INITIAL.  But, IS INITIAL is
+      *> excluded because skip-init is not defined. 
+        identification division.
+        program-id. prog.
+        >>IF skip-init  IS DEFINED
+        IS INITIAL
+        >>END-IF
+        data division.
+        working-storage section.
+        77  VAR     INDEX.
+        procedure division.
+        set VAR TO +1
+        display var
+        set VAR TO -1000
+        display var
+        .
+        end program prog.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CLEANUP
+
+AT_SETUP([CDF2 Trouble with >>IF (2)])
+AT_KEYWORDS([cdf define])
+AT_DATA([prog.cob], [
+      *> This should compile, and doesn't
+        identification division.
+        program-id. prog2
+        >>IF skip-init  IS DEFINED
+        IS INITIAL .
+        >>END-IF
+        data division.
+        working-storage section.
+        77  VAR     INDEX.
+        procedure division.
+        set VAR TO +1
+        display var
+        set VAR TO -1000
+        display var
+        .
+        end program prog2.
+])
+AT_CHECK([$COMPILE prog.cob], [0], [], [])
+AT_CHECK([./a.out], [0], [1
+18446744073709550616
+], [])
+AT_CLEANUP
+
+AT_SETUP([skipping at the top])
+AT_KEYWORDS([cdf])
+AT_DATA([prog.cob], [
+        ID DIVISION.
+        PROGRAM-ID. TS00PCOl.
+        SKIP1
+        DATE-WRITTEN.
+])
+AT_CHECK([$COMPILE_ONLY prog.cob], [0], [], [])
+AT_CLEANUP
+
