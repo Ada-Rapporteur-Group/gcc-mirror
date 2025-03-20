@@ -1500,7 +1500,11 @@ bool is_prelive(insn_info *insn)
     }
 
     // this ignore clobbers, which is probably fine
-    if (def->kind() == access_kind::SET && HARD_REGISTER_NUM_P(def->regno())) {
+    if (def->kind() == access_kind::SET 
+        && (HARD_REGISTER_NUM_P(def->regno())
+        || (def->regno() == REGNO (pic_offset_table_rtx)
+        && REGNO (pic_offset_table_rtx) >= FIRST_PSEUDO_REGISTER))
+      ) {
       // We might try to write something like def->regno() == REGNO (pic_offset_table_rtx) ...
       // TODO : else if (DF_REF_REG (def) == pic_offset_table_rtx && REGNO (pic_offset_table_rtx) >= FIRST_PSEUDO_REGISTER)
       // std::cerr << "hello, dear hard register! regno: " << def->regno() << "\n";
