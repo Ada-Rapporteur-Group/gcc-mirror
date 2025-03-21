@@ -1306,10 +1306,6 @@ public:
 
 } // namespace
 
-// We should mark stack registers
-// use HARD_FRAME_POINTER_REGNUM, REGNO_PTR_FRAME_P
-// muzeme mit parallel, ktery ma napr. dva single sety, nebo asm statement
-// pouzit note_pattern_stores nebo note_stores
 bool sets_global_register(rtx_insn* insn) {
   rtx set = single_set(insn);
   if (!set)
@@ -1442,14 +1438,24 @@ bool is_rtx_insn_prelive(rtx_insn *insn) {
   //   return true;
 
   rtx body = PATTERN(insn);
-  if (GET_CODE(body) == CLOBBER) // gcc/gcc/testsuite/gcc.c-torture/compile/20000605-1.c
-    return true;
+  switch (GET_CODE(body)) {
+    case CLOBBER: // gcc/gcc/testsuite/gcc.c-torture/compile/20000605-1.c
+    case USE:
+    case VAR_LOCATION:
+    case PREFETCH: // This and following case might be removed since they are part of deletable_insn_p_1
+    case TRAP_IF:
+    case UNSPEC:
+      return true;
 
-  if (GET_CODE(body) == PREFETCH)
-    return true;
+    case PARALLEL:
+      for (int i = XVECLEN (body, 0) - 1; i >= 0; i--)
+        if (!deletable_insn_p_1 (XVECEXP (body, 0, i)))
+          return true;
+        return false;
 
-  if (GET_CODE(body) == USE || GET_CODE(body) == TRAP_IF || GET_CODE(body) == UNSPEC)
-    return true;
+    default:
+      return !deletable_insn_p_1 (body);
+  }
 
   // See deletable_insn_p_1 for UNSPEC. TRAP_IF is caught by may_trap_or_fault_p
 
@@ -1495,26 +1501,24 @@ bool is_prelive(insn_info *insn)
 
   for (auto&& __def : insn->defs()) {
     def_info * def = __def;
-    if (!def->is_reg()) {
-      continue;
+    // The purpose of this pass is not to eliminate stores to memory...
+    if (def->is_mem()) { // TODO : clobbered memory?
+      return true;
     }
 
-    // this ignore clobbers, which is probably fine
+    gcc_assert(def->is_reg());
+    // this ignores clobbers, which is probably fine
     if (def->kind() == access_kind::SET 
         && (HARD_REGISTER_NUM_P(def->regno())
-        || (def->regno() == REGNO (pic_offset_table_rtx)
-        && REGNO (pic_offset_table_rtx) >= FIRST_PSEUDO_REGISTER))
+        || ( pic_offset_table_rtx != nullptr 
+          && def->regno() == REGNO (pic_offset_table_rtx)
+          && REGNO (pic_offset_table_rtx) >= FIRST_PSEUDO_REGISTER))
       ) {
-      // We might try to write something like def->regno() == REGNO (pic_offset_table_rtx) ...
-      // TODO : else if (DF_REF_REG (def) == pic_offset_table_rtx && REGNO (pic_offset_table_rtx) >= FIRST_PSEUDO_REGISTER)
-      // std::cerr << "hello, dear hard register! regno: " << def->regno() << "\n";
+      // std::cerr << "hard reg marked: " << def->regno() << "in " << insn->uid() << "\n";
       // debug(rtl);
       return true;
     }
   }
-
-  // auto res = is_rtx_insn_prelive(rtl);
-  //std::cerr << "Trying to mark insn: " << insn->uid() << " as prelive: " << res << '\n';
 
   return is_rtx_insn_prelive(rtl);
 }
@@ -1539,7 +1543,9 @@ rtl_ssa_dce_prelive(std::unordered_set<insn_info *> &marked)
   {
     next = insn->next_any_insn();
     if (is_prelive(insn))
-      rtl_ssa_dce_mark_live(insn, worklist, marked);
+      {
+        // std::cout << "insn is prelive: " << insn->uid() << '\n';
+        rtl_ssa_dce_mark_live(insn, worklist, marked);}
 
     // if (insn->can_be_optimized () || insn->is_debug_insn ())
     //  if (fwprop_insn (insn, fwprop_addr_p))
@@ -1639,6 +1645,9 @@ rtl_ssa_dce_sweep(std::unordered_set<insn_info *> marked)
   // which will hopefully have constructor for array_slice<insn_info *>
   auto attempt = crtl->ssa->new_change_attempt ();
   // std::cerr << "Change attempt created successfully" << std::endl;
+  for (auto && insn : crtl->ssa->all_insns()) {
+
+  }
   for (insn_info *insn = crtl->ssa->first_insn(); insn; insn = next)
   {
     if (dump_file)
@@ -1646,22 +1655,24 @@ rtl_ssa_dce_sweep(std::unordered_set<insn_info *> marked)
       fprintf(dump_file, "Insn: %d\n", insn->uid());
     }
     next = insn->next_any_insn();
-    if (!(marked.count(insn) > 0))
+    if (marked.count(insn) > 0)
     {
-      if (dump_file)
-      {
-        fprintf(dump_file, "  Sweeping insn %d\n", insn->uid());
-      }
+      continue;
+    }
+    
+    if (dump_file)
+    {
+      fprintf(dump_file, "  Sweeping insn %d\n", insn->uid());
+    }
 
-      // Skip artificial insns (or uid() < 0)
-      if (insn->is_real())
-      {
-        // std::cerr << "Insn: " << insn->uid() << " will be deleted\n";
-        auto change = insn_change::delete_insn(insn);
-        // crtl->ssa->possibly_queue_changes(change);
-        to_delete.safe_push(change);
-        // crtl->ssa->change_insn(change);
-      }
+    // Skip artificial insns (or uid() < 0)
+    if (insn->is_real())
+    {
+      // std::cerr << "\033[32m" << "Insn: " << insn->uid() << " will be deleted" << "\033[0m \n";
+      auto change = insn_change::delete_insn(insn);
+      // crtl->ssa->possibly_queue_changes(change);
+      to_delete.safe_push(change);
+      // crtl->ssa->change_insn(change);
     }
   }
 
@@ -1711,13 +1722,16 @@ rtl_ssa_dce()
 {
   rtl_ssa_dce_init();
   // debug(crtl->ssa);
+  // for (rtx_insn * insn = get_insns (); insn != nullptr; insn = next_insn(insn)) {
+  //   debug(insn);
+  // }l
 
-  //std::cerr << "Next phase: prelive + mark: \n";
   std::unordered_set<insn_info *> marked = rtl_ssa_dce_mark();
-  // std::cerr << "Marking done\n";
   rtl_ssa_dce_sweep(marked);
-  // std::cerr << "Sweeping done\n";
   rtl_ssa_dce_done();
+  if (delete_trivially_dead_insns(get_insns (), max_reg_num ())) {
+    std::cerr << "\033[31m" << "rtl_ssa_dce did not delete everything :(" << "\033[0m" << "\n";
+  }
 
   return 0;
 }
