@@ -7047,7 +7047,11 @@ extern string_slice get_target_version (const tree);
    a decl.  Can also record the number of default versions found.  */
 extern auto_vec<string_slice> get_clone_versions (const tree, int * = NULL);
 /* Returns a vector of the version strings from a target_clones attribute
-   directly.  */
-extern auto_vec<string_slice> get_clone_attr_versions (const tree, int *);
+   directly.  Additionally takes a location for potential diagnostics to be
+   emmitted for and a bool to control whether or not the results should
+   be filtered with TARGET_REJECT_FUNCTION_CLONE_VERSION.  */
+extern auto_vec<string_slice> get_clone_attr_versions (const tree, int *,
+						       location_t loc,
+						       bool = true);
 
 #endif  /* GCC_TREE_H  */

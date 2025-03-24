@@ -1242,6 +1242,13 @@ common_function_versions (tree fn1, tree fn2)
   return result;
 }
 
+bool
+reject_target_clone_version (string_slice str ATTRIBUTE_UNUSED,
+			     location_t loc ATTRIBUTE_UNUSED)
+{
+  return false;
+}
+
 /* Make a dispatcher declaration for the multi-versioned function DECL.
    Calls to DECL function will be replaced with calls to the dispatcher
    by the front-end.  Return the decl created.  */

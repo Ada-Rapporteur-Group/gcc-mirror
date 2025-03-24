@@ -31233,6 +31233,23 @@ aarch64_expand_reversed_crc_using_pmull (scalar_mode crc_mode,
     }
 }
 
+bool
+aarch64_reject_target_clone_version (string_slice str,
+				     location_t loc ATTRIBUTE_UNUSED)
+{
+  str = str.strip ();
+
+  if (str == "default")
+    return false;
+
+  enum aarch_parse_opt_result parse_res;
+  auto isa_flags = aarch64_asm_isa_flags;
+  parse_res = aarch64_parse_fmv_features (str, &isa_flags, NULL, NULL);
+
+  /* Reject any version which does not parse.  */
+  return parse_res != AARCH_PARSE_OK;
+}
+
 /* Target-specific selftests.  */
 
 #if CHECKING_P
@@ -32055,6 +32072,9 @@ aarch64_libgcc_floating_mode_supported_p
 
 #undef TARGET_OPTION_FUNCTION_VERSIONS
 #define TARGET_OPTION_FUNCTION_VERSIONS aarch64_common_function_versions
+
+#undef TARGET_REJECT_FUNCTION_CLONE_VERSION
+#define TARGET_REJECT_FUNCTION_CLONE_VERSION aarch64_reject_target_clone_version
 
 #undef TARGET_COMPARE_VERSION_PRIORITY
 #define TARGET_COMPARE_VERSION_PRIORITY aarch64_compare_version_priority

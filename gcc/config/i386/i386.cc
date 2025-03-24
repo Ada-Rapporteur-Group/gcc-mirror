@@ -27148,6 +27148,9 @@ ix86_libgcc_floating_mode_supported_p
 #undef TARGET_OPTION_FUNCTION_VERSIONS
 #define TARGET_OPTION_FUNCTION_VERSIONS common_function_versions
 
+#undef TARGET_REJECT_FUNCTION_CLONE_VERSION
+#define TARGET_REJECT_FUNCTION_CLONE_VERSION reject_target_clone_version
+
 #undef TARGET_CAN_INLINE_P
 #define TARGET_CAN_INLINE_P ix86_can_inline_p
 

@@ -13211,6 +13211,21 @@ riscv_common_function_versions (tree fn1, tree fn2)
   return riscv_compare_version_priority (fn1, fn2) != 0;
 }
 
+bool
+riscv_reject_target_clone_version (string_slice str, location_t loc)
+{
+  struct riscv_feature_bits mask;
+  int prio;
+
+  /* Currently it is not possible to parse without emitting errors on failure
+     so do not reject on a failed parse, as this would then emit two
+     diagnostics.  Instead let errors be emitted which will halt
+     compilation.  */
+  parse_features_for_version (str, loc, mask, prio);
+
+  return false;
+}
+
 /* Implement TARGET_MANGLE_DECL_ASSEMBLER_NAME, to add function multiversioning
    suffixes.  */
 
@@ -14357,6 +14372,9 @@ bool need_shadow_stack_push_pop_p ()
 
 #undef TARGET_COMPARE_VERSION_PRIORITY
 #define TARGET_COMPARE_VERSION_PRIORITY riscv_compare_version_priority
+
+#undef TARGET_REJECT_FUNCTION_CLONE_VERSION
+#define TARGET_REJECT_FUNCTION_CLONE_VERSION riscv_reject_target_clone_version
 
 #undef TARGET_OPTION_FUNCTION_VERSIONS
 #define TARGET_OPTION_FUNCTION_VERSIONS riscv_common_function_versions

@@ -6132,12 +6132,28 @@ handle_target_clones_attribute (tree *node, tree name, tree ARG_UNUSED (args),
 	    }
 	}
 
-      auto_vec<string_slice> versions= get_clone_attr_versions (args, NULL);
+      int num_defaults = 0;
+      auto_vec<string_slice> versions= get_clone_attr_versions (args,
+				      &num_defaults,
+				      DECL_SOURCE_LOCATION (*node),
+				      false);
 
-      if (versions.length () == 1)
-	{
+      for (auto v : versions)
+	if (targetm.reject_function_clone_version
+	      (v, DECL_SOURCE_LOCATION (*node)))
 	  warning (OPT_Wattributes,
-		   "single %<target_clones%> attribute is ignored");
+		   "invalid %<target_clones%> version %qB ignored",
+		   &v);
+
+      /* Lone target_clones version is always ignored for target attr semantics.
+	 Only ignore under target_version semantics if it is a default
+	 version.  */
+      if (versions.length () == 1 && (TARGET_HAS_FMV_TARGET_ATTRIBUTE
+				      || num_defaults == 1))
+	{
+	  if (TARGET_HAS_FMV_TARGET_ATTRIBUTE)
+	    warning (OPT_Wattributes,
+		     "single %<target_clones%> attribute is ignored");
 	  *no_add_attrs = true;
 	}
       else

@@ -15350,7 +15350,10 @@ get_attr_nonstring_decl (tree expr, tree *ref)
    ARGLIST.  DEFAULT_COUNT is incremented for each default version found.  */
 
 auto_vec<string_slice>
-get_clone_attr_versions (const tree arglist, int *default_count)
+get_clone_attr_versions (const tree arglist,
+			 int *default_count,
+			 location_t loc,
+			 bool filter)
 {
   gcc_assert (TREE_CODE (arglist) == TREE_LIST);
   auto_vec<string_slice> versions;
@@ -15365,6 +15368,9 @@ get_clone_attr_versions (const tree arglist, int *default_count)
 	{
 	  string_slice attr = string_slice::tokenize (&str, separators);
 	  attr = attr.strip ();
+
+	  if (filter && targetm.reject_function_clone_version (attr, loc))
+	    continue;
 
 	  if (attr == "default" && default_count)
 	    (*default_count)++;
@@ -15384,7 +15390,9 @@ get_clone_versions (const tree decl, int *default_count)
   if (!attr)
     return auto_vec<string_slice> ();
   tree arglist = TREE_VALUE (attr);
-  return get_clone_attr_versions (arglist, default_count);
+  return get_clone_attr_versions (arglist,
+				  default_count,
+				  DECL_SOURCE_LOCATION (decl));
 }
 
 /* Only works for target_version due to target attributes allowing multiple
