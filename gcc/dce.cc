@@ -1394,6 +1394,18 @@ bool side_effects_with_mem (const_rtx x)
   return false;
 }
 
+bool is_ssa_prelive(const_rtx insn) {
+  switch (GET_CODE(insn)) {
+    case PREFETCH:
+    case UNSPEC:
+    case TRAP_IF:
+      return true;
+
+    default:
+      return side_effects_p(insn);
+  }
+}
+
 bool is_rtx_insn_prelive(rtx_insn *insn) {
   gcc_assert(insn != nullptr);
 
@@ -1401,6 +1413,7 @@ bool is_rtx_insn_prelive(rtx_insn *insn) {
   // According to the docs, rtl ssa does not contain noteS and barrierS 
   if (!NONJUMP_INSN_P (insn))
   {
+    // This handles jumps, debug_insns, call_insn, ...
     //std::cerr << "found jump instruction\n";
     //debug(insn);
     return true;
@@ -1437,6 +1450,8 @@ bool is_rtx_insn_prelive(rtx_insn *insn) {
   // if (sets_global_register(insn)) // check rtx_class with GET_RTX_CLASS if RTX_ISNS and convert if needed
   //   return true;
 
+  // TODO : asm_noperands???
+
   rtx body = PATTERN(insn);
   switch (GET_CODE(body)) {
     case CLOBBER: // gcc/gcc/testsuite/gcc.c-torture/compile/20000605-1.c
@@ -1449,12 +1464,12 @@ bool is_rtx_insn_prelive(rtx_insn *insn) {
 
     case PARALLEL:
       for (int i = XVECLEN (body, 0) - 1; i >= 0; i--)
-        if (!deletable_insn_p_1 (XVECEXP (body, 0, i)))
+        if (is_ssa_prelive (XVECEXP (body, 0, i)))
           return true;
-        return false;
+      return false;
 
     default:
-      return !deletable_insn_p_1 (body);
+      return is_ssa_prelive (body);
   }
 
   // See deletable_insn_p_1 for UNSPEC. TRAP_IF is caught by may_trap_or_fault_p
@@ -1514,6 +1529,8 @@ bool is_prelive(insn_info *insn)
           && def->regno() == REGNO (pic_offset_table_rtx)
           && REGNO (pic_offset_table_rtx) >= FIRST_PSEUDO_REGISTER))
       ) {
+        // TODO : set_noop_p?
+
       // std::cerr << "hard reg marked: " << def->regno() << "in " << insn->uid() << "\n";
       // debug(rtl);
       return true;
@@ -1722,17 +1739,31 @@ rtl_ssa_dce()
 {
   rtl_ssa_dce_init();
   // debug(crtl->ssa);
+  // std::cout << "\033[31m" << "Before rtl ssa dce pass" << "\033[0m" << "\n";
+
   // for (rtx_insn * insn = get_insns (); insn != nullptr; insn = next_insn(insn)) {
-  //   debug(insn);
-  // }l
+    // debug(insn);
+  // }
+
+  // std::cout << "\033[31m" << "Before rtl ssa dce pass end" << "\033[0m" << "\n";
+
 
   std::unordered_set<insn_info *> marked = rtl_ssa_dce_mark();
   rtl_ssa_dce_sweep(marked);
   rtl_ssa_dce_done();
+  // std::cout << "\033[32m" << "After rtl ssa dce" << "\033[0m" << "\n";
+  // for (rtx_insn * insn = get_insns (); insn != nullptr; insn = next_insn(insn)) {
+    // debug(insn);
+  // }
   if (delete_trivially_dead_insns(get_insns (), max_reg_num ())) {
+    // std::cout << "\033[31m" << "Some insns deleted by delete_trivially_dead_insns" << "\033[0m" << "\n";
+    // for (rtx_insn * insn = get_insns (); insn != nullptr; insn = next_insn(insn)) {
+      // debug(insn);
+    // }
     std::cerr << "\033[31m" << "rtl_ssa_dce did not delete everything :(" << "\033[0m" << "\n";
   }
 
+  // std::cout << "rtl ssa dce FINISH\n";
   return 0;
 }
 
