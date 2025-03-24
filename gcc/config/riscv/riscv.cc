@@ -13092,31 +13092,22 @@ riscv_c_mode_for_floating_type (enum tree_index ti)
   return default_mode_for_floating_type (ti);
 }
 
-/* This parses the attribute arguments to target_version in DECL and modifies
-   the feature mask and priority required to select those targets.  */
-static void
-parse_features_for_version (tree decl,
+/* This parses STR and modifies the feature mask and priority required to
+   select those targets.  */
+static bool
+parse_features_for_version (string_slice version_str,
+			    location_t loc,
 			    struct riscv_feature_bits &res,
 			    int &priority)
 {
-  tree version_attr = lookup_attribute ("target_version",
-					DECL_ATTRIBUTES (decl));
-  if (version_attr == NULL_TREE)
+  gcc_assert (version_str.is_valid ());
+  if (version_str == "default")
     {
       res.length = 0;
       priority = 0;
-      return;
+      return true;
     }
 
-  const char *version_string = TREE_STRING_POINTER (TREE_VALUE (TREE_VALUE
-						    (version_attr)));
-  gcc_assert (version_string != NULL);
-  if (strcmp (version_string, "default") == 0)
-    {
-      res.length = 0;
-      priority = 0;
-      return;
-    }
   struct cl_target_option cur_target;
   cl_target_option_save (&cur_target, &global_options,
 			 &global_options_set);
@@ -13126,21 +13117,20 @@ parse_features_for_version (tree decl,
   cl_target_option_restore (&global_options, &global_options_set,
 			    default_opts);
 
-  riscv_process_target_version_attr (TREE_VALUE (version_attr),
-				     DECL_SOURCE_LOCATION (decl));
+  riscv_process_target_version_str (version_str, loc);
 
   priority = global_options.x_riscv_fmv_priority;
   const char *arch_string = global_options.x_riscv_arch_string;
   bool parse_res
     = riscv_minimal_hwprobe_feature_bits (arch_string, &res,
-					  DECL_SOURCE_LOCATION (decl));
-  gcc_assert (parse_res);
+					  loc);
 
   if (arch_string != default_opts->x_riscv_arch_string)
     free (CONST_CAST (void *, (const void *) arch_string));
 
   cl_target_option_restore (&global_options, &global_options_set,
 			    &cur_target);
+  return parse_res;
 }
 
 /* Compare priorities of two feature masks.  Return:
@@ -13193,8 +13183,16 @@ riscv_compare_version_priority (tree decl1, tree decl2)
   struct riscv_feature_bits mask1, mask2;
   int prio1, prio2;
 
-  parse_features_for_version (decl1, mask1, prio1);
-  parse_features_for_version (decl2, mask2, prio2);
+  string_slice v1 = get_target_version (decl1);
+  string_slice v2 = get_target_version (decl2);
+
+  if (!v1.is_valid ())
+    v1 = "default";
+  if (!v2.is_valid ())
+    v2 = "default";
+
+  parse_features_for_version (v1, DECL_SOURCE_LOCATION (decl1), mask1, prio1);
+  parse_features_for_version (v2, DECL_SOURCE_LOCATION (decl1), mask2, prio2);
 
   return compare_fmv_features (mask1, mask2, prio1, prio2);
 }
@@ -13495,7 +13493,11 @@ dispatch_function_versions (tree dispatch_decl,
       struct function_version_info version_info;
       version_info.version_decl = version_decl;
       // Get attribute string, parse it and find the right features.
-      parse_features_for_version (version_decl,
+      string_slice v = get_target_version (version_decl);
+      if (!v.is_valid ())
+	v = "default";
+      parse_features_for_version (v,
+				  DECL_SOURCE_LOCATION (version_decl),
 				  version_info.features,
 				  version_info.prio);
       function_versions.push_back (version_info);
