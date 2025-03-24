@@ -1120,7 +1120,10 @@ fns_correspond (tree newdecl, tree olddecl)
    `const int&'.  */
 
 int
-decls_match (tree newdecl, tree olddecl, bool record_versions /* = true */)
+decls_match (tree newdecl,
+	     tree olddecl,
+	     bool record_versions /* = true */,
+	     string_slice *conflicting_version)
 {
   int types_match;
 
@@ -1213,7 +1216,7 @@ decls_match (tree newdecl, tree olddecl, bool record_versions /* = true */)
       if (types_match
 	  && !DECL_EXTERN_C_P (newdecl)
 	  && !DECL_EXTERN_C_P (olddecl)
-	  && targetm.target_option.function_versions (newdecl, olddecl))
+	  && distinct_version_decls (newdecl, olddecl, conflicting_version))
 	{
 	  if (record_versions)
 	    maybe_version_functions (newdecl, olddecl);
@@ -1296,7 +1299,7 @@ maybe_mark_function_versioned (tree decl)
 bool
 maybe_version_functions (tree newdecl, tree olddecl)
 {
-  if (!targetm.target_option.function_versions (newdecl, olddecl))
+  if (!distinct_version_decls (newdecl, olddecl))
     return false;
 
   maybe_mark_function_versioned (olddecl);
@@ -1686,11 +1689,12 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
   tree new_template_info;
   location_t olddecl_loc = DECL_SOURCE_LOCATION (olddecl);
   location_t newdecl_loc = DECL_SOURCE_LOCATION (newdecl);
+  string_slice conflicting_version = string_slice::invalid ();
 
   if (newdecl == olddecl)
     return olddecl;
 
-  types_match = decls_match (newdecl, olddecl);
+  types_match = decls_match (newdecl, olddecl, true, &conflicting_version);
 
   /* If either the type of the new decl or the type of the old decl is an
      error_mark_node, then that implies that we have already issued an
@@ -2106,6 +2110,16 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
       /* Leave it to update_binding to merge or report error.  */
       return NULL_TREE;
     }
+  else if (!TARGET_HAS_FMV_TARGET_ATTRIBUTE
+	   && !mergeable_version_decls (newdecl, olddecl))
+    {
+      /* newdecl defines an overlapping FMV version with olddecl but they
+	 cannot be merged so are conflicting.  */
+      gcc_assert (conflicting_version.is_valid ());
+      error_at (newdecl_loc, "conflicting %qB versions", &conflicting_version);
+      inform (olddecl_loc, "previous definition");
+      return error_mark_node;
+    }
   else
     {
       const char *errmsg = redeclaration_error_message (newdecl, olddecl);
@@ -2114,10 +2128,23 @@ duplicate_decls (tree newdecl, tree olddecl, bool hiding, bool was_hidden)
 	  auto_diagnostic_group d;
 	  error_at (newdecl_loc, errmsg, newdecl);
 	  if (DECL_NAME (olddecl) != NULL_TREE)
-	    inform (olddecl_loc,
-		    (DECL_INITIAL (olddecl) && namespace_bindings_p ())
-		    ? G_("%q#D previously defined here")
-		    : G_("%q#D previously declared here"), olddecl);
+	    {
+	      /* If conflicting_version is set then this collision is between
+		 two FMV annotated functions.  */
+	      if (conflicting_version.is_valid ())
+		inform (olddecl_loc,
+			(DECL_INITIAL (olddecl) && namespace_bindings_p ())
+			? G_("%qB version of %q#D previously defined here")
+			: G_("%qB version of %q#D previously declared here"),
+			&conflicting_version,
+			olddecl);
+	      else
+		inform (olddecl_loc,
+			(DECL_INITIAL (olddecl) && namespace_bindings_p ())
+			? G_("%q#D previously defined here")
+			: G_("%q#D previously declared here"),
+			olddecl);
+	    }
 	  if (cxx_dialect >= cxx26
 	      && DECL_NAME (newdecl)
 	      && id_equal (DECL_NAME (newdecl), "_")

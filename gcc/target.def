@@ -6912,13 +6912,13 @@ changed via the optimize attribute or pragma, see\n\
    that is, they are compiled for different target machines.  */
 DEFHOOK
 (function_versions,
- "This target hook returns @code{true} if @var{DECL1} and @var{DECL2} are\n\
+ "This target hook returns @code{true} if @var{fn1} and @var{fn2} are\n\
 versions of the same function.  @var{DECL1} and @var{DECL2} are function\n\
 versions if and only if they have the same function signature and\n\
 different target specific attributes, that is, they are compiled for\n\
 different target machines.",
- bool, (tree decl1, tree decl2),
- hook_bool_tree_tree_false)
+ bool, (string_slice fn1, string_slice fn2),
+ NULL)
 
 /* Function to determine if one function can inline another function.  */
 #undef HOOK_PREFIX

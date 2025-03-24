@@ -15411,6 +15411,210 @@ get_target_version (const tree decl)
 	   .strip ();
 }
 
+bool
+distinct_version_decls (tree fn1, tree fn2, string_slice *conflicting_version)
+{
+  if (TREE_CODE (fn1) != FUNCTION_DECL
+      || TREE_CODE (fn2) != FUNCTION_DECL)
+    return false;
+
+  if (TARGET_HAS_FMV_TARGET_ATTRIBUTE)
+    {
+      tree attr1 = lookup_attribute ("target", DECL_ATTRIBUTES (fn1));
+      tree attr2 = lookup_attribute ("target", DECL_ATTRIBUTES (fn2));
+
+      /* At least one function decl should have the target attribute
+	 specified.  */
+      if (attr1 == NULL_TREE && attr2 == NULL_TREE)
+	return false;
+
+      /* Diagnose missing target attribute if one of the decls is already
+	 multi-versioned.  */
+      if (attr1 == NULL_TREE || attr2 == NULL_TREE)
+	{
+	  if (DECL_FUNCTION_VERSIONED (fn1) || DECL_FUNCTION_VERSIONED (fn2))
+	    {
+	      if (attr2 != NULL_TREE)
+		{
+		  std::swap (fn1, fn2);
+		  attr1 = attr2;
+		}
+	      auto_diagnostic_group d;
+	      error_at (DECL_SOURCE_LOCATION (fn2),
+			"missing %<target%> attribute for multi-versioned %qD",
+			fn2);
+	      inform (DECL_SOURCE_LOCATION (fn1),
+		      "previous declaration of %qD", fn1);
+	      /* Prevent diagnosing of the same error multiple times.  */
+	      DECL_ATTRIBUTES (fn2)
+		= tree_cons (get_identifier ("target"),
+			     copy_node (TREE_VALUE (attr1)),
+			     DECL_ATTRIBUTES (fn2));
+	    }
+	  return false;
+	}
+
+      char *target1 = sorted_attr_string (TREE_VALUE (attr1));
+      char *target2 = sorted_attr_string (TREE_VALUE (attr2));
+
+      /* The sorted target strings must be different for fn1 and fn2
+	 to be versions.  */
+      bool result = strcmp (target1, target2) != 0;
+
+      XDELETEVEC (target1);
+      XDELETEVEC (target2);
+
+      return result;
+    }
+  else
+    {
+      /* As this is symmetric, can remove the case where fn2 is target clone
+	 and fn1 is target version by swapping here.  */
+      if (lookup_attribute ("target_clones", DECL_ATTRIBUTES (fn2)))
+	std::swap (fn1, fn2);
+
+      if (lookup_attribute ("target_clones", DECL_ATTRIBUTES (fn1)))
+	{
+	  auto_vec<string_slice> fn1_versions = get_clone_versions (fn1);
+	  /* fn1 is target_clone.  */
+	  if (lookup_attribute ("target_clones", DECL_ATTRIBUTES (fn2)))
+	    {
+	      /* Both are target_clone.  */
+	      auto_vec<string_slice> fn2_versions = get_clone_versions (fn2);
+	      for (string_slice v1 : fn1_versions)
+		{
+		  for (string_slice v2 : fn2_versions)
+		    if (targetm.target_option.function_versions (v1, v2))
+		      {
+			if (conflicting_version)
+			  *conflicting_version= v1;
+			return false;
+		      }
+		}
+	      return true;
+	    }
+	  else
+	    {
+	      string_slice v2 = get_target_version (fn2);
+
+	      /* target and target_clones is always conflicting for target
+		 semantics.  */
+	      if (TARGET_HAS_FMV_TARGET_ATTRIBUTE)
+		return false;
+
+	      /* Only fn1 is target clone.  */
+	      if (!v2.is_valid ())
+		v2 = "default";
+	      for (string_slice v1 : fn1_versions)
+		if (targetm.target_option.function_versions (v1, v2))
+		  {
+		    if (conflicting_version)
+		      *conflicting_version= v1;
+		    return false;
+		  }
+	      return true;
+	    }
+	}
+      else
+	{
+	  /* Both are target_version.  */
+	  string_slice v1 = get_target_version (fn1);
+	  string_slice v2 = get_target_version (fn2);
+
+	  if (!v1.is_valid () && !v2.is_valid ())
+	    return false;
+
+	  if (!v1.is_valid ())
+	    v1 = "default";
+	  if (!v2.is_valid ())
+	    v2 = "default";
+
+	  if (targetm.target_option.function_versions (v1, v2))
+	    {
+	      if (conflicting_version)
+		*conflicting_version = v1;
+	      return false;
+	    }
+
+	  return true;
+	}
+    }
+}
+
+/* check if the target_version/target_clones attributes are mergeable
+   for two decls.  */
+bool
+mergeable_version_decls (tree fn1, tree fn2)
+{
+  gcc_assert (!TARGET_HAS_FMV_TARGET_ATTRIBUTE);
+
+  string_slice fn1_target_attr = get_target_version (fn1);
+  string_slice fn2_target_attr = get_target_version (fn2);
+
+  tree fn1_target_clones_attr = lookup_attribute ("target_clones",
+						  DECL_ATTRIBUTES (fn1));
+  tree fn2_target_clones_attr = lookup_attribute ("target_clones",
+						  DECL_ATTRIBUTES (fn2));
+
+  /* If none of these are annotated, then it is mergeable.  */
+  if (!fn1_target_attr.is_valid ()
+      && !fn1_target_attr.is_valid ()
+      && !fn1_target_clones_attr
+      && !fn2_target_clones_attr)
+    return true;
+
+  /* If fn1 is unnanotated and fn2 contains default, then is mergeable.  */
+  if (!fn1_target_attr.is_valid ()
+      && !fn1_target_clones_attr
+      && is_function_default_version (fn2))
+    return true;
+
+  if (fn1_target_clones_attr && fn2_target_clones_attr)
+    {
+      auto_vec<string_slice> fn1_versions = get_clone_versions (fn1);
+      auto_vec<string_slice> fn2_versions = get_clone_versions (fn2);
+
+      if (fn1_versions.length () != fn2_versions.length ())
+	return false;
+
+      /* Check both inclusion directions.  */
+      for (auto fn1v : fn1_versions)
+	{
+	  bool matched = false;
+	  for (auto fn2v : fn2_versions)
+	    if (targetm.target_option.function_versions (fn1v, fn2v))
+	      matched = true;
+	  if (!matched)
+	    return false;
+	}
+
+      for (auto fn2v : fn2_versions)
+	{
+	  bool matched = false;
+	  for (auto fn1v : fn1_versions)
+	    if (targetm.target_option.function_versions (fn1v, fn2v))
+	      matched = true;
+	  if (!matched)
+	    return false;
+	}
+
+      return true;
+    }
+
+  /* If olddecl is target clones but not newdecl, never mergeable.  */
+  if (fn1_target_clones_attr || fn2_target_clones_attr)
+    return false;
+
+  if (!fn1_target_attr.is_valid ())
+    fn1_target_attr = "default";
+  if (!fn2_target_attr.is_valid ())
+    fn2_target_attr = "default";
+
+  /* Mergeable if define the same version.  */
+  return targetm.target_option.function_versions (fn1_target_attr,
+						  fn2_target_attr);
+}
+
 void
 tree_cc_finalize (void)
 {

@@ -54,7 +54,8 @@ extern struct scoped_attributes *
   register_scoped_attributes (const scoped_attribute_specs &, bool = false);
 
 extern char *sorted_attr_string (tree);
-extern bool common_function_versions (tree, tree);
+extern bool common_function_versions (string_slice, string_slice);
+extern bool reject_target_clone_version (string_slice, location_t);
 extern tree make_dispatcher_decl (const tree);
 extern bool is_function_default_version (const tree);
 extern void handle_ignored_attributes_option (vec<char *> *);

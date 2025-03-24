@@ -7054,4 +7054,10 @@ extern auto_vec<string_slice> get_clone_attr_versions (const tree, int *,
 						       location_t loc,
 						       bool = true);
 
+/* Checks if two decls define any overlapping versions.  If they do updates
+   the string slice with the overlapping version.  */
+extern bool distinct_version_decls (tree, tree, string_slice * = NULL);
+/* Checks if two overlapping decls are mergeable..  */
+extern bool mergeable_version_decls (tree, tree);
+
 #endif  /* GCC_TREE_H  */
