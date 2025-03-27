@@ -231,43 +231,49 @@ cgraph_node::delete_function_version_by_decl (tree decl)
   decl_node->remove ();
 }
 
-/* Record that DECL1 and DECL2 are semantically identical function
-   versions.  */
+/* Add decl to the structure of semantically identical function versions..  */
 void
-cgraph_node::record_function_versions (tree decl1, tree decl2)
+cgraph_node::add_function_version (cgraph_function_version_info *fn_v,
+				   tree decl)
 {
-  cgraph_node *decl1_node = cgraph_node::get_create (decl1);
-  cgraph_node *decl2_node = cgraph_node::get_create (decl2);
-  cgraph_function_version_info *decl1_v = NULL;
-  cgraph_function_version_info *decl2_v = NULL;
+  cgraph_node *decl_node = cgraph_node::get_create (decl);
+  cgraph_function_version_info *decl_v = NULL;
+
   cgraph_function_version_info *before;
   cgraph_function_version_info *after;
 
-  gcc_assert (decl1_node != NULL && decl2_node != NULL);
-  decl1_v = decl1_node->function_version ();
-  decl2_v = decl2_node->function_version ();
+  gcc_assert (decl_node != NULL);
 
-  if (decl1_v != NULL && decl2_v != NULL)
+  decl_v = decl_node->function_version ();
+
+  /* If the nodes are already linked, skip.  */
+  if (decl_v != NULL && (decl_v->next || decl_v->prev))
     return;
 
-  if (decl1_v == NULL)
-    decl1_v = decl1_node->insert_new_function_version ();
+  if (decl_v == NULL)
+    decl_v = decl_node->insert_new_function_version ();
 
-  if (decl2_v == NULL)
-    decl2_v = decl2_node->insert_new_function_version ();
+  gcc_assert (decl_v);
+  gcc_assert (fn_v);
 
-  /* Chain decl2_v and decl1_v.  All semantically identical versions
-     will be chained together.  */
+  before = fn_v;
+  after = decl_v;
 
-  before = decl1_v;
-  after = decl2_v;
+  /* Go to the beginning of both nodes (as after is on its own we just need to
+     this for before).  */
+  while (before->prev != NULL)
+    before = before->prev;
 
+  /* Potentially swap the nodes to maintain the default always being in the
+     first position.  */
+  if (is_function_default_version (decl))
+    std::swap (before, after);
+
+  /* Go to last node of before.  */
   while (before->next != NULL)
     before = before->next;
 
-  while (after->prev != NULL)
-    after= after->prev;
-
+  /* Chain decl2_v and decl1_v.  */
   before->next = after;
   after->prev = before;
 }
