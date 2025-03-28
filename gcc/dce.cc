@@ -1306,6 +1306,32 @@ public:
 
 } // namespace
 
+struct offset_bitmap {
+  private:
+    const int m_offset;
+    sbitmap m_bitmap;
+  
+  public:
+    offset_bitmap(size_t size, int offset) : m_bitmap{sbitmap_alloc(size)} {}
+    offset_bitmap(int min_index, int max_index) : offset_bitmap(max_index - min_index, 0) {}
+
+    void clear_bit(int index) {
+      bitmap_clear_bit(m_bitmap, index + m_offset);
+    }
+
+    void set_bit(int index) {
+      bitmap_set_bit(m_bitmap, index + m_offset);
+    }
+
+    bool get_bit(int index) {
+      return bitmap_bit_p(m_bitmap, index + m_offset);
+    }
+
+    ~offset_bitmap() {
+      sbitmap_free(m_bitmap);
+    }
+};
+
 bool sets_global_register(rtx_insn* insn) {
   rtx set = single_set(insn);
   if (!set)
@@ -1409,13 +1435,9 @@ bool is_ssa_prelive(const_rtx insn) {
 bool is_rtx_insn_prelive(rtx_insn *insn) {
   gcc_assert(insn != nullptr);
 
-  // Jumps, notes, barriers should not be deleted
-  // According to the docs, rtl ssa does not contain noteS and barrierS 
   if (!NONJUMP_INSN_P (insn))
   {
     // This handles jumps, debug_insns, call_insn, ...
-    //std::cerr << "found jump instruction\n";
-    //debug(insn);
     return true;
   }
 
@@ -1445,10 +1467,6 @@ bool is_rtx_insn_prelive(rtx_insn *insn) {
   /* Callee-save restores are needed.  */
   if (RTX_FRAME_RELATED_P (insn) && crtl->shrink_wrapped_separate && find_reg_note (insn, REG_CFA_RESTORE, NULL))
     return true;
-
-  // Mark set of a global register
-  // if (sets_global_register(insn)) // check rtx_class with GET_RTX_CLASS if RTX_ISNS and convert if needed
-  //   return true;
 
   // TODO : asm_noperands???
 
@@ -1561,8 +1579,8 @@ rtl_ssa_dce_prelive(std::unordered_set<insn_info *> &marked)
     next = insn->next_any_insn();
     if (is_prelive(insn))
       {
-        // std::cout << "insn is prelive: " << insn->uid() << '\n';
-        rtl_ssa_dce_mark_live(insn, worklist, marked);}
+        rtl_ssa_dce_mark_live(insn, worklist, marked);
+      }
 
     // if (insn->can_be_optimized () || insn->is_debug_insn ())
     //  if (fwprop_insn (insn, fwprop_addr_p))
@@ -1575,9 +1593,6 @@ rtl_ssa_dce_prelive(std::unordered_set<insn_info *> &marked)
 static std::unordered_set<insn_info *>
 rtl_ssa_dce_mark()
 {
-  std::unordered_set<set_info *> marked_sets{};
-
-
   std::unordered_set<insn_info *> marked{};
   // phi insn might have more that one phi node: gcc/gcc/testsuite/gcc.c-torture/execute/20000224-1.c
   std::unordered_set<phi_info *> marked_phi_nodes{};
@@ -1586,7 +1601,6 @@ rtl_ssa_dce_mark()
   auto_vec<set_info *> worklist_new{};
   for (auto && item : worklist) {
     insn_info * insn = item;
-    // std::cerr << "cp Current: " << insn->uid() << '\n';
     for (auto&& use : insn->uses()) {
       set_info* set = use->def();
       if (set) {
@@ -1621,6 +1635,8 @@ rtl_ssa_dce_mark()
 
     use_array uses = insn->uses();
     if (insn->is_phi()) {
+      // Each phi node has a unique uid, yeeey
+      // So, only one bitmap (with shift) in needed.
       phi_info* pi = as_a<phi_info *> (set);
       if (marked_phi_nodes.count(pi) > 0) {
         continue;
@@ -1711,6 +1727,41 @@ rtl_ssa_dce_sweep(std::unordered_set<insn_info *> marked)
 }
 
 static void
+rtl_ssa_dce_transform_insns_to_debug() {
+  // TODO : bude nejspise zase treba rozdelit phi a ostatni insns
+  std::unordered_set<int> is_debug;
+
+  // chceme prochazet v post orderu, abychom nejdrive zpracovali zavislosti a pak az definici
+  // nelze jen menit instrukce, protoze musime informaci propagovat pres phi node
+  for (insn_info * insn : crtl->ssa->reverse_all_insns()) {
+    if (insn->is_debug_insn()) { // phi is never debug
+        // TODO : store info about this insn
+
+        is_debug.emplace(insn->uid());
+        continue;
+    }
+
+    if (insn->is_phi()) {
+      // TODO : special handling for phi_node required
+    }
+
+    bool is_debug = true;
+    for (def_info *def : insn->defs()) {
+      // TODO : how to cast this correctly? - clobber_info
+      if (def->mode() == access_kind::CLOBBER)
+        continue;
+      set_info* set = as_a<set_info*>(def);
+      for (use_info * use : set->all_uses()) {
+        auto iii = use->insn()->uid();
+      }
+    }
+
+    // TODO : projit vsechny set_infa a podivat se, zda jsou zavisloti jen debug
+    // Musime si dat pozor na phi - tam je treba se podivat na kontretni phi node
+  }
+}
+
+static void
 rtl_ssa_dce_init()
 {
   // internal compiler error: gcc.c-torture/execute/20040811-1.c - rtl_ssa::function_info::add_phi_nodes
@@ -1738,8 +1789,9 @@ static unsigned int
 rtl_ssa_dce()
 {
   rtl_ssa_dce_init();
-  // debug(crtl->ssa);
-  // std::cout << "\033[31m" << "Before rtl ssa dce pass" << "\033[0m" << "\n";
+  std::cout << "\033[31m" << "SSA FOR DCE PASS:" << "\033[0m" << "\n";
+  debug(crtl->ssa);
+  std::cout << "\033[31m" << "Before rtl ssa dce pass" << "\033[0m" << "\n";
 
   // for (rtx_insn * insn = get_insns (); insn != nullptr; insn = next_insn(insn)) {
     // debug(insn);
@@ -1756,7 +1808,7 @@ rtl_ssa_dce()
     // debug(insn);
   // }
   if (delete_trivially_dead_insns(get_insns (), max_reg_num ())) {
-    // std::cout << "\033[31m" << "Some insns deleted by delete_trivially_dead_insns" << "\033[0m" << "\n";
+    std::cout << "\033[31m" << "Some insns deleted by delete_trivially_dead_insns" << "\033[0m" << "\n";
     // for (rtx_insn * insn = get_insns (); insn != nullptr; insn = next_insn(insn)) {
       // debug(insn);
     // }
