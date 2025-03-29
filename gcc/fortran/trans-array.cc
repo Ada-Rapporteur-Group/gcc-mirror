@@ -10109,7 +10109,7 @@ structure_alloc_comps (gfc_symbol * der_type, tree decl, tree dest,
 	  else
 	    {
 	      attr = &c->attr;
-	      if (attr->pointer)
+	      if (attr->pointer || attr->proc_pointer)
 		continue;
 	    }
 
@@ -11236,9 +11236,7 @@ gfc_is_reallocatable_lhs (gfc_expr *expr)
     return true;
 
   /* All that can be left are allocatable components.  */
-  if ((sym->ts.type != BT_DERIVED
-       && sym->ts.type != BT_CLASS)
-	|| !sym->ts.u.derived->attr.alloc_comp)
+  if (sym->ts.type != BT_DERIVED && sym->ts.type != BT_CLASS)
     return false;
 
   /* Find a component ref followed by an array reference.  */

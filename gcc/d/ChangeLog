@@ -1,3 +1,106 @@
+2025-03-26  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	* dmd/MERGE: Merge upstream dmd 02a64d2e13.
+
+2025-03-23  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/117621
+	* types.cc (finish_aggregate_type): Propagate TYPE_PACKED to variants.
+
+2025-03-22  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	* dmd/MERGE: Merge upstream dmd 032e24446b.
+	* dmd/VERSION: Bump version to v2.111.0-rc.1.
+
+2025-03-22  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	* dmd/MERGE: Merge upstream dmd 9d2f034398.
+
+2025-03-22  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	* dmd/MERGE: Merge upstream dmd 94950cae58.
+	* d-lang.cc (d_handle_option): Add case for CppStdRevisionCpp23.
+	* gdc.texi: Document -fextern-std=c++23.
+	* lang.opt (fextern-std=): Add c++23.
+
+2025-03-22  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	* dmd/MERGE: Merge upstream dmd 8db14cf846.
+
+2025-03-22  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	* runtime.def (INVARIANT): Update signature of run-time function.
+
+2025-03-20  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/118545
+	* d-lang.cc (d_handle_option): Adjust quoted options.
+
+2025-03-18  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	* dmd/MERGE: Merge upstream dmd fde0f8c40a.
+
+2025-03-18  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	* dmd/MERGE: Merge upstream dmd 51be8bb729.
+
+2025-03-16  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	* dmd/MERGE: Merge upstream dmd 603225372b.
+	* dmd/VERSION: Bump version to v2.111.0-beta.1.
+	* d-builtins.cc (build_frontend_type): Update for new front-end
+	interface.
+	* decl.cc (Class DeclVisitor): Likewise.
+	(maybe_build_decl_tree): Likewise.
+	(get_vtable_decl): Likewise.
+	(layout_class_initializer): Likewise.
+	* expr.cc (class ExprVisitor): Likewise.
+	(ExprVisitor::visit (NewExp *)): Implement placement new for class,
+	struct, and pointer types.
+	* modules.cc (get_internal_fn): Update for new front-end interface.
+
+2025-03-16  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	* dmd/MERGE: Merge upstream dmd 53a1cc8d13.
+	* d-tree.h (create_typeinfo): Change second parameter to Scope *.
+	(speculative_type_p): Remove prototype.
+	* d-frontend.cc (getTypeInfoType): Adjust.
+	* decl.cc: Include dmd/typinf.h.
+	(DeclVisitor::visit (TypeInfoDeclaration *)): Update for new front-end
+	interface.
+	* typeinfo.cc (create_typeinfo): Likewise.
+	(class SpeculativeTypeVisitor): Remove class.
+	(speculative_type_p): Remove function.
+
+2025-03-16  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	* dmd/MERGE: Merge upstream dmd ffbad272b6.
+	* d-tree.h (make_location_t): Add overload taking a const SourceLoc &.
+	* d-codegen.cc (make_location_t): Likewise.
+	* d-diagnostic.cc (d_diagnostic_report_diagnostic): Change first
+	parameter type to const SourceLoc &.
+	(verrorReport): Update for new front-end interface.
+	(verrorReportSupplemental): Likewise.
+	* d-frontend.cc (eval_builtin): Likewise.
+	(getTypeInfoType): Likewise.
+	* d-lang.cc (d_parse_file): Likewise.
+	* d-target.cc (Target::va_listType): Likewise.
+	(Target::getTargetInfo): Likewise.
+	* decl.cc (build_decl_tree): Likewise.
+	* imports.cc (ImportVisitor::visit (Module *)): Likewise.
+	* modules.cc (get_internal_fn): Likewise.
+
+2025-03-15  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	* dmd/MERGE: Merge upstream dmd d29e3eca45.
+	* d-codegen.cc (can_elide_copy_p): Update for new front-end interface.
+	* d-lang.cc (d_handle_option): Likewise.
+	* expr.cc (class ExprVisitor): Likewise.
+
+2025-03-15  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	* dmd/MERGE: Merge upstream b7e3b3b617.
+
 2025-03-11  Iain Buclaw  <ibuclaw@gdcproject.org>
 
 	PR d/119139

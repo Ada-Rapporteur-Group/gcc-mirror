@@ -657,10 +657,6 @@ if test "${ENABLE_LIBSTDCXX}" = "default" ; then
       # VxWorks uses the Dinkumware C++ library.
       noconfigdirs="$noconfigdirs target-libstdc++-v3"
       ;;
-    amdgcn*-*-*)
-      # Not ported/fails to build when using newlib.
-      noconfigdirs="$noconfigdirs target-libstdc++-v3"
-      ;;
     arm*-wince-pe*)
       # the C++ libraries don't build on top of CE's C libraries
       noconfigdirs="$noconfigdirs target-libstdc++-v3"
@@ -1365,7 +1361,7 @@ case "${target}" in
     noconfigdirs="$noconfigdirs gprof"
     ;;
   nvptx*-*-*)
-    noconfigdirs="$noconfigdirs target-libssp target-libstdc++-v3"
+    noconfigdirs="$noconfigdirs target-libssp"
     ;;
   sh-*-*)
     case "${target}" in
@@ -2696,6 +2692,16 @@ case ,${enable_languages}, in
         # Disable target libgrust if we're not building target libstdc++.
         noconfigdirs="$noconfigdirs target-libgrust"
         ;;
+      *)
+	case "${target}" in
+	  amdgcn*-*-* \
+	  | nvptx*-*-* )
+	    # Build fails in 'libgrust/libproc_macro_internal/':
+	    #     sorry, unimplemented: exception handling not supported
+	    noconfigdirs="$noconfigdirs target-libgrust"
+	    ;;
+	esac
+	;;
     esac
     ;;
 esac
@@ -4201,6 +4207,7 @@ compare_exclusions="gcc/cc*-checksum\$(objext) | gcc/ada/*tools/*"
 compare_exclusions="$compare_exclusions | gcc/m2/gm2-compiler-boot/M2Version*"
 compare_exclusions="$compare_exclusions | gcc/m2/gm2-compiler-boot/SYSTEM*"
 compare_exclusions="$compare_exclusions | gcc/m2/gm2version*"
+compare_exclusions="$compare_exclusions | gcc/cobol/parse\$(objext)"
 case "$target" in
   hppa*64*-*-hpux*) ;;
   powerpc*-ibm-aix*) compare_exclusions="$compare_exclusions | *libgomp*\$(objext)" ;;

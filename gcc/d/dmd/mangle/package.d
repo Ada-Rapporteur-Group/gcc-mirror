@@ -3,7 +3,7 @@
  *
  * Specification: $(LINK2 https://dlang.org/spec/abi.html#name_mangling, Name Mangling)
  *
- * Copyright: Copyright (C) 1999-2024 by The D Language Foundation, All Rights Reserved
+ * Copyright: Copyright (C) 1999-2025 by The D Language Foundation, All Rights Reserved
  * Authors: Walter Bright, https://www.digitalmars.com
  * License:   $(LINK2 https://www.boost.org/LICENSE_1_0.txt, Boost License 1.0)
  * Source:    $(LINK2 https://github.com/dlang/dmd/blob/master/src/dmd/dmangle.d, _dmangle.d)
@@ -451,7 +451,7 @@ void mangleParameter(Parameter p, ref OutBuffer buf, ref Backref backref)
 
     switch (stc & ((STC.IOR | STC.lazy_) & ~STC.constscoperef))
     {
-    case 0:
+    case STC.none:
         break;
     case STC.in_:
         buf.writeByte('I');

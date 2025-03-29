@@ -43,7 +43,7 @@ FROM SymbolTable IMPORT PushSize, PopSize, PushValue, PopValue,
                         IsConst, IsConstSet, IsProcedure, IsProcType,
                         IsVar, IsVarParamAny, IsTemporary, IsTuple,
                         IsEnumeration,
-                        IsUnbounded, IsArray, IsSet, IsConstructor,
+                        IsUnbounded, IsArray, IsSet, IsConstructor, IsConstructorConstant,
                         IsProcedureVariable,
                         IsUnboundedParamAny,
                         IsRecordField, IsFieldVarient, IsVarient, IsRecord,
@@ -232,7 +232,7 @@ FROM m2statement IMPORT BuildAsm, BuildProcedureCallTree, BuildParam, BuildFunct
                         BuildReturnValueCode, SetLastFunction,
                         BuildIncludeVarConst, BuildIncludeVarVar,
                         BuildExcludeVarConst, BuildExcludeVarVar,
-                        BuildBuiltinCallTree,
+                        BuildBuiltinCallTree, CopyByField,
 			GetParamTree, BuildCleanUp,
 			BuildTryFinally,
 			GetLastFunction, SetLastFunction,
@@ -241,7 +241,7 @@ FROM m2statement IMPORT BuildAsm, BuildProcedureCallTree, BuildParam, BuildFunct
 FROM m2type IMPORT ChainOnParamValue, GetPointerType, GetIntegerType, AddStatement,
                    GetCardinalType, GetWordType, GetM2ZType, GetM2RType, GetM2CType,
                    BuildCharConstant, AddStringToTreeList, BuildArrayStringConstructor,
-                   GetArrayNoOfElements, GetTreeType ;
+                   GetArrayNoOfElements, GetTreeType, IsGccStrictTypeEquivalent ;
 
 FROM m2block IMPORT RememberConstant, pushGlobalScope, popGlobalScope, finishFunctionDecl,
                     pushFunctionScope, popFunctionScope,
@@ -1032,6 +1032,10 @@ END FoldStatementNote ;
 
 PROCEDURE CodeStatementNote (tokenno: CARDINAL) ;
 BEGIN
+   IF Debugging
+   THEN
+      MetaErrorT0 (tokenno, '{%W} statement note')
+   END ;
    CurrentQuadToken := tokenno ;
    addStmtNote (TokenToLocation (tokenno))
 END CodeStatementNote ;
@@ -3494,6 +3498,29 @@ END checkDeclare ;
 
 
 (*
+   PerformCodeBecomes -
+*)
+
+PROCEDURE PerformCodeBecomes (location: location_t;
+                              virtpos: CARDINAL; des, expr: CARDINAL) ;
+VAR
+   destree, exprtree: tree ;
+BEGIN
+   destree := Mod2Gcc (des) ;
+   exprtree := FoldConstBecomes (virtpos, des, expr) ;
+   IF IsVar (des) AND IsVariableSSA (des)
+   THEN
+      Replace (des, exprtree)
+   ELSIF IsGccStrictTypeEquivalent (destree, exprtree)
+   THEN
+      BuildAssignmentStatement (location, destree, exprtree)
+   ELSE
+      CopyByField (location, destree, exprtree)
+   END
+END PerformCodeBecomes ;
+
+
+(*
 ------------------------------------------------------------------------------
    := Operator
 ------------------------------------------------------------------------------
@@ -3572,14 +3599,7 @@ BEGIN
       ELSE
          IF checkBecomes (des, expr, virtpos, despos, exprpos)
          THEN
-            IF IsVar (des) AND IsVariableSSA (des)
-            THEN
-               Replace (des, FoldConstBecomes (virtpos, des, expr))
-            ELSE
-               BuildAssignmentStatement (location,
-                                         Mod2Gcc (des),
-                                         FoldConstBecomes (virtpos, des, expr))
-            END
+            PerformCodeBecomes (location, virtpos, des, expr)
          ELSE
             SubQuad (quad)  (* We don't want multiple errors for the quad.  *)
          END
@@ -4817,18 +4837,17 @@ END FoldBuiltinTypeInfo ;
 
 PROCEDURE FoldTBitsize  (tokenno: CARDINAL; p: WalkAction;
                          quad: CARDINAL;
-                         op1, op2, op3: CARDINAL) ;
+                         res, type: CARDINAL) ;
 VAR
-   type    : CARDINAL ;
    location: location_t ;
 BEGIN
    location := TokenToLocation(tokenno) ;
-   TryDeclareType (tokenno, op3) ;
-   type := GetDType (op3) ;
+   TryDeclareType (type) ;
+   type := GetDType (type) ;
    IF CompletelyResolved (type)
    THEN
-      AddModGcc (op1, BuildSystemTBitSize (location, Mod2Gcc (type))) ;
-      p (op1) ;
+      AddModGcc (res, BuildSystemTBitSize (location, Mod2Gcc (type))) ;
+      p (res) ;
       NoChange := FALSE ;
       SubQuad (quad)
    END
@@ -4967,7 +4986,7 @@ BEGIN
       END
    ELSIF op2=TBitSize
    THEN
-      FoldTBitsize (tokenno, p, quad, op1, op2, op3)
+      FoldTBitsize (tokenno, p, quad, op1, op3)
    ELSE
       InternalError ('only expecting LENGTH, CAP, ABS, IM, RE')
    END

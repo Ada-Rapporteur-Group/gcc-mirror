@@ -30,16 +30,10 @@
  */
 
 #include <ctype.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <math.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <unistd.h>
 #include <algorithm>
-#include <langinfo.h>
 #include <unordered_map>
 #include <locale.h>
 #include <iconv.h>
@@ -48,7 +42,6 @@
 #include "common-defs.h"
 #include "io.h"
 #include "gcobolio.h"
-#include "libgcobol.h"
 #include "charmaps.h"
 #include "valconv.h"
 
@@ -445,8 +438,7 @@ __gg__raw_to_ascii(char **dest, size_t *dest_size, const char *in, size_t length
 
     // Check for that unicode code point in the subset of characters we
     // know about:
-    std::unordered_map<unsigned short, unsigned char>::const_iterator it =
-        utf8_to_cp1252_values.find(unicode_point);
+    auto it = utf8_to_cp1252_values.find(unicode_point);
     if( it == utf8_to_cp1252_values.end() )
         {
         // That unicode character isn't in our list
@@ -507,8 +499,7 @@ __gg__raw_to_ebcdic(char **dest, size_t *dest_size, const char *in, size_t lengt
                                                                 position );
         // Check for that unicode code point in the subset of characters we
         // know about:
-        std::unordered_map<unsigned short, unsigned char>::const_iterator it =
-            utf8_to_cp1252_values.find(unicode_point);
+        auto it = utf8_to_cp1252_values.find(unicode_point);
         if( it == utf8_to_cp1252_values.end() )
             {
             // That unicode character isn't in our list
@@ -775,8 +766,7 @@ void __gg__console_to_ascii(char * const str, size_t length)
             {
             // Check for that unicode code point in the subset of characters we
             // know about:
-            std::unordered_map<unsigned short, unsigned char>::const_iterator it
-                = utf8_to_cp1252_values.find(unicode_point);
+            auto it = utf8_to_cp1252_values.find(unicode_point);
             if( it == utf8_to_cp1252_values.end() )
                 {
                 // That unicode character isn't in our list
@@ -816,8 +806,7 @@ __gg__console_to_ebcdic(char * const str, size_t length)
             {
             // Check for that unicode code point in the subset of characters we
             // know about:
-            std::unordered_map<unsigned short, unsigned char>::const_iterator it
-                = utf8_to_cp1252_values.find(unicode_point);
+            auto it = utf8_to_cp1252_values.find(unicode_point);
             if( it == utf8_to_cp1252_values.end() )
                 {
                 // That unicode character isn't in our list

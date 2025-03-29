@@ -1366,7 +1366,7 @@ AC_HEADER_TIOCGWINSZ
 AC_CHECK_HEADERS(limits.h stddef.h string.h strings.h stdlib.h time.h iconv.h \
 		 fcntl.h ftw.h unistd.h sys/auxv.h sys/file.h sys/time.h sys/mman.h \
 		 sys/resource.h sys/param.h sys/times.h sys/stat.h sys/locking.h \
-		 direct.h malloc.h langinfo.h ldfcn.h locale.h wchar.h)
+		 direct.h malloc.h langinfo.h ldfcn.h locale.h wchar.h libgen.h)
 
 # Check for thread headers.
 AC_CHECK_HEADER(thread.h, [have_thread_h=yes], [have_thread_h=])
@@ -1574,7 +1574,7 @@ AC_CHECK_FUNCS(times clock kill getrlimit setrlimit atoq \
 	popen sysconf strsignal getrusage nl_langinfo \
 	gettimeofday mbstowcs wcswidth mmap posix_fallocate setlocale \
 	gcc_UNLOCKED_FUNCS madvise mallinfo mallinfo2 fstatat getauxval \
-	clock_gettime munmap msync)
+	clock_gettime munmap msync get_current_dir_name)
 
 # At least for glibc, clock_gettime is in librt.  But don't pull that
 # in if it still doesn't give us the function we want.
@@ -1645,9 +1645,17 @@ CXXFLAGS="$CXXFLAGS -I${srcdir} -I${srcdir}/../include $GMPINC"
 # normal autoconf function for these.  But force definition of
 # HAVE_DECL_BASENAME like gcc_AC_CHECK_DECLS does, to suppress the bizarre
 # basename handling in libiberty.h.
-AC_CHECK_DECLS([basename(const char*), strstr(const char*,const char*)], , ,[
+# Match the configure test in libiberty so that we have a consistent result.
+AC_CHECK_DECLS([basename(char*)], , ,[
 #undef HAVE_DECL_BASENAME
 #define HAVE_DECL_BASENAME 1
+#if HAVE_LIBGEN_H
+# include <libgen.h>
+#endif
+#include "ansidecl.h"
+#include "system.h"])
+
+AC_CHECK_DECLS([strstr(const char*,const char*)], , ,[
 #include "ansidecl.h"
 #include "system.h"])
 
@@ -6358,6 +6366,7 @@ if test x"$ld64_flag" = x"yes"; then
   # Set defaults for possibly untestable items.
   gcc_cv_ld64_export_dynamic=0
   gcc_cv_ld64_platform_version=0
+  gcc_cv_ld64_macos_version_min=0
   gcc_cv_ld64_demangle=0
 
   if test "$build" = "$host"; then
@@ -6388,6 +6397,7 @@ if test x"$ld64_flag" = x"yes"; then
     fi
     if test "$gcc_cv_ld64_major" -ge 512; then
       gcc_cv_ld64_platform_version=1
+      gcc_cv_ld64_macos_version_min=1
     fi
   elif test -x "$gcc_cv_ld" -a "$darwin_try_test" -eq 1; then
     # If the version was not specified, try to find it.
@@ -6418,6 +6428,13 @@ if test x"$ld64_flag" = x"yes"; then
       gcc_cv_ld64_platform_version=0
     fi
     AC_MSG_RESULT($gcc_cv_ld64_platform_version)
+
+    AC_MSG_CHECKING(linker for -macos_version_min)
+    gcc_cv_ld64_macos_version_min=1
+    if $gcc_cv_ld -macos_version_min 10.5 < /dev/null 2>&1 | grep 'unknown option' > /dev/null; then
+      gcc_cv_ld64_macos_version_min=0
+    fi
+    AC_MSG_RESULT($gcc_cv_ld64_macos_version_min)
   fi
 
   if test x"${gcc_cv_ld64_version}" != x; then
@@ -6433,6 +6450,9 @@ if test x"$ld64_flag" = x"yes"; then
 
   AC_DEFINE_UNQUOTED(LD64_HAS_PLATFORM_VERSION, $gcc_cv_ld64_platform_version,
   [Define to 1 if ld64 supports '-platform_version'.])
+
+  AC_DEFINE_UNQUOTED(LD64_HAS_MACOS_VERSION_MIN, $gcc_cv_ld64_macos_version_min,
+  [Define to 1 if ld64 supports '-macos_version_min'.])
 fi
 
 if test x"$dsymutil_flag" = x"yes"; then

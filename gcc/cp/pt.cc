@@ -12134,13 +12134,18 @@ tsubst_attribute (tree t, tree *decl_p, tree args,
       location_t match_loc = cp_expr_loc_or_input_loc (TREE_PURPOSE (chain));
       tree ctx = copy_list (TREE_VALUE (val));
       tree append_args_list = TREE_CHAIN (TREE_CHAIN (chain));
-      if (append_args_list && TREE_VALUE (append_args_list))
+      if (append_args_list
+	  && TREE_VALUE (append_args_list)
+	  && TREE_CHAIN (TREE_VALUE (append_args_list)))
 	{
-	  append_args_list = TREE_VALUE (TREE_VALUE (append_args_list));
+	  append_args_list = TREE_VALUE (append_args_list);
+	  append_args_list = TREE_VALUE (TREE_CHAIN (append_args_list));
 	  for (; append_args_list;
 	       append_args_list = TREE_CHAIN (append_args_list))
 	     {
 	      tree pref_list = TREE_VALUE (append_args_list);
+	      if (pref_list == NULL_TREE || TREE_CODE (pref_list) != TREE_LIST)
+		continue;
 	      tree fr_list = TREE_VALUE (pref_list);
 	      int len = TREE_VEC_LENGTH (fr_list);
 	      for (int i = 0; i < len; i++)
@@ -13180,7 +13185,16 @@ use_pack_expansion_extra_args_p (tree t,
 
       if (has_expansion_arg && has_non_expansion_arg)
 	{
-	  gcc_checking_assert (false);
+	  /* We can get here with:
+
+	      template <class... Ts> struct X {
+		template <class... Us> using Y = Z<void(Ts, Us)...>;
+	      };
+	      template <class A, class... P>
+	      using foo = X<int, int>::Y<A, P...>;
+
+	     where we compare int and A and then the second int and P...,
+	     whose expansion-ness doesn't match, but that's OK.  */
 	  return true;
 	}
     }
@@ -15911,6 +15925,11 @@ tsubst_decl (tree t, tree args, tsubst_flags_t complain,
 	    if (TYPE_USER_ALIGN (TREE_TYPE (t)))
 	      TREE_TYPE (r) = build_aligned_type (TREE_TYPE (r),
 						  TYPE_ALIGN (TREE_TYPE (t)));
+
+	    /* Preserve structural-ness of a partially instantiated typedef.  */
+	    if (TYPE_STRUCTURAL_EQUALITY_P (TREE_TYPE (t))
+		&& dependent_type_p (TREE_TYPE (r)))
+	      SET_TYPE_STRUCTURAL_EQUALITY (TREE_TYPE (r));
 	  }
 
 	layout_decl (r, 0);
@@ -22491,6 +22510,12 @@ mark_template_arguments_used (tree tmpl, tree args)
 	      gcc_checking_assert (ok || seen_error ());
 	    }
 	}
+      /* A member function pointer.  */
+      else if (TREE_CODE (arg) == PTRMEM_CST)
+	{
+	  bool ok = mark_used (PTRMEM_CST_MEMBER (arg), tf_none);
+	  gcc_checking_assert (ok || seen_error ());
+	}
       /* A class NTTP argument.  */
       else if (VAR_P (arg)
 	       && DECL_NTTP_OBJECT_P (arg))
@@ -25943,6 +25968,23 @@ mark_definable (tree decl)
     DECL_NOT_REALLY_EXTERN (clone) = 1;
 }
 
+/* DECL is an explicit instantiation definition, ensure that it will
+   be written out here and that it won't clash with other instantiations
+   in other translation units.  */
+
+void
+setup_explicit_instantiation_definition_linkage (tree decl)
+{
+  mark_definable (decl);
+  mark_needed (decl);
+  /* Always make artificials weak.  */
+  if (DECL_ARTIFICIAL (decl) && flag_weak)
+    comdat_linkage (decl);
+  /* We also want to put explicit instantiations in linkonce sections.  */
+  else if (TREE_PUBLIC (decl))
+    maybe_make_one_only (decl);
+}
+
 /* Called if RESULT is explicitly instantiated, or is a member of an
    explicitly instantiated class.  */
 
@@ -25980,16 +26022,8 @@ mark_decl_instantiated (tree result, int extern_p)
     }
   else
     {
-      mark_definable (result);
-      mark_needed (result);
       set_instantiating_module (result);
-      /* Always make artificials weak.  */
-      if (DECL_ARTIFICIAL (result) && flag_weak)
-	comdat_linkage (result);
-      /* For WIN32 we also want to put explicit instantiations in
-	 linkonce sections.  */
-      else if (TREE_PUBLIC (result))
-	maybe_make_one_only (result);
+      setup_explicit_instantiation_definition_linkage (result);
       if (TREE_CODE (result) == FUNCTION_DECL
 	  && DECL_TEMPLATE_INSTANTIATED (result))
 	/* If the function has already been instantiated, clear DECL_EXTERNAL,

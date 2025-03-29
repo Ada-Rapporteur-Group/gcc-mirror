@@ -2788,6 +2788,9 @@ merge_decls (tree newdecl, tree olddecl, tree newtype, tree oldtype)
 		  break;
 		}
 	}
+
+      /* Make sure we refer to the same type as the olddecl.  */
+      DECL_ORIGINAL_TYPE (newdecl) = DECL_ORIGINAL_TYPE (olddecl);
     }
 
   /* Merge the data types specified in the two decls.  */
@@ -9846,7 +9849,7 @@ finish_struct (location_t loc, tree t, tree fieldlist, tree attributes,
 	  && TREE_CODE (vistype) == TREE_CODE (t)
 	  && !C_TYPE_BEING_DEFINED (vistype))
 	{
-	  TYPE_STUB_DECL (vistype) = TYPE_STUB_DECL (t);
+	  TYPE_STUB_DECL (t) = TYPE_STUB_DECL (vistype);
 	  if (c_type_variably_modified_p (t))
 	    {
 	      error ("redefinition of struct or union %qT with variably "
@@ -10321,7 +10324,7 @@ finish_enum (tree enumtype, tree values, tree attributes)
 	  && TREE_CODE (vistype) == TREE_CODE (enumtype)
 	  && !C_TYPE_BEING_DEFINED (vistype))
 	{
-	  TYPE_STUB_DECL (vistype) = TYPE_STUB_DECL (enumtype);
+	  TYPE_STUB_DECL (enumtype) = TYPE_STUB_DECL (vistype);
 	  if (!comptypes_same_p (enumtype, vistype))
 	    error("conflicting redefinition of enum %qT", enumtype);
 	}

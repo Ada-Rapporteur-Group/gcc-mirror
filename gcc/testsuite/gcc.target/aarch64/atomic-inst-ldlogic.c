@@ -128,7 +128,7 @@ TEST (xor_load_notreturn, XOR_LOAD_NORETURN)
 /* { dg-final { scan-assembler-times "ldclrlh\t" 8} } */
 /* { dg-final { scan-assembler-times "ldclralh\t" 16} } */
 
-/* { dg-final { scan-assembler-times "ldclr\t" 16} */
+/* { dg-final { scan-assembler-times "ldclr\t" 16 } */
 /* { dg-final { scan-assembler-times "ldclra\t" 32} } */
 /* { dg-final { scan-assembler-times "ldclrl\t" 16} } */
 /* { dg-final { scan-assembler-times "ldclral\t" 32} } */
@@ -137,7 +137,7 @@ TEST (xor_load_notreturn, XOR_LOAD_NORETURN)
 
 /* { dg-final { scan-assembler-times "ldeorb\t" 8} } */
 /* { dg-final { scan-assembler-times "ldeorab\t" 16} } */
-/* { dg-final { scan-assembler-times "ldeorlb\t" 8} } */
+/* { dg-final { scan-assembler-times "ldeorlb\t" 8 } } */
 /* { dg-final { scan-assembler-times "ldeoralb\t" 16} } */
 
 /* { dg-final { scan-assembler-times "ldeorh\t" 8} } */
@@ -145,7 +145,7 @@ TEST (xor_load_notreturn, XOR_LOAD_NORETURN)
 /* { dg-final { scan-assembler-times "ldeorlh\t" 8} } */
 /* { dg-final { scan-assembler-times "ldeoralh\t" 16} } */
 
-/* { dg-final { scan-assembler-times "ldeor\t" 16} */
+/* { dg-final { scan-assembler-times "ldeor\t" 16} } */
 /* { dg-final { scan-assembler-times "ldeora\t" 32} } */
 /* { dg-final { scan-assembler-times "ldeorl\t" 16} } */
 /* { dg-final { scan-assembler-times "ldeoral\t" 32} } */

@@ -103,7 +103,8 @@ void      get_binary_value( tree value,
                             tree         hilo = NULL);
 tree      get_data_address( cbl_field_t *field,
                             tree         offset);
-__int128  get_power_of_ten(int n);
+
+FIXED_WIDE_INT(128) get_power_of_ten(int n);
 void      scale_by_power_of_ten_N(tree value,
                                 int N,
                                 bool check_for_fractional = false);

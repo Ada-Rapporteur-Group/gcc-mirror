@@ -1,3 +1,23 @@
+2025-03-22  Georg-Johann Lay  <avr@gjlay.de>
+
+	* config/avr/t-avr (LIB1ASMFUNCS, LIB2FUNCS_EXCLUDE):
+	Properly handle avrtiny.
+
+2025-03-14  Thomas Schwinge  <thomas@codesourcery.com>
+
+	Revert:
+	2023-12-23  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* c++-minimal/README: New.
+	* c++-minimal/guard.c: New.
+	* config/gcn/t-amdgcn (LIB2ADD): Add it.
+	* config/nvptx/t-nvptx (LIB2ADD): Likewise.
+
+2025-03-13  Wilco Dijkstra  <wilco.dijkstra@arm.com>
+
+	* config/aarch64/cpuinfo.c (__init_cpu_features_constructor):
+	Remove FEAT_PREDRES and FEAT_LS64* support.
+
 2025-03-10  Jakub Jelinek  <jakub@redhat.com>
 	    Michael Leuchtenburg  <michael@slashhome.org>
 

@@ -11773,6 +11773,9 @@ cp_parser_lambda_expression (cp_parser* parser)
     parser->auto_is_implicit_function_template_parm_p = false;
     parser->omp_array_section_p = false;
 
+    /* Inside the lambda, outside unevaluated context do not apply.  */
+    cp_evaluated ev;
+
     /* The body of a lambda in a discarded statement is not discarded.  */
     bool discarded = in_discarded_stmt;
     in_discarded_stmt = 0;
@@ -12992,7 +12995,7 @@ cp_parser_statement (cp_parser* parser, tree in_statement_expr,
        c++11 attributes, or a nested objc-message-expression.  So
        let's parse the c++11 attributes tentatively.  */
     cp_parser_parse_tentatively (parser);
-  std_attrs = cp_parser_std_attribute_spec_seq (parser);
+  std_attrs = cp_parser_attributes_opt (parser);
   if (std_attrs)
     attrs_loc = make_location (attrs_loc, attrs_loc, parser->lexer);
   if (c_dialect_objc ())
@@ -15332,8 +15335,13 @@ cp_parser_jump_statement (cp_parser* parser, tree &std_attrs)
 	if (keyword == RID_RETURN)
 	  {
 	    bool musttail_p = false;
-	    if (lookup_attribute ("gnu", "musttail", std_attrs))
+	    if (tree a = lookup_attribute ("gnu", "musttail", std_attrs))
 	      {
+		for (; a; a = lookup_attribute ("gnu", "musttail",
+						TREE_CHAIN (a)))
+		  if (TREE_VALUE (a))
+		    error ("%qs attribute does not take any arguments",
+			   "musttail");
 		musttail_p = true;
 		std_attrs = remove_attribute ("gnu", "musttail", std_attrs);
 	      }
@@ -43178,6 +43186,7 @@ cp_parser_omp_clause_init (cp_parser *parser, tree list)
 					    NULL, false);
   for (tree c = nl; c != list; c = OMP_CLAUSE_CHAIN (c))
     {
+      TREE_ADDRESSABLE (OMP_CLAUSE_DECL (c)) = 1;
       if (target)
 	OMP_CLAUSE_INIT_TARGET (c) = 1;
       if (targetsync)

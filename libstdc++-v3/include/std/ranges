@@ -48,6 +48,7 @@
 #include <string_view>
 #include <tuple>
 #if __cplusplus > 202002L
+#include <utility>
 #include <variant>
 #endif
 #include <bits/ranges_util.h>
@@ -5332,15 +5333,21 @@ namespace views::__adaptor
 
     struct _ZipTransform
     {
+      template<typename _Fp>
+	requires move_constructible<decay_t<_Fp>> && regular_invocable<decay_t<_Fp>&>
+	  && is_object_v<decay_t<invoke_result_t<decay_t<_Fp>&>>>
+	constexpr auto
+	operator() [[nodiscard]] (_Fp&& __f) const
+	{
+	  return views::empty<decay_t<invoke_result_t<decay_t<_Fp>&>>>;
+	}
+
       template<typename _Fp, typename... _Ts>
-	requires (sizeof...(_Ts) == 0) || __detail::__can_zip_transform_view<_Fp, _Ts...>
+	requires (sizeof...(_Ts) != 0) && __detail::__can_zip_transform_view<_Fp, _Ts...>
 	constexpr auto
 	operator() [[nodiscard]] (_Fp&& __f, _Ts&&... __ts) const
 	{
-	  if constexpr (sizeof...(_Ts) == 0)
-	    return views::empty<decay_t<invoke_result_t<decay_t<_Fp>&>>>;
-	  else
-	    return zip_transform_view(std::forward<_Fp>(__f), std::forward<_Ts>(__ts)...);
+          return zip_transform_view(std::forward<_Fp>(__f), std::forward<_Ts>(__ts)...);
 	}
     };
 
@@ -9324,10 +9331,11 @@ namespace views::__adaptor
     namespace __detail
     {
       template<typename _Tp>
-	inline constexpr bool __is_ref_view = false;
+	inline constexpr bool __is_constable_ref_view = false;
 
       template<typename _Range>
-	inline constexpr bool __is_ref_view<ref_view<_Range>> = true;
+	inline constexpr bool __is_constable_ref_view<ref_view<_Range>>
+	  = constant_range<const _Range>;
 
       template<typename _Range>
 	concept __can_as_const_view = requires { as_const_view(std::declval<_Range>()); };
@@ -9349,10 +9357,8 @@ namespace views::__adaptor
 	  return views::empty<const element_type>;
 	else if constexpr (std::__detail::__is_span<_Tp>)
 	  return span<const element_type, _Tp::extent>(std::forward<_Range>(__r));
-	else if constexpr (__detail::__is_ref_view<_Tp>
-			   && constant_range<const element_type>)
-	  return ref_view(static_cast<const element_type&>
-			  (std::forward<_Range>(__r).base()));
+	else if constexpr (__detail::__is_constable_ref_view<_Tp>)
+	  return ref_view(std::as_const(std::forward<_Range>(__r).base()));
 	else if constexpr (is_lvalue_reference_v<_Range>
 			   && constant_range<const _Tp>
 			   && !view<_Tp>)
@@ -9415,7 +9421,7 @@ namespace __detail
     to [[nodiscard]] (_Rg&& __r, _Args&&... __args)
     {
       static_assert(!is_const_v<_Cont> && !is_volatile_v<_Cont>);
-      static_assert(is_class_v<_Cont>);
+      static_assert(is_class_v<_Cont> || is_union_v<_Cont>);
 
       if constexpr (__detail::__toable<_Cont, _Rg>)
 	{
@@ -9574,7 +9580,7 @@ namespace __detail
     to [[nodiscard]] (_Args&&... __args)
     {
       static_assert(!is_const_v<_Cont> && !is_volatile_v<_Cont>);
-      static_assert(is_class_v<_Cont>);
+      static_assert(is_class_v<_Cont> || is_union_v<_Cont>);
 
       using __detail::_To;
       using views::__adaptor::_Partial;

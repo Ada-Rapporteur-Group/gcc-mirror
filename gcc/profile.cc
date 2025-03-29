@@ -1340,6 +1340,20 @@ branch_prob (bool thunk)
 	  EDGE_INFO (e)->ignore = 1;
 	  ignored_edges++;
 	}
+      /* Ignore fake edges after musttail calls.  */
+      if ((e->flags & EDGE_FAKE)
+	  && e->dest == EXIT_BLOCK_PTR_FOR_FN (cfun))
+	{
+	  gimple_stmt_iterator gsi = gsi_last_bb (e->src);
+	  gimple *stmt = gsi_stmt (gsi);
+	  if (stmt
+	      && is_gimple_call (stmt)
+	      && gimple_call_must_tail_p (as_a <const gcall *> (stmt)))
+	    {
+	      EDGE_INFO (e)->ignore = 1;
+	      ignored_edges++;
+	    }
+	}
     }
 
   /* Create spanning tree from basic block graph, mark each edge that is
@@ -1545,7 +1559,7 @@ branch_prob (bool thunk)
 
   remove_fake_edges ();
 
-  if (condition_coverage_flag || profile_arc_flag)
+  if (condition_coverage_flag || path_coverage_flag || profile_arc_flag)
       gimple_init_gcov_profiler ();
 
   if (condition_coverage_flag)
@@ -1596,6 +1610,10 @@ branch_prob (bool thunk)
       if (flag_profile_values)
 	instrument_values (values);
     }
+
+  void find_paths (struct function*);
+  if (path_coverage_flag)
+    find_paths (cfun);
 
   free_aux_for_edges ();
 
@@ -1779,4 +1797,11 @@ end_branch_prob (void)
       fprintf (dump_file, "Total number of conditions: %d\n",
 	       total_num_conds);
     }
+}
+
+/* Return true if any cfg coverage/profiling is enabled; -fprofile-arcs
+   -fcondition-coverage -fpath-coverage.  */
+bool coverage_instrumentation_p ()
+{
+  return profile_arc_flag || condition_coverage_flag || path_coverage_flag;
 }

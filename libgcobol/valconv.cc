@@ -30,30 +30,14 @@
  */
 
 #include <ctype.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <math.h>
-#include <fenv.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <time.h>
-#include <unistd.h>
 #include <algorithm>
 #include <unordered_map>
-#include <set>
 
 #include "ec.h"
 #include "common-defs.h"
-#include "io.h"
-#include "gcobolio.h"
-#include "libgcobol.h"
-#include "gfileio.h"
 #include "charmaps.h"
-
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 
 #include "valconv.h"
 #include "exceptl.h"
@@ -268,8 +252,8 @@ __gg__string_to_numeric_edited( char * const dest,
   if( dlength >= 2 )
     {
     // It's a positive number, so we might have to get rid of a CR or DB:
-    char ch1 = toupper(dest[dlength-2]);
-    char ch2 = toupper(dest[dlength-1]);
+    char ch1 = toupper((unsigned char)dest[dlength-2]);
+    char ch2 = toupper((unsigned char)dest[dlength-1]);
     if(     (ch1 == ascii_D && ch2 == ascii_B)
             ||  (ch1 == ascii_C && ch2 == ascii_R) )
       {

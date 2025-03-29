@@ -601,7 +601,8 @@ Objective-C and Objective-C++ Dialects}.
 -floop-block  -floop-interchange  -floop-strip-mine
 -floop-unroll-and-jam  -floop-nest-optimize
 -floop-parallelize-all  -flra-remat  -flto  -flto-compression-level
--flto-partition=@var{alg}  -fmalloc-dce -fmerge-all-constants
+-flto-partition=@var{alg} -flto-incremental=@var{path}
+-flto-incremental-cache-size=@var{n} -fmalloc-dce -fmerge-all-constants
 -fmerge-constants  -fmodulo-sched  -fmodulo-sched-allow-regmoves
 -fmove-loop-invariants  -fmove-loop-stores  -fno-branch-count-reg
 -fno-defer-pop  -fno-fp-int-builtin-inexact  -fno-function-cse
@@ -659,6 +660,7 @@ Objective-C and Objective-C++ Dialects}.
 @xref{Instrumentation Options,,Program Instrumentation Options}.
 @gccoptlist{-p  -pg  -fprofile-arcs  --coverage  -ftest-coverage
 -fcondition-coverage
+-fpath-coverage
 -fprofile-abs-path
 -fprofile-dir=@var{path}  -fprofile-generate  -fprofile-generate=@var{path}
 -fprofile-info-section  -fprofile-info-section=@var{name}
@@ -911,8 +913,8 @@ Objective-C and Objective-C++ Dialects}.
 -mdouble=@var{bits}  -mlong-double=@var{bits}  -mno-call-main
 -mn_flash=@var{size}  -mfract-convert-truncate  -mno-interrupts
 -mmain-is-OS_task  -mrelax  -mrmw  -mstrict-X  -mtiny-stack
--mrodata-in-ram  -msplit-bit-shift  -msplit-ldst
--mshort-calls  -mskip-bug  -nodevicelib  -nodevicespecs
+-mrodata-in-ram  -msplit-bit-shift  -msplit-ldst  -mshort-calls
+-mskip-bug  -muse-nonzero-bits  -nodevicelib  -nodevicespecs
 -Waddr-space-convert  -Wmisspelled-isr}
 
 @emph{Blackfin Options} (@ref{Blackfin Options})
@@ -1319,6 +1321,7 @@ See RS/6000 and PowerPC Options.
 -mtraceback=@var{traceback_type}
 -maix-struct-return  -msvr4-struct-return
 -mabi=@var{abi-type}  -msecure-plt  -mbss-plt
+-msplit-patch-nops
 -mlongcall  -mno-longcall  -mpltseq  -mno-pltseq
 -mblock-move-inline-limit=@var{num}
 -mblock-compare-inline-limit=@var{num}
@@ -1487,8 +1490,8 @@ See RS/6000 and PowerPC Options.
 -mamx-tile  -mamx-int8  -mamx-bf16 -muintr -mhreset -mavxvnni -mamx-fp8
 -mavx512fp16 -mavxifma -mavxvnniint8 -mavxneconvert -mcmpccxadd -mamx-fp16
 -mprefetchi -mraoint -mamx-complex -mavxvnniint16 -msm3 -msha512 -msm4 -mapxf
--musermsr -mavx10.1 -mavx10.1-256 -mavx10.1-512 -mevex512 -mavx10.2 -mavx10.2-256
--mavx10.2-512 -mamx-avx512 -mamx-tf32 -mamx-transpose -mmovrs -mamx-movrs
+-musermsr -mavx10.1 -mavx10.1-256 -mavx10.1-512 -mevex512 -mavx10.2
+-mamx-avx512 -mamx-tf32 -mamx-transpose -mmovrs -mamx-movrs
 -mcldemote  -mms-bitfields  -mno-align-stringops  -minline-all-stringops
 -minline-stringops-dynamically  -mstringop-strategy=@var{alg}
 -mkl -mwidekl
@@ -2385,39 +2388,6 @@ accepts:
 @item -ansi
 In C mode, this is equivalent to @option{-std=c90}. In C++ mode, it is
 equivalent to @option{-std=c++98}.
-
-This turns off certain features of GCC that are incompatible with ISO
-C90 (when compiling C code), or of standard C++ (when compiling C++ code),
-such as the @code{asm} and @code{typeof} keywords, and
-predefined macros such as @code{unix} and @code{vax} that identify the
-type of system you are using.  It also enables the undesirable and
-rarely used ISO trigraph feature.  For the C compiler,
-it disables recognition of C++ style @samp{//} comments as well as
-the @code{inline} keyword.
-
-The alternate keywords @code{__asm__}, @code{__extension__},
-@code{__inline__} and @code{__typeof__} continue to work despite
-@option{-ansi}.  You would not want to use them in an ISO C program, of
-course, but it is useful to put them in header files that might be included
-in compilations done with @option{-ansi}.  Alternate predefined macros
-such as @code{__unix__} and @code{__vax__} are also available, with or
-without @option{-ansi}.
-
-The @option{-ansi} option does not cause non-ISO programs to be
-rejected gratuitously.  For that, @option{-Wpedantic} is required in
-addition to @option{-ansi}.  @xref{Warning Options}.
-
-The macro @code{__STRICT_ANSI__} is predefined when the @option{-ansi}
-option is used.  Some header files may notice this macro and refrain
-from declaring certain functions or defining certain macros that the
-ISO standard doesn't call for; this is to avoid interfering with any
-programs that might use these names for other things.
-
-Functions that are normally built in but do not have semantics
-defined by ISO C (such as @code{alloca} and @code{ffs}) are not built-in
-functions when @option{-ansi} is used.  @xref{Other Builtins,,Other
-built-in functions provided by GCC}, for details of the functions
-affected.
 
 @opindex std
 @item -std=
@@ -6704,6 +6674,13 @@ Warn if @option{-fcondition-coverage} is used and an expression have too many
 terms and GCC gives up coverage.  Coverage is given up when there are more
 terms in the conditional than there are bits in a @code{gcov_type_unsigned}.
 This warning is enabled by default.
+
+@opindex Wno-coverage-too-many-paths
+@opindex Wcoverage-too-many-paths
+@item -Wno-coverage-too-many-paths
+Warn if @option{-fpath-coverage} is used and a function has too many
+paths and GCC gives up coverage.  Giving up is controlled by
+@option{-fpath-coverage-limit}.  This warning is enabled by default.
 
 @opindex Wno-coverage-invalid-line-number
 @opindex Wcoverage-invalid-line-number
@@ -15086,14 +15063,33 @@ Specify the partitioning algorithm used by the link-time optimizer.
 The value is either @samp{1to1} to specify a partitioning mirroring
 the original source files or @samp{balanced} to specify partitioning
 into equally sized chunks (whenever possible) or @samp{max} to create
-new partition for every symbol where possible.  Specifying @samp{none}
-as an algorithm disables partitioning and streaming completely.
+new partition for every symbol where possible or @samp{cache} to
+balance chunk sizes while keeping related symbols together for better
+caching in incremental LTO.  Specifying @samp{none} as an algorithm
+disables partitioning and streaming completely.
 The default value is @samp{balanced}. While @samp{1to1} can be used
 as an workaround for various code ordering issues, the @samp{max}
 partitioning is intended for internal testing only.
 The value @samp{one} specifies that exactly one partition should be
 used while the value @samp{none} bypasses partitioning and executes
 the link-time optimization step directly from the WPA phase.
+
+@opindex flto-incremental
+@item -flto-incremental=@var{path}
+Enable incremental LTO, with its cache in given existing directory.
+Can significantly shorten edit-compile cycles with LTO.
+
+When used with LTO (@option{-flto}), the output of translation units
+inside LTO is cached. Cached translation units are likely to be
+encountered again when recompiling with small code changes, leading to
+recompile time reduction.
+
+Multiple GCC instances can use the same cache in parallel.
+
+@opindex flto-incremental-cache-size
+@item -flto-incremental-cache-size=@var{n}
+Specifies number of cache entries in incremental LTO after which to prune
+old entries. This is a soft limit, temporarily there may be more entries.
 
 @opindex flto-compression-level
 @item -flto-compression-level=@var{n}
@@ -17518,6 +17514,27 @@ can be used to verify that all terms in a Boolean function are tested and have
 an independent effect on the outcome of a decision.  The result can be read
 with @code{gcov --conditions}.
 
+@item -fpath-coverage
+@opindex fpath-coverage
+Add code so that the paths taken are tracked.  During execution the
+program records the prime paths taken.  The number of paths grows very
+fast with complexity, and to avoid exploding compile times GCC will give
+up instrumentation if the approximate number of paths exceeds the limit
+controlled by @option{-fpath-coverage-limit}.  The result can be read
+with @code{gcov --prime-paths --prime-paths-lines --prime-paths-source},
+@xref{gcov prime paths example}.
+
+@item -fpath-coverage-limit=@var{limit}
+@opindex fpath-coverage-limit
+The threshold at which point @option{-fpath-coverage} gives up on
+instrumenting a function.  This limit is approximate and conservative,
+as GCC uses a pessimistic heuristic which slightly overcounts the
+running number of paths, and gives up if the threshold is reached before
+finding all the paths.  This option is not for fine grained control over
+which functions to instrument - rather it is intended to limit the
+effect of path explosion and keep compile times reasonable.  The default
+is @var{250000}.
+
 @xref{Cross-profiling}.
 
 @cindex @command{gcov}
@@ -17583,6 +17600,14 @@ block must be created to hold the instrumentation code.
 With @option{-fcondition-coverage}, for each conditional in your program GCC
 creates a bitset and records the exercised boolean values that have an
 independent effect on the outcome of that expression.
+
+With @option{-fpath-coverage}, GCC finds and enumerates and records the
+taken prime paths of each function, unless the number of paths would
+exceed the limit controlled by @option{-fpath-coverage-limit}.  If the
+limit is exceeded the function is not instrumented as if
+@option{-fpath-coverage} was not used.  A prime path is the longest
+sequence of unique blocks, except possibly the first and last, which is
+not a subpath of any other path.
 
 @need 2000
 @opindex ftest-coverage
@@ -18818,11 +18843,12 @@ If @code{N=0}, no pad location is recorded.
 The NOP instructions are inserted at---and maybe before, depending on
 @var{M}---the function entry address, even before the prologue.  On
 PowerPC with the ELFv2 ABI, for a function with dual entry points,
-the local entry point is this function entry address.
+the local entry point is this function entry address by default.  See
+the @option{-msplit-patch-nops} option to change this.
 
 The maximum value of @var{N} and @var{M} is 65535.  On PowerPC with the
 ELFv2 ABI, for a function with dual entry points, the supported values
-for @var{M} are 0, 2, 6 and 14.
+for @var{M} are 0, 2, 6 and 14 when not using @option{-msplit-patch-nops}.
 @end table
 
 
@@ -21719,7 +21745,7 @@ and the features that they enable by default:
 @item @samp{armv9.1-a} @tab Armv9.1-A @tab @samp{armv9-a}, @samp{+bf16}, @samp{+i8mm}
 @item @samp{armv9.2-a} @tab Armv9.2-A @tab @samp{armv9.1-a}, @samp{+wfxt}, @samp{+xs}
 @item @samp{armv9.3-a} @tab Armv9.3-A @tab @samp{armv9.2-a}, @samp{+mops}
-@item @samp{armv9.4-a} @tab Armv9.4-A @tab @samp{armv9.3-a}
+@item @samp{armv9.4-a} @tab Armv9.4-A @tab @samp{armv9.3-a}, @samp{+sve2p1}
 @item @samp{armv9.5-a} @tab Armv9.4-A @tab @samp{armv9.4-a}, @samp{cpa}, @samp{+faminmax}, @samp{+lut}
 @item @samp{armv8-r} @tab Armv8-R @tab @samp{armv8-r}
 @end multitable
@@ -21756,7 +21782,7 @@ performance of the code.  Permissible values for this option are:
 @samp{oryon-1},
 @samp{neoverse-512tvb}, @samp{neoverse-e1}, @samp{neoverse-n1},
 @samp{neoverse-n2}, @samp{neoverse-v1}, @samp{neoverse-v2}, @samp{grace},
-@samp{neoverse-v3}, @samp{neoverse-v3ae}, @samp{neoverse-n3},
+@samp{neoverse-v3}, @samp{neoverse-v3ae}, @samp{neoverse-n3}, @samp{olympus},
 @samp{cortex-a725}, @samp{cortex-x925},
 @samp{qdf24xx}, @samp{saphira}, @samp{phecda}, @samp{xgene1}, @samp{vulcan},
 @samp{octeontx}, @samp{octeontx81},  @samp{octeontx83},
@@ -24566,6 +24592,8 @@ Accumulate outgoing function arguments and acquire/release the needed
 stack space for outgoing function arguments once in function
 prologue/epilogue.  Without this option, outgoing arguments are pushed
 before calling a function and popped afterwards.
+See also the @option{-fdefer-pop}
+@ref{Optimize Options,,optimization option}.
 
 Popping the arguments after the function call can be expensive on
 AVR so that accumulating the stack space might lead to smaller
@@ -24639,6 +24667,12 @@ a multiple of 8 is controlled by @option{-mfuse-move}.
 @opindex msplit-ldst
 @item -msplit-ldst
 Split multi-byte loads and stores into several byte loads and stores.
+This optimization is turned on per default for @option{-O2} and higher.
+
+@opindex muse-nonzero-bits
+@item -muse-nonzero-bits
+Enable optimizations that are only possible when some bits in a
+register are always zero.
 This optimization is turned on per default for @option{-O2} and higher.
 
 @end table
@@ -27966,8 +28000,8 @@ Use (do not use) @code{amcas[_db].@{b/h/w/d@}} instructions.  When build with
 @opindex mno-ld-seq-sa
 @item -mld-seq-sa
 @itemx -mno-ld-seq-sa
-Whether a load-load barrier (@code{dbar 0x700}) is needed.  When build with
-@option{-march=la664}, it is enabled by default.  The default is
+Whether a same-address load-load barrier (@code{dbar 0x700}) is needed.  When
+build with @option{-march=la664}, it is enabled by default.  The default is
 @option{-mno-ld-seq-sa}, the load-load barrier is needed.
 
 @opindex mtls-dialect
@@ -30413,7 +30447,7 @@ Valid version strings are
 @samp{7.0}, @samp{7.3}, and @samp{7.8}.
 The default PTX ISA version is the one that added support for the
 selected PTX ISA target architecture, see @option{-march=}, but at
-least @samp{6.0}, or @samp{7.3} for @option{-march=sm_52} and higher.
+least @samp{6.3}, or @samp{7.3} for @option{-march=sm_52} and higher.
 
 This option sets the values of the preprocessor macros
 @code{__PTX_ISA_VERSION_MAJOR__} and @code{__PTX_ISA_VERSION_MINOR__};
@@ -31862,6 +31896,17 @@ requires @code{.plt} and @code{.got}
 sections that are both writable and executable.
 This is a PowerPC 32-bit SYSV ABI option.
 
+@opindex msplit-patch-nops
+@item -msplit-patch-nops
+When adding NOPs for a patchable area via the
+@option{-fpatchable-function-entry} option emit the ``before'' NOPs in front
+of the global entry point and the ``after'' NOPs after the local entry point.
+This makes the sequence of NOPs not consecutive when a global entry point
+is generated.  Without this option the NOPs are emitted directly before and
+after the local entry point, making them consecutive but moving global and
+local entry point further apart.  If only a single entry point is generated
+this option has no effect.
+
 @opindex misel
 @opindex mno-isel
 @item -misel
@@ -33114,10 +33159,7 @@ GNU/Linux for S/390 ABI@.  When @option{-m64} is specified, generate
 code compliant to the GNU/Linux for zSeries ABI@.  This allows GCC in
 particular to generate 64-bit instructions.  For the @samp{s390}
 targets, the default is @option{-m31}, while the @samp{s390x}
-targets default to @option{-m64}.  Note, previously, @option{-m31} defaulted to
-@option{-mesa} unless @option{-mzarch} was explicitely specified.  Now,
-@option{-m31} defaults to @option{-mzarch} unless @option{-mesa} is explicitely
-specified since ESA/390 support is deprecated and will be removed.
+targets default to @option{-m64}.
 
 @opindex mzarch
 @opindex mesa
@@ -33131,7 +33173,6 @@ not possible with @option{-m64}.
 When generating code compliant to the GNU/Linux for S/390 ABI,
 the default is @option{-mesa}.  When generating code compliant
 to the GNU/Linux for zSeries ABI, the default is @option{-mzarch}.
-Option @option{-mesa} is deprecated and support for ESA/390 will be removed.
 
 @opindex mhtm
 @opindex mno-htm
@@ -35903,12 +35944,6 @@ preferred alignment to @option{-mpreferred-stack-boundary=2}.
 @need 200
 @opindex mavx10.2
 @itemx -mavx10.2
-@need 200
-@opindex mavx10.2-256
-@itemx -mavx10.2-256
-@need 200
-@opindex mavx10.2-512
-@itemx -mavx10.2-512
 @need 200
 @opindex mamx-avx512
 @itemx -mamx-avx512

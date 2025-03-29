@@ -170,6 +170,9 @@ esac
 AC_SUBST(toolexecdir)
 AC_SUBST(toolexeclibdir)
 
+# Determine what GCC version number to use in filesystem paths.
+GCC_BASE_VER
+
 AH_TEMPLATE(PACKAGE, [Name of package])
 AH_TEMPLATE(VERSION, [Version number of package])
 
@@ -262,6 +265,9 @@ case $host in
   *) ;;
 esac
 AC_SUBST(extra_darwin_ldflags_libgcobol)
+
+# For iconv support.
+AM_ICONV
 
 AC_CONFIG_SRCDIR([Makefile.am])
 AC_CONFIG_FILES([Makefile])

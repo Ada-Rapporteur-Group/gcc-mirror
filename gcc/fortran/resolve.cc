@@ -1986,7 +1986,7 @@ resolve_procedure_expression (gfc_expr* expr)
   if (is_illegal_recursion (sym, gfc_current_ns))
     {
       if (sym->attr.use_assoc && expr->symtree->name[0] == '@')
-	gfc_warning (0, "Non-RECURSIVE procedure %qs from module %qs is "
+	gfc_warning (0, "Non-RECURSIVE procedure %qs from module %qs is"
 		     " possibly calling itself recursively in procedure %qs. "
 		     " Declare it RECURSIVE or use %<-frecursive%>",
 		     sym->name, sym->module, gfc_current_ns->proc_name->name);
@@ -7351,8 +7351,9 @@ resolve_compcall (gfc_expr* e, const char **name)
   /* Check that's really a FUNCTION.  */
   if (!e->value.compcall.tbp->function)
     {
-      gfc_error ("%qs at %L should be a FUNCTION",
-		 e->value.compcall.name, &e->where);
+      if (e->symtree && e->symtree->n.sym->resolve_symbol_called)
+	gfc_error ("%qs at %L should be a FUNCTION", e->value.compcall.name,
+		   &e->where);
       return false;
     }
 
@@ -8214,7 +8215,7 @@ resolve_locality_spec (gfc_code *code, gfc_namespace *ns)
 	    {
 	      if (iter->var->symtree->n.sym == sym)
 		{
-		  gfc_error ("Index variable %qs at %L cannot be specified in a"
+		  gfc_error ("Index variable %qs at %L cannot be specified in a "
 			     "locality-spec", sym->name, &expr->where);
 		  continue;
 		}
@@ -8629,6 +8630,14 @@ gfc_find_sym_in_expr (gfc_symbol *sym, gfc_expr *e)
   return gfc_traverse_expr (e, sym, sym_in_expr, 0);
 }
 
+/* Same as gfc_find_sym_in_expr, but do not descend into length type parameter
+   of character expressions.  */
+static bool
+gfc_find_var_in_expr (gfc_symbol *sym, gfc_expr *e)
+{
+  return gfc_traverse_expr (e, sym, sym_in_expr, -1);
+}
+
 
 /* Given the expression node e for an allocatable/pointer of derived type to be
    allocated, get the expression node to be initialized afterwards (needed for
@@ -8979,6 +8988,22 @@ resolve_allocate_expr (gfc_expr *e, gfc_code *code, bool *array_alloc_wo_spec)
       goto failure;
     }
 
+  /* F2003:C626 (R623) A type-param-value in a type-spec shall be an asterisk
+     if and only if each allocate-object is a dummy argument for which the
+     corresponding type parameter is assumed.  */
+  if (code->ext.alloc.ts.type == BT_CHARACTER
+      && code->ext.alloc.ts.u.cl->length != NULL
+      && e->ts.type == BT_CHARACTER && !e->ts.deferred
+      && e->ts.u.cl->length == NULL
+      && e->symtree->n.sym->attr.dummy)
+    {
+      gfc_error ("The type parameter in ALLOCATE statement with type-spec "
+		 "shall be an asterisk as allocate object %qs at %L is a "
+		 "dummy argument with assumed type parameter",
+		 sym->name, &e->where);
+      goto failure;
+    }
+
   /* Check F08:C632.  */
   if (code->ext.alloc.ts.type == BT_CHARACTER && !e->ts.deferred
       && !UNLIMITED_POLY (e))
@@ -9190,9 +9215,9 @@ check_symbols:
 	    continue;
 
 	  if ((ar->start[i] != NULL
-	       && gfc_find_sym_in_expr (sym, ar->start[i]))
+	       && gfc_find_var_in_expr (sym, ar->start[i]))
 	      || (ar->end[i] != NULL
-		  && gfc_find_sym_in_expr (sym, ar->end[i])))
+		  && gfc_find_var_in_expr (sym, ar->end[i])))
 	    {
 	      gfc_error ("%qs must not appear in the array specification at "
 			 "%L in the same ALLOCATE statement where it is "
@@ -17921,7 +17946,8 @@ skip_interfaces:
 	/* Mark the result symbol to be referenced, when it has allocatable
 	   components.  */
 	sym->result->attr.referenced = 1;
-      else if (a->function && !a->pointer && !a->allocatable && sym->result)
+      else if (a->function && !a->pointer && !a->allocatable && !a->use_assoc
+	       && sym->result)
 	/* Default initialization for function results.  */
 	apply_default_init (sym->result);
     }

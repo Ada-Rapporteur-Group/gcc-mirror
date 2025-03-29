@@ -1,3 +1,57 @@
+2025-03-28  Jakub Jelinek  <jakub@redhat.com>
+
+	* Make-lang.in (c.srcextra): Don't depend on anything and don't copy
+	anything.
+
+2025-03-27  Martin Uecker  <uecker@tugraz.at>
+
+	PR c/118765
+	* c-decl.cc (merge_decls): For TYPE_DECLS copy
+	DECL_ORIGINAL_TYPE from the old declaration.
+	* c-typeck.cc (tagged_types_tu_compatible_p): Add
+	checking assertions.
+
+2025-03-21  Paul-Antoine Arras  <parras@baylibre.com>
+	    Tobias Burnus  <tburnus@baylibre.com>
+
+	* c-parser.cc (c_parser_omp_clause_destroy): Make addressable.
+	(c_parser_omp_clause_init): Make addressable.
+
+2025-03-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/119350
+	* c-typeck.cc (pop_init_level): Don't ignore empty brackets for
+	flag_isoc23, still set constructor_type to NULL in that case but
+	emit a pedwarn_init in that case.
+
+2025-03-19  Martin Uecker  <uecker@tugraz.at>
+
+	PR c/118765
+	* c-decl.cc (finish_struct,finish_enum): Swap direction when
+	copying TYPE_STRUB_DECL in redefinitions.
+
+2025-03-19  Martin Uecker  <uecker@tugraz.at>
+
+	PR c/118061
+	* c-typeck.cc (tagged_types_tu_compatible_p): Handle
+	errors in types of struct members.
+
+2025-03-18  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/119311
+	* c-parser.cc (c_parser_if_body): Pass result of c_parser_all_labels
+	as last argument to c_parser_statement_after_labels.
+	(c_parser_else_body): Likewise.
+
+2025-03-18  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/116545
+	* c-parser.cc (c_parser_declaration_or_fndef): Parse
+	__attribute__((musttail)) return.
+	(c_parser_handle_musttail): Diagnose attribute arguments.
+	(c_parser_statement_after_labels): Parse
+	__attribute__((musttail)) return.
+
 2025-03-11  Jakub Jelinek  <jakub@redhat.com>
 
 	PR c/117178

@@ -32,17 +32,16 @@
 #include "cobol-system.h"
 #include "coretypes.h"
 #include "tree.h"
-#define HOWEVER_GCC_DEFINES_TREE 1
-#include "ec.h"
-#include "common-defs.h"
+#include "../../libgcobol/ec.h"
+#include "../../libgcobol/common-defs.h"
 #include "util.h"
 #include "cbldiag.h"
 #include "symbols.h"
 #include "inspect.h"
-#include "io.h"
+#include "../../libgcobol/io.h"
 #include "genapi.h"
 #include "gengen.h"
-#include "exceptl.h"
+#include "../../libgcobol/exceptl.h"
 #include "util.h"
 
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
@@ -116,31 +115,27 @@ cbl_enabled_exceptions_t::turn_on_off( bool enabled,
     return true;
   }
 
-  /*
-   * std::remove_if cannot be used with std::set because its elements are const.
-   * std::set::erase_if became available only in C++20.
-   */
+  // std::set::erase_if became available only in C++20.
   if( enabled ) { // remove any disabled
     if( files.empty() ) {
       auto p = begin();
-      while( end() != (p = std::find_if( begin(), end(),
-                                         [ec = type]( const auto& elem ) {
-                                           return
-                                             !elem.enabled &&
-                                             ec_cmp(ec, elem.ec); } )) ) {
-        erase(p);
+      while( p != end() ) {
+	if( !p->enabled && ec_cmp(type, p->ec) ) {
+	  p = erase(p);
+	} else {
+	  ++p;
+	}
       }
     } else {
       for( size_t file: files ) {
         auto p = begin();
-        while( end() != (p = std::find_if( begin(), end(),
-                                           [ec = type, file]( const auto& elem ) {
-                                             return
-                                               !elem.enabled &&
-                                               file == elem.file &&
-                                               ec_cmp(ec, elem.ec); } )) ) {
-          erase(p);
-        }
+        while( p != end() ) {
+	  if( !p->enabled && file == p->file && ec_cmp(type, p->ec) ) {
+	    p = erase(p);
+	  } else {
+	    ++p;
+	  }
+	}
       }
     }
     auto elem = cbl_enabled_exception_t(enabled, location, type);
@@ -279,10 +274,11 @@ symbol_declaratives_add( size_t program,
   char achBlob[32];
   sprintf(achBlob, "_DECLARATIVE_BLOB%d_", blob_count++);
 
-  cbl_field_data_t data = { .memsize = capacity_cast(len),
-                            .capacity = capacity_cast(len),
-                            .initial = reinterpret_cast<char*>(blob),
-                            .picture = reinterpret_cast<char*>(blob) };
+  cbl_field_data_t data = {};
+  data.memsize = capacity_cast(len);
+  data.capacity = capacity_cast(len);
+  data.initial = reinterpret_cast<char*>(blob);
+  data.picture = reinterpret_cast<char*>(blob);
   cbl_field_t field = { 0, FldBlob, FldInvalid, constant_e,
                         0, 0, 0, cbl_occurs_t(), 0, "",
                         0, {}, data, NULL };
@@ -310,7 +306,7 @@ symbol_declaratives_add( size_t program,
  * section is PERFORMed, and control branches to the end of this
  * section, and thence back to the statement it came from.
  */
-#include "io.h"
+#include "../../libgcobol/io.h"
 size_t current_file_index();
 file_status_t current_file_handled_status();
 

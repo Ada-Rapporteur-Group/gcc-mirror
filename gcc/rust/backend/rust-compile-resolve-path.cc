@@ -32,18 +32,41 @@
 namespace Rust {
 namespace Compile {
 
-void
-ResolvePathRef::visit (HIR::QualifiedPathInExpression &expr)
+tree
+ResolvePathRef::Compile (HIR::QualifiedPathInExpression &expr, Context *ctx)
 {
-  resolved = resolve (expr.get_final_segment ().get_segment (),
-		      expr.get_mappings (), expr.get_locus (), true);
+  ResolvePathRef resolver (ctx);
+  return resolver.resolve_path_like (expr);
 }
 
-void
-ResolvePathRef::visit (HIR::PathInExpression &expr)
+tree
+ResolvePathRef::Compile (HIR::PathInExpression &expr, Context *ctx)
 {
-  resolved = resolve (expr.get_final_segment ().get_segment (),
-		      expr.get_mappings (), expr.get_locus (), false);
+  ResolvePathRef resolver (ctx);
+  return resolver.resolve_path_like (expr);
+}
+
+ResolvePathRef::ResolvePathRef (Context *ctx) : HIRCompileBase (ctx) {}
+
+template <typename T>
+tree
+ResolvePathRef::resolve_path_like (T &expr)
+{
+  if (expr.is_lang_item ())
+    {
+      auto lang_item
+	= Analysis::Mappings::get ().get_lang_item_node (expr.get_lang_item ());
+
+      // FIXME: Is that correct? :/
+      auto final_segment
+	= HIR::PathIdentSegment (LangItem::ToString (expr.get_lang_item ()));
+
+      return resolve_with_node_id (final_segment, expr.get_mappings (),
+				   expr.get_locus (), true, lang_item);
+    }
+
+  return resolve (expr.get_final_segment ().get_segment (),
+		  expr.get_mappings (), expr.get_locus (), true);
 }
 
 tree
@@ -57,7 +80,7 @@ ResolvePathRef::attempt_constructor_expression_lookup (
 
   TyTy::ADTType *adt = static_cast<TyTy::ADTType *> (lookup);
   if (adt->is_unit ())
-    return unit_expression (ctx, expr_locus);
+    return unit_expression (expr_locus);
 
   if (!adt->is_enum ())
     return error_mark_node;
@@ -81,56 +104,34 @@ ResolvePathRef::attempt_constructor_expression_lookup (
   tree compiled_adt_type = TyTyResolveCompile::compile (ctx, adt);
 
   // make the ctor for the union
-  HIR::Expr *discrim_expr = variant->get_discriminant ();
+  HIR::Expr &discrim_expr = variant->get_discriminant ();
   tree discrim_expr_node = CompileExpr::Compile (discrim_expr, ctx);
   tree folded_discrim_expr = fold_expr (discrim_expr_node);
   tree qualifier = folded_discrim_expr;
 
-  return Backend::constructor_expression (compiled_adt_type, true, {qualifier},
-					  union_disriminator, expr_locus);
+  // false for is enum but this is an enum but we have a new layout
+  return Backend::constructor_expression (compiled_adt_type, false, {qualifier},
+					  -1, expr_locus);
 }
 
 tree
-ResolvePathRef::resolve (const HIR::PathIdentSegment &final_segment,
-			 const Analysis::NodeMapping &mappings,
-			 location_t expr_locus, bool is_qualified_path)
+ResolvePathRef::resolve_with_node_id (
+  const HIR::PathIdentSegment &final_segment,
+  const Analysis::NodeMapping &mappings, location_t expr_locus,
+  bool is_qualified_path, NodeId resolved_node_id)
 {
   TyTy::BaseType *lookup = nullptr;
   bool ok = ctx->get_tyctx ()->lookup_type (mappings.get_hirid (), &lookup);
   rust_assert (ok);
 
-  // need to look up the reference for this identifier
-
-  // this can fail because it might be a Constructor for something
-  // in that case the caller should attempt ResolvePathType::Compile
-  NodeId ref_node_id = UNKNOWN_NODEID;
-  if (flag_name_resolution_2_0)
-    {
-      auto nr_ctx
-	= Resolver2_0::ImmutableNameResolutionContext::get ().resolver ();
-
-      auto resolved = nr_ctx.lookup (mappings.get_nodeid ());
-
-      if (!resolved)
-	return attempt_constructor_expression_lookup (lookup, ctx, mappings,
-						      expr_locus);
-
-      ref_node_id = *resolved;
-    }
-  else
-    {
-      if (!ctx->get_resolver ()->lookup_resolved_name (mappings.get_nodeid (),
-						       &ref_node_id))
-	return attempt_constructor_expression_lookup (lookup, ctx, mappings,
-						      expr_locus);
-    }
-
-  HirId ref;
-  if (!ctx->get_mappings ()->lookup_node_to_hir (ref_node_id, &ref))
+  tl::optional<HirId> hid
+    = ctx->get_mappings ().lookup_node_to_hir (resolved_node_id);
+  if (!hid.has_value ())
     {
       rust_error_at (expr_locus, "reverse call path lookup failure");
       return error_mark_node;
     }
+  auto ref = hid.value ();
 
   // might be a constant
   tree constant_expr;
@@ -183,6 +184,11 @@ ResolvePathRef::resolve (const HIR::PathIdentSegment &final_segment,
 	}
     }
 
+  // Handle unit struct
+  if (lookup->get_kind () == TyTy::TypeKind::ADT)
+    return attempt_constructor_expression_lookup (lookup, ctx, mappings,
+						  expr_locus);
+
   // let the query system figure it out
   tree resolved_item = query_compile (ref, lookup, final_segment, mappings,
 				      expr_locus, is_qualified_path);
@@ -190,7 +196,47 @@ ResolvePathRef::resolve (const HIR::PathIdentSegment &final_segment,
     {
       TREE_USED (resolved_item) = 1;
     }
+
   return resolved_item;
+}
+
+tree
+ResolvePathRef::resolve (const HIR::PathIdentSegment &final_segment,
+			 const Analysis::NodeMapping &mappings,
+			 location_t expr_locus, bool is_qualified_path)
+{
+  TyTy::BaseType *lookup = nullptr;
+  bool ok = ctx->get_tyctx ()->lookup_type (mappings.get_hirid (), &lookup);
+  rust_assert (ok);
+
+  // need to look up the reference for this identifier
+
+  // this can fail because it might be a Constructor for something
+  // in that case the caller should attempt ResolvePathType::Compile
+  NodeId ref_node_id = UNKNOWN_NODEID;
+  if (flag_name_resolution_2_0)
+    {
+      auto &nr_ctx
+	= Resolver2_0::ImmutableNameResolutionContext::get ().resolver ();
+
+      auto resolved = nr_ctx.lookup (mappings.get_nodeid ());
+
+      if (!resolved)
+	return attempt_constructor_expression_lookup (lookup, ctx, mappings,
+						      expr_locus);
+
+      ref_node_id = *resolved;
+    }
+  else
+    {
+      if (!ctx->get_resolver ()->lookup_resolved_name (mappings.get_nodeid (),
+						       &ref_node_id))
+	return attempt_constructor_expression_lookup (lookup, ctx, mappings,
+						      expr_locus);
+    }
+
+  return resolve_with_node_id (final_segment, mappings, expr_locus,
+			       is_qualified_path, ref_node_id);
 }
 
 tree
@@ -199,24 +245,18 @@ HIRCompileBase::query_compile (HirId ref, TyTy::BaseType *lookup,
 			       const Analysis::NodeMapping &mappings,
 			       location_t expr_locus, bool is_qualified_path)
 {
-  HIR::Item *resolved_item = ctx->get_mappings ()->lookup_hir_item (ref);
-  HirId parent_block;
-  HIR::ExternalItem *resolved_extern_item
-    = ctx->get_mappings ()->lookup_hir_extern_item (ref, &parent_block);
-  bool is_hir_item = resolved_item != nullptr;
-  bool is_hir_extern_item = resolved_extern_item != nullptr;
   bool is_fn = lookup->get_kind () == TyTy::TypeKind::FNDEF;
-  if (is_hir_item)
+  if (auto resolved_item = ctx->get_mappings ().lookup_hir_item (ref))
     {
       if (!lookup->has_substitutions_defined ())
-	return CompileItem::compile (resolved_item, ctx, nullptr, true,
-				     expr_locus);
+	return CompileItem::compile (*resolved_item, ctx, nullptr, expr_locus);
       else
-	return CompileItem::compile (resolved_item, ctx, lookup, true,
-				     expr_locus);
+	return CompileItem::compile (*resolved_item, ctx, lookup, expr_locus);
     }
-  else if (is_hir_extern_item)
+  else if (auto hir_extern_item
+	   = ctx->get_mappings ().lookup_hir_extern_item (ref))
     {
+      HIR::ExternalItem *resolved_extern_item = hir_extern_item->first;
       if (!lookup->has_substitutions_defined ())
 	return CompileExternItem::compile (resolved_extern_item, ctx, nullptr,
 					   true, expr_locus);
@@ -240,26 +280,20 @@ HIRCompileBase::query_compile (HirId ref, TyTy::BaseType *lookup,
 	    }
 	}
 
-      HirId parent_impl_id = UNKNOWN_HIRID;
-      HIR::ImplItem *resolved_item
-	= ctx->get_mappings ()->lookup_hir_implitem (ref, &parent_impl_id);
-      bool is_impl_item = resolved_item != nullptr;
-      if (is_impl_item)
+      if (auto resolved_item = ctx->get_mappings ().lookup_hir_implitem (ref))
 	{
 	  if (!lookup->has_substitutions_defined ())
-	    return CompileInherentImplItem::Compile (resolved_item, ctx,
+	    return CompileInherentImplItem::Compile (resolved_item->first, ctx,
 						     nullptr, true, expr_locus);
 	  else
-	    return CompileInherentImplItem::Compile (resolved_item, ctx, lookup,
-						     true, expr_locus);
+	    return CompileInherentImplItem::Compile (resolved_item->first, ctx,
+						     lookup, true, expr_locus);
 	}
-      else
+      else if (auto trait_item
+	       = ctx->get_mappings ().lookup_hir_trait_item (ref))
 	{
-	  // it might be resolved to a trait item
-	  HIR::TraitItem *trait_item
-	    = ctx->get_mappings ()->lookup_hir_trait_item (ref);
-	  HIR::Trait *trait = ctx->get_mappings ()->lookup_trait_item_mapping (
-	    trait_item->get_mappings ().get_hirid ());
+	  HIR::Trait *trait = ctx->get_mappings ().lookup_trait_item_mapping (
+	    trait_item.value ()->get_mappings ().get_hirid ());
 
 	  Resolver::TraitReference *trait_ref
 	    = &Resolver::TraitReference::error_node ();
@@ -267,16 +301,20 @@ HIRCompileBase::query_compile (HirId ref, TyTy::BaseType *lookup,
 	    trait->get_mappings ().get_defid (), &trait_ref);
 	  rust_assert (ok);
 
-	  TyTy::BaseType *receiver = nullptr;
-	  ok = ctx->get_tyctx ()->lookup_receiver (mappings.get_hirid (),
-						   &receiver);
-	  rust_assert (ok);
-	  receiver = receiver->destructure ();
-
 	  // the type resolver can only resolve type bounds to their trait
 	  // item so its up to us to figure out if this path should resolve
 	  // to an trait-impl-block-item or if it can be defaulted to the
 	  // trait-impl-item's definition
+	  //
+	  // because we know this is resolved to a trait item we can actually
+	  // just grab the Self type parameter here for the receiver to match
+	  // the appropriate impl block
+
+	  rust_assert (lookup->is<TyTy::FnType> ());
+	  auto fn = lookup->as<TyTy::FnType> ();
+	  rust_assert (fn->get_num_type_params () > 0);
+	  auto &self = fn->get_substs ().at (0);
+	  auto receiver = self.get_param_ty ();
 	  auto candidates
 	    = Resolver::PathProbeImplTrait::Probe (receiver, final_segment,
 						   trait_ref);
@@ -285,7 +323,7 @@ HIRCompileBase::query_compile (HirId ref, TyTy::BaseType *lookup,
 	      // this means we are defaulting back to the trait_item if
 	      // possible
 	      Resolver::TraitItemReference *trait_item_ref = nullptr;
-	      bool ok = trait_ref->lookup_hir_trait_item (*trait_item,
+	      bool ok = trait_ref->lookup_hir_trait_item (*trait_item.value (),
 							  &trait_item_ref);
 	      rust_assert (ok);				    // found
 	      rust_assert (trait_item_ref->is_optional ()); // has definition
@@ -306,7 +344,7 @@ HIRCompileBase::query_compile (HirId ref, TyTy::BaseType *lookup,
 
 	      TyTy::BaseType *self = nullptr;
 	      bool ok = ctx->get_tyctx ()->lookup_type (
-		impl->get_type ()->get_mappings ().get_hirid (), &self);
+		impl->get_type ().get_mappings ().get_hirid (), &self);
 	      rust_assert (ok);
 
 	      if (!lookup->has_substitutions_defined ())

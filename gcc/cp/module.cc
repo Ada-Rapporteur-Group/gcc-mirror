@@ -3012,6 +3012,7 @@ public:
   bool read_definition (tree decl);
 
 private:
+  void check_abi_tags (tree existing, tree decl, tree &eattr, tree &dattr);
   bool is_matching_decl (tree existing, tree decl, bool is_typedef);
   static bool install_implicit_member (tree decl);
   bool read_function_def (tree decl, tree maybe_template);
@@ -5541,6 +5542,50 @@ trees_in::start (unsigned code)
   return t;
 }
 
+/* The kinds of interface an importer could have for a decl.  */
+
+enum class importer_interface {
+  unknown,	  /* The definition may or may not need to be emitted.  */
+  always_import,  /* The definition can always be found in another TU.  */
+  always_emit,	  /* The definition must be emitted in the importer's TU. */
+};
+
+/* Returns what kind of interface an importer will have of DECL.  */
+
+static importer_interface
+get_importer_interface (tree decl)
+{
+  /* Internal linkage entities must be emitted in each importer if
+     there is a definition available.  */
+  if (!TREE_PUBLIC (decl))
+    return importer_interface::always_emit;
+
+  /* Entities that aren't vague linkage are either not definitions or
+     will be emitted in this TU, so importers can just refer to an
+     external definition.  */
+  if (!vague_linkage_p (decl))
+    return importer_interface::always_import;
+
+  /* For explicit instantiations, importers can always rely on there
+     being a definition in another TU, unless this is a definition
+     in a header module: in which case the importer will always need
+     to emit it.  */
+  if (DECL_LANG_SPECIFIC (decl)
+      && DECL_EXPLICIT_INSTANTIATION (decl))
+    return (header_module_p () && !DECL_EXTERNAL (decl)
+	    ? importer_interface::always_emit
+	    : importer_interface::always_import);
+
+  /* A gnu_inline function is never emitted in any TU.  */
+  if (TREE_CODE (decl) == FUNCTION_DECL
+      && DECL_DECLARED_INLINE_P (decl)
+      && lookup_attribute ("gnu_inline", DECL_ATTRIBUTES (decl)))
+    return importer_interface::always_import;
+
+  /* Everything else has vague linkage.  */
+  return importer_interface::unknown;
+}
+
 /* The structure streamers access the raw fields, because the
    alternative, of using the accessor macros can require using
    different accessors for the same underlying field, depending on the
@@ -5660,7 +5705,8 @@ trees_out::core_bools (tree t, bits_out& bits)
 	   we need to import or export any vague-linkage entities on
 	   stream-in.  */
 	bool interface_known = t->decl_common.lang_flag_5;
-	if (interface_known && vague_linkage_p (t))
+	if (interface_known
+	    && get_importer_interface (t) == importer_interface::unknown)
 	  interface_known = false;
 	WB (interface_known);
       }
@@ -5694,8 +5740,8 @@ trees_out::core_bools (tree t, bits_out& bits)
 		is_external = true;
 	      gcc_fallthrough ();
 	    case FUNCTION_DECL:
-	      if (TREE_PUBLIC (t)
-		  && !vague_linkage_p (t))
+	      if (get_importer_interface (t)
+		  == importer_interface::always_import)
 		is_external = true;
 	      break;
 	    }
@@ -5757,7 +5803,7 @@ trees_out::core_bools (tree t, bits_out& bits)
       WB (t->function_decl.replaceable_operator);
 
       /* decl_type is a (misnamed) 2 bit discriminator.	 */
-      unsigned kind = t->function_decl.decl_type;
+      unsigned kind = (unsigned)t->function_decl.decl_type;
       WB ((kind >> 0) & 1);
       WB ((kind >> 1) & 1);
     }
@@ -8787,8 +8833,11 @@ trees_in::decl_value ()
 	  tree etype = TREE_TYPE (existing);
 
 	  /* Handle separate declarations with different attributes.  */
+	  tree &dattr = TYPE_ATTRIBUTES (type);
 	  tree &eattr = TYPE_ATTRIBUTES (etype);
-	  eattr = merge_attributes (eattr, TYPE_ATTRIBUTES (type));
+	  check_abi_tags (existing, decl, eattr, dattr);
+	  // TODO: handle other conflicting type attributes
+	  eattr = merge_attributes (eattr, dattr);
 
 	  /* When merging a partial specialisation, the existing decl may have
 	     had its TYPE_CANONICAL adjusted.  If so we should use structural
@@ -11966,6 +12015,51 @@ trees_in::binfo_mergeable (tree *type)
   return u ();
 }
 
+/* DECL is a just streamed declaration with attributes DATTR that should
+   have matching ABI tags as EXISTING's attributes EATTR.  Check that the
+   ABI tags match, and report an error if not.  */
+
+void
+trees_in::check_abi_tags (tree existing, tree decl, tree &eattr, tree &dattr)
+{
+  tree etags = lookup_attribute ("abi_tag", eattr);
+  tree dtags = lookup_attribute ("abi_tag", dattr);
+  if ((etags == nullptr) != (dtags == nullptr)
+      || (etags && !attribute_value_equal (etags, dtags)))
+    {
+      if (etags)
+	etags = TREE_VALUE (etags);
+      if (dtags)
+	dtags = TREE_VALUE (dtags);
+
+      /* We only error if mangling wouldn't consider the tags equivalent.  */
+      if (!equal_abi_tags (etags, dtags))
+	{
+	  auto_diagnostic_group d;
+	  if (dtags)
+	    error_at (DECL_SOURCE_LOCATION (decl),
+		      "mismatching abi tags for %qD with tags %qE",
+		      decl, dtags);
+	  else
+	    error_at (DECL_SOURCE_LOCATION (decl),
+		      "mismatching abi tags for %qD with no tags", decl);
+	  if (etags)
+	    inform (DECL_SOURCE_LOCATION (existing),
+		    "existing declaration here with tags %qE", etags);
+	  else
+	    inform (DECL_SOURCE_LOCATION (existing),
+		    "existing declaration here with no tags");
+	}
+
+      /* Always use the existing abi_tags as the canonical set so that
+	 later processing doesn't get confused.  */
+      if (dtags)
+	dattr = remove_attribute ("abi_tag", dattr);
+      if (etags)
+	duplicate_one_attribute (&dattr, eattr, "abi_tag");
+    }
+}
+
 /* DECL is a just streamed mergeable decl that should match EXISTING.  Check
    it does and issue an appropriate diagnostic if not.  Merge any
    bits from DECL to EXISTING.  This is stricter matching than
@@ -12159,9 +12253,27 @@ trees_in::is_matching_decl (tree existing, tree decl, bool is_typedef)
 
   if (TREE_CODE (d_inner) == FUNCTION_DECL
       && DECL_DECLARED_INLINE_P (d_inner))
-    DECL_DECLARED_INLINE_P (e_inner) = true;
+    {
+      DECL_DECLARED_INLINE_P (e_inner) = true;
+      if (!DECL_SAVED_TREE (e_inner)
+	  && lookup_attribute ("gnu_inline", DECL_ATTRIBUTES (d_inner))
+	  && !lookup_attribute ("gnu_inline", DECL_ATTRIBUTES (e_inner)))
+	{
+	  DECL_INTERFACE_KNOWN (e_inner)
+	    |= DECL_INTERFACE_KNOWN (d_inner);
+	  DECL_DISREGARD_INLINE_LIMITS (e_inner)
+	    |= DECL_DISREGARD_INLINE_LIMITS (d_inner);
+	  // TODO: we will eventually want to merge all decl attributes
+	  duplicate_one_attribute (&DECL_ATTRIBUTES (e_inner),
+				   DECL_ATTRIBUTES (d_inner), "gnu_inline");
+	}
+    }
   if (!DECL_EXTERNAL (d_inner))
     DECL_EXTERNAL (e_inner) = false;
+
+  if (VAR_OR_FUNCTION_DECL_P (d_inner))
+    check_abi_tags (existing, decl,
+		    DECL_ATTRIBUTES (e_inner), DECL_ATTRIBUTES (d_inner));
 
   if (TREE_CODE (decl) == TEMPLATE_DECL)
     {
@@ -12625,7 +12737,12 @@ trees_in::read_var_def (tree decl, tree maybe_template)
 	  if (maybe_dup && DECL_INITIALIZED_BY_CONSTANT_EXPRESSION_P (maybe_dup))
 	    DECL_INITIALIZED_BY_CONSTANT_EXPRESSION_P (decl) = true;
 	  tentative_decl_linkage (decl);
+	  if (DECL_EXPLICIT_INSTANTIATION (decl)
+	      && !DECL_EXTERNAL (decl))
+	    setup_explicit_instantiation_definition_linkage (decl);
 	  if (DECL_IMPLICIT_INSTANTIATION (decl)
+	      || (DECL_EXPLICIT_INSTANTIATION (decl)
+		  && !DECL_EXTERNAL (decl))
 	      || (DECL_CLASS_SCOPE_P (decl)
 		  && !DECL_VTABLE_OR_VTT_P (decl)
 		  && !DECL_TEMPLATE_INFO (decl)))
@@ -16543,6 +16660,12 @@ module_state::read_cluster (unsigned snum)
       cfun->language->returns_abnormally = pdata.returns_abnormally;
       cfun->language->infinite_loop = pdata.infinite_loop;
 
+      /* Make sure we emit explicit instantiations.
+	 FIXME do we want to do this in expand_or_defer_fn instead?  */
+      if (DECL_EXPLICIT_INSTANTIATION (decl)
+	  && !DECL_EXTERNAL (decl))
+	setup_explicit_instantiation_definition_linkage (decl);
+
       if (abstract)
 	;
       else if (DECL_MAYBE_IN_CHARGE_CDTOR_P (decl))
@@ -20310,20 +20433,24 @@ get_originating_module_decl (tree decl)
   return decl;
 }
 
+/* If DECL is imported, return which module imported it, or 0 for the current
+   module.  Except that if GLOBAL_M1, return -1 for decls attached to the
+   global module.  */
+
 int
-get_originating_module (tree decl, bool for_mangle)
+get_originating_module (tree decl, bool global_m1)
 {
   tree owner = get_originating_module_decl (decl);
   tree not_tmpl = STRIP_TEMPLATE (owner);
 
   if (!DECL_LANG_SPECIFIC (not_tmpl))
-    return for_mangle ? -1 : 0;
+    return global_m1 ? -1 : 0;
 
-  if (for_mangle && !DECL_MODULE_ATTACH_P (not_tmpl))
+  if (global_m1 && !DECL_MODULE_ATTACH_P (not_tmpl))
     return -1;
 
   int mod = !DECL_MODULE_IMPORT_P (not_tmpl) ? 0 : get_importing_module (owner);
-  gcc_checking_assert (!for_mangle || !(*modules)[mod]->is_header ());
+  gcc_checking_assert (!global_m1 || !(*modules)[mod]->is_header ());
   return mod;
 }
 

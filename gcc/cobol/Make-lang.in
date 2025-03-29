@@ -34,32 +34,17 @@
 # - the compiler proper (eg: cc1plus)
 # - define the names for selecting the language in LANGUAGES.
 
-gcobol_INSTALL_NAME := $(shell echo gcobol|sed '$(program_transform_name)')
-gcobol_TARGET_INSTALL_NAME := $(target_noncanonical)-$(shell echo gcobol|sed '$(program_transform_name)')
+GCOBOL_INSTALL_NAME := $(shell echo gcobol|sed '$(program_transform_name)')
+GCOBOL_TARGET_INSTALL_NAME := $(target_noncanonical)-$(shell echo gcobol|sed '$(program_transform_name)')
+
+GCOBC_INSTALL_NAME := $(shell echo gcobc|sed '$(program_transform_name)')
+GCOBC_TARGET_INSTALL_NAME := $(target_noncanonical)-$(shell echo gcobc|sed '$(program_transform_name)')
 
 cobol: cobol1$(exeext)
 cobol.serial = cobol1$(exeext)
 .PHONY: cobol
 
-BINCLUDE ?= ./gcc
-LIB_INCLUDE ?= $(srcdir)/../libgcobol
 LIB_SOURCE ?= $(srcdir)/../libgcobol
-
-#
-# At this point, as of 2022-10-21, CPPFLAGS is an empty string and can be
-# altered.  CFLAGS and CXXFLAGS are being established upstream, and thus
-# cannot, at this point, be changed.
-#
-# Note further that we are producing only a 64-bit version of libgcobol.so, so
-# it is safe to hard-code the lib64 location.  This obviously has to match the
-# installation code in libgcobol/Makefile.in
-#
-CPPFLAGS =					\
- -std=c++14					\
- -I$(BINCLUDE)					\
- -I$(LIB_INCLUDE)				\
- -DEXEC_LIB=\"$(prefix)/lib64\"		\
- $(END)
 
 YFLAGS = -Werror -Wmidrule-values -Wno-yacc \
 	--debug --verbose
@@ -94,16 +79,18 @@ cobol1_OBJS =    \
 # There is source code in libgcobol/charmaps.cc and
 # libgcobol/valconv.cc that needs to be compiled into both libgcobol
 # and cobol1.  We copy those two source code files from libgcobol to
-# here to avoid the nightmare of one file appearing in more than one
-# place.  For simplicity, we make those compilations dependent on all
-# of the libgcobol/*.h files, which might lead to the occasional
+# build/gcc/cobol to avoid the nightmare of one file appearing in more
+# than one place.  For simplicity, we make those compilations dependent
+# on all of the libgcobol/*.h files, which might lead to the occasional
 # unnecessary compilation.  The impact of that is negligible.
 #
-cobol/charmaps.cc: $(LIB_SOURCE)/charmaps.cc
-	cp $^ $@
+# Various #includes in the files copied from gcc/libgcobol need to be modified
+# so that the .h files can be found.
 
-cobol/valconv.cc: $(LIB_SOURCE)/valconv.cc
-	cp $^ $@
+cobol/charmaps.cc cobol/valconv.cc: cobol/%.cc: $(LIB_SOURCE)/%.cc
+	-l='ec\|common-defs\|io\|gcobolio\|gfileio\|charmaps'; \
+	l=$$l'\|valconv\|exceptl'; \
+	sed -e '/^#include/s,"\('$$l'\)\.h","../../libgcobol/\1.h",' $^ > $@
 
 LIB_SOURCE_H=$(wildcard $(LIB_SOURCE)/*.h)
 
@@ -143,6 +130,11 @@ gcobol$(exeext): \
 	+$(LINKER) $(ALL_LINKERFLAGS) $(LDFLAGS) -o $@		\
 	 $(GCOBOL_D_OBJS) $(EXTRA_GCC_OBJS) libcommon-target.a	\
 	 $(EXTRA_GCC_LIBS) $(LIBS)
+
+# Create a version of the gcobol driver which calls the cross-compiler.
+gcobol-cross$(exeext): gcobol$(exeext)
+	-rm -f gcobol-cross$(exeext)
+	cp gcobol$(exeext) gcobol-cross$(exeext)
 
 #
 # These control the build of the cobol1 source-to-GENERIC converter
@@ -261,8 +253,9 @@ cobol/scan.o: cobol/scan.cc			\
 # output, and do not require those tools to be installed.
 #
 cobol.srcextra: cobol/parse.cc cobol/cdf.cc cobol/scan.cc
-	ln -f $^ cobol/parse.h cobol/cdf.h $(srcdir)/cobol/
-
+	-for i in $^ cobol/parse.h cobol/cdf.h; do \
+	  sed -e '/^#line/s,"\(.*gcc/\)\?cobol/\([^/]*\.\([ylh]\|cc\)\)","\2",' $$i \
+	    > $(srcdir)/$$i; done
 
 # And the cobol1 front end
 
@@ -272,22 +265,34 @@ cobol1$(exeext): $(cobol1_OBJS) $(BACKEND) $(LIBDEPS) attribs.o $(cobol.prev)
 	      $(cobol1_OBJS) $(BACKEND) $(LIBS) $(BACKENDLIBS)
 	@$(call LINK_PROGRESS,$(INDEX.cobol),end)
 
-# FIXME
-cobol.all.cross:
+cobol.all.cross: gcobol-cross$(exeext)
 
 cobol.start.encap: gcobol$(exeext)
 
 cobol.rest.encap:
 
 cobol.install-common: installdirs
-	$(INSTALL_PROGRAM) gcobol$(exeext)      $(DESTDIR)$(bindir)/
+	-rm -f $(DESTDIR)$(bindir)/$(GCOBOL_INSTALL_NAME)$(exeext)
+	-rm -f $(DESTDIR)$(bindir)/$(GCOBC_INSTALL_NAME)$(exeext)
+	$(INSTALL_PROGRAM) gcobol$(exeext)      $(DESTDIR)$(bindir)/$(GCOBOL_INSTALL_NAME)$(exeext)
 	$(INSTALL_PROGRAM) cobol1$(exeext)      $(DESTDIR)$(libexecsubdir)/
-	$(INSTALL) -m 755 $(srcdir)/cobol/gcobc $(DESTDIR)$(bindir)/
+	$(INSTALL) -m 755 $(srcdir)/cobol/gcobc $(DESTDIR)$(bindir)/$(GCOBC_INSTALL_NAME)$(exeext)
+	-if test -f cobol1$(exeext); then \
+	  if test -f gcobol-cross$(exeext); then \
+	    :; \
+	  else \
+	    rm -f $(DESTDIR)$(bindir)/$(GCOBOL_TARGET_INSTALL_NAME)$(exeext); \
+	    rm -f $(DESTDIR)$(bindir)/$(GCOBC_TARGET_INSTALL_NAME)$(exeext); \
+	    ( cd $(DESTDIR)$(bindir) && \
+	      $(LN) $(GCOBOL_INSTALL_NAME)$(exeext) $(GCOBOL_TARGET_INSTALL_NAME)$(exeext) ); \
+	      $(LN) $(GCOBC_INSTALL_NAME)$(exeext) $(GCOBC_TARGET_INSTALL_NAME)$(exeext) ); \
+	  fi; \
+	fi
 	mkdir -p $(DESTDIR)$(datadir)/gcobol/udf
 	$(INSTALL_DATA) $(srcdir)/cobol/udf/*   $(DESTDIR)$(datadir)/gcobol/udf/
 
 cobol.install-man: installdirs
-	$(INSTALL_DATA) $(srcdir)/cobol/gcobol.1 $(DESTDIR)$(man1dir)/
+	$(INSTALL_DATA) $(srcdir)/cobol/gcobol.1 $(DESTDIR)$(man1dir)/$(GCOBOL_INSTALL_NAME)$(man1ext)
 	$(INSTALL_DATA) $(srcdir)/cobol/gcobol.3 $(DESTDIR)$(man3dir)/
 
 cobol.install-info:
@@ -332,10 +337,10 @@ gcobol-io.html: $(srcdir)/cobol/gcobol.3
 # "make uninstall" is not expected to work.  It's not clear how to name
 # the installed location of the cobol1 compiler.
 cobol.uninstall:
-	rm -rf 	$(DESTDIR)$(bindir)/$(gcobol_INSTALL_NAME)$(exeext)	\
-		$(DESTDIR)$(bindir)/gcobc				\
+	rm -rf 	$(DESTDIR)$(bindir)/$(GCOBOL_INSTALL_NAME)$(exeext)	\
+		$(DESTDIR)$(bindir)/$(GCOBC_INSTALL_NAME)		\
 		$(DESTDIR)$(datadir)/gcobol/				\
-		$(DESTDIR)$(man1dir)/gcobol.1				\
+		$(DESTDIR)$(man1dir)/$(GCOBOL_INSTALL_NAME).1		\
 		$(DESTDIR)$(man3dir)/gcobol.3
 
 cobol.man:

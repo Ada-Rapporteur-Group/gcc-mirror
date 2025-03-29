@@ -22,6 +22,9 @@
 AUTOMAKE_OPTIONS = 1.8 foreign
 ACLOCAL_AMFLAGS = -I .. -I ../config
 
+# May be used by various substitution variables.
+gcc_version := $(shell @get_gcc_base_ver@ $(top_srcdir)/../gcc/BASE-VER)
+
 if BUILD_LIBGCOBOL
 toolexeclib_LTLIBRARIES  = libgcobol.la
 endif
@@ -45,9 +48,11 @@ libgcobol_la_LINK = $(LIBTOOL) --mode=link --tag=CXX $(CXX)	\
 		-Wc,-shared-libgcc				\
 		-version-info $(LIBGCOBOL_VERSION)		\
 		-lstdc++					\
-		$(LTLDFLAGS)
+		$(LTLDFLAGS) $(LTLIBICONV)
 
 WARN_CFLAGS = -W -Wall -Wwrite-strings
+
+AM_CXXFLAGS = $(CXXFLAGS_FOR_TARGET)
 
 # not defined: DEFS, MAX_ERRORS, LTLDFLAGS
 ALL_CXXFLAGS = -I. -I$(srcdir) $(AM_CPPFLAGS) $(DEFS)		\

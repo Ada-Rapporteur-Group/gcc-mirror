@@ -29,6 +29,7 @@ public:
   static constexpr auto &COLD = "cold";
   static constexpr auto &CFG = "cfg";
   static constexpr auto &CFG_ATTR = "cfg_attr";
+  static constexpr auto &DERIVE_ATTR = "derive";
   static constexpr auto &DEPRECATED = "deprecated";
   static constexpr auto &ALLOW = "allow";
   static constexpr auto &ALLOW_INTERNAL_UNSTABLE = "allow_internal_unstable";
@@ -53,6 +54,10 @@ public:
     = "rustc_inherit_overflow_checks";
   static constexpr auto &STABLE = "stable";
   static constexpr auto &UNSTABLE = "unstable";
+  static constexpr auto &RUSTC_CONST_STABLE = "rustc_const_stable";
+  static constexpr auto &RUSTC_CONST_UNSTABLE = "rustc_const_unstable";
+  static constexpr auto &MAY_DANGLE = "may_dangle";
+  static constexpr auto &PRELUDE_IMPORT = "prelude_import";
 };
 } // namespace Values
 } // namespace Rust

@@ -116,8 +116,8 @@ add_arg_lib(const char *library, bool force_static ATTRIBUTE_UNUSED)
     {
     append_option (OPT_Wl_, LD_STATIC_OPTION, 1);
     }
-  append_option (OPT_l, library, 1);
 #endif
+  append_option (OPT_l, library, 1);
 #ifdef HAVE_LD_STATIC_DYNAMIC
   if( force_static )
     {
@@ -137,21 +137,6 @@ append_rdynamic()
   decoded.canonical_option_num_elements = 1;
   decoded.value = 1;
   append_arg(decoded);
-  return;
-  }
-
-static void
-append_rpath()
-  {
-#ifdef EXEC_LIB
-  // Handing append_option() something on the stack Just Doesn't Work
-  if( strlen(EXEC_LIB) )
-    {
-    static char ach[256];
-    snprintf(ach, sizeof(ach), "-rpath=%s", EXEC_LIB);
-    append_option (OPT_Wl_, ach, 1);
-    }
-#endif
   return;
   }
 
@@ -250,9 +235,6 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
 
   int index_libgcobol_a = 0;
 
-  // This is for the -Wl,-rpath=<EXEC_LIB>
-  bool need_rpath = true;
-
   bool no_files_error = true;
 
 #ifdef NOISY
@@ -339,16 +321,6 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
           {
           need_allow_multiple_definition = false;
           }
-        if( strstr(decoded_options[i].orig_option_with_args_text, "-rpath") )
-          {
-          // The caller is doing something with -rpath.  Assume they know what
-          // they are doing
-
-          // On second thought, always install our rpath.  It goes at the end,
-          // so if the user specifies and rpath that they prefer, it'll get
-          // taken first.
-          need_rpath = true;
-          }
         break;
 
       case OPT_nostdlib:
@@ -367,10 +339,8 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
         break;
 
       case OPT_static_libgcobol:
-#ifdef HAVE_LD_STATIC_DYNAMIC
         static_libgcobol = true;
         need_libgcobol   = true;
-#endif
         break;
 
       case OPT_l:
@@ -415,8 +385,8 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
       case OPT_print_multi_os_directory:
       case OPT_print_multiarch:
       case OPT_print_sysroot_headers_suffix:
-	no_files_error = false;
-	break;
+        no_files_error = false;
+        break;
 
       case OPT_v:
         no_files_error = false;
@@ -528,15 +498,11 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
 
           if( prior_main )
             {
-            char ach[128];
-            if( entry_point )
-              {
-              strcpy(ach, entry_point);
-              }
+            const char *ach;
+            if (entry_point)
+              ach = entry_point;
             else
-              {
-              strcpy(ach, decoded_options[i].arg);
-              }
+              ach = decoded_options[i].arg;
             append_option(OPT_main_, ach, 1);
             prior_main = false;
             entry_point = NULL;
@@ -576,7 +542,11 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
         break;
 
       case OPT_static_libgcobol:
-        // Don't pass this one on to cobol1
+#if !defined (HAVE_LD_STATIC_DYNAMIC)
+        // Allow the target to use spec substitution.
+        append_arg(decoded_options[i]);
+#endif
+        // Else don't pass this one on to cobol1
         break;
 
 ////#ifdef __x86_64__
@@ -616,13 +586,9 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
 
   if( need_libgcobol )
     {
-    if( 0 != strcmp(EXEC_LIB, "/usr/lib") )
-      {
-      append_option(OPT_L, EXEC_LIB, 1);
-      }
     add_arg_lib(COBOL_LIBRARY, static_libgcobol);
     }
-  if( need_libmath   )
+  if( need_libmath)
     {
     add_arg_lib(MATH_LIBRARY, static_in_general);
     }
@@ -630,7 +596,7 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
     {
     add_arg_lib(DL_LIBRARY, static_in_general);
     }
-  if( need_libstdc && static_in_general )
+  if( need_libstdc )
     {
     add_arg_lib(STDCPP_LIBRARY, static_in_general);
     }
@@ -648,11 +614,6 @@ lang_specific_driver (struct cl_decoded_option **in_decoded_options,
   if( need_allow_multiple_definition && (n_infiles || n_outfiles) )
     {
     append_allow_multiple_definition();
-    }
-
-  if( need_rpath && (n_infiles || n_outfiles) )
-    {
-    append_rpath();
     }
 
   if( prior_main )

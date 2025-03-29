@@ -1794,21 +1794,6 @@ validate_autoinc_and_mem_addr_p (rtx x)
 static bool
 equiv_can_be_consumed_p (int regno, rtx to, rtx_insn *insn, bool invariant_p)
 {
-  if (invariant_p)
-    {
-      /* We use more expensive code for the invariant because we need to
-	 simplify the result insn as the invariant can be arithmetic rtx
-	 inserted into another arithmetic rtx.  */
-      rtx pat = PATTERN (insn);
-      int code = INSN_CODE (insn);
-      PATTERN (insn) = copy_rtx (pat);
-      PATTERN (insn)
-	= simplify_replace_rtx (PATTERN (insn), regno_reg_rtx[regno], to);
-      bool res = !insn_invalid_p (insn, false);
-      PATTERN (insn) = pat;
-      INSN_CODE (insn) = code;
-      return res;
-    }
   validate_replace_src_group (regno_reg_rtx[regno], to, insn);
   /* We can change register to equivalent memory in autoinc rtl.  Some code
      including verify_changes assumes that autoinc contains only a register.
@@ -1817,6 +1802,20 @@ equiv_can_be_consumed_p (int regno, rtx to, rtx_insn *insn, bool invariant_p)
   if (res)
     res = verify_changes (0);
   cancel_changes (0);
+  if (!res && invariant_p)
+    {
+      /* Here we use more expensive code for the invariant because we need to
+	 simplify the result insn as the invariant can be arithmetic rtx
+	 inserted into another arithmetic rtx, e.g. into memory address.  */
+      rtx pat = PATTERN (insn);
+      int code = INSN_CODE (insn);
+      PATTERN (insn) = copy_rtx (pat);
+      PATTERN (insn)
+	= simplify_replace_rtx (PATTERN (insn), regno_reg_rtx[regno], to);
+      res = !insn_invalid_p (insn, false);
+      PATTERN (insn) = pat;
+      INSN_CODE (insn) = code;
+    }
   return res;
 }
 
@@ -1927,12 +1926,15 @@ calculate_equiv_gains (void)
 	      || !bitmap_bit_p (&equiv_pseudos, regno))
 	    continue;
 
-	  rtx_insn_list *x;
-	  for (x = ira_reg_equiv[regno].init_insns; x != NULL; x = x->next ())
-	    if (insn == x->insn ())
-	      break;
-	  if (x != NULL)
-	    continue; /* skip equiv init insn */
+	  if (ira_reg_equiv[regno].invariant != NULL)
+	    {
+	      rtx_insn_list *x = ira_reg_equiv[regno].init_insns;
+	      for (; x != NULL; x = x->next ())
+		if (insn == x->insn ())
+		  break;
+	      if (x != NULL)
+		continue; /* skip equiv init insn for invariant */
+	    }
 
 	  rtx subst = ira_reg_equiv[regno].memory;
 

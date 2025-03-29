@@ -1169,7 +1169,7 @@ proper position among the other output files.  */
 	%:include(libgomp.spec)%(link_gomp)}\
     %{fgnu-tm:%:include(libitm.spec)%(link_itm)}\
     " STACK_SPLIT_SPEC "\
-    %{fprofile-arcs|fcondition-coverage|fprofile-generate*|coverage:-lgcov} " SANITIZER_SPEC " \
+    %{fprofile-arcs|fcondition-coverage|fpath-coverage|fprofile-generate*|coverage:-lgcov} " SANITIZER_SPEC " \
     %{!nostdlib:%{!r:%{!nodefaultlibs:%(link_ssp) %(link_gcc_c_sequence)}}}\
     %{!nostdlib:%{!r:%{!nostartfiles:%E}}} %{T*}  \n%(post_link) }}}}}}"
 #endif
@@ -1292,7 +1292,7 @@ static const char *cc1_options =
  %{!fsyntax-only:%{S:%W{o*}%{!o*:-o %w%b.s}}}\
  %{fsyntax-only:-o %j} %{-param*}\
  %{coverage:-fprofile-arcs -ftest-coverage}\
- %{fprofile-arcs|fcondition-coverage|fprofile-generate*|coverage:\
+ %{fprofile-arcs|fcondition-coverage|fpath-coverage|fprofile-generate*|coverage:\
    %{!fprofile-update=single:\
      %{pthread:-fprofile-update=prefer-atomic}}}";
 
@@ -4154,7 +4154,8 @@ forward_offload_option (size_t opt_index, const char *arg, bool validated)
 	 are injected by default in offloading compilation, and therefore not
 	 forwarded here.  */
       /* GCC libraries.  */
-      if (/* '-lgfortran' */ strcmp (arg, "gfortran") == 0 )
+      if (/* '-lgfortran' */ strcmp (arg, "gfortran") == 0
+	  || /* '-lstdc++' */ strcmp (arg, "stdc++") == 0)
 	save_switch (concat ("-foffload-options=-l_GCC_", arg, NULL),
 		     0, NULL, validated, true);
       /* Other libraries.  */
@@ -8356,7 +8357,7 @@ driver::global_initializations ()
   diagnostic_initialize (global_dc, 0);
   diagnostic_color_init (global_dc);
   diagnostic_urls_init (global_dc);
-  global_dc->set_urlifier (make_gcc_urlifier (0));
+  global_dc->push_owned_urlifier (make_gcc_urlifier (0));
 
 #ifdef GCC_DRIVER_HOST_INITIALIZATION
   /* Perform host dependent initialization when needed.  */

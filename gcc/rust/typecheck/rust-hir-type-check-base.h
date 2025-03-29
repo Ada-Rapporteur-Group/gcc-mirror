@@ -37,10 +37,11 @@ protected:
 
   TraitReference *resolve_trait_path (HIR::TypePath &);
 
-  TyTy::TypeBoundPredicate
-  get_predicate_from_bound (HIR::TypePath &path, HIR::Type *associated_self,
-			    BoundPolarity polarity
-			    = BoundPolarity::RegularBound);
+  TyTy::TypeBoundPredicate get_predicate_from_bound (
+    HIR::TypePath &path,
+    tl::optional<std::reference_wrapper<HIR::Type>> associated_self,
+    BoundPolarity polarity = BoundPolarity::RegularBound,
+    bool is_qualified_type = false);
 
   bool check_for_unconstrained (
     const std::vector<TyTy::SubstitutionParamMapping> &params_to_constrain,
@@ -55,13 +56,13 @@ protected:
 						 location_t locus);
 
   void resolve_generic_params (
-    const std::vector<std::unique_ptr<HIR::GenericParam> > &generic_params,
+    const std::vector<std::unique_ptr<HIR::GenericParam>> &generic_params,
     std::vector<TyTy::SubstitutionParamMapping> &substitutions);
 
   TyTy::TypeBoundPredicate get_marker_predicate (LangItem::Kind item_type,
 						 location_t locus);
 
-  Analysis::Mappings *mappings;
+  Analysis::Mappings &mappings;
   Resolver *resolver;
   TypeCheckContext *context;
 };

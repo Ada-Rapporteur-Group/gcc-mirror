@@ -30,13 +30,16 @@
 %{
 
 #include "cobol-system.h"
-#include "ec.h"
-#include "common-defs.h"
+#include "coretypes.h"
+#include "tree.h"
+#undef yy_flex_debug
+#include "../../libgcobol/ec.h"
+#include "../../libgcobol/common-defs.h"
 #include "util.h"
 #include "cbldiag.h"
 #include "symbols.h"
 #include "copybook.h"
-#include "exceptl.h"
+#include "../../libgcobol/exceptl.h"
 #include "exceptg.h"
 
 #define COUNT_OF(X) (sizeof(X) / sizeof(X[0]))
@@ -702,7 +705,9 @@ suppress:	%empty
 		;
 
 name_any:	namelit
-	|	PSEUDOTEXT { $$ = (cdf_arg_t){YDF_PSEUDOTEXT, $1}; }
+	|	PSEUDOTEXT {
+		  $$ = cdf_arg_t{YDF_PSEUDOTEXT, $1};
+		}
 		;
 
 name_one:	NAME
@@ -715,8 +720,8 @@ name_one:	NAME
 		  }
 		  $$ = arg;
 		}
-	|	NUMSTR  { $$ = (cdf_arg_t){YDF_NUMSTR, $1}; }
-	|	LITERAL { $$ = (cdf_arg_t){YDF_LITERAL, $1}; }
+	|	NUMSTR  { $$ = cdf_arg_t{YDF_NUMSTR, $1}; }
+	|	LITERAL { $$ = cdf_arg_t{YDF_LITERAL, $1}; }
 		;
 
 namelit:	name
@@ -738,8 +743,8 @@ namelit:	name
 		  cdf_arg_t arg = { YDF_NAME, s };
 		  $$ = arg;
 		}
-	|	NUMSTR  { $$ = (cdf_arg_t){YDF_NUMSTR, $1}; }
-	|	LITERAL { $$ = (cdf_arg_t){YDF_LITERAL, $1}; }
+	|	NUMSTR  { $$ = cdf_arg_t{YDF_NUMSTR, $1}; }
+	|	LITERAL { $$ = cdf_arg_t{YDF_LITERAL, $1}; }
 		;
 
 name:		NAME
@@ -949,7 +954,7 @@ verify_integer( const YDFLTYPE& loc, const cdfval_base_t& val ) {
   return true;
 }
 
-cdfval_base_t&
+const cdfval_base_t&
 cdfval_base_t::operator()( const YDFLTYPE& loc ) {
   static cdfval_t zero(0);
   return verify_integer(loc, *this) ? *this : zero;

@@ -1,3 +1,20 @@
+2025-03-27  David Malcolm  <dmalcolm@redhat.com>
+
+	PR testsuite/116163
+	* dg-lint/dg-lint: New file.
+	* dg-lint/libgdiagnostics.py: New file.
+	* dg-lint/test-1.c: New file.
+	* dg-lint/test-2.c: New file.
+
+2025-03-17  Sahil Yeole  <sahilyeole93@gmail.com>
+
+	* update-copyright.py: Add libgrust folder.
+
+2025-03-15  Tobias Burnus  <tburnus@baylibre.com>
+
+	* gcc-changelog/git_repository.py (parse_git_revisions): Destroy the
+	Repo object by calling repo.close() at the end of the function.
+
 2025-03-12  Jason Merrill  <jason@redhat.com>
 
 	PR libstdc++/119081

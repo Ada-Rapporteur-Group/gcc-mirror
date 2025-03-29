@@ -30,23 +30,21 @@
 #include "cobol-system.h"
 #include "coretypes.h"
 #include "tree.h"
-#define HOWEVER_GCC_DEFINES_TREE 1
-#include "ec.h"
-#include "common-defs.h"
+#include "../../libgcobol/ec.h"
+#include "../../libgcobol/common-defs.h"
 #include "util.h"
 #include "cbldiag.h"
 #include "symbols.h"
 #include "gengen.h"
 #include "inspect.h"
-#include "io.h"
+#include "../../libgcobol/io.h"
 #include "genapi.h"
 #include "genutil.h"
 #include "structs.h"
-#include "gcobolio.h"
-#include "libgcobol.h"
-#include "charmaps.h"
+#include "../../libgcobol/gcobolio.h"
+#include "../../libgcobol/charmaps.h"
 #include "show_parse.h"
-#include "exceptl.h"
+#include "../../libgcobol/exceptl.h"
 #include "exceptg.h"
 
 bool internal_codeset_is_ebcdic() { return gcobol_feature_internal_ebcdic(); }
@@ -1420,14 +1418,14 @@ get_data_address( cbl_field_t *field,
     }
   }
 
-__int128
+FIXED_WIDE_INT(128)
 get_power_of_ten(int n)
   {
   // 2** 64 = 1.8E19
   // 2**128 = 3.4E38
-  __int128 retval = 1;
+  FIXED_WIDE_INT(128) retval = 1;
   static const int MAX_POWER = 19 ;
-  static const __int128 pos[MAX_POWER+1] =
+  static const unsigned long long pos[MAX_POWER+1] =
     {
     1ULL,                       // 00
     10ULL,                      // 01
@@ -1464,7 +1462,7 @@ get_power_of_ten(int n)
   else
     {
     // 19 through 38 is handled in a second step, because when this was written,
-    // GCC couldn't handle __int128 constants:
+    // GCC couldn't handle 128-bit constants:
     retval = pos[n/2];
     retval *= retval;
     if( n & 1 )
@@ -1498,18 +1496,18 @@ scale_by_power_of_ten_N(tree value,
       gg_assign(var_decl_rdigits, integer_zero_node);
       }
     tree value_type = TREE_TYPE(value);
-    __int128 power_of_ten = get_power_of_ten(N);
-    gg_assign(value, gg_multiply(value, build_int_cst_type( value_type,
+    FIXED_WIDE_INT(128) power_of_ten = get_power_of_ten(N);
+    gg_assign(value, gg_multiply(value, wide_int_to_tree( value_type,
                                   power_of_ten)));
     }
   if( N < 0 )
     {
     tree value_type = TREE_TYPE(value);
-    __int128 power_of_ten = get_power_of_ten(-N);
+    FIXED_WIDE_INT(128) power_of_ten = get_power_of_ten(-N);
     if( check_for_fractional )
       {
-      IF( gg_mod(value, build_int_cst_type( value_type,
-                                  power_of_ten)),
+      IF( gg_mod(value, wide_int_to_tree( value_type,
+                                          power_of_ten)),
           ne_op,
           gg_cast(value_type, integer_zero_node) )
         {
@@ -1519,7 +1517,7 @@ scale_by_power_of_ten_N(tree value,
         gg_assign(var_decl_rdigits, integer_zero_node);
         ENDIF
       }
-    gg_assign(value, gg_divide(value, build_int_cst_type( value_type,
+    gg_assign(value, gg_divide(value, wide_int_to_tree( value_type,
                                   power_of_ten)));
     }
   }
@@ -1862,12 +1860,12 @@ copy_little_endian_into_place(cbl_field_t *dest,
       }
     ENDIF
 
-    __int128 power_of_ten = get_power_of_ten(  dest->data.digits
-                                             - dest->data.rdigits
-                                             + rhs_rdigits );
+    FIXED_WIDE_INT(128) power_of_ten = get_power_of_ten(  dest->data.digits
+                                                        - dest->data.rdigits
+                                                        + rhs_rdigits );
     IF( gg_cast(INT128, abs_value),
         ge_op,
-        build_int_cst_type(INT128, power_of_ten) )
+        wide_int_to_tree(INT128, power_of_ten) )
       {
       // Flag the size error
       gg_assign(size_error, integer_one_node);

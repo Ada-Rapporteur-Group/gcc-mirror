@@ -450,7 +450,7 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
       break;
 
     case OPT_fdebug:
-      global.params.debuglevel = value ? 1 : 0;
+      global.params.debugEnabled = value ? true : false;
       break;
 
     case OPT_fdebug_:
@@ -460,7 +460,7 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
 	  break;
 	}
 
-      error ("bad argument for %<-fdebug%>: %qs", arg);
+      error ("bad argument for %<-fdebug=%>: %qs", arg);
       break;
 
     case OPT_fdoc:
@@ -510,6 +510,7 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
 	case CppStdRevisionCpp14:
 	case CppStdRevisionCpp17:
 	case CppStdRevisionCpp20:
+	case CppStdRevisionCpp23:
 	  global.params.cplusplus = (CppStdRevision) value;
 	  break;
 
@@ -533,7 +534,7 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
     case OPT_fmodule_file_:
       global.params.modFileAliasStrings.push (arg);
       if (!strchr (arg, '='))
-	error ("bad argument for %<-fmodule-file%>: %qs", arg);
+	error ("bad argument for %<-fmodule-file=%>: %qs", arg);
       break;
 
     case OPT_fmoduleinfo:
@@ -700,7 +701,7 @@ d_handle_option (size_t scode, const char *arg, HOST_WIDE_INT value,
 	  break;
 	}
 
-      error ("bad argument for %<-fversion%>: %qs", arg);
+      error ("bad argument for %<-fversion=%>: %qs", arg);
       break;
 
     case OPT_H:
@@ -1113,7 +1114,7 @@ d_parse_file (void)
 
 	  if (count < 0)
 	    {
-	      error (Loc ("stdin", 0, 0), "%s", xstrerror (errno));
+	      error (Loc::singleFilename ("stdin"), "%s", xstrerror (errno));
 	      free (buffer);
 	      continue;
 	    }

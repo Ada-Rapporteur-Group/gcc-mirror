@@ -16668,7 +16668,7 @@ ix86_fp_compare_code_to_integer (enum rtx_code code)
       return NE;
     case EQ:
     case NE:
-      if (TARGET_AVX10_2_256)
+      if (TARGET_AVX10_2)
 	return code;
       /* FALLTHRU.  */
     default:
@@ -25055,7 +25055,7 @@ ix86_get_mask_mode (machine_mode data_mode)
 	 to kmask for _Float16.  */
       || (TARGET_AVX512VL && TARGET_AVX512FP16
 	  && GET_MODE_INNER (data_mode) == E_HFmode)
-      || (TARGET_AVX10_2_256 && GET_MODE_INNER (data_mode) == E_BFmode))
+      || (TARGET_AVX10_2 && GET_MODE_INNER (data_mode) == E_BFmode))
     {
       if (elem_size == 4
 	  || elem_size == 8
@@ -26465,8 +26465,7 @@ ix86_redzone_clobber ()
   cfun->machine->asm_redzone_clobber_seen = true;
   if (ix86_using_red_zone ())
     {
-      rtx base = plus_constant (Pmode, stack_pointer_rtx,
-				GEN_INT (-RED_ZONE_SIZE));
+      rtx base = plus_constant (Pmode, stack_pointer_rtx, -RED_ZONE_SIZE);
       rtx mem = gen_rtx_MEM (BLKmode, base);
       set_mem_size (mem, RED_ZONE_SIZE);
       return mem;

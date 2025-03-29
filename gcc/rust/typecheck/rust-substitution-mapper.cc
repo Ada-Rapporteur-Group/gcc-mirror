@@ -192,8 +192,10 @@ SubstMapperInternal::visit (TyTy::FnType &type)
 {
   TyTy::SubstitutionArgumentMappings adjusted
     = type.adjust_mappings_for_this (mappings);
-  if (adjusted.is_error ())
+  if (adjusted.is_error () && !mappings.trait_item_mode ())
     return;
+  if (adjusted.is_error () && mappings.trait_item_mode ())
+    adjusted = mappings;
 
   TyTy::BaseType *concrete = type.handle_substitions (adjusted);
   if (concrete != nullptr)
@@ -205,8 +207,10 @@ SubstMapperInternal::visit (TyTy::ADTType &type)
 {
   TyTy::SubstitutionArgumentMappings adjusted
     = type.adjust_mappings_for_this (mappings);
-  if (adjusted.is_error ())
+  if (adjusted.is_error () && !mappings.trait_item_mode ())
     return;
+  if (adjusted.is_error () && mappings.trait_item_mode ())
+    adjusted = mappings;
 
   TyTy::BaseType *concrete = type.handle_substitions (adjusted);
   if (concrete != nullptr)
@@ -341,6 +345,11 @@ void
 SubstMapperInternal::visit (TyTy::DynamicObjectType &type)
 {
   resolved = type.clone ();
+}
+void
+SubstMapperInternal::visit (TyTy::OpaqueType &type)
+{
+  resolved = type.handle_substitions (mappings);
 }
 
 // SubstMapperFromExisting

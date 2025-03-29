@@ -1820,6 +1820,7 @@ static void c_parser_objc_at_dynamic_declaration (c_parser *);
 static bool c_parser_objc_diagnose_bad_element_prefix
   (c_parser *, struct c_declspecs *);
 static location_t c_parser_parse_rtl_body (c_parser *, char *);
+static tree c_parser_handle_musttail (c_parser *, tree, attr_state &);
 
 #if ENABLE_ANALYZER
 
@@ -2518,6 +2519,32 @@ c_parser_declaration_or_fndef (c_parser *parser, bool fndef_ok,
       if (oacc_routine_data)
 	c_finish_oacc_routine (oacc_routine_data, NULL_TREE, false);
       return result;
+    }
+  else if (specs->typespec_kind == ctsk_none
+	   && nested
+	   /* Only parse __attribute__((musttail)) when called from
+	      c_parser_compound_statement_nostart.  This certainly isn't
+	      a declaration in that case, but we don't do tentative parsing
+	      of GNU attributes right now.  */
+	   && fallthru_attr_p
+	   && c_parser_next_token_is_keyword (parser, RID_RETURN))
+    {
+      attr_state astate = {};
+      specs->attrs = c_parser_handle_musttail (parser, specs->attrs, astate);
+      if (astate.musttail_p)
+	{
+	  if (specs->attrs)
+	    {
+	      auto_urlify_attributes sentinel;
+	      warning_at (c_parser_peek_token (parser)->location,
+			  OPT_Wattributes,
+			  "attribute %<musttail%> mixed with other attributes "
+			  "on %<return%> statement");
+	    }
+	  c_parser_statement_after_labels (parser, NULL, NULL_TREE, NULL,
+					   astate);
+	  return result;
+	}
     }
 
   /* Provide better error recovery.  Note that a type name here is usually
@@ -7373,8 +7400,12 @@ c_parser_handle_musttail (c_parser *parser, tree std_attrs, attr_state &attr)
 {
   if (c_parser_next_token_is_keyword (parser, RID_RETURN))
     {
-      if (lookup_attribute ("gnu", "musttail", std_attrs))
+      if (tree a = lookup_attribute ("gnu", "musttail", std_attrs))
 	{
+	  for (; a; a = lookup_attribute ("gnu", "musttail", TREE_CHAIN (a)))
+	    if (TREE_VALUE (a))
+	      error ("%qs attribute does not take any arguments",
+		     "musttail");
 	  std_attrs = remove_attribute ("gnu", "musttail", std_attrs);
 	  attr.musttail_p = true;
 	}
@@ -8237,7 +8268,8 @@ c_parser_statement_after_labels (c_parser *parser, bool *if_p,
 	case RID_ATTRIBUTE:
 	  {
 	    /* Allow '__attribute__((fallthrough));' or
-	       '__attribute__((assume(cond)));'.  */
+	       '__attribute__((assume(cond)));' or
+	       '__attribute__((musttail))) return'.  */
 	    tree attrs = c_parser_gnu_attributes (parser);
 	    bool has_assume = lookup_attribute ("assume", attrs);
 	    if (has_assume)
@@ -8251,6 +8283,20 @@ c_parser_statement_after_labels (c_parser *parser, bool *if_p,
 				"%<assume%> attribute not followed by %<;%>");
 		    has_assume = false;
 		  }
+	      }
+	    gcc_assert (!astate.musttail_p);
+	    attrs = c_parser_handle_musttail (parser, attrs, astate);
+	    if (astate.musttail_p)
+	      {
+		if (attrs)
+		  {
+		    auto_urlify_attributes sentinel;
+		    warning_at (c_parser_peek_token (parser)->location,
+				OPT_Wattributes,
+				"attribute %<musttail%> mixed with other "
+				"attributes on %<return%> statement");
+		  }
+		goto restart;
 	      }
 	    if (attribute_fallthrough_p (attrs))
 	      {
@@ -8499,8 +8545,8 @@ c_parser_if_body (c_parser *parser, bool *if_p,
   token_indent_info body_tinfo
     = get_token_indent_info (c_parser_peek_token (parser));
   tree before_labels = get_before_labels ();
+  attr_state a = c_parser_all_labels (parser);
 
-  c_parser_all_labels (parser);
   if (c_parser_next_token_is (parser, CPP_SEMICOLON))
     {
       location_t loc = c_parser_peek_token (parser)->location;
@@ -8515,7 +8561,7 @@ c_parser_if_body (c_parser *parser, bool *if_p,
   else
     {
       body_loc_after_labels = c_parser_peek_token (parser)->location;
-      c_parser_statement_after_labels (parser, if_p, before_labels);
+      c_parser_statement_after_labels (parser, if_p, before_labels, NULL, a);
     }
 
   token_indent_info next_tinfo
@@ -8544,8 +8590,8 @@ c_parser_else_body (c_parser *parser, const token_indent_info &else_tinfo,
     = get_token_indent_info (c_parser_peek_token (parser));
   location_t body_loc_after_labels = UNKNOWN_LOCATION;
   tree before_labels = get_before_labels ();
+  attr_state a = c_parser_all_labels (parser);
 
-  c_parser_all_labels (parser);
   if (c_parser_next_token_is (parser, CPP_SEMICOLON))
     {
       location_t loc = c_parser_peek_token (parser)->location;
@@ -8559,7 +8605,7 @@ c_parser_else_body (c_parser *parser, const token_indent_info &else_tinfo,
     {
       if (!c_parser_next_token_is (parser, CPP_OPEN_BRACE))
 	body_loc_after_labels = c_parser_peek_token (parser)->location;
-      c_parser_statement_after_labels (parser, NULL, before_labels, chain);
+      c_parser_statement_after_labels (parser, NULL, before_labels, chain, a);
     }
 
   token_indent_info next_tinfo
@@ -20473,7 +20519,10 @@ c_parser_omp_clause_detach (c_parser *parser, tree list)
 static tree
 c_parser_omp_clause_destroy (c_parser *parser, tree list)
 {
-  return c_parser_omp_var_list_parens (parser, OMP_CLAUSE_DESTROY, list);
+  tree nl = c_parser_omp_var_list_parens (parser, OMP_CLAUSE_DESTROY, list);
+  for (tree c = nl; c != list; c = OMP_CLAUSE_CHAIN (c))
+    TREE_ADDRESSABLE (OMP_CLAUSE_DECL (c)) = 1;
+  return nl;
 }
 
 /* OpenMP 5.1:
@@ -20855,6 +20904,7 @@ c_parser_omp_clause_init (c_parser *parser, tree list)
 
   for (tree c = nl; c != list; c = OMP_CLAUSE_CHAIN (c))
     {
+      TREE_ADDRESSABLE (OMP_CLAUSE_DECL (c)) = 1;
       if (target)
 	OMP_CLAUSE_INIT_TARGET (c) = 1;
       if (targetsync)

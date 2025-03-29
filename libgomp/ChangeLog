@@ -1,3 +1,120 @@
+2025-03-26  Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR driver/101544
+	* testsuite/libgomp.c++/pr101544-1-O0.C: Remove
+	'-foffload-options=-lstdc++'.
+	* testsuite/libgomp.c++/pr101544-1.C: Likewise.
+	* testsuite/libgomp.oacc-c++/pr101544-1.C: Likewise.
+
+2025-03-26  Tobias Burnus  <tburnus@baylibre.com>
+
+	* libgomp.texi (OpenMP 5.1): Add @ref to offload-target specifics
+	for 'interop'.
+	(OpenMP 6.0): Mark dispatch's interop clause as implemented.
+	(omp_get_interop_int, omp_get_interop_str,
+	omp_get_interop_ptr, omp_get_interop_type_desc): Add @ref to
+	Offload-Target Specifics; change ret_code argument type to
+	'omp_interop_rc_t *'.
+	(Offload-Target Specifics): Document the supported OpenMP
+	interop foreign runtimes on AMD and Nvidia GPUs.
+
+2025-03-25  Sandra Loosemore  <sloosemore@baylibre.com>
+	    Tobias Burnus  <tburnus@baylibre.com>
+
+	* libgomp.texi (OpenMP 5.1): Mark append_args as fully supported.
+
+2025-03-24  Tobias Burnus  <tburnus@baylibre.com>
+
+	* target.c (gomp_interop_internal): Set the 'device_num' member
+	when initializing an interop object.
+
+2025-03-24  Tobias Burnus  <tburnus@baylibre.com>
+
+	* plugin/plugin-nvptx.c (GOMP_OFFLOAD_interop): Set context for
+	stream creation to use the specified device.
+
+2025-03-24  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	PR libgomp/96835
+	* testsuite/libgomp.c++/pr96835-1.C: New.
+	* testsuite/libgomp.c++/pr96835-1-O0.C: Likewise.
+	* testsuite/libgomp.oacc-c++/pr96835-1.C: Likewise.
+
+2025-03-24  Thomas Schwinge  <thomas@codesourcery.com>
+
+	PR target/101544
+	* testsuite/libgomp.c++/pr101544-1.C: New.
+	* testsuite/libgomp.c++/pr101544-1-O0.C: Likewise.
+	* testsuite/libgomp.oacc-c++/pr101544-1.C: Likewise.
+
+2025-03-21  Tobias Burnus  <tburnus@baylibre.com>
+
+	* testsuite/libgomp.fortran/get-mapped-ptr-1.f90: Use -6
+	not -5 as non-conforming device number.
+
+2025-03-21  Tobias Burnus  <tburnus@baylibre.com>
+
+	* plugin/plugin-gcn.c (_LIBGOMP_PLUGIN_INCLUDE): Define.
+	(struct hsa_runtime_fn_info): Add two queue functions.
+	(hipError_t, hipCtx_t, hipStream_s, hipStream_t): New types.
+	(struct hip_runtime_fn_info): New.
+	(hip_runtime_lib, hip_fns): New global vars.
+	(init_environment_variables): Handle hip_runtime_lib.
+	(init_hsa_runtime_functions): Load the two queue functions.
+	(init_hip_runtime_functions, GOMP_OFFLOAD_interop,
+	GOMP_OFFLOAD_get_interop_int, GOMP_OFFLOAD_get_interop_ptr,
+	GOMP_OFFLOAD_get_interop_str,
+	GOMP_OFFLOAD_get_interop_type_desc): New.
+	* plugin/plugin-nvptx.c (_LIBGOMP_PLUGIN_INCLUDE): Define.
+	(GOMP_OFFLOAD_interop, GOMP_OFFLOAD_get_interop_int,
+	GOMP_OFFLOAD_get_interop_ptr, GOMP_OFFLOAD_get_interop_str,
+	GOMP_OFFLOAD_get_interop_type_desc): New.
+	* testsuite/libgomp.c/interop-fr-1.c: New test.
+	* testsuite/libgomp.c-c++-common/get-mapped-ptr-1.c: Use -6
+	not -5 as non-conforming device number.
+
+2025-03-21  Paul-Antoine Arras  <parras@baylibre.com>
+	    Tobias Burnus  <tburnus@baylibre.com>
+
+	* icv-device.c (omp_set_default_device): Check
+	GOMP_DEVICE_DEFAULT_OMP_61.
+	* libgomp-plugin.h (struct interop_obj_t): New.
+	(enum gomp_interop_flag): New.
+	(GOMP_OFFLOAD_interop): Declare.
+	(GOMP_OFFLOAD_get_interop_int): Declare.
+	(GOMP_OFFLOAD_get_interop_ptr): Declare.
+	(GOMP_OFFLOAD_get_interop_str): Declare.
+	(GOMP_OFFLOAD_get_interop_type_desc): Declare.
+	* libgomp.h (_LIBGOMP_OMP_LOCK_DEFINED): Define.
+	(struct gomp_device_descr): Add interop_func, get_interop_int_func,
+	get_interop_ptr_func, get_interop_str_func, get_interop_type_desc_func.
+	* libgomp.map: Add GOMP_interop.
+	* libgomp_g.h (GOMP_interop): Declare.
+	* target.c (resolve_device): Handle GOMP_DEVICE_DEFAULT_OMP_61.
+	(omp_get_interop_int): Replace stub with actual implementation.
+	(omp_get_interop_ptr): Likewise.
+	(omp_get_interop_str): Likewise.
+	(omp_get_interop_type_desc): Likewise.
+	(struct interop_data_t): Define.
+	(gomp_interop_internal): New function.
+	(GOMP_interop): Likewise.
+	(gomp_load_plugin_for_device): Load symbols for get_interop_int,
+	get_interop_ptr, get_interop_str and get_interop_type_desc.
+	* testsuite/libgomp.c-c++-common/interop-1.c: New test.
+
+2025-03-21  Tobias Burnus  <tburnus@baylibre.com>
+
+	* testsuite/lib/libgomp.exp (libgomp_init): Add
+	-fdiagnostics-plain-output to additional_flags; remove
+	-fno-diagnostics-show-caret and -fdiagnostics-color=never.
+
+2025-03-17  Tobias Burnus  <tburnus@baylibre.com>
+
+	PR fortran/115271
+	* testsuite/libgomp.fortran/declare-variant-mod-1-use.f90: Moved
+	from gcc/testsuite/gfortran.dg/gomp/.
+	* testsuite/libgomp.fortran/declare-variant-mod-1.f90: Likewise.
+
 2025-02-22  shynur  <shynur@outlook.com>
 
 	* oacc-mem.c (acc_unmap_data, goacc_exit_datum_1, find_group_last,

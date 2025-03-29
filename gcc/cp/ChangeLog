@@ -1,3 +1,158 @@
+2025-03-27  Tobias Burnus  <tburnus@baylibre.com>
+
+	* cp-tree.h (cp_finish_omp_init_prefer_type): Add.
+	* decl.cc (omp_declare_variant_finalize_one): Call it.
+	* pt.cc (tsubst_attribute): Minor rebustification for OpenMP
+	append_args handling.
+	* semantics.cc (cp_omp_init_prefer_type_update): Rename to ...
+	(cp_finish_omp_init_prefer_type): ... this; remove static attribute
+	and return modified tree. Move clause handling to ...
+	(finish_omp_clauses): ... the caller.
+
+2025-03-27  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/118920
+	* cp-tree.h (equal_abi_tags): Declare.
+	* mangle.cc (equal_abi_tags): Make external, fix comparison.
+	(tree_string_cmp): Make internal.
+	* module.cc (trees_in::check_abi_tags): New function.
+	(trees_in::decl_value): Use it.
+	(trees_in::is_matching_decl): Likewise.
+
+2025-03-27  Nathaniel Shead  <nathanieloshead@gmail.com>
+	    Jason Merrill  <jason@redhat.com>
+
+	PR c++/118920
+	* name-lookup.cc (lookup_imported_hidden_friend): Check for
+	module entity rather than just module import.
+	* module.cc (get_originating_module): Rename for_mangle parm to
+	global_m1.
+	* error.cc (dump_module_suffix): Don't decorate global module decls.
+
+2025-03-26  Thomas Schwinge  <tschwinge@baylibre.com>
+	    Jason Merrill  <jason@redhat.com>
+
+	* rtti.cc (throw_bad_typeid): Adjust implicit '__cxa_bad_typeid'
+	prototype to reality.  Adjust all users.
+
+2025-03-25  Simon Martin  <simon@nasilyan.com>
+
+	PR c++/114525
+	* typeck2.cc (build_m_component_ref): Call cp_build_addr_expr
+	instead of build_address.
+
+2025-03-25  yxj-github-437  <2457369732@qq.com>
+
+	* parser.cc (cp_parser_lambda_expression): Use cp_evaluated.
+
+2025-03-24  Jason Merrill  <jason@redhat.com>
+
+	* semantics.cc (finish_type_pack_element): Pass mce_true to
+	maybe_constant_value.
+
+2025-03-23  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/119154
+	* decl2.cc (vague_linkage_p): Revert gnu_linkage handling.
+	* module.cc (importer_interface): New enumeration.
+	(get_importer_interface): New function.
+	(trees_out::core_bools): Use it to determine interface.
+	(trees_in::is_matching_decl): Propagate gnu_inline handling onto
+	existing forward declarations.
+	(trees_in::read_var_def): Also note explicit instantiation
+	definitions of variable templates to be emitted.
+
+2025-03-22  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/119379
+	* pt.cc (tsubst_decl) <case TYPE_DECL>: Preserve structural-ness
+	of a partially instantiated typedef.
+
+2025-03-21  Paul-Antoine Arras  <parras@baylibre.com>
+	    Tobias Burnus  <tburnus@baylibre.com>
+
+	* parser.cc (cp_parser_omp_clause_init): Make addressable.
+
+2025-03-21  Jason Merrill  <jason@redhat.com>
+
+	* init.cc (throw_bad_array_new_length): Returns void.
+
+2025-03-21  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* rtti.cc (throw_bad_cast): Adjust implicit '__cxa_bad_cast'
+	prototype to reality.
+
+2025-03-20  Richard Biener  <rguenther@suse.de>
+
+	* module.cc (trees_out::core_bools): Convert scoped enum
+	explicitly.
+
+2025-03-20  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c++/119370
+	* decl2.cc (set_context_for_auto_vars_r): New function.
+	(emit_partial_init_fini_fn): Call walk_tree with that function
+	on &init before walk_tree with copy_tree_body_r.
+
+2025-03-19  Jason Merrill  <jason@redhat.com>
+
+	PR c++/119316
+	* mangle.cc (write_expression) [NEW_EXPR]: Avoid using
+	compute_array_index_type.
+	(write_array_type): Add checking_assert.
+
+2025-03-19  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/118068
+	* cp-gimplify.cc (cp_fold_immediate): Use cp_walk_tree rather than
+	cp_walk_tree_without_duplicates.
+	(cp_fold_immediate_r): For IF_STMT_CONSTEVAL_P IF_STMT don't walk
+	into THEN_CLAUSE subtree, only ELSE_CLAUSE.  For non-call related
+	stmts call data->pset.add and if it returns true, don't walk subtrees.
+	(cp_fold_r): Don't call cp_fold_immediate_r here.
+	(cp_fold_function): For C++20 or later call cp_walk_tree
+	with cp_fold_immediate_r callback first before calling cp_walk_tree
+	with cp_fold_r callback and call data.pset.empty () in between.
+	(cp_fully_fold_init): Likewise.
+	(cp_genericize_r) <case RETURN_EXPR>: Suppress -Wreturn-type warning
+	if RETURN_EXPR has erroneous argument.
+
+2025-03-18  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/119344
+	* typeck.cc (cp_build_binary_op): Use cp_save_expr instead of save_expr.
+
+2025-03-18  Jason Merrill  <jason@redhat.com>
+
+	PR c++/119194
+	* decl2.cc (min_vis_expr_r) [ADDR_EXPR]: New case.
+
+2025-03-18  Marek Polacek  <polacek@redhat.com>
+
+	PR c++/118104
+	* pt.cc (use_pack_expansion_extra_args_p): Remove an assert.
+
+2025-03-18  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/116545
+	* parser.cc (cp_parser_statement): Call cp_parser_attributes_opt
+	rather than cp_parser_std_attribute_spec_seq.
+	(cp_parser_jump_statement): Diagnose gnu::musttail attributes
+	with no arguments.
+
+2025-03-18  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/119233
+	* pt.cc (mark_template_arguments_used): Also handle member
+	function pointers.
+
+2025-03-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/119120
+	* cp-gimplify.cc (cp_genericize_r): Set DECL_NOT_GIMPLE_REG_P
+	on {REAL,IMAG}PART_EXPR is_gimple_reg operand at -O0 if it is lhs
+	of a MODIFY_EXPR.
+
 2025-03-12  Jakub Jelinek  <jakub@redhat.com>
 
 	PR c++/119150

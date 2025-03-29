@@ -534,7 +534,8 @@ extern Expression *d_eval_constant_expression (const Loc &, tree);
 extern void d_init_versions (void);
 
 /* In d-codegen.cc.  */
-extern location_t make_location_t (const Loc &);
+extern location_t make_location_t (const SourceLoc &);
+extern location_t make_location_t (const Loc);
 extern tree d_decl_context (Dsymbol *);
 extern tree copy_aggregate_type (tree);
 extern bool declaration_reference_p (Declaration *);
@@ -703,11 +704,10 @@ extern tree get_classinfo_decl (ClassDeclaration *);
 extern void check_typeinfo_type (const Loc &, Scope *, Expression * = NULL);
 extern tree build_typeinfo (const Loc &, Type *, Expression * = NULL);
 extern tree build_typeinfo (Expression *, Type *);
-extern void create_typeinfo (Type *, Module *);
+extern void create_typeinfo (Type *, Scope *);
 extern void create_tinfo_types (Module *);
 extern void layout_cpp_typeinfo (ClassDeclaration *);
 extern tree get_cpp_typeinfo_decl (ClassDeclaration *);
-extern bool speculative_type_p (Type *);
 
 /* In toir.cc.  */
 extern void push_binding_level (level_kind);

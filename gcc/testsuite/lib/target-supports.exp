@@ -38,6 +38,7 @@
 # "// ObjC++" for ObjC++
 # "// Go" for Go
 # "// Rust" for Rust
+# "*> COBOL" for COBOL
 # and "(* Modula-2" for Modula-2
 # If the tool is ObjC/ObjC++ then we overide the extension to .m/.mm to
 # allow for ObjC/ObjC++ specific flags.
@@ -72,6 +73,7 @@ proc check_compile {basename type contents args} {
 	"*/\\* ObjC*" { set src ${basename}[pid].m }
 	"*// Go*" { set src ${basename}[pid].go }
 	"*// Rust*" { set src ${basename}[pid].rs }
+	"*\\*> COBOL*" { set src ${basename}[pid].cob }
 	"*(\\* Modula-2*" { set src ${basename}[pid].mod }
 	default {
 	    switch -- $tool {
@@ -2076,7 +2078,7 @@ proc check_effective_target_riscv_zvfh { } {
 
 # Return 1 if the target arch supports half float, 0 otherwise.
 # Note, this differs from the test performed by
-# /* dg-skip-if "" { *-*-* } { "*" } { "-march=rv*zfh*" } */
+# /* { dg-skip-if "" { *-*-* } { "*" } { "-march=rv*zfh*" } } */
 # in that it takes default behaviour into account.
 # Cache the result.
 
@@ -11016,9 +11018,9 @@ proc check_effective_target_apxf { } {
     } "-mapxf" ]
 }
 
-# Return 1 if avx10.2-256 instructions can be compiled.
-proc check_effective_target_avx10_2_256 { } {
-    return [check_no_compiler_messages avx10.2-256 object {
+# Return 1 if avx10.2 instructions can be compiled.
+proc check_effective_target_avx10_2 { } {
+    return [check_no_compiler_messages avx10.2 object {
 	void
 	foo ()
 	{
@@ -11027,16 +11029,6 @@ proc check_effective_target_avx10_2_256 { } {
 	  __asm__ volatile ("vaddbf16\t%ymm4, %ymm5, %ymm6");
 	  __asm__ volatile ("vcvtph2ibs\t%ymm5, %ymm6");
 	  __asm__ volatile ("vminmaxpd\t$123, %ymm4, %ymm5, %ymm6");
-	}
-    } "" ]
-}
-
-# Return 1 if avx10.2-512 instructions can be compiled.
-proc check_effective_target_avx10_2_512 { } {
-    return [check_no_compiler_messages avx10.2-512 object {
-	void
-	foo ()
-	{
 	  __asm__ volatile ("vdpphps\t%zmm4, %zmm5, %zmm6");
 	  __asm__ volatile ("vcvthf82ph\t%ymm5, %zmm6");
 	  __asm__ volatile ("vaddbf16\t%zmm4, %zmm5, %zmm6");
@@ -13512,7 +13504,7 @@ proc check_effective_target_arm_v8_1_lob_ok { } {
 		  asm goto ("le lr, %l0" : : : "lr" : loop);
 		  return i != 10;
 		}
-	} "-mcpu=unset -mcpu=unset -march=armv8.1-m.main -mthumb" ]
+	} "-mcpu=unset -march=armv8.1-m.main -mthumb" ]
     }
 }
 

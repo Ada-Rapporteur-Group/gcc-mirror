@@ -55,9 +55,8 @@
 #include "cobol-system.h"
 #include "coretypes.h"
 #include "tree.h"
-#define HOWEVER_GCC_DEFINES_TREE 1
-#include "ec.h"
-#include "common-defs.h"
+#include "../../libgcobol/ec.h"
+#include "../../libgcobol/common-defs.h"
 #include "util.h"
 #include "cbldiag.h"
 #include "symbols.h"
@@ -158,7 +157,6 @@ tree cblc_field_pp_type_node;
 tree cblc_file_type_node;
 tree cblc_file_p_type_node;
 tree cblc_goto_type_node;
-tree cblc_int128_type_node;
 
 // The following functions return type_decl nodes for the various structures
 
@@ -287,34 +285,6 @@ typedef struct cblc_file_t
     return retval;
     }
 
-static tree
-create_cblc_int128_t()
-    {
-    /*
-    // GCC-13 can't initialize __int64 variables, which is something we need to
-    // be able to do.  So, I created this union.  The array can be initialized,
-    // and thus we do an end run around the problem.  Annoying, but not fatally
-    // so.
-
-    typedef union cblc_int128_t
-        {
-        unsigned char array16[16];
-        __uint128     uval128;
-        __int128      sval128;
-        } cblc_int128_t;
-    */
-    tree retval = NULL_TREE;
-    tree array_type = build_array_type_nelts(UCHAR, 16);
-    retval = gg_get_filelevel_union_type_decl(
-                "cblc_int128_t",
-                3,
-                array_type,   "array16"       ,
-                UINT128,      "uval128"  ,
-                INT128,       "sval128"  );
-    retval = TREE_TYPE(retval);
-    return retval;
-    }
-
 void
 create_our_type_nodes()
     {
@@ -327,7 +297,6 @@ create_our_type_nodes()
         cblc_field_pp_type_node           = build_pointer_type(cblc_field_p_type_node);
         cblc_file_type_node               = create_cblc_file_t();
         cblc_file_p_type_node             = build_pointer_type(cblc_file_type_node);
-        cblc_int128_type_node             = create_cblc_int128_t();
         }
     }
 

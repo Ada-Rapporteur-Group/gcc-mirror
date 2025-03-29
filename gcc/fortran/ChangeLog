@@ -1,3 +1,147 @@
+2025-03-28  Harald Anlauf  <anlauf@gmx.de>
+
+	* check.cc (gfc_invalid_boz): Correct spelling of compiler flag in
+	hint to -fallow-invalid-boz.
+
+2025-03-26  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/118796
+	* resolve.cc: Do not apply default initialization to a derived-type
+	function result if the resolved function is use-associated.
+
+2025-03-25  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/119419
+	* dump-parse-tree.cc (write_funptr_fcn): New function.
+	(write_type): Invoke it for C_FUNPTR.
+	(write_interop_decl): Do not dump vtabs.
+
+2025-03-25  Sandra Loosemore  <sloosemore@baylibre.com>
+	    Tobias Burnus  <tburnus@baylibre.com>
+
+	* trans-openmp.cc (gfc_trans_omp_declare_variant): Remove accidental
+	redeclaration of pref.
+
+2025-03-22  Jakub Jelinek  <jakub@redhat.com>
+
+	* resolve.cc (resolve_procedure_expression): Remove extraneous space
+	from the middle of diagnostics.
+
+2025-03-21  Paul-Antoine Arras  <parras@baylibre.com>
+	    Tobias Burnus  <tburnus@baylibre.com>
+
+	* trans-openmp.cc (gfc_trans_omp_clauses): Make OMP_CLAUSE_DESTROY and
+	OMP_CLAUSE_INIT addressable.
+	* types.def (BT_FN_VOID_INT_INT_PTR_PTR_PTR_INT_PTR_INT_PTR_UINT_PTR):
+	New.
+
+2025-03-21  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+
+	PR fortran/119406
+	* resolve.cc (resolve_locality_spec): Add space in error
+	message.
+
+2025-03-21  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+
+	PR fortran/119403
+	* interface.cc (compare_parameter): Fix typo.
+
+2025-03-21  Paul Thomas  <pault@gcc.gnu.org>
+
+	PR fortran/85836
+	* check.cc (get_ul_from_cst_cl): New function used in
+	check_operation.
+	(check_operation): New function used in check_reduce and
+	check_co_reduce.
+	(gfc_check_co_reduce): Use it.
+	(gfc_check_reduce): New function.
+	(gfc_check_rename): Add prototype for intrinsic with 6 arguments.
+	* gfortran.h : Add isym id for reduce and prototype for f6.
+	* intrinsic.cc (do_check): Add another argument expression and use
+	it in the call to the six argument specific check.
+	(add_sym_6): New function.
+	(add_functions): Add the discription of the reduce intrinsic and
+	add it to the intrinsic list.
+	* intrinsic.h : Add prototypes for gfc_check_reduce and
+	gfc_resolve_reduce.
+	* iresolve.cc (generate_reduce_op_wrapper): Generate a wrapper
+	subroutine for the 'operation' function to enable the library
+	implementation to be type agnostic and use pointer arithmetic
+	throughout.
+	(gfc_resolve_reduce): New function.
+	* trans-expr.cc (gfc_conv_procedure_call): Add flag for scalar
+	reduce. Generate a return variable 'sr' for scalar reduce, pass its
+	address to the library function and return it as the scalar result.
+	* trans-intrinsic.cc (gfc_conv_intrinsic_function): Array valued
+	reduce is called in same way as reshape. Fall through for call to
+	the scalar version.
+
+2025-03-21  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/119380
+	* trans-array.cc (structure_alloc_comps): Prevent freeing of
+	procedure pointer components.
+
+2025-03-21  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/119349
+	* trans-expr.cc (gfc_conv_procedure_call): Prevent deallocation
+	of array temporary for polymorphic temporary argument.
+
+2025-03-19  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/116706
+	* trans-array.cc (gfc_is_reallocatable_lhs): Fix check on
+	allocatable components of derived type or class objects.
+
+2025-03-19  Andre Vehreschild  <vehre@gcc.gnu.org>
+
+	PR fortran/119272
+	* resolve.cc (resolve_compcall): Postpone error report when
+	symbol is not resolved yet for component call resolve.
+
+2025-03-18  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/119338
+	* resolve.cc (resolve_allocate_expr): Check F2003:C626: Type-spec
+	in ALLOCATE of an assumed-length character dummy argument shall be
+	an asterisk.
+
+2025-03-16  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/60560
+	* expr.cc (gfc_traverse_expr): Do not descend into length type
+	parameter for negative values of auxiliary parameter f.
+	* resolve.cc (gfc_find_var_in_expr): New helper function to check
+	dependence of an expression on given variable.
+	(resolve_allocate_expr): Use it to determine if array bounds in an
+	ALLOCATE statement depend explicitly on a variable.
+
+2025-03-15  Tobias Burnus  <tburnus@baylibre.com>
+
+	PR fortran/115271
+	* module.cc (mio_omp_declare_simd_clauses): New, moved from ...
+	(mio_omp_declare_simd): ... here. Update call, write empty '( )'
+	if there is no declare simd but a declare variant.
+	(mio_omp_declare_variant): New.
+	(mio_symbol): Call it.
+	* openmp.cc (gfc_match_omp_context_selector): Add comment about
+	module.cc to TODO note.
+	* trans-stmt.h (gfc_trans_omp_declare_variant): Take additional
+	parent_ns argument.
+	* trans-decl.cc (create_function_arglist,
+	gfc_create_function_decl): Update call.
+	* trans-openmp.cc (gfc_trans_omp_declare_variant): Take new
+	argument, add some special case handling for attr.use_assoc.
+
+2025-03-13  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/119118
+	* dependency.cc (contains_forall_index_p): Let loop over elements
+	of a constructor update its control variable.  Handle REF_INQUIRY
+	in switch statement.
+	(gfc_contains_implied_index_p): Likewise.
+
 2025-03-12  Andre Vehreschild  <vehre@gcc.gnu.org>
 
 	PR fortran/98903
