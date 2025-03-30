@@ -1248,6 +1248,19 @@ cgraph_edge::next_callback_target ()
   return e;
 }
 
+void
+cgraph_edge::purge_callback_children ()
+{
+  gcc_checking_assert (has_callback);
+  cgraph_edge *e, *next;
+  for (e = first_callback_target (); e; e = next)
+    {
+      next = e->next_callback_target ();
+      cgraph_edge::remove (e);
+    }
+  has_callback = false;
+}
+
 /* Speculative call consists of an indirect edge and one or more
    direct edge+ref pairs.
 
@@ -1610,6 +1623,13 @@ cgraph_edge::redirect_call_stmt_to_callee (cgraph_edge *e,
      redirecting to. */
   if (e->callback)
     {
+      cgraph_edge *parent = e->get_callback_parent_edge ();
+      if (!lookup_attribute ("callback",
+			     DECL_ATTRIBUTES (parent->callee->decl)))
+	/* Callback attribute is removed if the offloading function changes
+	   signature, as the indices would be correct anymore. These edges will
+	   get cleaned up later, ignore their redirection for now. */
+	return e->call_stmt;
       int fn_idx
 	= callback_fetch_fn_position (e->call_stmt, DECL_ATTRIBUTES (decl),
 				      e->callee->decl);

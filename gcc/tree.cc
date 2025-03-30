@@ -9817,6 +9817,7 @@ build_common_tree_nodes (bool signed_char)
 void
 set_call_expr_flags (tree decl, int flags)
 {
+  // ahoj
   if (flags & ECF_NOTHROW)
     TREE_NOTHROW (decl) = 1;
   if (flags & ECF_CONST)
@@ -9850,6 +9851,48 @@ set_call_expr_flags (tree decl, int flags)
     DECL_ATTRIBUTES (decl)
       = tree_cons (get_identifier ("expected_throw"),
 		   NULL, DECL_ATTRIBUTES (decl));
+
+  if (flags & ECF_CB_1_0)
+    {
+      tree args
+	= tree_cons (NULL_TREE, build_int_cst (integer_type_node, 1),
+		     build_tree_list (NULL_TREE,
+				      build_int_cst (integer_type_node, 0)));
+      DECL_ATTRIBUTES (decl)
+	= tree_cons (get_identifier ("callback"), args, DECL_ATTRIBUTES (decl));
+    }
+
+  if (flags & ECF_CB_1_2)
+    {
+      tree args
+	= tree_cons (NULL_TREE, build_int_cst (integer_type_node, 1),
+		     build_tree_list (NULL_TREE,
+				      build_int_cst (integer_type_node, 2)));
+      DECL_ATTRIBUTES (decl)
+	= tree_cons (get_identifier ("callback"), args, DECL_ATTRIBUTES (decl));
+    }
+
+  if (flags & ECF_CB_2_4)
+    {
+      tree args
+	= tree_cons (NULL_TREE, build_int_cst (integer_type_node, 2),
+		     build_tree_list (NULL_TREE,
+				      build_int_cst (integer_type_node, 4)));
+      DECL_ATTRIBUTES (decl)
+	= tree_cons (get_identifier ("callback"), args, DECL_ATTRIBUTES (decl));
+    }
+
+  if (flags & ECF_CB_3_0_2)
+    {
+      tree args = tree_cons (
+	NULL_TREE, build_int_cst (integer_type_node, 3),
+	tree_cons (NULL_TREE, build_int_cst (integer_type_node, 0),
+		   build_tree_list (NULL_TREE,
+				    build_int_cst (integer_type_node, 2))));
+      DECL_ATTRIBUTES (decl)
+	= tree_cons (get_identifier ("callback"), args, DECL_ATTRIBUTES (decl));
+    }
+
   /* Looping const or pure is implied by noreturn.
      There is currently no way to declare looping const or looping pure alone.  */
   gcc_assert (!(flags & ECF_LOOPING_CONST_OR_PURE)

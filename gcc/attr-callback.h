@@ -270,4 +270,15 @@ handle_callback_attribute (tree *node, tree name, tree args,
   return NULL_TREE;
 }
 
+inline bool
+callback_edge_useful_p (cgraph_edge *e)
+{
+  gcc_checking_assert (e->callback);
+  /* If the edge is not pointing towards a clone, it is no longer useful as its
+     entire purpose is to produce clones of callbacks. */
+  if (!e->callee->clone_of)
+    return false;
+  return true;
+}
+
 #endif /* ATTR_CALLBACK_H  */

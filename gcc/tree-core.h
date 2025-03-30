@@ -98,6 +98,20 @@ struct die_struct;
 /* Nonzero if this is a function expected to end with an exception.  */
 #define ECF_XTHROW		  (1 << 16)
 
+/* Flags for various callback attribute combinations. */
+
+/* callback(1, 0) */
+#define ECF_CB_1_0      (1 << 17)
+
+/* callback(1, 2) */
+#define ECF_CB_1_2      (1 << 18)
+
+/* callback(2, 4) */
+#define ECF_CB_2_4      (1 << 19)
+
+/* callback(3, 0, 2) */
+#define ECF_CB_3_0_2    (1 << 20)
+
 /* Call argument flags.  */
 
 /* Nonzero if the argument is not used by the function.  */

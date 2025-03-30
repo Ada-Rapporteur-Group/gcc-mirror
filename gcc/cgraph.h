@@ -1753,6 +1753,9 @@ public:
   /* TODO DOCS */
   cgraph_edge *next_callback_target ();
 
+  /* TODO DOCS */
+  void purge_callback_children ();
+
   /* Speculative call consists of an indirect edge and one or more
      direct edge+ref pairs.  Speculative will expand to the following sequence:
 

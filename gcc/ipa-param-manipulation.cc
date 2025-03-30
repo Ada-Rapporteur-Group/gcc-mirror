@@ -308,6 +308,14 @@ drop_type_attribute_if_params_changed_p (tree name)
   return false;
 }
 
+static bool
+drop_decl_attribute_if_params_changed_p (tree name)
+{
+  if (is_attribute_p ("callback", name))
+    return true;
+  return false;
+}
+
 /* Build and return a function type just like ORIG_TYPE but with parameter
    types given in NEW_PARAM_TYPES - which can be NULL if, but only if,
    ORIG_TYPE itself has NULL TREE_ARG_TYPEs.  If METHOD2FUNC is true, also make
@@ -492,7 +500,7 @@ ipa_param_adjustments::method2func_p (tree orig_type)
 
 tree
 ipa_param_adjustments::build_new_function_type (tree old_type,
-						bool type_original_p)
+						bool type_original_p, bool *args_modified /* = NULL */)
 {
   auto_vec<tree,16> new_param_types, *new_param_types_p;
   if (prototype_p (old_type))
@@ -518,6 +526,8 @@ ipa_param_adjustments::build_new_function_type (tree old_type,
 	  || get_original_index (index) != (int)index)
 	modified = true;
 
+  if (args_modified)
+    *args_modified = modified;
 
   return build_adjusted_function_type (old_type, new_param_types_p,
 				       method2func_p (old_type), m_skip_return,
@@ -536,10 +546,11 @@ ipa_param_adjustments::adjust_decl (tree orig_decl)
 {
   tree new_decl = copy_node (orig_decl);
   tree orig_type = TREE_TYPE (orig_decl);
+  bool args_modified = false;
   if (prototype_p (orig_type)
       || (m_skip_return && !VOID_TYPE_P (TREE_TYPE (orig_type))))
     {
-      tree new_type = build_new_function_type (orig_type, false);
+      tree new_type = build_new_function_type (orig_type, false, &args_modified);
       TREE_TYPE (new_decl) = new_type;
     }
   if (method2func_p (orig_type))
@@ -556,6 +567,19 @@ ipa_param_adjustments::adjust_decl (tree orig_decl)
   if (m_skip_return)
     DECL_IS_MALLOC (new_decl) = 0;
 
+  if (args_modified && DECL_ATTRIBUTES (new_decl))
+    {
+      tree t = DECL_ATTRIBUTES (new_decl);
+      tree *last = &DECL_ATTRIBUTES (new_decl);
+      DECL_ATTRIBUTES (new_decl) = NULL;
+      for (; t; t = TREE_CHAIN (t))
+	if (!drop_decl_attribute_if_params_changed_p (get_attribute_name (t)))
+	  {
+	    *last = copy_node (t);
+	    TREE_CHAIN (*last) = NULL;
+	    last = &TREE_CHAIN (*last);
+	  }
+    }
   return new_decl;
 }
 

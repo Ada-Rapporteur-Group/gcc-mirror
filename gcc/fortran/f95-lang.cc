@@ -574,6 +574,10 @@ gfc_builtin_function (tree decl)
 #define ATTR_COLD_NORETURN_NOTHROW_LEAF_LIST \
 					(ECF_COLD | ECF_NORETURN | \
 					 ECF_NOTHROW | ECF_LEAF)
+#define ATTR_CALLBACK_GOMP_LIST (ECF_CB_1_2 | ATTR_NOTHROW_LIST)
+#define ATTR_CALLBACK_GOMP_TASK_LIST \
+  (ECF_CB_3_0_2 | ECF_CB_1_0 | ATTR_NOTHROW_LIST)
+#define ATTR_CALLBACK_OACC_LIST (ECF_CB_2_4 | ATTR_NOTHROW_LIST)
 
 static void
 gfc_define_builtin (const char *name, tree type, enum built_in_function code,

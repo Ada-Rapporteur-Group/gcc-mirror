@@ -131,7 +131,7 @@ along with GCC; see the file COPYING3.  If not see
 #include "dbgcnt.h"
 #include "symtab-clones.h"
 #include "gimple-range.h"
-
+#include "attr-callback.h"
 
 /* Allocation pools for values and their sources in ipa-cp.  */
 
@@ -6208,6 +6208,49 @@ identify_dead_nodes (struct cgraph_node *node)
     }
 }
 
+static void
+purge_useless_callback_edges ()
+{
+  if (dump_file)
+    fprintf (dump_file, "\nPurging useless callback edges:\n");
+
+  cgraph_edge *e;
+  cgraph_node *node;
+  FOR_EACH_FUNCTION_WITH_GIMPLE_BODY (node)
+    {
+      for (e = node->callees; e; e = e->next_callee)
+	{
+	  if (e->has_callback)
+	    {
+	      if (dump_file)
+		fprintf (dump_file, "\tExamining children of edge %s -> %s:\n",
+			 e->caller->name (), e->callee->name ());
+	      if (!lookup_attribute ("callback",
+				     DECL_ATTRIBUTES (e->callee->decl)))
+		{
+		  if (dump_file)
+		    fprintf (dump_file,
+			     "\t\tPurging children, because the offloading "
+			     "function no longer has any callback attributes.\n");
+		  e->purge_callback_children ();
+		  continue;
+		}
+		    cgraph_edge *cbe, *next;
+		    for (cbe = e->first_callback_target(); cbe; cbe = next) {
+          next = cbe->next_callback_target();
+          if (!callback_edge_useful_p(cbe)) {
+            if (dump_file)
+              fprintf(dump_file, "\t\tCallback edge %s -> %s not deemed useful, removing.\n", cbe->caller->name(), cbe->callee->name());
+            cgraph_edge::remove(cbe);
+          }
+		    }
+	    }
+	}
+    }
+  if (dump_file)
+    fprintf(dump_file, "\n");
+}
+
 /* The decision stage.  Iterate over the topological order of call graph nodes
    TOPO and make specialized clones if deemed beneficial.  */
 
@@ -6238,6 +6281,8 @@ ipcp_decision_stage (class ipa_topo_info *topo)
       if (change)
 	identify_dead_nodes (node);
     }
+  if (0)
+  purge_useless_callback_edges();
 }
 
 /* Look up all VR and bits information that we have discovered and copy it
