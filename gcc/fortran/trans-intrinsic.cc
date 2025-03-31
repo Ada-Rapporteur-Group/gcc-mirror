@@ -1307,7 +1307,7 @@ gfc_conv_intrinsic_caf_get (gfc_se *se, gfc_expr *expr, tree lhs,
 			    : gfc_conv_descriptor_size (res_var,
 							array_expr->rank)),
 	    fold_convert (size_type_node,
-			  gfc_conv_descriptor_span_get (res_var)));
+			  gfc_conv_descriptor_elem_len_get (res_var)));
 	}
       opt_dest_desc = res_var;
       dest_data = gfc_conv_descriptor_data_get (res_var);
@@ -1534,7 +1534,7 @@ conv_caf_send_to_remote (gfc_code *code)
 			    : gfc_conv_descriptor_size (rhs_se.expr,
 							rhs_expr->rank)),
 	    fold_convert (size_type_node,
-			  gfc_conv_descriptor_span_get (rhs_se.expr)));
+			  gfc_conv_descriptor_elem_len_get (rhs_se.expr)));
 	}
 
       rhs_data = gfc_build_addr_expr (
@@ -1759,7 +1759,7 @@ conv_caf_sendget (gfc_code *code)
 			    : gfc_conv_descriptor_size (rhs_se.expr,
 							rhs_expr->rank)),
 	    fold_convert (size_type_node,
-			  gfc_conv_descriptor_span_get (rhs_se.expr)));
+			  gfc_conv_descriptor_elem_len_get (rhs_se.expr)));
 	}
 
       opt_rhs_desc = gfc_build_addr_expr (NULL_TREE, opt_rhs_desc);

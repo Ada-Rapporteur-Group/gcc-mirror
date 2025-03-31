@@ -69,12 +69,7 @@ cfi_desc_to_gfc_desc (gfc_array_void *d, CFI_cdesc_t **s_ptr)
   d->dtype.attribute = (signed short)s->attribute;
 
   if (s->rank)
-    {
-      if ((size_t)s->dim[0].sm % s->elem_len)
-	d->span = (index_type)s->dim[0].sm;
-      else
-	d->span = (index_type)s->elem_len;
-    }
+    d->dtype.elem_len = (index_type)s->elem_len;
 
   d->offset = 0;
   if (GFC_DESCRIPTOR_DATA (d))
@@ -146,7 +141,7 @@ gfc_desc_to_cfi_desc (CFI_cdesc_t **d_ptr, const gfc_array_void *s)
 	else
 	  d->dim[n].extent = (CFI_index_t)GFC_DESCRIPTOR_UBOUND(s, n)
 			     - (CFI_index_t)GFC_DESCRIPTOR_LBOUND(s, n) + 1;
-	d->dim[n].sm = (CFI_index_t)(GFC_DESCRIPTOR_STRIDE(s, n) * s->span);
+	d->dim[n].sm = (CFI_index_t)(GFC_DESCRIPTOR_STRIDE(s, n) * s->dtype.elem_len);
       }
 
   if (*d_ptr == NULL)

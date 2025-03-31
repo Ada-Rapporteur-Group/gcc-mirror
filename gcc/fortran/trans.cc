@@ -395,12 +395,14 @@ get_array_span (tree type, tree decl)
   /* Component references are guaranteed to have a reliable value for
      'span'. Likewise indirect references since they emerge from the
      conversion of a CFI descriptor or the hidden dummy descriptor.  */
-  if (TREE_CODE (decl) == COMPONENT_REF
-      && GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (decl)))
-    return gfc_conv_descriptor_span_get (decl);
-  else if (INDIRECT_REF_P (decl)
-	   && GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (decl)))
-    return gfc_conv_descriptor_span_get (decl);
+  if ((TREE_CODE (decl) == COMPONENT_REF
+       && GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (decl)))
+      || (INDIRECT_REF_P (decl)
+	  && GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (decl))))
+    {
+      span = gfc_conv_descriptor_elem_len_get (decl);
+      return fold_convert (gfc_array_index_type, span);
+    }
 
   /* Return the span for deferred character length array references.  */
   if (type
@@ -410,7 +412,7 @@ get_array_span (tree type, tree decl)
       if (TREE_CODE (decl) == PARM_DECL)
 	decl = build_fold_indirect_ref_loc (input_location, decl);
       if (GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (decl)))
-	span = gfc_conv_descriptor_span_get (decl);
+	span = gfc_conv_descriptor_elem_len_get (decl);
       else
 	span = gfc_get_character_len_in_bytes (type);
       span = (span && !integer_zerop (span))
@@ -450,15 +452,18 @@ get_array_span (tree type, tree decl)
 	{
 	  if (TREE_CODE (decl) == PARM_DECL)
 	    decl = build_fold_indirect_ref_loc (input_location, decl);
-	  span = gfc_conv_descriptor_span_get (decl);
+	  span = gfc_conv_descriptor_elem_len_get (decl);
 	}
       else
-	span = NULL_TREE;
+	return NULL_TREE;
     }
   else
-    span = NULL_TREE;
+    return NULL_TREE;
 
-  return span;
+  if (span == NULL_TREE)
+    return NULL_TREE;
+
+  return fold_convert (gfc_array_index_type, span);
 }
 
 

@@ -40,7 +40,6 @@ void gfc_copy_descriptor (stmtblock_t *block, tree dest, tree src,
 
 tree gfc_conv_descriptor_data_get (tree);
 tree gfc_conv_descriptor_offset_get (tree);
-tree gfc_conv_descriptor_span_get (tree);
 tree gfc_conv_descriptor_dtype_get (tree);
 tree gfc_conv_descriptor_rank_get (tree);
 tree gfc_conv_descriptor_elem_len_get (tree);

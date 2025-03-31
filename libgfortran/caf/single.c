@@ -576,7 +576,7 @@ _gfortran_caf_get_from_remote (
   if (opt_dst_desc && old_dst_data_ptr && !may_realloc_dst
       && opt_dst_desc->base_addr != old_dst_data_ptr)
     {
-      size_t dsize = opt_dst_desc->span;
+      size_t dsize = opt_dst_desc->dtype.elem_len;
       for (int i = 0; i < GFC_DESCRIPTOR_RANK (opt_dst_desc); ++i)
 	dsize *= GFC_DESCRIPTOR_EXTENT (opt_dst_desc, i);
       memcpy (old_dst_data_ptr, opt_dst_desc->base_addr, dsize);

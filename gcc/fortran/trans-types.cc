@@ -2104,12 +2104,6 @@ gfc_get_array_descriptor_base (int dimen, int codimen, bool restricted)
 				    get_dtype_type_node (), &chain);
   suppress_warning (decl);
 
-  /* Add the span component.  */
-  decl = gfc_add_field_to_struct_1 (fat_type,
-				    get_identifier ("span"),
-				    gfc_array_index_type, &chain);
-  suppress_warning (decl);
-
   /* Build the array type for the stride and bound components.  */
   if (dimen + codimen > 0)
     {
@@ -3829,7 +3823,7 @@ gfc_get_array_descr_info (const_tree type, struct array_descr_info *info)
   int rank, dim;
   bool indirect = false;
   tree etype, ptype, t, base_decl;
-  tree data_off, span_off, dim_off, dtype_off, dim_size, elem_size;
+  tree data_off, elem_len_off, dim_off, dtype_off, dim_size, elem_size;
   tree lower_suboff, upper_suboff, stride_suboff;
   tree dtype, field, rank_off;
 
@@ -3884,11 +3878,12 @@ gfc_get_array_descr_info (const_tree type, struct array_descr_info *info)
   if (indirect)
     base_decl = build1 (INDIRECT_REF, ptype, base_decl);
 
-  gfc_get_descriptor_offsets_for_info (type, &data_off, &dtype_off, &span_off,
-				       &dim_off, &dim_size, &stride_suboff,
-				       &lower_suboff, &upper_suboff);
+  gfc_get_descriptor_offsets_for_info (type, &data_off, &dtype_off,
+				       &elem_len_off, &dim_off, &dim_size,
+				       &stride_suboff, &lower_suboff,
+				       &upper_suboff);
 
-  t = fold_build_pointer_plus (base_decl, span_off);
+  t = fold_build_pointer_plus (base_decl, elem_len_off);
   elem_size = build1 (INDIRECT_REF, gfc_array_index_type, t);
 
   t = base_decl;

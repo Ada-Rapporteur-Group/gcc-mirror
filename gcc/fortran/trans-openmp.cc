@@ -785,7 +785,7 @@ gfc_omp_clause_default_ctor (tree clause, tree decl, tree outer)
 				gfc_conv_descriptor_sm_get (decl, rank));
       else
 	{
-	  tree esize = gfc_conv_descriptor_span_get (decl);
+	  tree esize = gfc_conv_descriptor_elem_len_get (decl);
 	  esize = fold_convert_loc (input_location, gfc_array_index_type, esize);
 	  size = fold_build2_loc (input_location, MULT_EXPR, gfc_array_index_type,
 				  size, esize);
@@ -974,7 +974,7 @@ gfc_omp_clause_copy_ctor (tree clause, tree dest, tree src)
 				gfc_conv_descriptor_sm_get (dest, rank));
       else
 	{
-	  tree esize = gfc_conv_descriptor_span_get (dest);
+	  tree esize = gfc_conv_descriptor_elem_len_get (dest);
 	  esize = fold_convert_loc (input_location, gfc_array_index_type, esize);
 	  size = fold_build2_loc (input_location, MULT_EXPR, gfc_array_index_type,
 				  size, esize);
@@ -1095,7 +1095,7 @@ gfc_omp_clause_assign_op (tree clause, tree dest, tree src)
 				gfc_conv_descriptor_sm_get (src, rank));
       else
 	{
-	  tree esize = gfc_conv_descriptor_span_get (src);
+	  tree esize = gfc_conv_descriptor_elem_len_get (src);
 	  esize = fold_convert_loc (input_location, gfc_array_index_type, esize);
 	  size = fold_build2_loc (input_location, MULT_EXPR, gfc_array_index_type,
 				  size, esize);

@@ -450,7 +450,7 @@ gfc_get_array_span (tree desc, gfc_expr *expr)
 	desc = build_fold_indirect_ref_loc (input_location, desc);
 
       /* This will have the span field set.  */
-      tmp = gfc_conv_descriptor_span_get (desc);
+      tmp = gfc_conv_descriptor_elem_len_get (desc);
     }
   else if (expr->ts.type == BT_ASSUMED)
     {
@@ -458,7 +458,7 @@ gfc_get_array_span (tree desc, gfc_expr *expr)
 	desc = GFC_DECL_SAVED_DESCRIPTOR (desc);
       if (POINTER_TYPE_P (TREE_TYPE (desc)))
 	desc = build_fold_indirect_ref_loc (input_location, desc);
-      tmp = gfc_conv_descriptor_span_get (desc);
+      tmp = gfc_conv_descriptor_elem_len_get (desc);
     }
   else if (TREE_CODE (desc) == COMPONENT_REF
 	   && GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (desc))

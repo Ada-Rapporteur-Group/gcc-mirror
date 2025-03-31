@@ -164,9 +164,8 @@ gfc_get_cfi_dim_sm (tree desc, tree idx)
 #define DATA_FIELD 0
 #define OFFSET_FIELD 1
 #define DTYPE_FIELD 2
-#define SPAN_FIELD 3
-#define DIMENSION_FIELD 4
-#define CAF_TOKEN_FIELD 5
+#define DIMENSION_FIELD 3
+#define CAF_TOKEN_FIELD 4
 
 #define STRIDE_SUBFIELD 0
 #define LBOUND_SUBFIELD 1
@@ -280,27 +279,6 @@ conv_dtype_set (stmtblock_t *block, tree desc, tree val)
 {
   tree t = get_dtype (desc);
   gfc_add_modify (block, t, val);
-}
-
-tree
-get_span (tree desc)
-{
-  tree field = get_component (desc, SPAN_FIELD);
-  gcc_assert (TREE_TYPE (field) == gfc_array_index_type);
-  return field;
-}
-
-tree
-conv_span_get (tree desc)
-{
-  return non_lvalue_loc (input_location, get_span (desc));
-}
-
-void
-conv_span_set (stmtblock_t *block, tree desc, tree value)
-{
-  tree t = get_span (desc);
-  gfc_add_modify (block, t, fold_convert (TREE_TYPE (t), value));
 }
 
 tree
@@ -716,18 +694,6 @@ gfc_conv_descriptor_dtype_set (stmtblock_t *block, tree desc, tree val)
 }
 
 tree
-gfc_conv_descriptor_span_get (tree desc)
-{
-  return gfc_descriptor::conv_span_get (desc);
-}
-
-static void
-gfc_conv_descriptor_span_set (stmtblock_t *block, tree desc, tree value)
-{
-  return gfc_descriptor::conv_span_set (block, desc, value);
-}
-
-tree
 gfc_conv_descriptor_dimension_get (tree desc, tree dim)
 {
   return gfc_descriptor::conv_dimension_get (desc, dim);
@@ -932,10 +898,11 @@ tree
 gfc_conv_descriptor_sm_get (tree desc, tree dim)
 {
   tree stride = gfc_conv_descriptor_stride_get (desc, dim);
-  tree span = gfc_conv_descriptor_span_get (desc);
+  tree elem_len = gfc_conv_descriptor_elem_len_get (desc);
+  elem_len = fold_convert (gfc_array_index_type, elem_len);
 
   return fold_build2_loc (input_location, MULT_EXPR, gfc_array_index_type,
-			  stride, span);
+			  stride, elem_len);
 }
 
 
@@ -1103,31 +1070,6 @@ get_descr_data_value (const descr_change_info &info)
 	  return value;
 	else
 	  return gfc_build_addr_expr (NULL_TREE, value);
-      }
-
-    default:
-      gcc_unreachable ();
-    }
-}
-
-
-static tree
-get_descr_span (const descr_change_info &info)
-{
-  switch (info.type)
-    {
-    case UNKNOWN_CHANGE:
-    case EXPLICIT_NULLIFICATION:
-    case INITIALISATION:
-    case DEFAULT_INITIALISATION:
-    case NULL_INITIALISATION:
-      return NULL_TREE;
-
-    case SCALAR_VALUE:
-      {
-	tree fields = TYPE_FIELDS (info.descriptor_type);
-	tree span_field = gfc_advance_chain (fields, SPAN_FIELD);
-	return build_zero_cst (TREE_TYPE (span_field));
       }
 
     default:
@@ -1355,14 +1297,6 @@ get_descriptor_init (tree type, gfc_typespec *ts, int rank,
     {
       tree dtype_field = gfc_advance_chain (fields, DTYPE_FIELD);
       CONSTRUCTOR_APPEND_ELT (v, dtype_field, dtype_value);
-    }
-
-  tree span_value = get_descr_span (change);
-  if (span_value != NULL_TREE)
-    {
-      tree span_field = gfc_advance_chain (fields, SPAN_FIELD);
-      tree span_value = build_zero_cst (TREE_TYPE (span_field));
-      CONSTRUCTOR_APPEND_ELT (v, span_field, span_value);
     }
 
   if (flag_coarray == GFC_FCOARRAY_LIB && attr->codimension)
@@ -2366,14 +2300,14 @@ gfc_conv_remap_descriptor (stmtblock_t *block, tree dest, tree src,
   tree span;
   if (VAR_P (src)
       && GFC_DECL_PTR_ARRAY_P (src))
-    span = gfc_conv_descriptor_span_get (src);
+    span = gfc_conv_descriptor_elem_len_get (src);
   else
     {
       tmp = TREE_TYPE (src);
       tmp = TYPE_SIZE_UNIT (gfc_get_element_type (tmp));
       span = fold_convert (gfc_array_index_type, tmp);
     }
-  gfc_conv_descriptor_span_set (block, dest, span);
+  gfc_conv_descriptor_elem_len_set (block, dest, span);
 
   /* Copy offset but adjust it such that it would correspond
      to a lbound of zero.  */
@@ -2472,10 +2406,10 @@ gfc_copy_descriptor (stmtblock_t *block, tree dest, tree src,
   /* ....and set the span field.  */
   tree tmp2;
   if (src_expr->ts.type == BT_CHARACTER)
-    tmp2 = gfc_conv_descriptor_span_get (src);
+    tmp2 = gfc_conv_descriptor_elem_len_get (src);
   else
     tmp2 = gfc_get_array_span (src, src_expr);
-  gfc_conv_descriptor_span_set (block, dest, tmp2);
+  gfc_conv_descriptor_elem_len_set (block, dest, tmp2);
 }
 
 
@@ -2487,7 +2421,7 @@ gfc_set_descriptor_with_shape (stmtblock_t *block, tree desc,
   /* Set the span field.  */
   tree tmp = TYPE_SIZE_UNIT (gfc_get_element_type (TREE_TYPE (desc)));
   tmp = fold_convert (gfc_array_index_type, tmp);
-  gfc_conv_descriptor_span_set (block, desc, tmp);
+  gfc_conv_descriptor_elem_len_set (block, desc, tmp);
 
   /* Set data value, dtype, and offset.  */
   tmp = GFC_TYPE_ARRAY_DATAPTR_TYPE (TREE_TYPE (desc));
@@ -2610,8 +2544,8 @@ gfc_copy_sequence_descriptor (stmtblock_t &block, tree lhs_desc, tree rhs_desc,
 				     gfc_conv_descriptor_dtype_get (rhs_desc));
       tree rank_value = build_int_cst (signed_char_type_node, lhs_rank);
       gfc_conv_descriptor_rank_set (&block, arr, rank_value);
-      gfc_conv_descriptor_span_set (&block, arr,
-				    gfc_conv_descriptor_span_get (arr));
+      gfc_conv_descriptor_elem_len_set (&block, arr,
+				    gfc_conv_descriptor_elem_len_get (arr));
       gfc_conv_descriptor_offset_set (&block, arr, gfc_index_zero_node);
       desc = arr;
     }
@@ -2764,7 +2698,7 @@ gfc_set_gfc_from_cfi (stmtblock_t *unconditional_block,
       tmp = build3_loc (input_location, COND_EXPR, gfc_array_index_type, tmp,
 			sm0, elem_len);
     }
-  gfc_conv_descriptor_span_set (conditional_block, gfc, tmp);
+  gfc_conv_descriptor_elem_len_set (conditional_block, gfc, tmp);
 
   /* Calculate offset + set lbound, ubound and stride.  */
   gfc_conv_descriptor_offset_set (conditional_block, gfc, gfc_index_zero_node);
@@ -2856,7 +2790,7 @@ gfc_set_gfc_from_cfi (stmtblock_t *unconditional_block,
 
 void
 gfc_get_descriptor_offsets_for_info (const_tree desc_type, tree *data_off,
-				     tree *dtype_off, tree *span_off,
+				     tree *dtype_off, tree *elem_len_off,
 				     tree *dim_off, tree *dim_size,
 				     tree *stride_suboff, tree *lower_suboff,
 				     tree *upper_suboff)
@@ -2869,8 +2803,11 @@ gfc_get_descriptor_offsets_for_info (const_tree desc_type, tree *data_off,
   *data_off = byte_position (field);
   field = gfc_advance_chain (TYPE_FIELDS (type), DTYPE_FIELD);
   *dtype_off = byte_position (field);
-  field = gfc_advance_chain (TYPE_FIELDS (type), SPAN_FIELD);
-  *span_off = byte_position (field);
+  field = gfc_advance_chain (TYPE_FIELDS (TREE_TYPE (field)),
+			     GFC_DTYPE_ELEM_LEN);
+  *elem_len_off = fold_build2 (PLUS_EXPR, size_type_node,
+			       fold_convert (size_type_node, *dtype_off),
+			       fold_convert (size_type_node, byte_position (field)));
   field = gfc_advance_chain (TYPE_FIELDS (type), DIMENSION_FIELD);
   *dim_off = byte_position (field);
   type = TREE_TYPE (TREE_TYPE (field));
@@ -2889,7 +2826,6 @@ gfc_get_descriptor_offsets_for_info (const_tree desc_type, tree *data_off,
 #undef DATA_FIELD
 #undef OFFSET_FIELD
 #undef DTYPE_FIELD
-#undef SPAN_FIELD
 #undef DIMENSION_FIELD
 #undef CAF_TOKEN_FIELD
 #undef STRIDE_SUBFIELD
@@ -2941,7 +2877,7 @@ gfc_set_temporary_descriptor (stmtblock_t *block, tree desc, tree class_src,
 	}
     }
 
-  gfc_conv_descriptor_span_set (block, desc, elemsize);
+  gfc_conv_descriptor_elem_len_set (block, desc, elemsize);
   
   gfc_conv_descriptor_data_set (block, desc, data_ptr);
 
@@ -3011,15 +2947,6 @@ gfc_set_descriptor (stmtblock_t *block, tree dest, tree src, gfc_expr *src_expr,
 {
   int ndim = info->ref ? info->ref->u.ar.dimen : rank;
 
-  /* Set the span field.  */
-  tree tmp = NULL_TREE;
-  if (GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (src)))
-    tmp = gfc_conv_descriptor_span_get (src);
-  else
-    tmp = gfc_get_array_span (src, src_expr);
-  if (tmp)
-    gfc_conv_descriptor_span_set (block, dest, tmp);
-
   /* The following can be somewhat confusing.  We have two
      descriptors, a new one and the original array.
      {dest, parmtype, dim} refer to the new one.
@@ -3043,6 +2970,15 @@ gfc_set_descriptor (stmtblock_t *block, tree dest, tree src, gfc_expr *src_expr,
   else
     dtype = gfc_get_dtype (TREE_TYPE (src), &rank);
   gfc_conv_descriptor_dtype_set (block, dest, dtype);
+
+  /* Set the span field.  */
+  tree tmp = NULL_TREE;
+  if (GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (src)))
+    tmp = gfc_conv_descriptor_elem_len_get (src);
+  else
+    tmp = gfc_get_array_span (src, src_expr);
+  if (tmp)
+    gfc_conv_descriptor_elem_len_set (block, dest, tmp);
 
   /* The 1st element in the section.  */
   tree base = gfc_index_zero_node;
@@ -3439,7 +3375,7 @@ gfc_descr_init_count (tree descriptor, int rank, int corank, gfc_expr ** lower,
   offset = gfc_evaluate_now (offset, pblock);
   gfc_conv_descriptor_offset_set (descriptor_block, descriptor, offset);
   tmp = fold_convert (gfc_array_index_type, element_size);
-  gfc_conv_descriptor_span_set (descriptor_block, descriptor, tmp);
+  gfc_conv_descriptor_elem_len_set (descriptor_block, descriptor, tmp);
 
   return gfc_evaluate_now (stride, pblock);
 }
@@ -3731,7 +3667,7 @@ gfc_set_descriptor_for_assign_realloc (stmtblock_t *block, gfc_loopinfo *loop,
   gfc_conv_descriptor_offset_set (block, desc, offset);
 
   if (GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (desc)))
-    gfc_conv_descriptor_span_set (block, desc, elemsize2);
+    gfc_conv_descriptor_elem_len_set (block, desc, elemsize2);
 
   /* For deferred character length, the 'size' field of the dtype might
      have changed so set the dtype.  */
