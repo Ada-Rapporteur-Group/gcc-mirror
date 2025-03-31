@@ -1325,8 +1325,10 @@ struct offset_bitmap {
     sbitmap m_bitmap;
   
   public:
-    offset_bitmap(size_t size, int offset) : m_offset{offset}, m_bitmap{sbitmap_alloc(size)} {}
-    offset_bitmap(int min_index, int max_index) : offset_bitmap(size_t(max_index - min_index), min_index) {}
+    offset_bitmap(size_t size, int offset) : m_offset{offset},
+      m_bitmap{sbitmap_alloc(size)} {}
+    offset_bitmap(int min_index, int max_index) : 
+      offset_bitmap(size_t(max_index - min_index), min_index) {}
 
     void clear_bit(int index) {
       bitmap_clear_bit(m_bitmap, index + m_offset);
@@ -1345,75 +1347,7 @@ struct offset_bitmap {
     }
 };
 
-bool side_effects_with_mem (const_rtx x)
-{
-  const RTX_CODE code = GET_CODE (x);
-  switch (code)
-    {
-    case LABEL_REF:
-    case SYMBOL_REF:
-    case CONST:
-    CASE_CONST_ANY:
-    case PC:
-    case REG:
-    case SCRATCH:
-    case ADDR_VEC:
-    case ADDR_DIFF_VEC:
-    case VAR_LOCATION:
-      return false;
-
-    case CLOBBER:
-      /* Reject CLOBBER with a non-VOID mode.  These are made by combine.cc
-	 when some combination can't be done.  If we see one, don't think
-	 that we can simplify the expression.  */
-      return (GET_MODE (x) != VOIDmode);
-
-    case PRE_INC:
-    case PRE_DEC:
-    case POST_INC:
-    case POST_DEC:
-    case PRE_MODIFY:
-    case POST_MODIFY:
-    case CALL:
-    case UNSPEC_VOLATILE:
-      return true;
-
-    case MEM: // We might want tu return true iff volatile or mem is a destination
-      // write or possible null read
-    case ASM_INPUT:
-    case ASM_OPERANDS:
-	    return true;
-
-    default:
-      break;
-    }
-
-  /* Recursively scan the operands of this expression.  */
-
-  {
-    const char *fmt = GET_RTX_FORMAT (code);
-    int i;
-
-    for (i = GET_RTX_LENGTH (code) - 1; i >= 0; i--)
-      {
-	if (fmt[i] == 'e')
-	  {
-	    if (side_effects_with_mem (XEXP (x, i)))
-	      return true;
-	  }
-	else if (fmt[i] == 'E')
-	  {
-	    int j;
-	    for (j = 0; j < XVECLEN (x, i); j++)
-	      if (side_effects_with_mem (XVECEXP (x, i, j)))
-		return true;
-	  }
-      }
-  }
-  return false;
-}
-
-bool is_ssa_prelive(const_rtx insn) {
+bool is_rtx_prelive(const_rtx insn) {
   switch (GET_CODE(insn)) {
     case PREFETCH:
     case UNSPEC:
@@ -1429,15 +1363,12 @@ bool is_rtx_insn_prelive(rtx_insn *insn) {
   gcc_assert(insn != nullptr);
 
   if (!NONJUMP_INSN_P (insn))
-  {
-    // This handles jumps, debug_insns, call_insn, ...
+    /* This handles jumps, debug_insns, call_insn, ... */
     return true;
-  }
 
-  // TODO : handle calls correctly
   if (CALL_P (insn)
       /* We cannot delete pure or const sibling calls because it is
-	 hard to see the result.  */
+	       hard to see the result.  */
       && (!SIBLING_CALL_P (insn))
       /* We can delete dead const or pure calls as long as they do not
          infinite loop.  */
@@ -1447,111 +1378,74 @@ bool is_rtx_insn_prelive(rtx_insn *insn) {
     return true;
     // return !find_call_stack_args (as_a <rtx_call_insn *> (insn), false, fast, arg_stores);
 
-  // Only rtx_insn should be handled here
+  /* Only rtx_insn should be handled here */
   gcc_assert(GET_CODE(insn) == INSN);
 
   /* Don't delete insns that may throw if we cannot do so.  */
-  if (!(cfun->can_delete_dead_exceptions && can_alter_cfg) && !insn_nothrow_p (insn))
+  if (!(cfun->can_delete_dead_exceptions && can_alter_cfg)
+      && !insn_nothrow_p (insn))
     return true;
  
   /* Callee-save restores are needed.  */
-  if (RTX_FRAME_RELATED_P (insn) && crtl->shrink_wrapped_separate && find_reg_note (insn, REG_CFA_RESTORE, NULL))
+  if (RTX_FRAME_RELATED_P (insn) && crtl->shrink_wrapped_separate 
+      && find_reg_note (insn, REG_CFA_RESTORE, NULL))
     return true;
-
-  // TODO : asm_noperands???
 
   rtx body = PATTERN(insn);
   switch (GET_CODE(body)) {
     case CLOBBER: // gcc/gcc/testsuite/gcc.c-torture/compile/20000605-1.c
     case USE:
     case VAR_LOCATION:
-    case PREFETCH: // This and following case might be removed since they are part of deletable_insn_p_1
-    case TRAP_IF:
+    /* Following cases might be removed since they are part of is_rtx_prelive */
+    case PREFETCH:
+    case TRAP_IF: /* testsuite/gcc.c-torture/execute/20020418-1.c */
     case UNSPEC:
       return true;
 
     case PARALLEL:
       for (int i = XVECLEN (body, 0) - 1; i >= 0; i--)
-        if (is_ssa_prelive (XVECEXP (body, 0, i)))
+        if (is_rtx_prelive (XVECEXP (body, 0, i)))
           return true;
       return false;
 
     default:
-      return is_ssa_prelive (body);
+      return is_rtx_prelive (body);
   }
-
-  // See deletable_insn_p_1 for UNSPEC. TRAP_IF is caught by may_trap_or_fault_p
-
-  // may_trap_or_fault_p helps a lot to pass some tests from RUNTESTSFLAGS=execute.exp
-  // e. g. this one: testsuite/gcc.c-torture/execute/20020418-1.c
-  // TODO : debug the testcase
-  // It seems that the issue was due to trap_if rtl insn and fixed with may_trap_or_fault_p
-  if (side_effects_with_mem(body)) // may_trap_or_fault_p(body) replaced by TRAP_IF
-    return true;
-
-  return false;
 }
 
 bool is_prelive(insn_info *insn)
 {
-  if (insn->is_artificial()) // phis are never prelive, bb head + end are artificial
+  /* Phi insns are never prelive, bb head + end also are artificial */
+  if (insn->is_artificial())
     return false;
 
-  /*
-   * There are a few functions we can use to detect if an instruction is
-   * inherently live:
-   * rtlanal.cc:
-   *  bool side_effects_p (const_rtx x);
-   *  bool volatile_insn_p (const_rtx x);
-   *
-   * rtlanal.h
-   *  bool has_side_effects (); inside class rtx_properties
-   *
-   * dce.cc:
-   *  static bool deletable_insn_p_1(rtx body); uses bool volatile_insn_p (const_rtx x);
-   *  static bool deletable_insn_p(rtx_insn *insn, bool fast, bitmap arg_stores);
-   * 
-   * Possibly the most accurate way would be to rewrite `static bool
-   * deletable_insn_p(rtx_insn *insn, bool fast, bitmap arg_stores);`
-   * 
-  */
-
-  // Now, we only have to handle rtx insns
   gcc_assert (insn->is_real());
   auto rtl = insn->rtl();
 
   for (def_info * def : insn->defs()) {
-    // The purpose of this pass is not to eliminate stores to memory...
-    if (def->is_mem()) { // TODO : clobbered memory?
+    /* The purpose of this pass is not to eliminate stores to memory... */
+    if (def->is_mem())
+      // TODO : clobbered memory?
       return true;
-    }
 
     gcc_assert(def->is_reg());
-    // this ignores clobbers, which is probably fine
+    /* this ignores clobbers, which is probably fine */
 
-
-    // TODO : find something similar to mark_artificial_uses to mark only
-    // artificially-used registers
-    //  check: df_get_regular_block_artificial_uses
-    //  That should fix following test as assume
-    // gcc.c-torture/execute/20000503-1.c - flags register is unused
+    /* TODO : find something similar to mark_artificial_uses to mark only
+       artificially-used registers.
+       - df_get_regular_block_artificial_uses
+       That should fix following test as assume
+       gcc.c-torture/execute/20000503-1.c - flags register is unused. Not all
+       hard registers should be marked... */
     if (def->kind() != access_kind::SET)
       continue;
 
-    // We need to perform some kind of reset_unmarked_insns_debug_uses
-    // to be able to reproduce ud_dce - now only 4 tests are falling
-    // because of debug_insn being dependent on parallel with set flags 
-    // gcc.c-torture/execute/20051215-1.c
-    // gcc.c-torture/execute/20100805-1.c
-    // gcc.c-torture/execute/pr39339.c
-    // gcc.c-torture/execute/pr47925.c
-
-    // This might be messed up a bit
+    /* This might be messed up a bit */
     if (def->regno() == FRAME_POINTER_REGNUM
         || def->regno() == STACK_POINTER_REGNUM)
       return true;
 
-    // needed by gcc.c-torture/execute/pr51447.c
+    /* needed by gcc.c-torture/execute/pr51447.c */
     if (HARD_REGISTER_NUM_P (def->regno())
         && global_regs[def->regno()])
         return true;
@@ -1573,26 +1467,27 @@ bool is_prelive(insn_info *insn)
 
     // TODO : eh?
 
-    // if (def->kind() == access_kind::SET 
-    //     && (HARD_REGISTER_NUM_P(def->regno())
-    //     || (pic_offset_table_rtx != nullptr 
-    //       && def->regno() == REGNO (pic_offset_table_rtx)
-    //       && REGNO (pic_offset_table_rtx) >= FIRST_PSEUDO_REGISTER))
-    //   ) {
-    //   // find_reg_note(insn->rtl(), REG_UNUSED, def->regno())
-    //   return true;
-    // }
+    /*
+    if (def->kind() == access_kind::SET 
+        && (HARD_REGISTER_NUM_P(def->regno())
+        || (pic_offset_table_rtx != nullptr 
+          && def->regno() == REGNO (pic_offset_table_rtx)
+          && REGNO (pic_offset_table_rtx) >= FIRST_PSEUDO_REGISTER))
+      ) {
+      // find_reg_note(insn->rtl(), REG_UNUSED, def->regno())
+      return true;
+    } */
   }
 
   return is_rtx_insn_prelive(rtl);
 }
 
 static void
-rtl_ssa_dce_mark_live(insn_info *info, vec<insn_info *> &worklist, std::unordered_set<insn_info *> &marked)
+rtl_ssa_dce_mark_prelive(insn_info *info, vec<insn_info *> &worklist, 
+      std::unordered_set<insn_info *> &marked)
 {
-  int info_uid = info->uid();
   if (dump_file)
-    fprintf(dump_file, "  Adding insn %d to worklist\n", info_uid);
+    fprintf(dump_file, "Insn %d is prelive\n", info->uid());
 
   marked.emplace(info);
   worklist.safe_push(info);
@@ -1601,17 +1496,10 @@ rtl_ssa_dce_mark_live(insn_info *info, vec<insn_info *> &worklist, std::unordere
 static auto_vec<insn_info *>
 rtl_ssa_dce_prelive(std::unordered_set<insn_info *> &marked)
 {
-  insn_info *next;
   auto_vec<insn_info *> worklist;
-  for (insn_info *insn = crtl->ssa->first_insn(); insn; insn = next)
-  {
-    next = insn->next_any_insn();
+  for (insn_info * insn : crtl->ssa->all_insns()) {
     if (is_prelive(insn))
-      {
-        rtl_ssa_dce_mark_live(insn, worklist, marked);
-      }
-
-    // Might help to fix -DPREVENT_OPTIMIZATION? (insn->can_be_optimized () || insn->is_debug_insn ())
+      rtl_ssa_dce_mark_prelive(insn, worklist, marked);
   }
 
   return worklist;
@@ -1621,85 +1509,77 @@ static std::unordered_set<insn_info *>
 rtl_ssa_dce_mark()
 {
   std::unordered_set<insn_info *> marked{};
-  // phi insn might have more that one phi node: gcc/gcc/testsuite/gcc.c-torture/execute/20000224-1.c
+  /* Phi insn might have more that one phi node: gcc/gcc/testsuite/gcc.c-torture/execute/20000224-1.c */
   std::unordered_set<phi_info *> marked_phi_nodes{};
-  // Phi will not be prelive
   auto prelive_insns = rtl_ssa_dce_prelive(marked);
+  /* Extract uses from prelive insns to worklist */
   auto_vec<set_info *> worklist{};
   for (insn_info * insn : prelive_insns) {
     for (auto&& use : insn->uses()) {
       set_info* set = use->def();
-      if (set) {
+      if (set)
         worklist.safe_push(set);
-      }
     }
   }
 
   while (!worklist.is_empty()) {
     set_info* set = worklist.pop();
     insn_info* insn = set->insn();
-    if (!insn) {
+    if (!insn)
       continue;
-    }
 
-    /*
-     * TODO : a phi insn might be visited more times due to having more phi nodes
-     * Either we have to mark phi nodes or do not mark phi insn
-    */
-
+    /* A phi insn might be visited more times because of having more phi nodes
+       The phi insn is never marked, only phi nodes (phi_info) */
     auto uid = insn->uid();
-    if ((marked.count(insn) > 0) && !insn->is_phi()) {
+    if ((marked.count(insn) > 0) && !insn->is_phi())
       continue;
-    }
 
     marked.emplace(insn);
 
     use_array uses = insn->uses();
     if (insn->is_phi()) {
-      // Each phi node has a unique uid, yeeey
-      // So, only one bitmap (with shift) in needed.
+      /* Each phi node has a unique uid, so only one bitmap (with shift) in
+         might be used. */
       phi_info* pi = as_a<phi_info *> (set);
       auto pi_uid = pi->uid();
-      if (marked_phi_nodes.count(pi) > 0) {
+      if (marked_phi_nodes.count(pi) > 0)
         continue;
-      }
+
       marked_phi_nodes.emplace(pi);
       uses = pi->inputs();
     }
 
     if (dump_file)
-      fprintf(dump_file, "  Adding insn %d to worklist - mark\n", insn->uid());
+      fprintf(dump_file, "Adding insn %d to worklist\n", insn->uid());
     
     for (use_info * use : uses) {
       set_info* parent_set = use->def();
-      if (!parent_set) {
+      if (!parent_set)
         continue;
-      }
 
       worklist.safe_push(parent_set);
     }
   }
 
-  // TODO : control dependence
   return marked;
 }
 
 static void
 rtl_ssa_dce_sweep(std::unordered_set<insn_info *> marked)
 {
-  // we can get the number of items in the set and create an array of changes
-  // which will hopefully have constructor for array_slice<insn_info *>
+  /* We can get the number of items in the `marked` set and create an array
+     of changes with appropriate size */
   auto_vec<insn_change> to_delete;
   for (insn_info * insn : crtl->ssa->all_insns()) {
-    // artificial and marked insns cannot be deleted
+    /* artificial and marked insns cannot be deleted */
     if (insn->is_artificial() || marked.count(insn) > 0)
       continue;
 
     auto change = insn_change::delete_insn(insn);
     to_delete.safe_push(change);
     if (dump_file)
-      fprintf(dump_file, "  Sweeping insn %d\n", insn->uid());
-    // crtl->ssa->change_insn(change);
+      fprintf(dump_file, "Sweeping insn %d\n", insn->uid());
+    /* crtl->ssa->change_insn(change); */
   }
 
   auto attempt = crtl->ssa->new_change_attempt ();
@@ -1709,19 +1589,21 @@ rtl_ssa_dce_sweep(std::unordered_set<insn_info *> marked)
   }
 
   gcc_assert (crtl->ssa->verify_insn_changes(changes));
-    // segfault: gcc.c-torture/execute/20000224-1.c
+  /* segfault: gcc.c-torture/execute/20000224-1.c */
   crtl->ssa->change_insns(changes);
 }
 
+// WIP
 static void
 rtl_ssa_dce_transform_insns_to_debug() {
   std::unordered_set<int> is_debug;
-  // TODO : make sure, that phi_nodes have unique id from all insns
   // Should we use ssa when modifing insns? if yes, we want in-place replace
 
-  // chceme prochazet v post orderu, abychom nejdrive zpracovali zavislosti a pak az definici
-  // nelze jen menit instrukce, protoze musime informaci propagovat pres phi node
-  // We check, if insns that use a definition from current insn are all debug
+  /* chceme prochazet v post orderu, abychom nejdrive zpracovali zavislosti
+     a pak az definici nelze jen menit instrukce, protoze musime informaci
+     propagovat pres phi node */
+  /* We check, whether all insns that use a definition from the current insn
+     are only debug insns */
   for (insn_info * insn : crtl->ssa->reverse_all_insns()) {
     if (insn->is_debug_insn()) { // phi is never debug
         // TODO : store info about this insn
@@ -1803,36 +1685,36 @@ rtl_ssa_dce_done()
 
   delete crtl->ssa;
   crtl->ssa = nullptr;
-
-  if (dump_file)
-    fprintf(dump_file, "\nFinished running rtl_ssa_dce\n\n");
 }
 
 static unsigned int
 rtl_ssa_dce()
 {
-  // for (int i = 0; i < FIRST_VIRTUAL_REGISTER; ++i) {
-  //   if (global_regs[i] > 0)
-  //     std::cerr << "Global reg needed: " << i << '\n';
-  //   if (fixed_regs[i] > 0) 
-  //     std::cerr << "Fixed reg: " << i << '\n';
-  // }
-  // std::cerr << "RTL SSA BEGIN\n" << std::endl;
   rtl_ssa_dce_init();
   std::unordered_set<insn_info *> marked = rtl_ssa_dce_mark();
   rtl_ssa_dce_sweep(marked);
-  std::cerr << "\033[31m" << "SSA debug start" << "\033[0m" << "\n";
-  debug (crtl->ssa);
-  for (insn_info * insn : crtl->ssa->all_insns()) {
-    if (insn->is_artificial())
-      continue;
-    debug(insn->rtl());
-  }
-  std::cerr << "\033[31m" << "SSA debug end" << "\033[0m" << "\n";
-  rtl_ssa_dce_done();
-  // if (delete_trivially_dead_insns(get_insns (), max_reg_num ())) {
-  //   std::cerr << "\033[31m" << "rtl_ssa_dce did not delete everything :(" << "\033[0m" << "\n";
+  // std::cerr << "\033[31m" << "SSA debug start" << "\033[0m" << "\n";
+  // debug (crtl->ssa);
+  // for (insn_info * insn : crtl->ssa->all_insns()) {
+  //   if (insn->is_artificial())
+  //     continue;
+  //   debug(insn->rtl());
   // }
+  // std::cerr << "\033[31m" << "SSA debug end" << "\033[0m" << "\n";
+  rtl_ssa_dce_done();
+
+  /* We need to perform some kind of reset_unmarked_insns_debug_uses
+     to be able to reproduce ud_dce - now only 4 tests are falling
+     because of debug_insn being dependent on parallel with set flags 
+     - gcc.c-torture/execute/20051215-1.c
+     - gcc.c-torture/execute/20100805-1.c
+     - gcc.c-torture/execute/pr39339.c
+     - gcc.c-torture/execute/pr47925.c */
+
+  /*
+  if (delete_trivially_dead_insns(get_insns (), max_reg_num ())) {
+    std::cerr << "\033[31m" << "rtl_ssa_dce did not delete everything :(" << "\033[0m" << "\n";
+  } */
 
   return 0;
 }
@@ -1872,7 +1754,7 @@ namespace
 
     unsigned int execute(function *) final override { return rtl_ssa_dce(); }
 
-  }; // class pass_fast_rtl_dce
+  }; // class pass_rtl_ssa_dce
 
 } // namespace
 
