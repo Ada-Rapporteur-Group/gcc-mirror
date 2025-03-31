@@ -1362,21 +1362,21 @@ bool is_rtx_prelive(const_rtx insn) {
 bool is_rtx_insn_prelive(rtx_insn *insn) {
   gcc_assert(insn != nullptr);
 
-  if (!NONJUMP_INSN_P (insn))
-    /* This handles jumps, debug_insns, call_insn, ... */
-    return true;
-
   if (CALL_P (insn)
-      /* We cannot delete pure or const sibling calls because it is
-	       hard to see the result.  */
-      && (!SIBLING_CALL_P (insn))
-      /* We can delete dead const or pure calls as long as they do not
-         infinite loop.  */
-      && (RTL_CONST_OR_PURE_CALL_P (insn) && !RTL_LOOPING_CONST_OR_PURE_CALL_P (insn))
-      /* Don't delete calls that may throw if we cannot do so.  */
-      && can_delete_call (insn))
+    /* We cannot delete pure or const sibling calls because it is
+      hard to see the result.  */
+    && (!SIBLING_CALL_P (insn))
+    /* We can delete dead const or pure calls as long as they do not
+      infinite loop.  */
+    && (RTL_CONST_OR_PURE_CALL_P (insn) && !RTL_LOOPING_CONST_OR_PURE_CALL_P (insn))
+    /* Don't delete calls that may throw if we cannot do so.  */
+    && can_delete_call (insn))
+  return false;
+  // return !find_call_stack_args (as_a <rtx_call_insn *> (insn), false, fast, arg_stores);
+
+  if (!NONJUMP_INSN_P (insn))
+    /* This handles jumps, notes, call_insns, debug_insns, ... */
     return true;
-    // return !find_call_stack_args (as_a <rtx_call_insn *> (insn), false, fast, arg_stores);
 
   /* Only rtx_insn should be handled here */
   gcc_assert(GET_CODE(insn) == INSN);
@@ -1571,7 +1571,9 @@ rtl_ssa_dce_sweep(std::unordered_set<insn_info *> marked)
      of changes with appropriate size */
   auto_vec<insn_change> to_delete;
   for (insn_info * insn : crtl->ssa->all_insns()) {
-    /* artificial and marked insns cannot be deleted */
+    /* Artificial and marked insns cannot be deleted.
+       There is a slight problem with phis, because we might want to delete
+       some phi nodes from phi insn. */
     if (insn->is_artificial() || marked.count(insn) > 0)
       continue;
 
