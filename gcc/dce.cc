@@ -1538,6 +1538,14 @@ bool is_prelive(insn_info *insn)
     if (def->kind() != access_kind::SET)
       continue;
 
+    // We need to perform some kind of reset_unmarked_insns_debug_uses
+    // to be able to reproduce ud_dce - now only 4 tests are falling
+    // because of debug_insn being dependent on parallel with set flags 
+    // gcc.c-torture/execute/20051215-1.c
+    // gcc.c-torture/execute/20100805-1.c
+    // gcc.c-torture/execute/pr39339.c
+    // gcc.c-torture/execute/pr47925.c
+
     // This might be messed up a bit
     if (def->regno() == FRAME_POINTER_REGNUM
         || def->regno() == STACK_POINTER_REGNUM)
@@ -1813,14 +1821,14 @@ rtl_ssa_dce()
   rtl_ssa_dce_init();
   std::unordered_set<insn_info *> marked = rtl_ssa_dce_mark();
   rtl_ssa_dce_sweep(marked);
-  // std::cerr << "\033[31m" << "SSA debug start" << "\033[0m" << "\n";
-  // debug (crtl->ssa);
-  // for (insn_info * insn : crtl->ssa->all_insns()) {
-  //   if (insn->is_artificial())
-  //     continue;
-  //   debug(insn->rtl());
-  // }
-  // std::cerr << "\033[31m" << "SSA debug end" << "\033[0m" << "\n";
+  std::cerr << "\033[31m" << "SSA debug start" << "\033[0m" << "\n";
+  debug (crtl->ssa);
+  for (insn_info * insn : crtl->ssa->all_insns()) {
+    if (insn->is_artificial())
+      continue;
+    debug(insn->rtl());
+  }
+  std::cerr << "\033[31m" << "SSA debug end" << "\033[0m" << "\n";
   rtl_ssa_dce_done();
   // if (delete_trivially_dead_insns(get_insns (), max_reg_num ())) {
   //   std::cerr << "\033[31m" << "rtl_ssa_dce did not delete everything :(" << "\033[0m" << "\n";
