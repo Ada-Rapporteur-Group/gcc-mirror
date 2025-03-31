@@ -1212,7 +1212,8 @@ cgraph_edge::get_callback_parent_edge ()
   cgraph_edge *e;
   for (e = caller->callees; e; e = e->next_callee)
     {
-      if (e->has_callback && e->call_stmt == call_stmt)
+      if (e->has_callback && e->call_stmt == call_stmt
+	  && e->lto_stmt_uid == lto_stmt_uid)
 	break;
     }
   return e;
@@ -1225,7 +1226,8 @@ cgraph_edge::first_callback_target ()
   cgraph_edge *e = NULL;
   for (e = caller->callees; e; e = e->next_callee)
     {
-      if (e->callback && e->call_stmt == call_stmt)
+      if (e->callback && e->call_stmt == call_stmt
+	  && e->lto_stmt_uid == lto_stmt_uid)
 	{
 	  break;
 	}
@@ -1240,7 +1242,8 @@ cgraph_edge::next_callback_target ()
   cgraph_edge *e = NULL;
   for (e = next_callee; e; e = e->next_callee)
     {
-      if (e->callback && e->call_stmt == call_stmt)
+      if (e->callback && e->call_stmt == call_stmt
+	  && e->lto_stmt_uid == lto_stmt_uid)
 	{
 	  break;
 	}
@@ -4099,16 +4102,16 @@ cgraph_node::verify_node (void)
 		;
 	      for (cgraph_edge *cbe = callees; cbe; cbe = cbe->next_callee)
 		{
-		  if (cbe->callback && cbe->call_stmt == e->call_stmt) {
-
-		    nfound_edges++;
-
-		      }
+		  if (cbe->callback && cbe->call_stmt == e->call_stmt
+		      && cbe->lto_stmt_uid == e->lto_stmt_uid)
+		    {
+		      nfound_edges++;
+		    }
 		  else if (cbe->callback) {
 		    fprintf (stderr, "sus verify %s -> %s\n",
 			     cbe->caller->name (), cbe->callee->name ());
 		      }
-	}
+		}
 	      if (ncallbacks != nfound_edges)
 		{
 		  error ("callback edge %s->%s child edge count mismatch, "

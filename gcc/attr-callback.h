@@ -86,18 +86,13 @@ callback_get_arg_mapping (tree decl)
   return res;
 }
 
-/* Given a call statement of the parent, it's attribute list and
-   a decl of the callback, returns a 0-based index of the callback
-   function in the parameters of it's caller function. Arguments
-   are extracted from the call statement. If kernel_decl is a decl
-   of a clone, it's parent decl will be considered as well. */
-inline int
-callback_fetch_fn_position (gcall *call, tree attr_list, tree kernel_decl)
+inline tree
+callback_fetch_attr_by_decl(gcall *call, tree attr_list, tree kernel_decl)
 {
   tree original_decl = DECL_ORIGIN (kernel_decl);
   tree cb_attr = lookup_attribute ("callback", attr_list);
   gcc_checking_assert (cb_attr);
-  int res = -1;
+  tree res = NULL_TREE;
   for (; cb_attr; cb_attr = lookup_attribute ("callback", TREE_CHAIN (cb_attr)))
     {
       int idx = callback_get_fn_index (cb_attr);
@@ -108,13 +103,25 @@ callback_fetch_fn_position (gcall *call, tree attr_list, tree kernel_decl)
 	  if (pointee != NULL_TREE
 	      && (pointee == kernel_decl || pointee == original_decl))
 	    {
-	      res = idx;
+	      res = cb_attr;
 	      break;
 	    }
 	}
     }
-  gcc_checking_assert (res != -1);
+  gcc_checking_assert (res != NULL_TREE);
   return res;
+}
+
+/* Given a call statement of the parent, it's attribute list and
+   a decl of the callback, returns a 0-based index of the callback
+   function in the parameters of it's caller function. Arguments
+   are extracted from the call statement. If kernel_decl is a decl
+   of a clone, it's parent decl will be considered as well. */
+inline int
+callback_fetch_fn_position (gcall *call, tree attr_list, tree kernel_decl)
+{
+  tree attr = callback_fetch_attr_by_decl(call, attr_list, kernel_decl);
+  return callback_get_fn_index(attr);
 }
 
 /* Returns the element at index idx in the list or NULL_TREE if
@@ -279,6 +286,37 @@ callback_edge_useful_p (cgraph_edge *e)
   if (!e->callee->clone_of)
     return false;
   return true;
+}
+
+inline void
+callback_remove_callback_edge (cgraph_edge *e)
+{
+  gcc_checking_assert (e->callback);
+  cgraph_edge *parent = e->get_callback_parent_edge ();
+  tree offload_decl = parent->callee->decl;
+  if (parent->call_stmt)
+    {
+      tree attr = callback_fetch_attr_by_decl (parent->call_stmt,
+					       DECL_ATTRIBUTES (offload_decl),
+					       e->callee->decl);
+
+      tree *p;
+      tree list = DECL_ATTRIBUTES (offload_decl);
+      for (p = &list; *p;)
+	{
+	  tree l = *p;
+
+	  if (l == attr)
+	    {
+	      *p = TREE_CHAIN (l);
+	      continue;
+	    }
+	  p = &TREE_CHAIN (l);
+	}
+
+      DECL_ATTRIBUTES (offload_decl) = list;
+    }
+  cgraph_edge::remove (e);
 }
 
 #endif /* ATTR_CALLBACK_H  */

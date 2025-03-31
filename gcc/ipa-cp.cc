@@ -6229,26 +6229,33 @@ purge_useless_callback_edges ()
 				     DECL_ATTRIBUTES (e->callee->decl)))
 		{
 		  if (dump_file)
-		    fprintf (dump_file,
-			     "\t\tPurging children, because the offloading "
-			     "function no longer has any callback attributes.\n");
+		    fprintf (
+		      dump_file,
+		      "\t\tPurging children, because the offloading "
+		      "function no longer has any callback attributes.\n");
 		  e->purge_callback_children ();
 		  continue;
 		}
-		    cgraph_edge *cbe, *next;
-		    for (cbe = e->first_callback_target(); cbe; cbe = next) {
-          next = cbe->next_callback_target();
-          if (!callback_edge_useful_p(cbe)) {
-            if (dump_file)
-              fprintf(dump_file, "\t\tCallback edge %s -> %s not deemed useful, removing.\n", cbe->caller->name(), cbe->callee->name());
-            cgraph_edge::remove(cbe);
-          }
+	      cgraph_edge *cbe, *next;
+	      for (cbe = e->first_callback_target (); cbe; cbe = next)
+		{
+		  next = cbe->next_callback_target ();
+		  if (!callback_edge_useful_p (cbe))
+		    {
+		      if (dump_file)
+			fprintf (dump_file,
+				 "\t\tCallback edge %s -> %s not deemed "
+				 "useful, removing.\n",
+				 cbe->caller->name (), cbe->callee->name ());
+		      callback_remove_callback_edge (cbe);
 		    }
+		}
 	    }
 	}
     }
+
   if (dump_file)
-    fprintf(dump_file, "\n");
+    fprintf (dump_file, "\n");
 }
 
 /* The decision stage.  Iterate over the topological order of call graph nodes
@@ -6281,8 +6288,7 @@ ipcp_decision_stage (class ipa_topo_info *topo)
       if (change)
 	identify_dead_nodes (node);
     }
-  if (0)
-  purge_useless_callback_edges();
+    purge_useless_callback_edges();
 }
 
 /* Look up all VR and bits information that we have discovered and copy it

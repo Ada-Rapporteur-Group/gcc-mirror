@@ -3117,6 +3117,8 @@ analyze_function_body (struct cgraph_node *node, bool early)
 			continue;
 		      es2 = ipa_call_summaries->get_create (child);
 		      ipa_call_summaries->duplicate (edge, child, es, es2);
+		      es2->call_stmt_size = 0;
+		      es2->call_stmt_time = 0;
 		    }
 		}
 	    }
