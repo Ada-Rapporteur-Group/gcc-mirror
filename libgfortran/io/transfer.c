@@ -4929,7 +4929,7 @@ export_proto(st_set_nml_var_dim);
 
 void
 st_set_nml_var_dim (st_parameter_dt *dtp, GFC_INTEGER_4 n_dim,
-		    index_type stride, index_type lbound,
+		    index_type spacing, index_type lbound,
 		    index_type ubound)
 {
   namelist_info *nml;
@@ -4939,7 +4939,7 @@ st_set_nml_var_dim (st_parameter_dt *dtp, GFC_INTEGER_4 n_dim,
 
   for (nml = dtp->u.p.ionml; nml->next; nml = nml->next);
 
-  GFC_DIMENSION_SET(nml->dim[n],lbound,ubound,stride);
+  GFC_DIMENSION_SET(nml->dim[n],lbound,ubound,spacing);
 }
 
 
