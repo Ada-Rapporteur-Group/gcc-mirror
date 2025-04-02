@@ -1416,7 +1416,7 @@ bool is_rtx_insn_prelive(rtx_insn *insn) {
 bool is_prelive(insn_info *insn)
 {
   /* Phi insns are never prelive, bb head + end also are artificial */
-  if (insn->is_artificial())
+  if (insn->is_artificial() || insn->is_debug_insn())
     return false;
 
   gcc_assert (insn->is_real());
@@ -1574,7 +1574,7 @@ rtl_ssa_dce_sweep(std::unordered_set<insn_info *> marked)
     /* Artificial and marked insns cannot be deleted.
        There is a slight problem with phis, because we might want to delete
        some phi nodes from phi insn. */
-    if (insn->is_artificial() || marked.count(insn) > 0)
+    if (insn->is_artificial() || insn->is_debug_insn() || marked.count(insn) > 0)
       continue;
 
     auto change = insn_change::delete_insn(insn);
