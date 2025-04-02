@@ -168,9 +168,24 @@ handle_callback_attribute (tree *node, tree name, tree args,
     }
   /* We have to use the function type for validation, as
      DECL_ARGUMENTS returns NULL at this point. */
-  unsigned callback_fn_idx = TREE_INT_CST_LOW (cb_fn_idx_node) - 1;
+  unsigned callback_fn_idx = TREE_INT_CST_LOW (cb_fn_idx_node);
   tree decl_type_args = TYPE_ARG_TYPES (TREE_TYPE (decl));
+  tree it;
   unsigned decl_nargs = list_length (decl_type_args);
+  for (it = decl_type_args; it != NULL_TREE; it = TREE_CHAIN (it))
+    if (it == void_list_node)
+      {
+	--decl_nargs;
+	break;
+      }
+  if (callback_fn_idx == CB_UNKNOWN_POS)
+    {
+      error_at (DECL_SOURCE_LOCATION (decl),
+		"callback function position cannot be marked as unknown");
+      *no_add_attrs = true;
+      return NULL_TREE;
+    }
+  --callback_fn_idx;
   if (callback_fn_idx >= decl_nargs)
     {
       error_at (DECL_SOURCE_LOCATION (decl),
@@ -195,12 +210,11 @@ handle_callback_attribute (tree *node, tree name, tree args,
     {
       error_at (DECL_SOURCE_LOCATION (decl),
 		"argument no. %d is not an address of a function",
-		callback_fn_idx);
+		callback_fn_idx + 1);
       *no_add_attrs = true;
       return NULL_TREE;
     }
 
-  tree it;
   tree type_args = TYPE_ARG_TYPES (cfn_pointee_type);
   /* Compare the length of the list of argument indices
      and the real number of parameters the callback takes. */
@@ -268,7 +282,7 @@ handle_callback_attribute (tree *node, tree name, tree args,
 	  error_at (DECL_SOURCE_LOCATION (decl),
 		    "argument type at index %d is not compatible with callback "
 		    "argument type at index %d",
-		    curr, arg_idx);
+		    arg_idx + 1, curr + 1);
 	  *no_add_attrs = true;
 	  continue;
 	}
