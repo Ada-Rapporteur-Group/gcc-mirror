@@ -851,19 +851,22 @@ cgraph_edge::set_call_stmt (cgraph_edge *e, gcall *new_stmt,
       cgraph_edge *current, *next;
 
       current = e->first_callback_target ();
-      gcall *old_stmt = current->call_stmt;
-      for (cgraph_edge *d = current; d; d = next)
+      if (current)
 	{
-	  next = d->next_callee;
-	  for (; next; next = next->next_callee)
+	  gcall *old_stmt = current->call_stmt;
+	  for (cgraph_edge *d = current; d; d = next)
 	    {
-	      /* has_callback doesn't need to checked, as their
-		 call statements wouldn't match */
-	      if (next->callback && old_stmt == next->call_stmt)
-		break;
+	      next = d->next_callee;
+	      for (; next; next = next->next_callee)
+		{
+		  /* has_callback doesn't need to checked, as their
+		     call statements wouldn't match */
+		  if (next->callback && old_stmt == next->call_stmt)
+		    break;
+		}
+	      cgraph_edge *d2 = set_call_stmt (d, new_stmt, false);
+	      gcc_assert (d2 == d);
 	    }
-	  cgraph_edge *d2 = set_call_stmt (d, new_stmt, false);
-	  gcc_assert (d2 == d);
 	}
     }
 
@@ -3824,6 +3827,7 @@ cgraph_node::verify_node (void)
 	  && !e->caller->inlined_to
 	  && !e->speculative
 	  && !e->callback
+	  && !e->has_callback
 	  /* Optimized out calls are redirected to __builtin_unreachable.  */
 	  && (e->count.nonzero_p ()
 	      || ! e->callee->decl
@@ -4107,15 +4111,11 @@ cgraph_node::verify_node (void)
 		    {
 		      nfound_edges++;
 		    }
-		  else if (cbe->callback) {
-		    fprintf (stderr, "sus verify %s -> %s\n",
-			     cbe->caller->name (), cbe->callee->name ());
-		      }
 		}
-	      if (ncallbacks != nfound_edges)
+	      if (ncallbacks < nfound_edges)
 		{
 		  error ("callback edge %s->%s child edge count mismatch, "
-			 "expected %d, found %d",
+			 "expected at most %d, found %d",
 			 identifier_to_locale (e->caller->name ()),
 			 identifier_to_locale (e->callee->name ()), ncallbacks,
 			 nfound_edges);

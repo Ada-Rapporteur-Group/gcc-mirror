@@ -800,12 +800,17 @@ inline_transform (struct cgraph_node *node)
       next = e->next_callee;
       if (e->has_callback)
 	{
+	  /* Call statement might change, so we must set it to all child edges
+	     as well, otherwise their pairing would fall apart. */
 	  gcall *old_stmt = e->call_stmt;
 	  cgraph_edge *cbe;
 	  cgraph_edge::redirect_call_stmt_to_callee (e);
 	  for (cbe = node->callees; cbe; cbe = cbe->next_callee)
 	    if (cbe->callback && cbe->call_stmt == old_stmt)
-	      cgraph_edge::set_call_stmt (cbe, e->call_stmt, false);
+	      {
+		cgraph_edge::set_call_stmt (cbe, e->call_stmt, false);
+		cgraph_edge::redirect_call_stmt_to_callee (cbe);
+	      }
 	}
       else
 	cgraph_edge::redirect_call_stmt_to_callee (e);

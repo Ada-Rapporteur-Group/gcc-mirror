@@ -987,7 +987,8 @@ ipa_call_summary_t::duplicate (struct cgraph_edge *src,
   info->predicate = NULL;
   edge_set_predicate (dst, srcinfo->predicate);
   info->param = srcinfo->param.copy ();
-  if (!dst->indirect_unknown_callee && src->indirect_unknown_callee)
+  if (!dst->indirect_unknown_callee && src->indirect_unknown_callee
+      && !src->has_callback && !dst->callback)
     {
       info->call_stmt_size -= (eni_size_weights.indirect_call_cost
 			       - eni_size_weights.call_cost);

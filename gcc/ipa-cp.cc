@@ -6247,7 +6247,15 @@ purge_useless_callback_edges ()
 				 "\t\tCallback edge %s -> %s not deemed "
 				 "useful, removing.\n",
 				 cbe->caller->name (), cbe->callee->name ());
-		      callback_remove_callback_edge (cbe);
+		      cgraph_edge::remove (cbe);
+		    }
+		  else
+		    {
+		      if (dump_file)
+			fprintf (dump_file,
+				 "\t\tNot considering callback edge %s -> %s "
+				 "for deletion.\n",
+				 cbe->caller->name (), cbe->callee->name ());
 		    }
 		}
 	    }

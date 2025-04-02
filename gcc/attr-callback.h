@@ -288,35 +288,4 @@ callback_edge_useful_p (cgraph_edge *e)
   return true;
 }
 
-inline void
-callback_remove_callback_edge (cgraph_edge *e)
-{
-  gcc_checking_assert (e->callback);
-  cgraph_edge *parent = e->get_callback_parent_edge ();
-  tree offload_decl = parent->callee->decl;
-  if (parent->call_stmt)
-    {
-      tree attr = callback_fetch_attr_by_decl (parent->call_stmt,
-					       DECL_ATTRIBUTES (offload_decl),
-					       e->callee->decl);
-
-      tree *p;
-      tree list = DECL_ATTRIBUTES (offload_decl);
-      for (p = &list; *p;)
-	{
-	  tree l = *p;
-
-	  if (l == attr)
-	    {
-	      *p = TREE_CHAIN (l);
-	      continue;
-	    }
-	  p = &TREE_CHAIN (l);
-	}
-
-      DECL_ATTRIBUTES (offload_decl) = list;
-    }
-  cgraph_edge::remove (e);
-}
-
 #endif /* ATTR_CALLBACK_H  */

@@ -3045,8 +3045,16 @@ redirect_all_calls (copy_body_data * id, basic_block bb)
 	    {
 	      if (!id->killed_new_ssa_names)
 		id->killed_new_ssa_names = new hash_set<tree> (16);
-	      cgraph_edge::redirect_call_stmt_to_callee (edge,
-		id->killed_new_ssa_names);
+	      cgraph_edge::redirect_call_stmt_to_callee (
+		edge, id->killed_new_ssa_names);
+	      if (edge->has_callback)
+		{
+		  cgraph_edge *cbe;
+		  for (cbe = edge->first_callback_target (); cbe;
+		       cbe = cbe->next_callback_target ())
+		    cgraph_edge::redirect_call_stmt_to_callee (
+		      cbe, id->killed_new_ssa_names);
+		}
 
 	      if (stmt == last && id->call_stmt && maybe_clean_eh_stmt (stmt))
 		gimple_purge_dead_eh_edges (bb);
