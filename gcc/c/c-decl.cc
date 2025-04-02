@@ -2119,8 +2119,8 @@ maybe_mark_function_versioned (tree decl)
    TREE_TYPE (NEWDECL, OLDDECL) respectively.  */
 
 static bool
-diagnose_mismatched_decls (tree newdecl, tree olddecl,
-			   tree *newtypep, tree *oldtypep)
+diagnose_mismatched_decls (tree newdecl, tree olddecl, tree *newtypep,
+			   tree *oldtypep, string_slice *conflicting_ver = NULL)
 {
   tree newtype, oldtype;
   bool retval = true;
@@ -2448,7 +2448,12 @@ diagnose_mismatched_decls (tree newdecl, tree olddecl,
 						DECL_ATTRIBUTES (newdecl)))))
 		{
 		  auto_diagnostic_group d;
-		  error ("redefinition of %q+D", newdecl);
+		  if (conflicting_ver && conflicting_ver->is_valid ())
+		    error ("redefinition of %qB version for %q+D",
+			   conflicting_ver,
+			   newdecl);
+		  else
+		    error ("redefinition of %q+D", newdecl);
 		  locate_old_decl (olddecl);
 		  return false;
 		}
@@ -3188,20 +3193,29 @@ merge_decls (tree newdecl, tree olddecl, tree newtype, tree oldtype)
    true.  Otherwise, return false.  */
 
 static bool
-duplicate_decls (tree newdecl, tree olddecl)
+duplicate_decls (tree newdecl, tree olddecl,
+		 string_slice *conflicting_ver = NULL)
 {
   tree newtype = NULL, oldtype = NULL;
 
   if (!TARGET_HAS_FMV_TARGET_ATTRIBUTE
+      && TREE_CODE (olddecl) == FUNCTION_DECL
+      && TREE_CODE (newdecl) == FUNCTION_DECL
       && !mergeable_version_decls (olddecl, newdecl))
     {
       auto_diagnostic_group d;
-      error ("conflicting versioned declarations of %q+D", newdecl);
+      if (conflicting_ver && conflicting_ver->is_valid ())
+	error ("conflicting %qB version declarations of %q+D",
+	       conflicting_ver,
+	       newdecl);
+      else
+	error ("conflicting versioned declarations of %q+D", newdecl);
       locate_old_decl (olddecl);
       return false;
     }
 
-  if (!diagnose_mismatched_decls (newdecl, olddecl, &newtype, &oldtype))
+  if (!diagnose_mismatched_decls (newdecl, olddecl, &newtype, &oldtype,
+				  conflicting_ver))
     {
       /* Avoid `unused variable' and other warnings for OLDDECL.  */
       suppress_warning (olddecl, OPT_Wunused);
@@ -3388,6 +3402,7 @@ pushdecl (tree x)
       tree type = TREE_TYPE (x);
       tree visdecl = b->decl;
       tree vistype = TREE_TYPE (visdecl);
+      string_slice conflicting_version = string_slice::invalid ();
       if (TREE_CODE (TREE_TYPE (x)) == ARRAY_TYPE
 	  && COMPLETE_TYPE_P (TREE_TYPE (x)))
 	b->inner_comp = false;
@@ -3413,7 +3428,7 @@ pushdecl (tree x)
       if (b_use && TREE_CODE (b_use->decl) == FUNCTION_DECL
 	  && TREE_CODE (x) == FUNCTION_DECL && DECL_FILE_SCOPE_P (b_use->decl)
 	  && DECL_FILE_SCOPE_P (x)
-	  && distinct_version_decls (x, b_use->decl)
+	  && distinct_version_decls (x, b_use->decl, &conflicting_version)
 	  && comptypes (vistype, type) != 0)
 	{
 	  if (current_scope->depth != b->depth)
@@ -3432,11 +3447,13 @@ pushdecl (tree x)
 	     in the set.  */
 	  cgraph_function_version_info *version = b_v;
 	  for (; version; version = version->next)
-	    if (!distinct_version_decls (version->this_node->decl, x))
+	    if (!distinct_version_decls (version->this_node->decl, x,
+					 &conflicting_version))
 	      {
 		/* The decls define overlapping version, so attempt to merge
 		   or diagnose the conflict.  */
-		if (duplicate_decls (x, version->this_node->decl))
+		if (duplicate_decls (x, version->this_node->decl,
+				     &conflicting_version))
 		  return version->this_node->decl;
 		else
 		  return error_mark_node;
@@ -3458,7 +3475,7 @@ pushdecl (tree x)
 	  return x;
 	}
 
-      if (duplicate_decls (x, b_use->decl))
+      if (duplicate_decls (x, b_use->decl, &conflicting_version))
 	{
 	  if (b_use != b)
 	    {
