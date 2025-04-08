@@ -1421,42 +1421,24 @@ bool is_prelive(insn_info *insn)
   gcc_assert (insn->is_real());
   auto rtl = insn->rtl();
 
-  /* I guess that a lot of conditions bellow are captured by artificial uses
-     of bb head and end insns. */
   for (def_info * def : insn->defs()) {
     /* The purpose of this pass is not to eliminate stores to memory... */
     if (def->is_mem())
-      // TODO : clobbered memory?
       return true;
 
     gcc_assert(def->is_reg());
-    /* this ignores clobbers, which is probably fine */
 
     /* gcc.c-torture/execute/20000503-1.c - flags register is unused. Not all
        hard registers should be marked... */
+       
+    /* this ignores clobbers, which is probably fine */
     if (def->kind() != access_kind::SET)
       continue;
-
-    /* This might be messed up a bit */
-    // if (def->regno() == FRAME_POINTER_REGNUM
-    //     || def->regno() == STACK_POINTER_REGNUM)
-    //   return true;
 
     /* needed by gcc.c-torture/execute/pr51447.c */
     if (HARD_REGISTER_NUM_P (def->regno())
         && global_regs[def->regno()])
-        // { std::cout << "marked global reg: " << def->regno() << " in " << insn->uid() << '\n';
-          return true;
-        // }
-
-    // if (!HARD_FRAME_POINTER_IS_FRAME_POINTER
-    //     && def->regno() == HARD_FRAME_POINTER_REGNUM)
-    //   return true;
-
-    // if (FRAME_POINTER_REGNUM != ARG_POINTER_REGNUM
-    //     && fixed_regs[ARG_POINTER_REGNUM]
-    //     && def->regno() == ARG_POINTER_REGNUM)
-    //   return true;
+        return true;
 
     unsigned int picreg = PIC_OFFSET_TABLE_REGNUM;
     if (picreg != INVALID_REGNUM
@@ -1469,20 +1451,24 @@ bool is_prelive(insn_info *insn)
 }
 
 static void
-rtl_ssa_dce_mark_prelive_insn(insn_info *info, vec<insn_info *> &worklist, 
+rtl_ssa_dce_mark_prelive_insn(insn_info *insn, auto_vec<set_info *> &worklist, 
       std::unordered_set<insn_info *> &marked)
 {
   if (dump_file)
-    fprintf(dump_file, "Insn %d is prelive\n", info->uid());
+    fprintf(dump_file, "Insn %d marked as prelive\n", insn->uid());
 
-  marked.emplace(info);
-  worklist.safe_push(info);
+  marked.emplace(insn);
+  for (use_info *use : insn->uses()) {
+    set_info* set = use->def();
+    if (set)
+      worklist.safe_push(set);
+  }
 }
 
-static auto_vec<insn_info *>
+static auto_vec<set_info *>
 rtl_ssa_dce_mark_prelive(std::unordered_set<insn_info *> &marked)
 {
-  auto_vec<insn_info *> worklist;
+  auto_vec<set_info *> worklist;
   for (insn_info * insn : crtl->ssa->all_insns()) {
     if (is_prelive(insn))
       rtl_ssa_dce_mark_prelive_insn(insn, worklist, marked);
@@ -1497,16 +1483,7 @@ rtl_ssa_dce_mark()
   std::unordered_set<insn_info *> marked{};
   /* Phi insn might have more that one phi node: gcc/gcc/testsuite/gcc.c-torture/execute/20000224-1.c */
   std::unordered_set<phi_info *> marked_phi_nodes{};
-  auto prelive_insns = rtl_ssa_dce_mark_prelive(marked);
-  /* Extract uses from prelive insns to worklist */
-  auto_vec<set_info *> worklist{};
-  for (insn_info * insn : prelive_insns) {
-    for (auto&& use : insn->uses()) {
-      set_info* set = use->def();
-      if (set)
-        worklist.safe_push(set);
-    }
-  }
+  auto worklist = rtl_ssa_dce_mark_prelive(marked);
 
   while (!worklist.is_empty()) {
     set_info* set = worklist.pop();
@@ -1581,78 +1558,31 @@ rtl_ssa_dce_sweep(std::unordered_set<insn_info *> marked)
   crtl->ssa->change_insns(changes);
 }
 
+static void reset_debug_insn_uses(insn_info * insn) {
+  gcc_assert(insn->is_debug_insn());
+
+  if (dump_file)
+    fprintf(dump_file, "Resetting debug insn: %d\n", insn->uid());
+
+  insn_change change (insn);
+  change.new_uses = {};
+  INSN_VAR_LOCATION_LOC (insn->rtl()) = gen_rtx_UNKNOWN_VAR_LOC ();
+  crtl->ssa->change_insn (change);
+}
+
 // WIP
 static void
-rtl_ssa_dce_transform_insns_to_debug() {
-  std::unordered_set<int> is_debug;
-  // Should we use ssa when modifing insns? if yes, we want in-place replace
+rtl_ssa_dce_reset_dead_debug(std::unordered_set<insn_info *> &marked) {
+  for (insn_info *insn : crtl->ssa->all_insns()) {
+    if (!insn->is_debug_insn())
+      continue;
 
-  /* chceme prochazet v post orderu, abychom nejdrive zpracovali zavislosti
-     a pak az definici nelze jen menit instrukce, protoze musime informaci
-     propagovat pres phi node */
-  /* We check, whether all insns that use a definition from the current insn
-     are only debug insns */
-  for (insn_info * insn : crtl->ssa->reverse_all_insns()) {
-    if (insn->is_debug_insn()) { // phi is never debug
-        // TODO : store info about this insn
-        is_debug.emplace(insn->uid());
-        continue;
-    }
-
-    if (insn->is_phi()) {
-      // for each phi_info
-      for (def_info *def : insn->defs()) {
-        phi_info *pi = as_a<phi_info *> (def);
-        
+    for (use_info * use: insn->uses()) {
+      if (marked.count(use->def()->insn()) == 0) {
+        reset_debug_insn_uses(insn);
+        break;
       }
     }
-
-    rtx_insn * rtl = insn->rtl();
-    rtx set;
-    if (!(MAY_HAVE_DEBUG_BIND_INSNS 
-      && (set = single_set (rtl)) != NULL_RTX 
-      && (!side_effects_p (SET_SRC (set))
-      && asm_noperands (PATTERN (rtl)) < 0))) {
-      continue;
-    }
-
-    bool should_be_debug = true;
-    for (def_info *def : insn->defs()) {
-      // TODO : how to cast this correctly? - clobber_info
-      // access_kind for def_insn is only SET or CLOBBER
-      if (def->kind() == access_kind::CLOBBER)
-        continue;
-      set_info* si = as_a<set_info*>(def);
-      // TODO : use has_nondebug_uses or has_nondebug_insn_uses - what is the difference? phi?
-      // after that we will use rtl-ssa change API to make the insn debug (it will hopefully
-      // recalculate has_nondebug_uses of other instructions...)
-      for (use_info * use : si->all_uses()) {
-        auto iii = use->insn()->is_debug_insn();
-      }
-    }
-
-    if (!should_be_debug) {
-      continue;
-    }
-
-    // TODO : perform a change
-    /* Create DEBUG_EXPR (and DEBUG_EXPR_DECL).  */
-    rtx dval = make_debug_expr_from_rtl (SET_DEST (set));
-
-    /* Emit a debug bind insn before the insn in which
-        reg dies.  */
-    rtx bind_var_loc =
-      gen_rtx_VAR_LOCATION (GET_MODE (SET_DEST (set)),
-          DEBUG_EXPR_TREE_DECL (dval),
-          SET_SRC (set),
-          VAR_INIT_STATUS_INITIALIZED);
-
-    rtx_insn * bind = emit_debug_insn_before (bind_var_loc, rtl);
-    // auto debug_insn = insn_info(insn->bb(), bind, 0);
-    auto attempt = crtl->ssa->new_change_attempt ();
-    auto change = insn_change(insn);
-    // TODO : delete rtx from cfg and replace insn in ssa to debug_insn 
-    // delete_insn_and_edges or delete_insn - do we need to delete edges?
   }
 }
 
@@ -1681,6 +1611,8 @@ rtl_ssa_dce()
   rtl_ssa_dce_init();
   // debug(crtl->ssa);
   std::unordered_set<insn_info *> marked = rtl_ssa_dce_mark();
+  if (MAY_HAVE_DEBUG_BIND_INSNS)
+    rtl_ssa_dce_reset_dead_debug(marked);
   rtl_ssa_dce_sweep(marked);
   // std::cerr << "\033[31m" << "SSA debug start" << "\033[0m" << "\n";
   // debug (crtl->ssa);
