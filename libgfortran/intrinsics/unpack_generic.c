@@ -112,7 +112,7 @@ unpack_internal (gfc_array_char *ret, const gfc_array_char *vector,
 	 return array descriptor.  */
       dim = GFC_DESCRIPTOR_RANK (mask);
       rs = 1;
-      spacing = size / vector->align;
+      spacing = size;
       for (n = 0; n < dim; n++)
 	{
 	  count[n] = 0;

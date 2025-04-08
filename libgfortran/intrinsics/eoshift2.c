@@ -73,7 +73,6 @@ eoshift2 (gfc_array_char *ret, const gfc_array_char *array,
 
       ret->offset = 0;
       GFC_DTYPE_COPY(ret,array);
-      ret->align = array->align;
 
       /* xmallocarray allocates a single byte for zero size.  */
       ret->base_addr = xmallocarray (arraysize, size);
@@ -85,7 +84,7 @@ eoshift2 (gfc_array_char *ret, const gfc_array_char *array,
           ub = GFC_DESCRIPTOR_EXTENT(array,i) - 1;
 
           if (i == 0)
-	    sp = GFC_DESCRIPTOR_SIZE(ret) / ret->align;
+	    sp = GFC_DESCRIPTOR_SIZE(ret);
           else
             sp = GFC_DESCRIPTOR_EXTENT(ret,i-1)
 	      * GFC_DESCRIPTOR_SPACING(ret,i-1);

@@ -78,7 +78,7 @@ spread_internal (gfc_array_char *ret, const gfc_array_char *source,
 
       dim = 0;
       rs = 1;
-      spacing = size / source->align;
+      spacing = size;
       for (n = 0; n < rrank; n++)
 	{
 	  stride = rs;
@@ -105,7 +105,6 @@ spread_internal (gfc_array_char *ret, const gfc_array_char *source,
 	  GFC_DIMENSION_SET(ret->dim[n], 0, ub, spacing);
 	}
       ret->offset = 0;
-      ret->align = source->align;
       ret->base_addr = xmallocarray (rs, size);
 
       if (rs <= 0)
@@ -253,9 +252,7 @@ spread_internal_scalar (gfc_array_char *ret, const char *source,
     {
       ret->base_addr = xmallocarray (ncopies, size);
       ret->offset = 0;
-      ret->align = source->align;
-      GFC_DIMENSION_SET(ret->dim[0], 0, ncopies - 1,
-			size / source->align);
+      GFC_DIMENSION_SET(ret->dim[0], 0, ncopies - 1, size);
     }
   else
     {
