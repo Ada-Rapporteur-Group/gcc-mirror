@@ -1351,7 +1351,7 @@ bool is_rtx_prelive(const_rtx insn) {
   switch (GET_CODE(insn)) {
     case PREFETCH:
     case UNSPEC:
-    case TRAP_IF:
+    case TRAP_IF: /* testsuite/gcc.c-torture/execute/20020418-1.c */
       return true;
 
     default:
@@ -1372,7 +1372,6 @@ bool is_rtx_insn_prelive(rtx_insn *insn) {
     /* Don't delete calls that may throw if we cannot do so.  */
     && can_delete_call (insn))
   return false;
-  // return !find_call_stack_args (as_a <rtx_call_insn *> (insn), false, fast, arg_stores);
 
   if (!NONJUMP_INSN_P (insn))
     /* This handles jumps, notes, call_insns, debug_insns, ... */
@@ -1396,10 +1395,6 @@ bool is_rtx_insn_prelive(rtx_insn *insn) {
     case CLOBBER: // gcc/gcc/testsuite/gcc.c-torture/compile/20000605-1.c
     case USE:
     case VAR_LOCATION:
-    /* Following cases might be removed since they are part of is_rtx_prelive */
-    case PREFETCH:
-    case TRAP_IF: /* testsuite/gcc.c-torture/execute/20020418-1.c */
-    case UNSPEC:
       return true;
 
     case PARALLEL:
@@ -1415,13 +1410,19 @@ bool is_rtx_insn_prelive(rtx_insn *insn) {
 
 bool is_prelive(insn_info *insn)
 {
-  /* Phi insns are never prelive, bb head + end also are artificial */
+  /* Phi insns are never prelive, bb head and end contain artificial uses that
+     we need to mark as prelive */
+  if (insn->is_bb_head() || insn->is_bb_end())
+    return true;
+
   if (insn->is_artificial() || insn->is_debug_insn())
     return false;
 
   gcc_assert (insn->is_real());
   auto rtl = insn->rtl();
 
+  /* I guess that a lot of conditions bellow are captured by artificial uses
+     of bb head and end insns. */
   for (def_info * def : insn->defs()) {
     /* The purpose of this pass is not to eliminate stores to memory... */
     if (def->is_mem())
@@ -1431,59 +1432,44 @@ bool is_prelive(insn_info *insn)
     gcc_assert(def->is_reg());
     /* this ignores clobbers, which is probably fine */
 
-    /* TODO : find something similar to mark_artificial_uses to mark only
-       artificially-used registers.
-       - df_get_regular_block_artificial_uses
-       That should fix following test as assume
-       gcc.c-torture/execute/20000503-1.c - flags register is unused. Not all
+    /* gcc.c-torture/execute/20000503-1.c - flags register is unused. Not all
        hard registers should be marked... */
     if (def->kind() != access_kind::SET)
       continue;
 
     /* This might be messed up a bit */
-    if (def->regno() == FRAME_POINTER_REGNUM
-        || def->regno() == STACK_POINTER_REGNUM)
-      return true;
+    // if (def->regno() == FRAME_POINTER_REGNUM
+    //     || def->regno() == STACK_POINTER_REGNUM)
+    //   return true;
 
     /* needed by gcc.c-torture/execute/pr51447.c */
     if (HARD_REGISTER_NUM_P (def->regno())
         && global_regs[def->regno()])
-        return true;
+        // { std::cout << "marked global reg: " << def->regno() << " in " << insn->uid() << '\n';
+          return true;
+        // }
 
-    if (!HARD_FRAME_POINTER_IS_FRAME_POINTER
-        && def->regno() == HARD_FRAME_POINTER_REGNUM)
-      return true;
+    // if (!HARD_FRAME_POINTER_IS_FRAME_POINTER
+    //     && def->regno() == HARD_FRAME_POINTER_REGNUM)
+    //   return true;
 
-    if (FRAME_POINTER_REGNUM != ARG_POINTER_REGNUM
-        && fixed_regs[ARG_POINTER_REGNUM]
-        && def->regno() == ARG_POINTER_REGNUM)
-      return true;
+    // if (FRAME_POINTER_REGNUM != ARG_POINTER_REGNUM
+    //     && fixed_regs[ARG_POINTER_REGNUM]
+    //     && def->regno() == ARG_POINTER_REGNUM)
+    //   return true;
 
     unsigned int picreg = PIC_OFFSET_TABLE_REGNUM;
     if (picreg != INVALID_REGNUM
         && fixed_regs[picreg]
         && def->regno() == picreg)
     return true;
-
-    // TODO : eh?
-
-    /*
-    if (def->kind() == access_kind::SET 
-        && (HARD_REGISTER_NUM_P(def->regno())
-        || (pic_offset_table_rtx != nullptr 
-          && def->regno() == REGNO (pic_offset_table_rtx)
-          && REGNO (pic_offset_table_rtx) >= FIRST_PSEUDO_REGISTER))
-      ) {
-      // find_reg_note(insn->rtl(), REG_UNUSED, def->regno())
-      return true;
-    } */
   }
 
   return is_rtx_insn_prelive(rtl);
 }
 
 static void
-rtl_ssa_dce_mark_prelive(insn_info *info, vec<insn_info *> &worklist, 
+rtl_ssa_dce_mark_prelive_insn(insn_info *info, vec<insn_info *> &worklist, 
       std::unordered_set<insn_info *> &marked)
 {
   if (dump_file)
@@ -1494,12 +1480,12 @@ rtl_ssa_dce_mark_prelive(insn_info *info, vec<insn_info *> &worklist,
 }
 
 static auto_vec<insn_info *>
-rtl_ssa_dce_prelive(std::unordered_set<insn_info *> &marked)
+rtl_ssa_dce_mark_prelive(std::unordered_set<insn_info *> &marked)
 {
   auto_vec<insn_info *> worklist;
   for (insn_info * insn : crtl->ssa->all_insns()) {
     if (is_prelive(insn))
-      rtl_ssa_dce_mark_prelive(insn, worklist, marked);
+      rtl_ssa_dce_mark_prelive_insn(insn, worklist, marked);
   }
 
   return worklist;
@@ -1511,7 +1497,7 @@ rtl_ssa_dce_mark()
   std::unordered_set<insn_info *> marked{};
   /* Phi insn might have more that one phi node: gcc/gcc/testsuite/gcc.c-torture/execute/20000224-1.c */
   std::unordered_set<phi_info *> marked_phi_nodes{};
-  auto prelive_insns = rtl_ssa_dce_prelive(marked);
+  auto prelive_insns = rtl_ssa_dce_mark_prelive(marked);
   /* Extract uses from prelive insns to worklist */
   auto_vec<set_info *> worklist{};
   for (insn_info * insn : prelive_insns) {
@@ -1693,6 +1679,7 @@ static unsigned int
 rtl_ssa_dce()
 {
   rtl_ssa_dce_init();
+  // debug(crtl->ssa);
   std::unordered_set<insn_info *> marked = rtl_ssa_dce_mark();
   rtl_ssa_dce_sweep(marked);
   // std::cerr << "\033[31m" << "SSA debug start" << "\033[0m" << "\n";
