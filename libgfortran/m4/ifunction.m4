@@ -30,8 +30,8 @@ name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray,
 {
   index_type count[GFC_MAX_DIMENSIONS];
   index_type extent[GFC_MAX_DIMENSIONS];
-  index_type sstride[GFC_MAX_DIMENSIONS];
-  index_type dstride[GFC_MAX_DIMENSIONS];
+  index_type sspacing[GFC_MAX_DIMENSIONS];
+  index_type dspacing[GFC_MAX_DIMENSIONS];
   const 'atype_name * restrict base;
   rtype_name * restrict dest;
   index_type rank;
@@ -55,11 +55,11 @@ name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray,
   len = GFC_DESCRIPTOR_EXTENT(array,dim);
   if (len < 0)
     len = 0;
-  delta = GFC_DESCRIPTOR_STRIDE(array,dim);
+  delta = GFC_DESCRIPTOR_SPACING(array,dim);
 
   for (n = 0; n < dim; n++)
     {
-      sstride[n] = GFC_DESCRIPTOR_STRIDE(array,n);
+      sspacing[n] = GFC_DESCRIPTOR_SPACING(array,n);
       extent[n] = GFC_DESCRIPTOR_EXTENT(array,n);
 
       if (extent[n] < 0)
@@ -67,7 +67,7 @@ name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray,
     }
   for (n = dim; n < rank; n++)
     {
-      sstride[n] = GFC_DESCRIPTOR_STRIDE(array, n + 1);
+      sspacing[n] = GFC_DESCRIPTOR_SPACING(array, n + 1);
       extent[n] = GFC_DESCRIPTOR_EXTENT(array, n + 1);
 
       if (extent[n] < 0)
@@ -81,18 +81,18 @@ name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray,
       for (n = 0; n < rank; n++)
 	{
 	  if (n == 0)
-	    str = 1;
+	    str = sizeof ('rtype_name`);
 	  else
-	    str = GFC_DESCRIPTOR_STRIDE(retarray,n-1) * extent[n-1];
+	    str = GFC_DESCRIPTOR_SPACING(retarray,n-1) * extent[n-1];
 
-	  GFC_DIMENSION_SET(retarray->dim[n], 0, extent[n] - 1, str);
+	  GFC_DESCRIPTOR_DIMENSION_SET(retarray, n, 0, extent[n] - 1, str);
 
 	}
 
       retarray->offset = 0;
       retarray->dtype.rank = rank;
 
-      alloc_size = GFC_DESCRIPTOR_STRIDE(retarray,rank-1) * extent[rank-1];
+      alloc_size = GFC_DESCRIPTOR_SPACING(retarray,rank-1) * extent[rank-1];
 
       retarray->base_addr = xmallocarray (alloc_size, sizeof (rtype_name));
       if (alloc_size == 0)
@@ -114,7 +114,7 @@ name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray,
   for (n = 0; n < rank; n++)
     {
       count[n] = 0;
-      dstride[n] = GFC_DESCRIPTOR_STRIDE(retarray,n);
+      dspacing[n] = GFC_DESCRIPTOR_SPACING(retarray,n);
       if (extent[n] <= 0)
 	return;
     }
@@ -148,8 +148,8 @@ define(FINISH_ARRAY_FUNCTION,
       }
       /* Advance to the next element.  */
       count[0]++;
-      base += sstride[0];
-      dest += dstride[0];
+      base = (atype_name*) (((char*)base) + sspacing[0]);
+      dest = (rtype_name*) (((char*)dest) + dspacing[0]);
       n = 0;
       while (count[n] == extent[n])
 	{
@@ -158,8 +158,8 @@ define(FINISH_ARRAY_FUNCTION,
 	  count[n] = 0;
 	  /* We could precalculate these products, but this is a less
 	     frequently used path so probably not worth it.  */
-	  base -= sstride[n] * extent[n];
-	  dest -= dstride[n] * extent[n];
+	  base = (atype_name*) (((char*)base) - sspacing[n] * extent[n]);
+	  dest = (rtype_name*) (((char*)dest) - dspacing[n] * extent[n]);
 	  n++;
 	  if (n >= rank)
 	    {
@@ -170,8 +170,8 @@ define(FINISH_ARRAY_FUNCTION,
 	  else
 	    {
 	      count[n]++;
-	      base += sstride[n];
-	      dest += dstride[n];
+	      base = (atype_name*) (((char*)base) + sspacing[n]);
+	      dest = (rtype_name*) (((char*)dest) + dspacing[n]);
 	    }
 	}
     }
@@ -191,9 +191,9 @@ m'name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray,
 {
   index_type count[GFC_MAX_DIMENSIONS];
   index_type extent[GFC_MAX_DIMENSIONS];
-  index_type sstride[GFC_MAX_DIMENSIONS];
-  index_type dstride[GFC_MAX_DIMENSIONS];
-  index_type mstride[GFC_MAX_DIMENSIONS];
+  index_type sspacing[GFC_MAX_DIMENSIONS];
+  index_type dspacing[GFC_MAX_DIMENSIONS];
+  index_type mspacing[GFC_MAX_DIMENSIONS];
   'rtype_name * restrict dest;
   const atype_name * restrict base;
   const GFC_LOGICAL_1 * restrict mbase;
@@ -243,13 +243,13 @@ m'name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray,
   else
     runtime_error ("Funny sized logical array");
 
-  delta = GFC_DESCRIPTOR_STRIDE(array,dim);
-  mdelta = GFC_DESCRIPTOR_STRIDE_BYTES(mask,dim);
+  delta = GFC_DESCRIPTOR_SPACING(array,dim);
+  mdelta = GFC_DESCRIPTOR_SPACING(mask,dim);
 
   for (n = 0; n < dim; n++)
     {
-      sstride[n] = GFC_DESCRIPTOR_STRIDE(array,n);
-      mstride[n] = GFC_DESCRIPTOR_STRIDE_BYTES(mask,n);
+      sspacing[n] = GFC_DESCRIPTOR_SPACING(array,n);
+      mspacing[n] = GFC_DESCRIPTOR_SPACING(mask,n);
       extent[n] = GFC_DESCRIPTOR_EXTENT(array,n);
 
       if (extent[n] < 0)
@@ -258,8 +258,8 @@ m'name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray,
     }
   for (n = dim; n < rank; n++)
     {
-      sstride[n] = GFC_DESCRIPTOR_STRIDE(array,n + 1);
-      mstride[n] = GFC_DESCRIPTOR_STRIDE_BYTES(mask, n + 1);
+      sspacing[n] = GFC_DESCRIPTOR_SPACING(array,n + 1);
+      mspacing[n] = GFC_DESCRIPTOR_SPACING(mask, n + 1);
       extent[n] = GFC_DESCRIPTOR_EXTENT(array, n + 1);
 
       if (extent[n] < 0)
@@ -273,15 +273,15 @@ m'name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray,
       for (n = 0; n < rank; n++)
 	{
 	  if (n == 0)
-	    str = 1;
+	    str = sizeof ('rtype_name`);
 	  else
-	    str= GFC_DESCRIPTOR_STRIDE(retarray,n-1) * extent[n-1];
+	    str= GFC_DESCRIPTOR_SPACING(retarray,n-1) * extent[n-1];
 
-	  GFC_DIMENSION_SET(retarray->dim[n], 0, extent[n] - 1, str);
+	  GFC_DESCRIPTOR_DIMENSION_SET(retarray, n, 0, extent[n] - 1, str);
 
 	}
 
-      alloc_size = GFC_DESCRIPTOR_STRIDE(retarray,rank-1) * extent[rank-1];
+      alloc_size = GFC_DESCRIPTOR_SPACING(retarray,rank-1) * extent[rank-1];
 
       retarray->offset = 0;
       retarray->dtype.rank = rank;
@@ -307,7 +307,7 @@ m'name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray,
   for (n = 0; n < rank; n++)
     {
       count[n] = 0;
-      dstride[n] = GFC_DESCRIPTOR_STRIDE(retarray,n);
+      dspacing[n] = GFC_DESCRIPTOR_SPACING(retarray,n);
       if (extent[n] <= 0)
 	return;
     }
@@ -334,9 +334,9 @@ define(FINISH_MASKED_ARRAY_FUNCTION,
       }
       /* Advance to the next element.  */
       count[0]++;
-      base += sstride[0];
-      mbase += mstride[0];
-      dest += dstride[0];
+      base = (atype_name*) (((char*)base) + sspacing[0]);
+      mbase += mspacing[0];
+      dest = (rtype_name*) (((char*)dest) + dspacing[0]);
       n = 0;
       while (count[n] == extent[n])
 	{
@@ -345,9 +345,9 @@ define(FINISH_MASKED_ARRAY_FUNCTION,
 	  count[n] = 0;
 	  /* We could precalculate these products, but this is a less
 	     frequently used path so probably not worth it.  */
-	  base -= sstride[n] * extent[n];
-	  mbase -= mstride[n] * extent[n];
-	  dest -= dstride[n] * extent[n];
+	  base = (atype_name*) (((char*)base) - sspacing[n] * extent[n]);
+	  mbase -= mspacing[n] * extent[n];
+	  dest = (rtype_name*) (((char*)dest) - dspacing[n] * extent[n]);
 	  n++;
 	  if (n >= rank)
 	    {
@@ -358,9 +358,9 @@ define(FINISH_MASKED_ARRAY_FUNCTION,
 	  else
 	    {
 	      count[n]++;
-	      base += sstride[n];
-	      mbase += mstride[n];
-	      dest += dstride[n];
+	      base = (atype_name*) (((char*)base) + sspacing[n]);
+	      mbase += mspacing[n];
+	      dest = (rtype_name*) (((char*)dest) + dspacing[n]);
 	    }
 	}
     }
@@ -380,7 +380,7 @@ void
 {
   index_type count[GFC_MAX_DIMENSIONS];
   index_type extent[GFC_MAX_DIMENSIONS];
-  index_type dstride[GFC_MAX_DIMENSIONS];
+  index_type dspacing[GFC_MAX_DIMENSIONS];
   'rtype_name * restrict dest;
   index_type rank;
   index_type n;
@@ -431,18 +431,18 @@ void
       for (n = 0; n < rank; n++)
 	{
 	  if (n == 0)
-	    str = 1;
+	    str = sizeof ('rtype_name`);
 	  else
-	    str = GFC_DESCRIPTOR_STRIDE(retarray,n-1) * extent[n-1];
+	    str = GFC_DESCRIPTOR_SPACING(retarray,n-1) * extent[n-1];
 
-	  GFC_DIMENSION_SET(retarray->dim[n], 0, extent[n] - 1, str);
+	  GFC_DESCRIPTOR_DIMENSION_SET(retarray, n, 0, extent[n] - 1, str);
 
 	}
 
       retarray->offset = 0;
       retarray->dtype.rank = rank;
 
-      alloc_size = GFC_DESCRIPTOR_STRIDE(retarray,rank-1) * extent[rank-1];
+      alloc_size = GFC_DESCRIPTOR_SPACING(retarray,rank-1) * extent[rank-1];
 
       retarray->base_addr = xmallocarray (alloc_size, sizeof (rtype_name));
       if (alloc_size == 0)
@@ -475,7 +475,7 @@ void
   for (n = 0; n < rank; n++)
     {
       count[n] = 0;
-      dstride[n] = GFC_DESCRIPTOR_STRIDE(retarray,n);
+      dspacing[n] = GFC_DESCRIPTOR_SPACING(retarray,n);
     }
 
   dest = retarray->base_addr;
@@ -484,7 +484,7 @@ void
     {
       *dest = '$1`;
       count[0]++;
-      dest += dstride[0];
+      dest = (rtype_name*) (((char*)dest) + dspacing[0]);
       n = 0;
       while (count[n] == extent[n])
 	{
@@ -493,14 +493,14 @@ void
 	  count[n] = 0;
 	  /* We could precalculate these products, but this is a less
 	     frequently used path so probably not worth it.  */
-	  dest -= dstride[n] * extent[n];
+	  dest = (rtype_name*) (((char*)dest) - dspacing[n] * extent[n]);
 	  n++;
 	  if (n >= rank)
 	    return;
 	  else
 	    {
 	      count[n]++;
-	      dest += dstride[n];
+	      dest = (rtype_name*) (((char*)dest) + dspacing[n]);
 	    }
       	}
     }

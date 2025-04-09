@@ -7,7 +7,7 @@
   const 'rtype_name` * restrict bbase;
   'rtype_name` * restrict dest;
 
-  index_type rxstride, rystride, axstride, aystride, bxstride, bystride;
+  index_type rxspacing, ryspacing, axspacing, ayspacing, bxspacing, byspacing;
   index_type x, y, n, count, xcount, ycount;
 
   assert (GFC_DESCRIPTOR_RANK (a) == 2
@@ -28,22 +28,26 @@
     {
       if (GFC_DESCRIPTOR_RANK (a) == 1)
         {
-	  GFC_DIMENSION_SET(retarray->dim[0], 0,
-	                    GFC_DESCRIPTOR_EXTENT(b,1) - 1, 1);
+	  GFC_DESCRIPTOR_DIMENSION_SET(retarray, 0, 0,
+				       GFC_DESCRIPTOR_EXTENT(b,1) - 1,
+				       sizeof ('rtype_name`));
         }
       else if (GFC_DESCRIPTOR_RANK (b) == 1)
         {
-	  GFC_DIMENSION_SET(retarray->dim[0], 0,
-	                    GFC_DESCRIPTOR_EXTENT(a,0) - 1, 1);
+	  GFC_DESCRIPTOR_DIMENSION_SET(retarray, 0, 0,
+				       GFC_DESCRIPTOR_EXTENT(a,0) - 1,
+				       sizeof ('rtype_name`));
         }
       else
         {
-	  GFC_DIMENSION_SET(retarray->dim[0], 0,
-	                    GFC_DESCRIPTOR_EXTENT(a,0) - 1, 1);
+	  GFC_DESCRIPTOR_DIMENSION_SET(retarray, 0, 0,
+				       GFC_DESCRIPTOR_EXTENT(a,0) - 1,
+				       sizeof ('rtype_name`));
 
-          GFC_DIMENSION_SET(retarray->dim[1], 0,
-	                    GFC_DESCRIPTOR_EXTENT(b,1) - 1,
-			    GFC_DESCRIPTOR_EXTENT(retarray,0));
+          GFC_DESCRIPTOR_DIMENSION_SET(retarray, 1, 0,
+				       GFC_DESCRIPTOR_EXTENT(b,1) - 1,
+				       GFC_DESCRIPTOR_EXTENT(retarray,0)
+				       * sizeof ('rtype_name`));
         }
 
       retarray->base_addr
@@ -97,28 +101,28 @@ sinclude(`matmul_asm_'rtype_code`.m4')dnl
       /* One-dimensional result may be addressed in the code below
 	 either as a row or a column matrix. We want both cases to
 	 work. */
-      rxstride = rystride = GFC_DESCRIPTOR_STRIDE(retarray,0);
+      rxspacing = ryspacing = GFC_DESCRIPTOR_SPACING(retarray,0);
     }
   else
     {
-      rxstride = GFC_DESCRIPTOR_STRIDE(retarray,0);
-      rystride = GFC_DESCRIPTOR_STRIDE(retarray,1);
+      rxspacing = GFC_DESCRIPTOR_SPACING(retarray,0);
+      ryspacing = GFC_DESCRIPTOR_SPACING(retarray,1);
     }
 
 
   if (GFC_DESCRIPTOR_RANK (a) == 1)
     {
       /* Treat it as a a row matrix A[1,count]. */
-      axstride = GFC_DESCRIPTOR_STRIDE(a,0);
-      aystride = 1;
+      axspacing = GFC_DESCRIPTOR_SPACING(a,0);
+      ayspacing = sizeof ('rtype_name`);
 
       xcount = 1;
       count = GFC_DESCRIPTOR_EXTENT(a,0);
     }
   else
     {
-      axstride = GFC_DESCRIPTOR_STRIDE(a,0);
-      aystride = GFC_DESCRIPTOR_STRIDE(a,1);
+      axspacing = GFC_DESCRIPTOR_SPACING(a,0);
+      ayspacing = GFC_DESCRIPTOR_SPACING(a,1);
 
       count = GFC_DESCRIPTOR_EXTENT(a,1);
       xcount = GFC_DESCRIPTOR_EXTENT(a,0);
@@ -135,18 +139,18 @@ sinclude(`matmul_asm_'rtype_code`.m4')dnl
   if (GFC_DESCRIPTOR_RANK (b) == 1)
     {
       /* Treat it as a column matrix B[count,1] */
-      bxstride = GFC_DESCRIPTOR_STRIDE(b,0);
+      bxspacing = GFC_DESCRIPTOR_SPACING(b,0);
 
-      /* bystride should never be used for 1-dimensional b.
+      /* byspacing should never be used for 1-dimensional b.
          The value is only used for calculation of the
          memory by the buffer.  */
-      bystride = 256;
+      byspacing = -1;
       ycount = 1;
     }
   else
     {
-      bxstride = GFC_DESCRIPTOR_STRIDE(b,0);
-      bystride = GFC_DESCRIPTOR_STRIDE(b,1);
+      bxspacing = GFC_DESCRIPTOR_SPACING(b,0);
+      byspacing = GFC_DESCRIPTOR_SPACING(b,1);
       ycount = GFC_DESCRIPTOR_EXTENT(b,1);
     }
 
@@ -161,15 +165,17 @@ sinclude(`matmul_asm_'rtype_code`.m4')dnl
 #define min(a,b) ((a) <= (b) ? (a) : (b))
 #define max(a,b) ((a) >= (b) ? (a) : (b))
 
-  if (try_blas && rxstride == 1 && (axstride == 1 || aystride == 1)
-      && (bxstride == 1 || bystride == 1)
+  if (try_blas
+      && rxspacing == sizeof ('rtype_name`)
+      && (axspacing == sizeof ('rtype_name`) || ayspacing == sizeof ('rtype_name`))
+      && (bxspacing == sizeof ('rtype_name`) || byspacing == sizeof ('rtype_name`))
       && (((float) xcount) * ((float) ycount) * ((float) count)
           > POW3(blas_limit)))
     {
-      const int m = xcount, n = ycount, k = count, ldc = rystride;
+      const int m = xcount, n = ycount, k = count, ldc = ryspacing;
       const 'rtype_name` one = 1, zero = 0;
-      const int lda = (axstride == 1) ? aystride : axstride,
-		ldb = (bxstride == 1) ? bystride : bxstride;
+      const int lda = (axspacing == sizeof ('rtype_name`)) ? ayspacing : axspacing,
+		ldb = (bxspacing == sizeof ('rtype_name`)) ? byspacing : bxspacing;
 
       if (lda > 0 && ldb > 0 && ldc > 0 && m > 1 && n > 1 && k > 1)
 	{
@@ -178,12 +184,12 @@ sinclude(`matmul_asm_'rtype_code`.m4')dnl
 	  if (try_blas & 2)
 	    transa = "C";
 	  else
-	    transa = axstride == 1 ? "N" : "T";
+	    transa = axspacing == sizeof ('rtype_name`) ? "N" : "T";
 
 	  if (try_blas & 4)
 	    transb = "C";
 	  else
-	    transb = bxstride == 1 ? "N" : "T";
+	    transb = bxspacing == sizeof ('rtype_name`) ? "N" : "T";
 
 	  gemm (transa, transb , &m,
 		&n, &k,	&one, abase, &lda, bbase, &ldb, &zero, dest,
@@ -192,7 +198,9 @@ sinclude(`matmul_asm_'rtype_code`.m4')dnl
 	}
     }
 
-  if (rxstride == 1 && axstride == 1 && bxstride == 1
+  if (rxspacing == sizeof ('rtype_name`)
+      && axspacing == sizeof ('rtype_name`)
+      && bxspacing == sizeof ('rtype_name`)
       && GFC_DESCRIPTOR_RANK (b) != 1)
     {
       /* This block of code implements a tuned matmul, derived from
@@ -225,13 +233,13 @@ sinclude(`matmul_asm_'rtype_code`.m4')dnl
       c = retarray->base_addr;
 
       /* Parameter adjustments */
-      c_dim1 = rystride;
+      c_dim1 = ryspacing;
       c_offset = 1 + c_dim1;
       c -= c_offset;
-      a_dim1 = aystride;
+      a_dim1 = ayspacing;
       a_offset = 1 + a_dim1;
       a -= a_offset;
-      b_dim1 = bystride;
+      b_dim1 = byspacing;
       b_offset = 1 + b_dim1;
       b -= b_offset;
 
@@ -246,8 +254,8 @@ sinclude(`matmul_asm_'rtype_code`.m4')dnl
 
       /* Adjust size of t1 to what is needed.  */
       index_type t1_dim, a_sz;
-      if (aystride == 1)
-        a_sz = rystride;
+      if (ayspacing == sizeof ('rtype_name`))
+        a_sz = ryspacing;
       else
         a_sz = a_dim1;
 
@@ -469,7 +477,9 @@ sinclude(`matmul_asm_'rtype_code`.m4')dnl
       free(t1);
       return;
     }
-  else if (rxstride == 1 && aystride == 1 && bxstride == 1)
+  else if (rxspacing == sizeof ('rtype_name`)
+	   && ayspacing == sizeof ('rtype_name`)
+	   && bxspacing == sizeof ('rtype_name`))
     {
       if (GFC_DESCRIPTOR_RANK (a) != 1)
 	{
@@ -480,11 +490,11 @@ sinclude(`matmul_asm_'rtype_code`.m4')dnl
 
 	  for (y = 0; y < ycount; y++)
 	    {
-	      bbase_y = &bbase[y*bystride];
-	      dest_y = &dest[y*rystride];
+	      bbase_y = GFC_DESCRIPTOR_DIM_ELEM (const 'rtype_name` * restrict, b, 1, y);
+	      dest_y = GFC_DESCRIPTOR_DIM_ELEM ('rtype_name` * restrict, retarray, 1, y);
 	      for (x = 0; x < xcount; x++)
 		{
-		  abase_x = &abase[x*axstride];
+		  abase_x = GFC_DESCRIPTOR_DIM_ELEM (const 'rtype_name` * restrict, a, 0, x);
 		  s = ('rtype_name`) 0;
 		  for (n = 0; n < count; n++)
 		    s += abase_x[n] * bbase_y[n];
@@ -499,11 +509,11 @@ sinclude(`matmul_asm_'rtype_code`.m4')dnl
 
 	  for (y = 0; y < ycount; y++)
 	    {
-	      bbase_y = &bbase[y*bystride];
+	      bbase_y = GFC_DESCRIPTOR_DIM_ELEM (const 'rtype_name` * restrict, b, 1, y);
 	      s = ('rtype_name`) 0;
 	      for (n = 0; n < count; n++)
-		s += abase[n*axstride] * bbase_y[n];
-	      dest[y*rystride] = s;
+		s += GFC_DESCRIPTOR_DIM_ELEM (const 'rtype_name`, a, 0, n) * bbase_y[n];
+	      GFC_DESCRIPTOR_DIM_ELEM ('rtype_name`, retarray, 0, y) = s;
 	    }
 	}
     }
@@ -514,26 +524,27 @@ sinclude(`matmul_asm_'rtype_code`.m4')dnl
 
       for (y = 0; y < ycount; y++)
 	{
-	  bbase_y = &bbase[y*bystride];
+	  bbase_y = GFC_DESCRIPTOR_DIM_ELEM (const 'rtype_name` * restrict, b, 1, y);
 	  s = ('rtype_name`) 0;
 	  for (n = 0; n < count; n++)
-	    s += abase[n*axstride] * bbase_y[n*bxstride];
-	  dest[y*rxstride] = s;
+	    s += GFC_DESCRIPTOR_DIM_ELEM (const 'rtype_name`, a, 0, n)
+		 * GFC_ARRAY_ELEM (const 'rtype_name`, bbase_y, n * bxspacing);
+	  GFC_DESCRIPTOR_DIM_ELEM ('rtype_name`, retarray, 0, y) = s;
 	}
     }
-  else if (axstride < aystride)
+  else if (axspacing < ayspacing)
     {
       for (y = 0; y < ycount; y++)
 	for (x = 0; x < xcount; x++)
-	  dest[x*rxstride + y*rystride] = ('rtype_name`)0;
+	  GFC_ARRAY_ELEM ('rtype_name`, dest, x*rxspacing + y*ryspacing) = ('rtype_name`)0;
 
       for (y = 0; y < ycount; y++)
 	for (n = 0; n < count; n++)
 	  for (x = 0; x < xcount; x++)
 	    /* dest[x,y] += a[x,n] * b[n,y] */
-	    dest[x*rxstride + y*rystride] +=
-					abase[x*axstride + n*aystride] *
-					bbase[n*bxstride + y*bystride];
+	    GFC_ARRAY_ELEM ('rtype_name`, dest, x*rxspacing + y*ryspacing)
+		+= GFC_ARRAY_ELEM ('rtype_name`, abase, x*axspacing + n*ayspacing)
+		   * GFC_ARRAY_ELEM ('rtype_name`, bbase, n*bxspacing + y*byspacing);
     }
   else
     {
@@ -544,15 +555,16 @@ sinclude(`matmul_asm_'rtype_code`.m4')dnl
 
       for (y = 0; y < ycount; y++)
 	{
-	  bbase_y = &bbase[y*bystride];
-	  dest_y = &dest[y*rystride];
+	  bbase_y = GFC_DESCRIPTOR_DIM_ELEM (const 'rtype_name` * restrict, b, 1, y);
+	  dest_y = GFC_DESCRIPTOR_DIM_ELEM ('rtype_name` * restrict, retarray, 1, y);
 	  for (x = 0; x < xcount; x++)
 	    {
-	      abase_x = &abase[x*axstride];
+	      abase_x = GFC_DESCRIPTOR_DIM_ELEM (const 'rtype_name` * restrict, a, 0, x);
 	      s = ('rtype_name`) 0;
 	      for (n = 0; n < count; n++)
-		s += abase_x[n*aystride] * bbase_y[n*bxstride];
-	      dest_y[x*rxstride] = s;
+		s += GFC_ARRAY_ELEM (const 'rtype_name`, abase_x, n*ayspacing)
+		     * GFC_ARRAY_ELEM (const 'rtype_name`, bbase_y, n*bxspacing);
+	      GFC_ARRAY_ELEM ('rtype_name`, dest_y, x*rxspacing) = s;
 	    }
 	}
     }
