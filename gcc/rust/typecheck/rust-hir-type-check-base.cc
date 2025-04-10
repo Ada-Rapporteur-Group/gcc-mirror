@@ -31,6 +31,16 @@ TypeCheckBase::TypeCheckBase ()
     context (TypeCheckContext::get ())
 {}
 
+void
+TypeCheckBase::ResolveGenericParams (
+  const std::vector<std::unique_ptr<HIR::GenericParam>> &generic_params,
+  std::vector<TyTy::SubstitutionParamMapping> &substitutions, bool is_foreign,
+  ABI abi)
+{
+  TypeCheckBase ctx;
+  ctx.resolve_generic_params (generic_params, substitutions, is_foreign, abi);
+}
+
 static void
 walk_types_to_constrain (std::set<HirId> &constrained_symbols,
 			 const TyTy::SubstitutionArgumentMappings &constraints)
@@ -305,6 +315,12 @@ TypeCheckBase::parse_repr_options (const AST::AttrVec &attrs, location_t locus)
   for (const auto &attr : attrs)
     {
       bool is_repr = attr.get_path ().as_string () == Values::Attributes::REPR;
+      if (is_repr && !attr.has_attr_input ())
+	{
+	  rust_error_at (attr.get_locus (), "malformed %qs attribute", "repr");
+	  continue;
+	}
+
       if (is_repr)
 	{
 	  const AST::AttrInput &input = attr.get_attr_input ();
@@ -315,8 +331,22 @@ TypeCheckBase::parse_repr_options (const AST::AttrVec &attrs, location_t locus)
 	  AST::AttrInputMetaItemContainer *meta_items
 	    = option.parse_to_meta_item ();
 
-	  const std::string inline_option
-	    = meta_items->get_items ().at (0)->as_string ();
+	  if (meta_items == nullptr)
+	    {
+	      rust_error_at (attr.get_locus (), "malformed %qs attribute",
+			     "repr");
+	      continue;
+	    }
+
+	  auto &items = meta_items->get_items ();
+	  if (items.size () == 0)
+	    {
+	      // nothing to do with this its empty
+	      delete meta_items;
+	      continue;
+	    }
+
+	  const std::string inline_option = items.at (0)->as_string ();
 
 	  // TODO: it would probably be better to make the MetaItems more aware
 	  // of constructs with nesting like #[repr(packed(2))] rather than
@@ -353,6 +383,8 @@ TypeCheckBase::parse_repr_options (const AST::AttrVec &attrs, location_t locus)
 	  else if (is_align)
 	    repr.align = value;
 
+	  delete meta_items;
+
 	  // Multiple repr options must be specified with e.g. #[repr(C,
 	  // packed(2))].
 	  break;
@@ -365,7 +397,8 @@ TypeCheckBase::parse_repr_options (const AST::AttrVec &attrs, location_t locus)
 void
 TypeCheckBase::resolve_generic_params (
   const std::vector<std::unique_ptr<HIR::GenericParam>> &generic_params,
-  std::vector<TyTy::SubstitutionParamMapping> &substitutions)
+  std::vector<TyTy::SubstitutionParamMapping> &substitutions, bool is_foreign,
+  ABI abi)
 {
   for (auto &generic_param : generic_params)
     {
@@ -375,15 +408,18 @@ TypeCheckBase::resolve_generic_params (
 	    auto lifetime_param
 	      = static_cast<HIR::LifetimeParam &> (*generic_param);
 	    auto lifetime = lifetime_param.get_lifetime ();
-	    rust_assert (lifetime.get_lifetime_type ()
-			 == AST::Lifetime::LifetimeType::NAMED);
 	    context->get_lifetime_resolver ().insert_mapping (
 	      context->intern_lifetime (lifetime));
 	  }
-
 	  break;
 
 	  case HIR::GenericParam::GenericKind::CONST: {
+	    if (is_foreign && abi != Rust::ABI::INTRINSIC)
+	      {
+		rust_error_at (generic_param->get_locus (), ErrorCode::E0044,
+			       "foreign items may not have const parameters");
+	      }
+
 	    auto &param
 	      = static_cast<HIR::ConstGenericParam &> (*generic_param);
 	    auto specified_type = TypeCheckType::Resolve (param.get_type ());
@@ -407,14 +443,30 @@ TypeCheckBase::resolve_generic_params (
 	  break;
 
 	  case HIR::GenericParam::GenericKind::TYPE: {
-	    auto param_type = TypeResolveGenericParam::Resolve (*generic_param);
+	    if (is_foreign && abi != Rust::ABI::INTRINSIC)
+	      {
+		rust_error_at (generic_param->get_locus (), ErrorCode::E0044,
+			       "foreign items may not have type parameters");
+	      }
+
+	    auto param_type = TypeResolveGenericParam::Resolve (
+	      *generic_param, false /*resolve_trait_bounds*/);
 	    context->insert_type (generic_param->get_mappings (), param_type);
 
-	    substitutions.push_back (TyTy::SubstitutionParamMapping (
-	      static_cast<HIR::TypeParam &> (*generic_param), param_type));
+	    auto &param = static_cast<HIR::TypeParam &> (*generic_param);
+	    TyTy::SubstitutionParamMapping p (param, param_type);
+	    substitutions.push_back (p);
 	  }
 	  break;
 	}
+    }
+
+  // now walk them to setup any specified type param bounds
+  for (auto &subst : substitutions)
+    {
+      auto pty = subst.get_param_ty ();
+      TypeResolveGenericParam::ApplyAnyTraitBounds (subst.get_generic_param (),
+						    pty);
     }
 }
 

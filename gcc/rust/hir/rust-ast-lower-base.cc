@@ -690,8 +690,12 @@ ASTLoweringBase::lower_self (AST::Param &param)
 			     self.get_is_mut (), self.get_locus ());
     }
 
-  AST::Lifetime l = self.get_lifetime ();
-  return HIR::SelfParam (mapping, lower_lifetime (l), self.get_is_mut (),
+  tl::optional<HIR::Lifetime> lifetime = tl::nullopt;
+
+  if (self.has_lifetime ())
+    lifetime = lower_lifetime (self.get_lifetime ());
+
+  return HIR::SelfParam (mapping, lifetime, self.get_is_mut (),
 			 self.get_locus ());
 }
 
@@ -933,8 +937,8 @@ ASTLoweringBase::lower_literal (const AST::Literal &literal)
     case AST::Literal::LitType::BYTE_STRING:
       type = HIR::Literal::LitType::BYTE_STRING;
       break;
-    case AST::Literal::LitType::RAW_STRING: // TODO: Lower raw string literals.
-      rust_unreachable ();
+    case AST::Literal::LitType::RAW_STRING:
+      type = HIR::Literal::LitType::STRING;
       break;
     case AST::Literal::LitType::INT:
       type = HIR::Literal::LitType::INT;

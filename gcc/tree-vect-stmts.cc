@@ -2522,6 +2522,7 @@ get_load_store_type (vec_info  *vinfo, stmt_vec_info stmt_info,
 	{
 	  if (!TYPE_VECTOR_SUBPARTS (vectype).is_constant ()
 	      || !TYPE_VECTOR_SUBPARTS (gs_info->offset_vectype).is_constant ()
+	      || VECTOR_BOOLEAN_TYPE_P (gs_info->offset_vectype)
 	      || !constant_multiple_p (TYPE_VECTOR_SUBPARTS
 					 (gs_info->offset_vectype),
 				       TYPE_VECTOR_SUBPARTS (vectype)))
@@ -6749,13 +6750,16 @@ vectorizable_shift (vec_info *vinfo,
     {
       if (was_scalar_shift_arg)
 	{
-	  /* If the argument was the same in all lanes create
-	     the correctly typed vector shift amount directly.  */
+	  /* If the argument was the same in all lanes create the
+	     correctly typed vector shift amount directly.  Note
+	     we made SLP scheduling think we use the original scalars,
+	     so place the compensation code next to the shift which
+	     is conservative.  See PR119640 where it otherwise breaks.  */
 	  op1 = fold_convert (TREE_TYPE (vectype), op1);
 	  op1 = vect_init_vector (vinfo, stmt_info, op1, TREE_TYPE (vectype),
-				  !loop_vinfo ? gsi : NULL);
+				  gsi);
 	  vec_oprnd1 = vect_init_vector (vinfo, stmt_info, op1, vectype,
-					 !loop_vinfo ? gsi : NULL);
+					 gsi);
 	  vec_oprnds1.create (slp_node->vec_stmts_size);
 	  for (k = 0; k < slp_node->vec_stmts_size; k++)
 	    vec_oprnds1.quick_push (vec_oprnd1);
@@ -8905,10 +8909,17 @@ vectorizable_store (vec_info *vinfo,
 		}
 	    }
 	  unsigned align;
-	  if (alignment_support_scheme == dr_aligned)
-	    align = known_alignment (DR_TARGET_ALIGNMENT (first_dr_info));
-	  else
-	    align = dr_alignment (vect_dr_behavior (vinfo, first_dr_info));
+	  /* ???  We'd want to use
+	       if (alignment_support_scheme == dr_aligned)
+		 align = known_alignment (DR_TARGET_ALIGNMENT (first_dr_info));
+	     since doing that is what we assume we can in the above checks.
+	     But this interferes with groups with gaps where for example
+	     VF == 2 makes the group in the unrolled loop aligned but the
+	     fact that we advance with step between the two subgroups
+	     makes the access to the second unaligned.  See PR119586.
+	     We have to anticipate that here or adjust code generation to
+	     avoid the misaligned loads by means of permutations.  */
+	  align = dr_alignment (vect_dr_behavior (vinfo, first_dr_info));
 	  /* Alignment is at most the access size if we do multiple stores.  */
 	  if (nstores > 1)
 	    align = MIN (tree_to_uhwi (TYPE_SIZE_UNIT (ltype)), align);
@@ -10883,10 +10894,8 @@ vectorizable_load (vec_info *vinfo,
 		}
 	    }
 	  unsigned align;
-	  if (alignment_support_scheme == dr_aligned)
-	    align = known_alignment (DR_TARGET_ALIGNMENT (first_dr_info));
-	  else
-	    align = dr_alignment (vect_dr_behavior (vinfo, first_dr_info));
+	  /* ???  The above is still wrong, see vectorizable_store.  */
+	  align = dr_alignment (vect_dr_behavior (vinfo, first_dr_info));
 	  /* Alignment is at most the access size if we do multiple loads.  */
 	  if (nloads > 1)
 	    align = MIN (tree_to_uhwi (TYPE_SIZE_UNIT (ltype)), align);

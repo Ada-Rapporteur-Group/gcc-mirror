@@ -3887,6 +3887,7 @@ static tree
 modify_call_for_omp_dispatch (tree expr, tree dispatch_clauses,
 			      bool want_value, bool pointerize)
 {
+  location_t loc = EXPR_LOCATION (expr);
   tree fndecl = get_callee_fndecl (expr);
 
   /* Skip processing if we don't get the expected call form.  */
@@ -3933,24 +3934,9 @@ modify_call_for_omp_dispatch (tree expr, tree dispatch_clauses,
      the split between early/late resolution, etc instead of the code
      as written by the user.  */
   if (dispatch_interop)
-    {
-      for (tree t = dispatch_interop; t; t = TREE_CHAIN (t))
-	if (OMP_CLAUSE_CODE (t) == OMP_CLAUSE_INTEROP)
-	  ninterop++;
-      if (nappend < ninterop)
-	{
-	  error_at (OMP_CLAUSE_LOCATION (dispatch_interop),
-		    "number of list items in %<interop%> clause (%d) "
-		    "exceeds the number of %<append_args%> items (%d) for "
-		    "%<declare variant%> candidate %qD",
-		    ninterop, nappend, fndecl);
-	  inform (dispatch_append_args
-		  ? EXPR_LOCATION (TREE_PURPOSE (dispatch_append_args))
-		  : DECL_SOURCE_LOCATION (fndecl),
-		  "%<declare variant%> candidate %qD declared here",
-		  fndecl);
-	}
-    }
+    for (tree t = dispatch_interop; t; t = TREE_CHAIN (t))
+      if (OMP_CLAUSE_CODE (t) == OMP_CLAUSE_INTEROP)
+	ninterop++;
   if (dispatch_interop && !dispatch_device_num)
     {
       gcc_checking_assert (ninterop > 1);
@@ -3958,7 +3944,19 @@ modify_call_for_omp_dispatch (tree expr, tree dispatch_clauses,
 		"the %<device%> clause must be present if the %<interop%> "
 		"clause has more than one list item");
     }
-  else if (dispatch_append_args)
+  if (nappend < ninterop)
+    {
+      error_at (OMP_CLAUSE_LOCATION (dispatch_interop),
+		"number of list items in %<interop%> clause (%d) "
+		"exceeds the number of %<append_args%> items (%d) for "
+		"%<declare variant%> candidate %qD", ninterop, nappend, fndecl);
+      inform (dispatch_append_args
+	      ? EXPR_LOCATION (TREE_PURPOSE (dispatch_append_args))
+	      : DECL_SOURCE_LOCATION (fndecl),
+	      "%<declare variant%> candidate %qD declared here", fndecl);
+      ninterop = nappend;
+    }
+  if (dispatch_append_args)
     {
       tree *buffer = XALLOCAVEC (tree, nargs + nappend);
       tree arg = TYPE_ARG_TYPES (TREE_TYPE (fndecl));
@@ -3971,7 +3969,7 @@ modify_call_for_omp_dispatch (tree expr, tree dispatch_clauses,
 	  buffer[i] = CALL_EXPR_ARG (expr, i);
 	}
       int j = ninterop;
-      for (tree t = dispatch_interop; t; t = TREE_CHAIN (t))
+      for (tree t = dispatch_interop; t && j > 0; t = TREE_CHAIN (t))
 	if (OMP_CLAUSE_CODE (t) == OMP_CLAUSE_INTEROP)
 	  buffer[i + --j] = OMP_CLAUSE_DECL (t);
       gcc_checking_assert (j == 0);
@@ -4084,14 +4082,17 @@ modify_call_for_omp_dispatch (tree expr, tree dispatch_clauses,
 		}
 	    }
 
+	  objs = build_fold_addr_expr (objs);
+	  target_tgtsync = build_fold_addr_expr (target_tgtsync);
+	  prefer_type = prefer_type ? build_fold_addr_expr (prefer_type)
+				    : null_pointer_node;
 	  tree fn = builtin_decl_explicit (BUILT_IN_GOMP_INTEROP);
 	  tree create
-	    = build_call_expr (fn, 11, dispatch_device_num,
-			       nobjs, objs, target_tgtsync,
-			       prefer_type ? prefer_type : null_pointer_node,
-			       integer_zero_node, null_pointer_node,
-			       integer_zero_node, null_pointer_node,
-			       integer_zero_node, null_pointer_node);
+	    = build_call_expr_loc (loc, fn, 11, dispatch_device_num,
+				   nobjs, objs, target_tgtsync, prefer_type,
+				   integer_zero_node, null_pointer_node,
+				   integer_zero_node, null_pointer_node,
+				   integer_zero_node, null_pointer_node);
 	  if (init_code)
 	    init_code = build2 (COMPOUND_EXPR, TREE_TYPE (create),
 				init_code, create);
@@ -4099,12 +4100,12 @@ modify_call_for_omp_dispatch (tree expr, tree dispatch_clauses,
 	    init_code = create;
 
 	  cleanup
-	    = build_call_expr (fn, 11, dispatch_device_num,
-			       integer_zero_node, null_pointer_node,
-			       null_pointer_node, null_pointer_node,
-			       integer_zero_node, null_pointer_node,
-			       nobjs, objs,
-			       integer_zero_node, null_pointer_node);
+	    = build_call_expr_loc (loc, fn, 11, dispatch_device_num,
+				   integer_zero_node, null_pointer_node,
+				   null_pointer_node, null_pointer_node,
+				   integer_zero_node, null_pointer_node,
+				   nobjs, objs,
+				   integer_zero_node, null_pointer_node);
 	  if (clobbers)
 	    cleanup = build2 (COMPOUND_EXPR, TREE_TYPE (clobbers),
 			      cleanup, clobbers);
@@ -4285,8 +4286,8 @@ modify_call_for_omp_dispatch (tree expr, tree dispatch_clauses,
 				       actual_ptr);
 		}
 	      tree fn = builtin_decl_explicit (BUILT_IN_OMP_GET_MAPPED_PTR);
-	      tree mapped_arg = build_call_expr (fn, 2, actual_ptr,
-						 dispatch_device_num);
+	      tree mapped_arg = build_call_expr_loc (loc, fn, 2, actual_ptr,
+						     dispatch_device_num);
 
 	      if (TREE_CODE (*arg_p) == ADDR_EXPR
 		  || (TREE_CODE (TREE_TYPE (actual_ptr)) == REFERENCE_TYPE))
@@ -4507,6 +4508,21 @@ gimplify_variant_call_expr (tree expr, fallback_t fallback,
 }
 
 
+/* Helper function for gimplify_call_expr, called via walk_tree.
+   Find used user labels.  */
+
+static tree
+find_used_user_labels (tree *tp, int *, void *)
+{
+  if (TREE_CODE (*tp) == LABEL_EXPR
+      && !DECL_ARTIFICIAL (LABEL_EXPR_LABEL (*tp))
+      && DECL_NAME (LABEL_EXPR_LABEL (*tp))
+      && TREE_USED (LABEL_EXPR_LABEL (*tp)))
+    return *tp;
+  return NULL_TREE;
+}
+
+
 /* Gimplify the CALL_EXPR node *EXPR_P into the GIMPLE sequence PRE_P.
    WANT_VALUE is true if the result of the call is desired.  */
 
@@ -4567,8 +4583,14 @@ gimplify_call_expr (tree *expr_p, gimple_seq *pre_p, fallback_t fallback)
 						   fndecl, 0));
 		  return GS_OK;
 		}
-	      /* If not optimizing, ignore the assumptions.  */
-	      if (!optimize || seen_error ())
+	      /* If not optimizing, ignore the assumptions unless there
+		 are used user labels in it.  */
+	      if ((!optimize
+		   && !walk_tree_without_duplicates (&CALL_EXPR_ARG (*expr_p,
+								     0),
+						     find_used_user_labels,
+						     NULL))
+		  || seen_error ())
 		{
 		  *expr_p = NULL_TREE;
 		  return GS_ALL_DONE;
@@ -9204,11 +9226,18 @@ omp_notice_variable (struct gimplify_omp_ctx *ctx, tree decl, bool in_code)
 			  | GOVD_MAP_ALLOC_ONLY)) == flags)
 	    {
 	      tree type = TREE_TYPE (decl);
+	      location_t loc = DECL_SOURCE_LOCATION (decl);
 
 	      if (gimplify_omp_ctxp->target_firstprivatize_array_bases
 		  && omp_privatize_by_reference (decl))
 		type = TREE_TYPE (type);
-	      if (!omp_mappable_type (type))
+
+	      if (!verify_type_context (loc, TCTX_OMP_MAP_IMP_REF, type))
+		/* Check if TYPE can appear in a target region.
+		   verify_type_context has already issued an error if it
+		   can't.  */
+		nflags |= GOVD_MAP | GOVD_EXPLICIT;
+	      else if (!omp_mappable_type (type))
 		{
 		  error ("%qD referenced in target region does not have "
 			 "a mappable type", decl);
@@ -9283,7 +9312,8 @@ omp_notice_variable (struct gimplify_omp_ctx *ctx, tree decl, bool in_code)
       && (flags & (GOVD_SEEN | GOVD_LOCAL)) == GOVD_SEEN
       && DECL_SIZE (decl))
     {
-      if (TREE_CODE (DECL_SIZE (decl)) != INTEGER_CST)
+      tree size;
+      if (!poly_int_tree_p (DECL_SIZE (decl)))
 	{
 	  splay_tree_node n2;
 	  tree t = DECL_VALUE_EXPR (decl);
@@ -9294,16 +9324,14 @@ omp_notice_variable (struct gimplify_omp_ctx *ctx, tree decl, bool in_code)
 	  n2->value |= GOVD_SEEN;
 	}
       else if (omp_privatize_by_reference (decl)
-	       && TYPE_SIZE_UNIT (TREE_TYPE (TREE_TYPE (decl)))
-	       && (TREE_CODE (TYPE_SIZE_UNIT (TREE_TYPE (TREE_TYPE (decl))))
-		   != INTEGER_CST))
+	       && (size = TYPE_SIZE_UNIT (TREE_TYPE (TREE_TYPE (decl))))
+	       && !poly_int_tree_p (size))
 	{
 	  splay_tree_node n2;
-	  tree t = TYPE_SIZE_UNIT (TREE_TYPE (TREE_TYPE (decl)));
-	  gcc_assert (DECL_P (t));
-	  n2 = splay_tree_lookup (ctx->variables, (splay_tree_key) t);
+	  gcc_assert (DECL_P (size));
+	  n2 = splay_tree_lookup (ctx->variables, (splay_tree_key) size);
 	  if (n2)
-	    omp_notice_variable (ctx, t, true);
+	    omp_notice_variable (ctx, size, true);
 	}
     }
 
@@ -12939,12 +12967,44 @@ gimplify_scan_omp_clauses (tree *list_p, gimple_seq *pre_p,
       unsigned int flags;
       tree decl;
       auto_vec<omp_addr_token *, 10> addr_tokens;
+      tree op = NULL_TREE;
+      location_t loc = OMP_CLAUSE_LOCATION (c);
 
       if (grp_end && c == OMP_CLAUSE_CHAIN (grp_end))
 	{
 	  grp_start_p = NULL;
 	  grp_end = NULL_TREE;
 	}
+
+      if (code == OMP_TARGET
+	  || code == OMP_TARGET_DATA
+	  || code == OMP_TARGET_ENTER_DATA
+	  || code == OMP_TARGET_EXIT_DATA)
+	/* Do some target-specific type checks for map operands.  */
+	switch (OMP_CLAUSE_CODE (c))
+	  {
+	  case OMP_CLAUSE_MAP:
+	    op = OMP_CLAUSE_OPERAND (c, 0);
+	    verify_type_context (loc, TCTX_OMP_MAP, TREE_TYPE (op));
+	    break;
+	  case OMP_CLAUSE_PRIVATE:
+	    op = OMP_CLAUSE_OPERAND (c, 0);
+	    verify_type_context (loc, TCTX_OMP_PRIVATE, TREE_TYPE (op));
+	    break;
+	  case OMP_CLAUSE_FIRSTPRIVATE:
+	    op = OMP_CLAUSE_OPERAND (c, 0);
+	    verify_type_context (loc, TCTX_OMP_FIRSTPRIVATE, TREE_TYPE (op));
+	    break;
+	  case OMP_CLAUSE_IS_DEVICE_PTR:
+	  case OMP_CLAUSE_USE_DEVICE_ADDR:
+	  case OMP_CLAUSE_USE_DEVICE_PTR:
+	  case OMP_CLAUSE_HAS_DEVICE_ADDR:
+	    op = OMP_CLAUSE_OPERAND (c, 0);
+	    verify_type_context (loc, TCTX_OMP_DEVICE_ADDR, TREE_TYPE (op));
+	    break;
+	  default:
+	    break;
+	  }
 
       switch (OMP_CLAUSE_CODE (c))
 	{
@@ -14563,7 +14623,7 @@ gimplify_adjust_omp_clauses_1 (splay_tree_node n, void *data)
       if ((gimplify_omp_ctxp->region_type & ORT_ACC) == 0)
 	OMP_CLAUSE_MAP_RUNTIME_IMPLICIT_P (clause) = 1;
       if (DECL_SIZE (decl)
-	  && TREE_CODE (DECL_SIZE (decl)) != INTEGER_CST)
+	  && !poly_int_tree_p (DECL_SIZE (decl)))
 	{
 	  tree decl2 = DECL_VALUE_EXPR (decl);
 	  gcc_assert (INDIRECT_REF_P (decl2));
@@ -15304,7 +15364,7 @@ gimplify_adjust_omp_clauses (gimple_seq *pre_p, gimple_seq body, tree *list_p,
 	  if (!DECL_P (decl))
 	    break;
 	  if (DECL_SIZE (decl)
-	      && TREE_CODE (DECL_SIZE (decl)) != INTEGER_CST)
+	      && !poly_int_tree_p (DECL_SIZE (decl)))
 	    {
 	      tree decl2 = DECL_VALUE_EXPR (decl);
 	      gcc_assert (INDIRECT_REF_P (decl2));

@@ -81,13 +81,22 @@ TyTyResolveCompile::get_implicit_enumeral_node_type (TyTy::BaseType *repr)
 }
 
 tree
-TyTyResolveCompile::get_unit_type ()
+TyTyResolveCompile::get_unit_type (Context *ctx)
 {
   static tree unit_type;
   if (unit_type == nullptr)
     {
+      auto cn = ctx->get_mappings ().get_current_crate ();
+      auto &c = ctx->get_mappings ().get_ast_crate (cn);
+      location_t locus = BUILTINS_LOCATION;
+      if (c.items.size () > 0)
+	{
+	  auto &item = c.items[0];
+	  locus = item->get_locus ();
+	}
+
       auto unit_type_node = Backend::struct_type ({});
-      unit_type = Backend::named_type ("()", unit_type_node, BUILTINS_LOCATION);
+      unit_type = Backend::named_type ("()", unit_type_node, locus);
     }
   return unit_type;
 }
@@ -421,7 +430,7 @@ TyTyResolveCompile::visit (const TyTy::TupleType &type)
 {
   if (type.num_fields () == 0)
     {
-      translated = get_unit_type ();
+      translated = get_unit_type (ctx);
       return;
     }
 
@@ -456,12 +465,24 @@ TyTyResolveCompile::visit (const TyTy::ArrayType &type)
     = TyTyResolveCompile::compile (ctx, type.get_element_type ());
 
   ctx->push_const_context ();
-  tree capacity_expr = CompileExpr::Compile (type.get_capacity_expr (), ctx);
+
+  HIR::Expr &hir_capacity_expr = type.get_capacity_expr ();
+  TyTy::BaseType *capacity_expr_ty = nullptr;
+  bool ok = ctx->get_tyctx ()->lookup_type (
+    hir_capacity_expr.get_mappings ().get_hirid (), &capacity_expr_ty);
+  rust_assert (ok);
+  tree capacity_expr = HIRCompileBase::compile_constant_expr (
+    ctx, hir_capacity_expr.get_mappings ().get_hirid (), capacity_expr_ty,
+    capacity_expr_ty, Resolver::CanonicalPath::create_empty (),
+    hir_capacity_expr, type.get_locus (), hir_capacity_expr.get_locus ());
+
   ctx->pop_const_context ();
 
   tree folded_capacity_expr = fold_expr (capacity_expr);
 
   translated = Backend::array_type (element_type, folded_capacity_expr);
+  if (translated != error_mark_node)
+    translated = ctx->insert_compiled_type (translated);
 }
 
 void
@@ -714,7 +735,7 @@ TyTyResolveCompile::visit (const TyTy::StrType &type)
 void
 TyTyResolveCompile::visit (const TyTy::NeverType &)
 {
-  translated = get_unit_type ();
+  translated = get_unit_type (ctx);
 }
 
 void

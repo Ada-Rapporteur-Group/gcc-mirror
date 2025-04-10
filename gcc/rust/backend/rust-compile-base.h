@@ -29,7 +29,14 @@ class HIRCompileBase
 public:
   virtual ~HIRCompileBase () {}
 
-  static tree address_expression (tree expr, location_t locus);
+  static tree address_expression (tree expr, location_t locus,
+				  tree ptrty = NULL_TREE);
+
+  static tree compile_constant_expr (
+    Context *ctx, HirId coercion_id, TyTy::BaseType *resolved_type,
+    TyTy::BaseType *expected_type,
+    const Resolver::CanonicalPath &canonical_path, HIR::Expr &const_value_expr,
+    location_t locus, location_t expr_locus);
 
 protected:
   HIRCompileBase (Context *ctx) : ctx (ctx) {}
@@ -96,7 +103,8 @@ protected:
 			      HIR::Expr &const_value_expr, location_t locus,
 			      location_t expr_locus);
 
-  tree compile_function (const std::string &fn_name, HIR::SelfParam &self_param,
+  tree compile_function (bool is_root_item, const std::string &fn_name,
+			 tl::optional<HIR::SelfParam> &self_param,
 			 std::vector<HIR::FunctionParam> &function_params,
 			 const HIR::FunctionQualifiers &qualifiers,
 			 HIR::Visibility &visibility, AST::AttrVec &outer_attrs,
@@ -104,7 +112,7 @@ protected:
 			 const Resolver::CanonicalPath &canonical_path,
 			 TyTy::FnType *fntype);
 
-  static tree unit_expression (location_t locus);
+  tree unit_expression (location_t locus);
 
   void setup_fndecl (tree fndecl, bool is_main_entry_point, bool is_generic_fn,
 		     HIR::Visibility &visibility,

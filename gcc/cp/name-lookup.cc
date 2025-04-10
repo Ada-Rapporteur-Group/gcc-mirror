@@ -2012,8 +2012,8 @@ get_class_binding_direct (tree klass, tree name, bool want_type)
 static void
 maybe_lazily_declare (tree klass, tree name)
 {
-  /* See big comment anout module_state::write_pendings regarding adding a check
-     bit.  */
+  /* See big comment about module_state::write_pendings regarding adding
+     a check bit.  */
   if (modules_p ())
     lazy_load_pendings (TYPE_NAME (klass));
 
@@ -3777,6 +3777,10 @@ check_module_override (tree decl, tree mvec, bool hiding,
      any reachable declaration, so we should check for overriding here too.  */
   bool any_reachable = deduction_guide_p (decl);
 
+  /* DECL might have an originating module if it's an instantiation of a
+     friend; we want to look at all reachable decls in that module.  */
+  unsigned decl_mod = get_originating_module (decl);
+
   if (BINDING_VECTOR_SLOTS_PER_CLUSTER == BINDING_SLOTS_FIXED)
     {
       cluster++;
@@ -3789,18 +3793,15 @@ check_module_override (tree decl, tree mvec, bool hiding,
 	/* Are we importing this module?  */
 	if (cluster->indices[jx].span != 1)
 	  continue;
-	if (!cluster->indices[jx].base)
+	unsigned cluster_mod = cluster->indices[jx].base;
+	if (!cluster_mod)
 	  continue;
-	if (!any_reachable
-	    && !bitmap_bit_p (imports, cluster->indices[jx].base))
+	bool c_any_reachable = (any_reachable || cluster_mod == decl_mod);
+	if (!c_any_reachable && !bitmap_bit_p (imports, cluster_mod))
 	  continue;
 	/* Is it loaded? */
 	if (cluster->slots[jx].is_lazy ())
-	  {
-	    gcc_assert (cluster->indices[jx].span == 1);
-	    lazy_load_binding (cluster->indices[jx].base,
-			       scope, name, &cluster->slots[jx]);
-	  }
+	  lazy_load_binding (cluster_mod, scope, name, &cluster->slots[jx]);
 	tree bind = cluster->slots[jx];
 	if (!bind)
 	  /* Errors could cause there to be nothing.  */
@@ -3812,7 +3813,7 @@ check_module_override (tree decl, tree mvec, bool hiding,
 	    /* If there was a matching STAT_TYPE here then xref_tag
 	       should have found it, but we need to check anyway because
 	       a conflicting using-declaration may exist.  */
-	    if (any_reachable)
+	    if (c_any_reachable)
 	      {
 		type = STAT_TYPE (bind);
 		bind = STAT_DECL (bind);
@@ -5203,9 +5204,11 @@ pushdecl_outermost_localscope (tree x)
   cp_binding_level *b = NULL;
   auto_cond_timevar tv (TV_NAME_LOOKUP);
 
-  /* Find the scope just inside the function parms.  */
-  for (cp_binding_level *n = current_binding_level;
-       n->kind != sk_function_parms; n = b->level_chain)
+  /* Find the block scope just inside the function parms.  */
+  cp_binding_level *n = current_binding_level;
+  while (n && n->kind != sk_block)
+    n = n->level_chain;
+  for (; n && n->kind != sk_function_parms; n = b->level_chain)
     b = n;
 
   return b ? do_pushdecl_with_scope (x, b) : error_mark_node;
@@ -8675,6 +8678,9 @@ store_class_bindings (vec<cp_class_binding, va_gc> *names,
 
 static GTY((deletable)) struct saved_scope *free_saved_scope;
 
+/* Temporarily make the current scope the global namespace, saving away
+   the current scope for pop_from_top_level.  */
+
 void
 push_to_top_level (void)
 {
@@ -8716,18 +8722,19 @@ push_to_top_level (void)
     store_class_bindings (previous_class_level->class_shadowed,
 			  &s->old_bindings);
 
-  /* Have to include the global scope, because class-scope decls
-     aren't listed anywhere useful.  */
+  /* Save and clear any IDENTIFIER_BINDING from local scopes.  */
   for (; b; b = b->level_chain)
     {
       tree t;
 
-      /* Template IDs are inserted into the global level. If they were
-	 inserted into namespace level, finish_file wouldn't find them
-	 when doing pending instantiations. Therefore, don't stop at
-	 namespace level, but continue until :: .  */
-      if (global_scope_p (b))
-	break;
+      /* We don't need to consider namespace scopes, they don't affect
+	 IDENTIFIER_BINDING.  */
+      if (b->kind == sk_namespace)
+	{
+	  /* Jump straight to '::'.  */
+	  b = NAMESPACE_LEVEL (global_namespace);
+	  break;
+	}
 
       store_bindings (b->names, &s->old_bindings);
       /* We also need to check class_shadowed to save class-level type

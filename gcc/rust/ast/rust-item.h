@@ -434,13 +434,14 @@ class SelfParam : public Param
   bool has_ref;
   bool is_mut;
   // bool has_lifetime; // only possible if also ref
-  Lifetime lifetime;
+  tl::optional<Lifetime> lifetime;
 
   // bool has_type; // only possible if not ref
   std::unique_ptr<Type> type;
 
   // Unrestricted constructor used for error state
-  SelfParam (Lifetime lifetime, bool has_ref, bool is_mut, Type *type)
+  SelfParam (tl::optional<Lifetime> lifetime, bool has_ref, bool is_mut,
+	     Type *type)
     : Param ({}, UNDEF_LOCATION), has_ref (has_ref), is_mut (is_mut),
       lifetime (std::move (lifetime)), type (type)
   {}
@@ -453,7 +454,7 @@ public:
   bool has_type () const { return type != nullptr; }
 
   // Returns whether the self-param has a valid lifetime.
-  bool has_lifetime () const { return !lifetime.is_error (); }
+  bool has_lifetime () const { return lifetime.has_value (); }
 
   // Returns whether the self-param is in an error state.
   bool is_error () const
@@ -472,11 +473,11 @@ public:
   // Type-based self parameter (not ref, no lifetime)
   SelfParam (std::unique_ptr<Type> type, bool is_mut, location_t locus)
     : Param ({}, locus), has_ref (false), is_mut (is_mut),
-      lifetime (Lifetime::error ()), type (std::move (type))
+      lifetime (tl::nullopt), type (std::move (type))
   {}
 
   // Lifetime-based self parameter (is ref, no type)
-  SelfParam (Lifetime lifetime, bool is_mut, location_t locus)
+  SelfParam (tl::optional<Lifetime> lifetime, bool is_mut, location_t locus)
     : Param ({}, locus), has_ref (true), is_mut (is_mut),
       lifetime (std::move (lifetime))
   {}
@@ -522,8 +523,8 @@ public:
   bool get_has_ref () const { return has_ref; };
   bool get_is_mut () const { return is_mut; }
 
-  Lifetime get_lifetime () const { return lifetime; }
-  Lifetime &get_lifetime () { return lifetime; }
+  Lifetime get_lifetime () const { return lifetime.value (); }
+  Lifetime &get_lifetime () { return lifetime.value (); }
 
   NodeId get_node_id () const { return node_id; }
 
@@ -1330,7 +1331,7 @@ class Function : public VisItem, public AssociatedItem, public ExternalItem
   WhereClause where_clause;
   tl::optional<std::unique_ptr<BlockExpr>> function_body;
   location_t locus;
-  bool is_default;
+  bool has_default;
   bool is_external_function;
 
 public:
@@ -1355,6 +1356,8 @@ public:
 
   bool has_body () const { return function_body.has_value (); }
 
+  bool is_default () const { return has_default; }
+
   // Mega-constructor with all possible fields
   Function (Identifier function_name, FunctionQualifiers qualifiers,
 	    std::vector<std::unique_ptr<GenericParam>> generic_params,
@@ -1362,7 +1365,7 @@ public:
 	    std::unique_ptr<Type> return_type, WhereClause where_clause,
 	    tl::optional<std::unique_ptr<BlockExpr>> function_body,
 	    Visibility vis, std::vector<Attribute> outer_attrs,
-	    location_t locus, bool is_default = false,
+	    location_t locus, bool has_default = false,
 	    bool is_external_function = false)
     : VisItem (std::move (vis), std::move (outer_attrs)),
       ExternalItem (Stmt::node_id), qualifiers (std::move (qualifiers)),
@@ -1372,7 +1375,7 @@ public:
       return_type (std::move (return_type)),
       where_clause (std::move (where_clause)),
       function_body (std::move (function_body)), locus (locus),
-      is_default (is_default), is_external_function (is_external_function)
+      has_default (has_default), is_external_function (is_external_function)
   {}
 
   // TODO: add constructor with less fields

@@ -577,7 +577,7 @@ c_build_functype_attribute_variant (tree ntype, tree otype, tree attrs)
 }
 
 /* Given a type which could be a typedef name, make sure to return the
-   original type.  */
+   original type.  See set_underlying_type. */
 static const_tree
 c_type_original (const_tree t)
 {
@@ -590,6 +590,26 @@ c_type_original (const_tree t)
     t = DECL_ORIGINAL_TYPE (TYPE_NAME (t));
   return t;
 }
+
+/* Return the tag for a tagged type.  */
+tree
+c_type_tag (const_tree t)
+{
+  gcc_assert (RECORD_OR_UNION_TYPE_P (t) || TREE_CODE (t) == ENUMERAL_TYPE);
+  const_tree orig = c_type_original (t);
+  tree name = TYPE_NAME (orig);
+  if (!name)
+    return NULL_TREE;
+  if (TREE_CODE (name) == TYPE_DECL)
+    {
+      /* A TYPE_DECL added by add_decl_expr.  */
+      gcc_checking_assert (!DECL_NAME (name));
+      return NULL_TREE;
+    }
+  gcc_checking_assert (TREE_CODE (name) == IDENTIFIER_NODE);
+  return name;
+}
+
 
 
 /* Return the composite type of two compatible types.
@@ -744,7 +764,7 @@ composite_type_internal (tree t1, tree t2, struct composite_cache* cache)
       if (flag_isoc23 && !comptypes_same_p (t1, t2))
 	{
 	  /* Go to the original type to get the right tag.  */
-	  tree tag = TYPE_NAME (c_type_original (const_cast<tree> (t1)));
+	  tree tag = c_type_tag (t1);
 
 	  gcc_checking_assert (COMPLETE_TYPE_P (t1) && COMPLETE_TYPE_P (t2));
 	  gcc_checking_assert (!tag || comptypes (t1, t2));
@@ -1807,17 +1827,7 @@ tagged_types_tu_compatible_p (const_tree t1, const_tree t2,
 {
   tree s1, s2;
 
-  /* We have to verify that the tags of the types are the same.  This
-     is harder than it looks because this may be a typedef, so we have
-     to go look at the original type.  */
-  t1 = c_type_original (t1);
-  t2 = c_type_original (t2);
-  gcc_checking_assert (!TYPE_NAME (t1)
-		       || TREE_CODE (TYPE_NAME (t1)) == IDENTIFIER_NODE);
-  gcc_checking_assert (!TYPE_NAME (t2)
-		       || TREE_CODE (TYPE_NAME (t2)) == IDENTIFIER_NODE);
-
-  if (TYPE_NAME (t1) != TYPE_NAME (t2))
+  if (c_type_tag (t1) != c_type_tag (t2))
     return false;
 
   /* When forming equivalence classes for TYPE_CANONICAL in C23, we treat
@@ -1828,7 +1838,7 @@ tagged_types_tu_compatible_p (const_tree t1, const_tree t2,
 
   /* Different types without tag are incompatible except as an anonymous
      field or when forming equivalence classes for TYPE_CANONICAL.  */
-  if (!data->anon_field && !data->equiv && NULL_TREE == TYPE_NAME (t1))
+  if (!data->anon_field && !data->equiv && NULL_TREE == c_type_tag (t1))
     return false;
 
   if (!data->anon_field && TYPE_STUB_DECL (t1) != TYPE_STUB_DECL (t2))
@@ -4824,8 +4834,8 @@ pointer_diff (location_t loc, tree op0, tree op1, tree *instrument_expr)
   if (current_function_decl != NULL_TREE
       && sanitize_flags_p (SANITIZE_POINTER_SUBTRACT))
     {
-      op0 = save_expr (op0);
-      op1 = save_expr (op1);
+      op0 = save_expr (c_fully_fold (op0, false, NULL));
+      op1 = save_expr (c_fully_fold (op1, false, NULL));
 
       tree tt = builtin_decl_explicit (BUILT_IN_ASAN_POINTER_SUBTRACT);
       *instrument_expr = build_call_expr_loc (loc, tt, 2, op0, op1);
@@ -14455,8 +14465,8 @@ build_binary_op (location_t location, enum tree_code code,
 	  && current_function_decl != NULL_TREE
 	  && sanitize_flags_p (SANITIZE_POINTER_COMPARE))
 	{
-	  op0 = save_expr (op0);
-	  op1 = save_expr (op1);
+	  op0 = save_expr (c_fully_fold (op0, false, NULL));
+	  op1 = save_expr (c_fully_fold (op1, false, NULL));
 
 	  tree tt = builtin_decl_explicit (BUILT_IN_ASAN_POINTER_COMPARE);
 	  instrument_expr = build_call_expr_loc (location, tt, 2, op0, op1);

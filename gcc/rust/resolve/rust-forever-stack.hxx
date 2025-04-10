@@ -20,6 +20,7 @@
 #include "rust-ast.h"
 #include "rust-diagnostics.h"
 #include "rust-forever-stack.h"
+#include "rust-edition.h"
 #include "rust-rib.h"
 #include "rust-unwrap-segment.h"
 #include "optional.h"
@@ -77,7 +78,7 @@ ForeverStack<N>::push_inner (Rib rib, Link link)
       rust_assert (&cursor_reference.get () == &root);
       // Prelude doesn't have an access path
       rust_assert (!link.path);
-      update_cursor (this->prelude);
+      update_cursor (this->lang_prelude);
       return;
     }
   // If the link does not exist, we create it and emplace a new `Node` with the
@@ -319,16 +320,16 @@ ForeverStack<N>::get (const Identifier &name)
 
 template <Namespace N>
 tl::optional<Rib::Definition>
-ForeverStack<N>::get_prelude (const Identifier &name)
+ForeverStack<N>::get_lang_prelude (const Identifier &name)
 {
-  return prelude.rib.get (name.as_string ());
+  return lang_prelude.rib.get (name.as_string ());
 }
 
 template <Namespace N>
 tl::optional<Rib::Definition>
-ForeverStack<N>::get_prelude (const std::string &name)
+ForeverStack<N>::get_lang_prelude (const std::string &name)
 {
-  return prelude.rib.get (name);
+  return lang_prelude.rib.get (name);
 }
 
 template <>
@@ -571,7 +572,7 @@ ForeverStack<N>::resolve_segments (
 	  if (current_node->is_root () && !searched_prelude)
 	    {
 	      searched_prelude = true;
-	      current_node = &prelude;
+	      current_node = &lang_prelude;
 	      continue;
 	    }
 
@@ -594,14 +595,47 @@ ForeverStack<N>::resolve_segments (
   return *current_node;
 }
 
+template <>
+inline tl::optional<Rib::Definition>
+ForeverStack<Namespace::Types>::resolve_final_segment (Node &final_node,
+						       std::string &seg_name,
+						       bool is_lower_self)
+{
+  if (is_lower_self)
+    return Rib::Definition::NonShadowable (final_node.id);
+  else
+    return final_node.rib.get (seg_name);
+}
+
+template <Namespace N>
+tl::optional<Rib::Definition>
+ForeverStack<N>::resolve_final_segment (Node &final_node, std::string &seg_name,
+					bool is_lower_self)
+{
+  return final_node.rib.get (seg_name);
+}
+
 template <Namespace N>
 template <typename S>
 tl::optional<Rib::Definition>
 ForeverStack<N>::resolve_path (
-  const std::vector<S> &segments,
+  const std::vector<S> &segments, bool has_opening_scope_resolution,
   std::function<void (const S &, NodeId)> insert_segment_resolution)
 {
   // TODO: What to do if segments.empty() ?
+
+  // handle paths with opening scopes
+  std::function<void (void)> cleanup_current = [] () {};
+  if (has_opening_scope_resolution)
+    {
+      Node *last_current = &cursor_reference.get ();
+      if (get_rust_edition () == Edition::E2015)
+	cursor_reference = root;
+      else
+	cursor_reference = extern_prelude;
+      cleanup_current
+	= [this, last_current] () { cursor_reference = *last_current; };
+    }
 
   // if there's only one segment, we just use `get`
   if (segments.size () == 1)
@@ -613,6 +647,7 @@ ForeverStack<N>::resolve_path (
 	    lang_item.value ());
 
 	  insert_segment_resolution (seg, seg_id);
+	  cleanup_current ();
 	  // TODO: does NonShadowable matter?
 	  return Rib::Definition::NonShadowable (seg_id);
 	}
@@ -621,43 +656,49 @@ ForeverStack<N>::resolve_path (
 	= get (unwrap_type_segment (segments.back ()).as_string ());
 
       if (!res)
-	res = get_prelude (unwrap_type_segment (segments.back ()).as_string ());
+	res = get_lang_prelude (
+	  unwrap_type_segment (segments.back ()).as_string ());
 
       if (res && !res->is_ambiguous ())
 	insert_segment_resolution (segments.back (), res->get_node_id ());
+      cleanup_current ();
       return res;
     }
 
   std::reference_wrapper<Node> starting_point = cursor ();
 
-  return find_starting_point (segments, starting_point,
-			      insert_segment_resolution)
-    .and_then ([this, &segments, &starting_point, &insert_segment_resolution] (
-		 typename std::vector<S>::const_iterator iterator) {
-      return resolve_segments (starting_point.get (), segments, iterator,
-			       insert_segment_resolution);
-    })
-    .and_then ([this, &segments, &insert_segment_resolution] (
-		 Node final_node) -> tl::optional<Rib::Definition> {
-      // leave resolution within impl blocks to type checker
-      if (final_node.rib.kind == Rib::Kind::TraitOrImpl)
-	return tl::nullopt;
+  auto res
+    = find_starting_point (segments, starting_point, insert_segment_resolution)
+	.and_then (
+	  [this, &segments, &starting_point, &insert_segment_resolution] (
+	    typename std::vector<S>::const_iterator iterator) {
+	    return resolve_segments (starting_point.get (), segments, iterator,
+				     insert_segment_resolution);
+	  })
+	.and_then ([this, &segments, &insert_segment_resolution] (
+		     Node final_node) -> tl::optional<Rib::Definition> {
+	  // leave resolution within impl blocks to type checker
+	  if (final_node.rib.kind == Rib::Kind::TraitOrImpl)
+	    return tl::nullopt;
 
-      std::string seg_name
-	= unwrap_type_segment (segments.back ()).as_string ();
+	  auto &seg = unwrap_type_segment (segments.back ());
+	  std::string seg_name = seg.as_string ();
 
-      // assuming this can't be a lang item segment
-      tl::optional<Rib::Definition> res = final_node.rib.get (seg_name);
+	  // assuming this can't be a lang item segment
+	  tl::optional<Rib::Definition> res
+	    = resolve_final_segment (final_node, seg_name,
+				     seg.is_lower_self_seg ());
+	  // Ok we didn't find it in the rib, Lets try the prelude...
+	  if (!res)
+	    res = get_lang_prelude (seg_name);
 
-      // Ok we didn't find it in the rib, Lets try the prelude...
-      if (!res)
-	res = get_prelude (seg_name);
+	  if (res && !res->is_ambiguous ())
+	    insert_segment_resolution (segments.back (), res->get_node_id ());
 
-      if (res && !res->is_ambiguous ())
-	insert_segment_resolution (segments.back (), res->get_node_id ());
-
-      return res;
-    });
+	  return res;
+	});
+  cleanup_current ();
+  return res;
 }
 
 template <Namespace N>

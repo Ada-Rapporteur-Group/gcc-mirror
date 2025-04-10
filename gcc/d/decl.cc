@@ -651,7 +651,7 @@ public:
       }
 
     DECL_INITIAL (vtblsym->csym)
-      = build_constructor (TREE_TYPE (vtblsym->csym), elms);
+      = build_padded_constructor (TREE_TYPE (vtblsym->csym), elms);
     d_finish_decl (vtblsym->csym);
 
     d->semanticRun (PASS::obj);
@@ -2391,6 +2391,12 @@ aggregate_initializer_decl (AggregateDeclaration *decl)
   if (sd && !sd->alignment.isDefault ())
     {
       SET_DECL_ALIGN (sinit, sd->alignment.get () * BITS_PER_UNIT);
+      DECL_USER_ALIGN (sinit) = true;
+    }
+  else if (sd == NULL)
+    {
+      /* Alignment of class is determined its biggest field alignment.  */
+      SET_DECL_ALIGN (sinit, decl->alignsize * BITS_PER_UNIT);
       DECL_USER_ALIGN (sinit) = true;
     }
 

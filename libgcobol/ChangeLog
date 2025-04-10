@@ -1,3 +1,79 @@
+2025-04-09  Bob Dubner  <rdubner@symas.com>
+
+	PR cobol/119682
+	* common-defs.h: Define the REFER_T_REFMOD constant.
+	* intrinsic.cc: (__gg__max): Change the calls to __gg__compare_2(),
+	(__gg__min): Likewise, (__gg__ord_min): Likewise,
+	(__gg__ord_max): Likewise.
+	* libgcobol.cc: (__gg__compare_2): Change definition of calling
+	parameters, eliminate separate flag bit for ALL and ADDRESS_OF,
+	change comparison of alphanumeric to numeric when the numeric
+	is a refmod.
+	* libgcobol.h: Change declaration of __gg__compare_2.
+
+2025-04-05  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* Makefile.am: Add libgcobol.spec and dependency.
+	* Makefile.in: Regenerate.
+	* configure: Regenerate.
+	* configure.ac: Add libgcobol.spec handling.
+	* libgcobol.spec.in: New file.
+
+2025-04-05  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* aclocal.m4: Regenerate.
+	* config.h.in: Regenerate.
+	* Makefile.am: Use the configured LIBS and extra_ldflags.
+	* Makefile.in: Regenerate.
+	* configure: Regenerate.
+	* configure.ac: Shift configure to use c++. Order tests for tools
+	and environment before other tests.
+
+2025-04-04  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* Makefile.am: Use $(LIBM) to add the math lib when
+	it is needed.
+	* Makefile.in: Regenerate.
+	* configure: Regenerate.
+	* configure.ac: Check if the target wants libm.
+
+2025-04-04  Bob Dubner  <rdubner@symas.com>
+
+	* charmaps.h: Change __gg__data_return_code to 'short' type.
+	* constants.cc: Likewise.
+
+2025-04-03  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* config.h.in: Regenerate.
+	* configure: Regenerate.
+	* configure.ac: Check for availability of strfromf32 and
+	strfromf64.
+	* libgcobol.cc (strfromf32, strfromf64): New.
+
+2025-04-03  Iain Sandoe  <iain@sandoe.co.uk>
+
+	PR cobol/119295
+	* config.h.in: Regenerate.
+	* configure: Regenerate.
+	* configure.ac: Configure random_r and friends
+	* intrinsic.cc (__gg__random): Use random_r when available.
+	(__gg__random_next): Likewise.
+
+2025-04-03  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* gfileio.cc: Include config.h.
+	* gmath.cc: Likewise.
+	* io.cc: Likewise.
+	* libgcobol.cc: Likewise.
+
+2025-04-02  Bob Dubner  <rdubner@symas.com>
+
+	PR cobol/119521
+	* intrinsic.cc: (__gg__reverse): Trim final result for intermediate_e.
+	* libgcobol.cc: (__gg__adjust_dest_size): Abort on attempt to increase
+	the size of a result.  (__gg__module_name): Formatting.
+	__gg__reverse(): Resize only intermediates
+
 2025-03-28  Bob Dubner  <rdubner@symas.com>
 
 	* charmaps.cc:Eliminate "#include libgcobol.h".

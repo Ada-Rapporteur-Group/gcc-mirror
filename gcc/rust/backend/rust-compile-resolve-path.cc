@@ -105,7 +105,9 @@ ResolvePathRef::attempt_constructor_expression_lookup (
 
   // make the ctor for the union
   HIR::Expr &discrim_expr = variant->get_discriminant ();
+  ctx->push_const_context ();
   tree discrim_expr_node = CompileExpr::Compile (discrim_expr, ctx);
+  ctx->pop_const_context ();
   tree folded_discrim_expr = fold_expr (discrim_expr_node);
   tree qualifier = folded_discrim_expr;
 
@@ -259,10 +261,10 @@ HIRCompileBase::query_compile (HirId ref, TyTy::BaseType *lookup,
       HIR::ExternalItem *resolved_extern_item = hir_extern_item->first;
       if (!lookup->has_substitutions_defined ())
 	return CompileExternItem::compile (resolved_extern_item, ctx, nullptr,
-					   true, expr_locus);
+					   expr_locus);
       else
 	return CompileExternItem::compile (resolved_extern_item, ctx, lookup,
-					   true, expr_locus);
+					   expr_locus);
     }
   else
     {
@@ -284,10 +286,10 @@ HIRCompileBase::query_compile (HirId ref, TyTy::BaseType *lookup,
 	{
 	  if (!lookup->has_substitutions_defined ())
 	    return CompileInherentImplItem::Compile (resolved_item->first, ctx,
-						     nullptr, true, expr_locus);
+						     nullptr, expr_locus);
 	  else
 	    return CompileInherentImplItem::Compile (resolved_item->first, ctx,
-						     lookup, true, expr_locus);
+						     lookup, expr_locus);
 	}
       else if (auto trait_item
 	       = ctx->get_mappings ().lookup_hir_trait_item (ref))
@@ -300,6 +302,27 @@ HIRCompileBase::query_compile (HirId ref, TyTy::BaseType *lookup,
 	  bool ok = ctx->get_tyctx ()->lookup_trait_reference (
 	    trait->get_mappings ().get_defid (), &trait_ref);
 	  rust_assert (ok);
+
+	  if (trait_item.value ()->get_item_kind ()
+	      == HIR::TraitItem::TraitItemKind::CONST)
+	    {
+	      auto &c
+		= *static_cast<HIR::TraitItemConst *> (trait_item.value ());
+	      if (!c.has_expr ())
+		{
+		  rich_location r (line_table, expr_locus);
+		  r.add_range (trait->get_locus ());
+		  r.add_range (c.get_locus ());
+		  rust_error_at (r, "no default expression on trait constant");
+		  return error_mark_node;
+		}
+
+	      return CompileExpr::Compile (c.get_expr (), ctx);
+	    }
+
+	  if (trait_item.value ()->get_item_kind ()
+	      != HIR::TraitItem::TraitItemKind::FUNC)
+	    return error_mark_node;
 
 	  // the type resolver can only resolve type bounds to their trait
 	  // item so its up to us to figure out if this path should resolve
@@ -349,11 +372,10 @@ HIRCompileBase::query_compile (HirId ref, TyTy::BaseType *lookup,
 
 	      if (!lookup->has_substitutions_defined ())
 		return CompileInherentImplItem::Compile (impl_item, ctx,
-							 nullptr, true,
-							 expr_locus);
+							 nullptr, expr_locus);
 	      else
 		return CompileInherentImplItem::Compile (impl_item, ctx, lookup,
-							 true, expr_locus);
+							 expr_locus);
 	    }
 	}
     }

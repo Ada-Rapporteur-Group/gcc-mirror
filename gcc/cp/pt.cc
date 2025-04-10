@@ -11117,6 +11117,18 @@ any_template_parm_r (tree t, void *data)
 
     case LAMBDA_EXPR:
       {
+	/* TREE_STATIC on LAMBDA_EXPR_EXTRA_ARGS means a full set of
+	   arguments, so we can just look there; they will replace
+	   any template parms in the rest of the LAMBDA_EXPR.  */
+	if (tree args = LAMBDA_EXPR_EXTRA_ARGS (t))
+	  {
+	    WALK_SUBTREE (args);
+	    /* Without TREE_STATIC the args are just outer levels, so we'd
+	       still need to look through the lambda for just inner
+	       parameters.  Hopefully that's not necessary.  */
+	    gcc_checking_assert (TREE_STATIC (args));
+	    return 0;
+	  }
 	/* Look in the parms and body.  */
 	tree fn = lambda_function (t);
 	WALK_SUBTREE (TREE_TYPE (fn));
@@ -13740,7 +13752,6 @@ add_extra_args (tree extra, tree args, tsubst_flags_t complain, tree in_decl)
       gcc_assert (!TREE_PURPOSE (extra));
       extra = TREE_VALUE (extra);
     }
-  gcc_checking_assert (TREE_STATIC (extra) == uses_template_parms (extra));
   if (TREE_STATIC (extra))
     /* This is a partial substitution into e.g. a requires-expr or lambda-expr
        inside a default template argument; we expect 'extra' to be a full set
@@ -17741,13 +17752,37 @@ maybe_dependent_member_ref (tree t, tree args, tsubst_flags_t complain,
 
   if (TYPE_P (t))
     {
+      bool stripped = false;
       if (typedef_variant_p (t))
-	t = strip_typedefs (t);
-      tree decl = TYPE_NAME (t);
+	{
+	  /* Since this transformation may undesirably turn a deduced context
+	     into a non-deduced one, we'd rather strip typedefs than perform
+	     the transformation.  */
+	  tree u = strip_typedefs (t);
+	  if (u != t)
+	    {
+	      stripped = true;
+	      t = u;
+	    }
+	}
+      decl = TYPE_NAME (t);
       if (decl)
 	decl = maybe_dependent_member_ref (decl, args, complain, in_decl);
       if (!decl)
-	return NULL_TREE;
+	{
+	  if (stripped)
+	    /* The original type was an alias from the current instantiation
+	       which we stripped to something outside it.  At this point we
+	       need to commit to using the stripped type rather than deferring
+	       to the caller (which would use the original type), to ensure
+	       eligible bits of the stripped type get transformed.  */
+	    return tsubst (t, args, complain, in_decl);
+	  else
+	    /* The original type wasn't a typedef, and we decided it doesn't
+	       need rewriting, so just let the caller (tsubst) substitute it
+	       normally.  */
+	    return NULL_TREE;
+	}
       return cp_build_qualified_type (TREE_TYPE (decl), cp_type_quals (t),
 				      complain);
     }
@@ -17765,7 +17800,8 @@ maybe_dependent_member_ref (tree t, tree args, tsubst_flags_t complain,
 
   if (TREE_CODE (t) == TYPE_DECL)
     {
-      if (TREE_CODE (TREE_TYPE (t)) == TYPENAME_TYPE
+      if (!is_typedef_decl (t)
+	  && TREE_CODE (TREE_TYPE (t)) == TYPENAME_TYPE
 	  && TYPE_NAME (TREE_TYPE (t)) == t)
 	/* The TYPE_DECL for a typename has DECL_CONTEXT of the typename
 	   scope, but it doesn't need to be rewritten again.  */
@@ -22650,7 +22686,7 @@ instantiate_template (tree tmpl, tree orig_args, tsubst_flags_t complain)
      FUNCTION_DECL which is the desired context for access checking
      is not built yet.  We solve this chicken-and-egg problem by
      deferring all checks until we have the FUNCTION_DECL.  */
-  push_deferring_access_checks (dk_deferred);
+  deferring_access_check_sentinel dacs (dk_deferred);
 
   /* Instantiation of the function happens in the context of the function
      template, not the context of the overload resolution we're doing.  */
@@ -22708,10 +22744,13 @@ instantiate_template (tree tmpl, tree orig_args, tsubst_flags_t complain)
   pop_from_top_level ();
 
   if (fndecl == error_mark_node)
-    {
-      pop_deferring_access_checks ();
-      return error_mark_node;
-    }
+    return error_mark_node;
+
+  /* Substituting the type might have recursively instantiated this
+     same alias (c++/117530).  */
+  if (DECL_ALIAS_TEMPLATE_P (gen_tmpl)
+      && (spec = retrieve_specialization (gen_tmpl, targ_ptr, hash)))
+    return spec;
 
   /* The DECL_TI_TEMPLATE should always be the immediate parent
      template, not the most general template.  */
@@ -22746,7 +22785,6 @@ instantiate_template (tree tmpl, tree orig_args, tsubst_flags_t complain)
 	access_ok = false;
       pop_access_scope (fndecl);
     }
-  pop_deferring_access_checks ();
 
   /* If we've just instantiated the main entry point for a function,
      instantiate all the alternate entry points as well.  We do this
@@ -27236,6 +27274,19 @@ regenerate_decl_from_template (tree decl, tree tmpl, tree args)
       /* Don't bother with this for unique friends that can't be redeclared and
 	 might change type if regenerated (PR69836).  */
       if (DECL_UNIQUE_FRIEND_P (decl))
+	goto done;
+
+      /* A template with a lambda in the signature also changes type if
+	 regenerated (PR119401).  */
+      walk_tree_fn find_lambda
+	= [](tree *tp, int *, void *)
+	{
+	  if (TREE_CODE (*tp) == LAMBDA_EXPR)
+	    return *tp;
+	  return NULL_TREE;
+	};
+      if (cp_walk_tree_without_duplicates
+	  (&TREE_TYPE (tmpl), find_lambda, nullptr))
 	goto done;
 
       /* Use the source location of the definition.  */

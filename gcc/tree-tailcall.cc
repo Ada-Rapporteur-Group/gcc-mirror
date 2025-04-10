@@ -165,8 +165,6 @@ suitable_for_tail_opt_p (gcall *call, bool diag_musttail)
 static bool
 suitable_for_tail_call_opt_p (gcall *call, bool diag_musttail)
 {
-  tree param;
-
   /* alloca (until we have stack slot life analysis) inhibits
      sibling call optimizations, but not tail recursion.  */
   if (cfun->calls_alloca)
@@ -204,19 +202,58 @@ suitable_for_tail_call_opt_p (gcall *call, bool diag_musttail)
       return false;
     }
 
-  /* ??? It is OK if the argument of a function is taken in some cases,
-     but not in all cases.  See PR15387 and PR19616.  Revisit for 4.1.  */
-  for (param = DECL_ARGUMENTS (current_function_decl);
-       param;
-       param = DECL_CHAIN (param))
-    if (TREE_ADDRESSABLE (param))
+  if (diag_musttail
+      && gimple_call_must_tail_p (call)
+      && warn_musttail_local_addr)
+    for (unsigned int i = 0; i < gimple_call_num_args (call); i++)
       {
-	maybe_error_musttail (call, _("address of caller arguments taken"),
-			      diag_musttail);
-	return false;
+	tree arg = gimple_call_arg (call, i);
+	if (!POINTER_TYPE_P (TREE_TYPE (arg)))
+	  continue;
+	if (TREE_CODE (arg) == ADDR_EXPR)
+	  {
+	    arg = get_base_address (TREE_OPERAND (arg, 0));
+	    if (auto_var_in_fn_p (arg, current_function_decl))
+	      {
+		if (TREE_CODE (arg) == LABEL_DECL)
+		  warning_at (gimple_location (call), OPT_Wmusttail_local_addr,
+			      "address of label passed to %<musttail%> "
+			      "call argument");
+		else if (TREE_CODE (arg) == PARM_DECL)
+		  warning_at (gimple_location (call), OPT_Wmusttail_local_addr,
+			      "address of parameter %qD passed to "
+			      "%<musttail%> call argument", arg);
+		else if (!DECL_ARTIFICIAL (arg) && DECL_NAME (arg))
+		  warning_at (gimple_location (call), OPT_Wmusttail_local_addr,
+			      "address of automatic variable %qD passed to "
+			      "%<musttail%> call argument", arg);
+		else
+		  warning_at (gimple_location (call), OPT_Wmusttail_local_addr,
+			      "address of local variable passed to "
+			      "%<musttail%> call argument");
+		suppress_warning (call, OPT_Wmaybe_musttail_local_addr);
+	      }
+	  }
       }
 
   return true;
+}
+
+/* Return single successor edge ignoring EDGE_EH edges.  */
+
+static edge
+single_non_eh_succ_edge (basic_block bb)
+{
+   edge e, ret = NULL;
+   edge_iterator ei;
+   FOR_EACH_EDGE (e, ei, bb->succs)
+    if ((e->flags & EDGE_EH) == 0)
+      {
+	gcc_assert (ret == NULL);
+	ret = e;
+      }
+  gcc_assert (ret);
+  return ret;
 }
 
 /* Checks whether the expression EXPR in stmt AT is independent of the
@@ -245,7 +282,7 @@ independent_of_stmt_p (tree expr, gimple *at, gimple_stmt_iterator gsi,
   /* Mark the blocks in the chain leading to the end.  */
   at_bb = gimple_bb (at);
   call_bb = gimple_bb (gsi_stmt (gsi));
-  for (bb = call_bb; bb != at_bb; bb = single_succ (bb))
+  for (bb = call_bb; bb != at_bb; bb = single_non_eh_succ_edge (bb)->dest)
     bb->aux = &bb->aux;
   bb->aux = &bb->aux;
 
@@ -289,7 +326,7 @@ independent_of_stmt_p (tree expr, gimple *at, gimple_stmt_iterator gsi,
     }
 
   /* Unmark the blocks.  */
-  for (bb = call_bb; bb != at_bb; bb = single_succ (bb))
+  for (bb = call_bb; bb != at_bb; bb = single_non_eh_succ_edge (bb)->dest)
     bb->aux = NULL;
   bb->aux = NULL;
 
@@ -360,6 +397,10 @@ process_assignment (gassign *stmt,
   if (!flag_associative_math)
     if (FLOAT_TYPE_P (TREE_TYPE (DECL_RESULT (current_function_decl))))
       return FAIL;
+
+  /* We at least cannot build -1 for all fixed point types.  */
+  if (FIXED_POINT_TYPE_P (TREE_TYPE (DECL_RESULT (current_function_decl))))
+    return FAIL;
 
   if (rhs_class == GIMPLE_UNARY_RHS
       && op0 == *ass_var)
@@ -443,7 +484,7 @@ maybe_error_musttail (gcall *call, const char *err, bool diag_musttail)
 {
   if (gimple_call_must_tail_p (call) && diag_musttail)
     {
-      error_at (call->location, "cannot tail-call: %s", err);
+      error_at (gimple_location (call), "cannot tail-call: %s", err);
       /* Avoid another error. ??? If there are multiple reasons why tail
 	 calls fail it might be useful to report them all to avoid
 	 whack-a-mole for the user. But currently there is too much
@@ -456,6 +497,33 @@ maybe_error_musttail (gcall *call, const char *err, bool diag_musttail)
       print_gimple_stmt (dump_file, call, 0, TDF_SLIM);
       fprintf (dump_file, "Cannot convert: %s\n", err);
     }
+}
+
+/* Return true if there is no real work performed in the exception
+   path starting at BB and it will in the end result in external exception.
+   Search at most CNT basic blocks (so that we don't need to do trivial
+   loop discovery).  */
+static bool
+empty_eh_cleanup (basic_block bb, int cnt)
+{
+  if (EDGE_COUNT (bb->succs) > 1)
+    return false;
+
+  for (gimple_stmt_iterator gsi = gsi_after_labels (bb); !gsi_end_p (gsi);
+       gsi_next (&gsi))
+    {
+      gimple *g = gsi_stmt (gsi);
+      if (is_gimple_debug (g) || gimple_clobber_p (g))
+	continue;
+      if (is_gimple_resx (g) && stmt_can_throw_external (cfun, g))
+	return true;
+      return false;
+    }
+  if (!single_succ_p (bb))
+    return false;
+  if (cnt == 1)
+    return false;
+  return empty_eh_cleanup (single_succ (bb), cnt - 1);
 }
 
 /* Argument for compute_live_vars/live_vars_at_stmt and what compute_live_vars
@@ -483,6 +551,7 @@ find_tail_calls (basic_block bb, struct tailcall **ret, bool only_musttail,
   basic_block abb;
   size_t idx;
   tree var;
+  bool only_tailr = false;
 
   if (!single_succ_p (bb)
       && (EDGE_COUNT (bb->succs) || !cfun->has_musttail || !diag_musttail))
@@ -578,6 +647,25 @@ find_tail_calls (basic_block bb, struct tailcall **ret, bool only_musttail,
   if (!suitable_for_tail_call_opt_p (call, diag_musttail))
     opt_tailcalls = false;
 
+  /* ??? It is OK if the argument of a function is taken in some cases,
+     but not in all cases.  See PR15387 and PR19616.  Revisit for 4.1.  */
+  if (!diag_musttail || !gimple_call_must_tail_p (call))
+    for (param = DECL_ARGUMENTS (current_function_decl);
+	 param; param = DECL_CHAIN (param))
+      if (TREE_ADDRESSABLE (param))
+	{
+	  maybe_error_musttail (call, _("address of caller arguments taken"),
+				diag_musttail);
+	  /* If current function has musttail calls, we can't disable tail
+	     calls altogether for the whole caller, because those might be
+	     actually fine.  So just punt if this exact call is not
+	     a tail recursion.  */
+	  if (cfun->has_musttail)
+	    only_tailr = true;
+	  else
+	    opt_tailcalls = false;
+	}
+
   /* If the LHS of our call is not just a simple register or local
      variable, we can't transform this into a tail or sibling call.
      This situation happens, in (e.g.) "*p = foo()" where foo returns a
@@ -608,14 +696,36 @@ find_tail_calls (basic_block bb, struct tailcall **ret, bool only_musttail,
   if ((stmt_could_throw_p (cfun, stmt)
        && !stmt_can_throw_external (cfun, stmt)) || EDGE_COUNT (bb->succs) > 1)
   {
-    if (stmt == last_stmt)
-      maybe_error_musttail (call,
-			    _("call may throw exception that does not "
-			      "propagate"), diag_musttail);
-    else
-      maybe_error_musttail (call, _("code between call and return"),
-			    diag_musttail);
-    return;
+    if (stmt != last_stmt)
+      {
+	maybe_error_musttail (call, _("code between call and return"),
+			      diag_musttail);
+	return;
+      }
+
+    edge e;
+    edge_iterator ei;
+    FOR_EACH_EDGE (e, ei, bb->succs)
+      if (e->flags & EDGE_EH)
+	break;
+
+    if (!e)
+      {
+	maybe_error_musttail (call,
+			      _("call may throw exception that does not "
+				"propagate"), diag_musttail);
+	return;
+      }
+
+    if (!gimple_call_must_tail_p (call)
+	|| !empty_eh_cleanup (e->dest, 20)
+	|| EDGE_COUNT (bb->succs) > 2)
+      {
+	maybe_error_musttail (call,
+			      _("call may throw exception caught locally "
+				"or perform cleanups"), diag_musttail);
+	return;
+      }
   }
 
   /* If the function returns a value, then at present, the tail call
@@ -672,25 +782,26 @@ find_tail_calls (basic_block bb, struct tailcall **ret, bool only_musttail,
 	         have a copyable type and the two arguments must have reasonably
 	         equivalent types.  The latter requirement could be relaxed if
 	         we emitted a suitable type conversion statement.  */
-	      if (!is_gimple_reg_type (TREE_TYPE (param))
+	      if (TREE_ADDRESSABLE (TREE_TYPE (param))
 		  || !useless_type_conversion_p (TREE_TYPE (param),
 					         TREE_TYPE (arg)))
 		break;
 
-	      /* The parameter should be a real operand, so that phi node
-		 created for it at the start of the function has the meaning
-		 of copying the value.  This test implies is_gimple_reg_type
-		 from the previous condition, however this one could be
-		 relaxed by being more careful with copying the new value
-		 of the parameter (emitting appropriate GIMPLE_ASSIGN and
-		 updating the virtual operands).  */
-	      if (!is_gimple_reg (param))
+	      if (is_gimple_reg_type (TREE_TYPE (param))
+		  ? !is_gimple_reg (param)
+		  : (!is_gimple_variable (param)
+		     || TREE_THIS_VOLATILE (param)
+		     || may_be_aliased (param)
+		     || !gimple_call_must_tail_p (call)))
 		break;
 	    }
 	}
       if (idx == gimple_call_num_args (call) && !param)
 	tail_recursion = true;
     }
+
+  if (only_tailr && !tail_recursion)
+    return;
 
   /* Compute live vars if not computed yet.  */
   if (live_vars == NULL)
@@ -728,6 +839,19 @@ find_tail_calls (basic_block bb, struct tailcall **ret, bool only_musttail,
 	{
 	  if (!VAR_P (var))
 	    {
+	      if (diag_musttail && gimple_call_must_tail_p (call))
+		{
+		  auto opt = OPT_Wmaybe_musttail_local_addr;
+		  if (!warning_suppressed_p (call,
+					     opt))
+		    {
+		      warning_at (gimple_location (call), opt,
+				  "address of local variable can escape to "
+				  "%<musttail%> call");
+		      suppress_warning (call, opt);
+		    }
+		  continue;
+		}
 	      if (local_live_vars)
 		BITMAP_FREE (local_live_vars);
 	      maybe_error_musttail (call,
@@ -740,6 +864,24 @@ find_tail_calls (basic_block bb, struct tailcall **ret, bool only_musttail,
 	      unsigned int *v = live_vars->get (DECL_UID (var));
 	      if (bitmap_bit_p (local_live_vars, *v))
 		{
+		  if (diag_musttail && gimple_call_must_tail_p (call))
+		    {
+		      auto opt = OPT_Wmaybe_musttail_local_addr;
+		      if (!warning_suppressed_p (call, opt))
+			{
+			  if (!DECL_ARTIFICIAL (var) && DECL_NAME (var))
+			    warning_at (gimple_location (call), opt,
+					"address of automatic variable %qD "
+					"can escape to %<musttail%> call",
+					var);
+			  else
+			    warning_at (gimple_location (call), opt,
+					"address of local variable can escape "
+					"to %<musttail%> call");
+			  suppress_warning (call, opt);
+			}
+		      continue;
+		    }
 		  BITMAP_FREE (local_live_vars);
 		  maybe_error_musttail (call,
 					_("call invocation refers to locals"),
@@ -749,6 +891,22 @@ find_tail_calls (basic_block bb, struct tailcall **ret, bool only_musttail,
 	    }
 	}
     }
+  if (diag_musttail
+      && gimple_call_must_tail_p (call)
+      && !warning_suppressed_p (call, OPT_Wmaybe_musttail_local_addr))
+    for (tree param = DECL_ARGUMENTS (current_function_decl);
+	 param; param = DECL_CHAIN (param))
+      if (may_be_aliased (param)
+	  && (ref_maybe_used_by_stmt_p (call, param, false)
+	      || call_may_clobber_ref_p (call, param, false)))
+	{
+	  auto opt = OPT_Wmaybe_musttail_local_addr;
+	  warning_at (gimple_location (call), opt,
+		      "address of parameter %qD can escape to "
+		      "%<musttail%> call", param);
+	  suppress_warning (call, opt);
+	  break;
+	}
 
   if (local_live_vars)
     BITMAP_FREE (local_live_vars);
@@ -761,8 +919,8 @@ find_tail_calls (basic_block bb, struct tailcall **ret, bool only_musttail,
   a = NULL_TREE;
   auto_bitmap to_move_defs;
   auto_vec<gimple *> to_move_stmts;
-  bool is_noreturn
-    = EDGE_COUNT (bb->succs) == 0 && gimple_call_noreturn_p (call);
+  bool is_noreturn = gimple_call_noreturn_p (call);
+  auto_vec<edge> edges;
 
   abb = bb;
   agsi = gsi;
@@ -774,8 +932,11 @@ find_tail_calls (basic_block bb, struct tailcall **ret, bool only_musttail,
 
       while (gsi_end_p (agsi))
 	{
-	  ass_var = propagate_through_phis (ass_var, single_succ_edge (abb));
-	  abb = single_succ (abb);
+	  edge e = single_non_eh_succ_edge (abb);
+	  ass_var = propagate_through_phis (ass_var, e);
+	  if (!ass_var)
+	    edges.safe_push (e);
+	  abb = e->dest;
 	  agsi = gsi_start_bb (abb);
 	}
 
@@ -849,6 +1010,11 @@ find_tail_calls (basic_block bb, struct tailcall **ret, bool only_musttail,
   /* See if this is a tail call we can handle.  */
   if (is_noreturn)
     {
+      if (gimple_call_internal_p (call))
+	{
+	  maybe_error_musttail (call, _("internal call"), diag_musttail);
+	  return;
+	}
       tree rettype = TREE_TYPE (TREE_TYPE (current_function_decl));
       tree calltype = TREE_TYPE (gimple_call_fntype (call));
       if (!VOID_TYPE_P (rettype)
@@ -877,19 +1043,53 @@ find_tail_calls (basic_block bb, struct tailcall **ret, bool only_musttail,
       /* If IPA-VRP proves called function always returns a singleton range,
 	 the return value is replaced by the only value in that range.
 	 For tail call purposes, pretend such replacement didn't happen.  */
-      if (ass_var == NULL_TREE
-	  && !tail_recursion
-	  && TREE_CONSTANT (ret_var))
+      if (ass_var == NULL_TREE && !tail_recursion)
 	if (tree type = gimple_range_type (call))
 	  if (tree callee = gimple_call_fndecl (call))
-	    if ((INTEGRAL_TYPE_P (type) || SCALAR_FLOAT_TYPE_P (type))
+	    if ((INTEGRAL_TYPE_P (type)
+		 || SCALAR_FLOAT_TYPE_P (type)
+		 || POINTER_TYPE_P (type))
 		&& useless_type_conversion_p (TREE_TYPE (TREE_TYPE (callee)),
 					      type)
 		&& useless_type_conversion_p (TREE_TYPE (ret_var), type)
 		&& ipa_return_value_range (val, callee)
-		&& val.singleton_p (&valr)
-		&& operand_equal_p (ret_var, valr, 0))
-	      ok = true;
+		&& val.singleton_p (&valr))
+	      {
+		tree rv = ret_var;
+		unsigned int i = edges.length ();
+		/* If ret_var is equal to valr, we can tail optimize.  */
+		if (operand_equal_p (ret_var, valr, 0))
+		  ok = true;
+		else
+		  /* Otherwise, if ret_var is a PHI result, try to find out
+		     if valr isn't propagated through PHIs on the path from
+		     call's bb to SSA_NAME_DEF_STMT (ret_var)'s bb.  */
+		  while (TREE_CODE (rv) == SSA_NAME
+			 && gimple_code (SSA_NAME_DEF_STMT (rv)) == GIMPLE_PHI)
+		    {
+		      tree nrv = NULL_TREE;
+		      gimple *g = SSA_NAME_DEF_STMT (rv);
+		      for (; i; --i)
+			{
+			  if (edges[i - 1]->dest == gimple_bb (g))
+			    {
+			      nrv
+				= gimple_phi_arg_def_from_edge (g,
+								edges[i - 1]);
+			      --i;
+			      break;
+			    }
+			}
+		      if (nrv == NULL_TREE)
+			break;
+		      if (operand_equal_p (nrv, valr, 0))
+			{
+			  ok = true;
+			  break;
+			}
+		      rv = nrv;
+		    }
+	      }
       if (!ok)
 	{
 	  maybe_error_musttail (call,
@@ -934,9 +1134,9 @@ find_tail_calls (basic_block bb, struct tailcall **ret, bool only_musttail,
 	   param = DECL_CHAIN (param), idx++)
 	{
 	  tree ddef, arg = gimple_call_arg (call, idx);
-	  if (is_gimple_reg (param)
-	      && (ddef = ssa_default_def (cfun, param))
-	      && (arg != ddef))
+	  if (!is_gimple_reg (param)
+	      || ((ddef = ssa_default_def (cfun, param))
+		  && arg != ddef))
 	    bitmap_set_bit (tailr_arg_needs_copy, idx);
 	}
     }
@@ -1110,11 +1310,6 @@ static void
 decrease_profile (basic_block bb, profile_count count)
 {
   bb->count = bb->count - count;
-  if (!single_succ_p (bb))
-    {
-      gcc_assert (!EDGE_COUNT (bb->succs));
-      return;
-    }
 }
 
 /* Eliminates tail call described by T.  TMP_VARS is a list of
@@ -1179,7 +1374,7 @@ eliminate_tail_call (struct tailcall *t, class loop *&new_loop)
   else
     {
       /* Number of executions of function has reduced by the tailcall.  */
-      e = single_succ_edge (gsi_bb (t->call_gsi));
+      e = single_non_eh_succ_edge (gsi_bb (t->call_gsi));
 
       profile_count count = e->count ();
 
@@ -1194,8 +1389,7 @@ eliminate_tail_call (struct tailcall *t, class loop *&new_loop)
 	decrease_profile (e->dest, count);
 
       /* Replace the call by a jump to the start of function.  */
-      e = redirect_edge_and_branch (single_succ_edge (gsi_bb (t->call_gsi)),
-				    first);
+      e = redirect_edge_and_branch (e, first);
     }
   gcc_assert (e);
   PENDING_STMT (e) = NULL;
@@ -1212,6 +1406,7 @@ eliminate_tail_call (struct tailcall *t, class loop *&new_loop)
 
   /* Add phi node entries for arguments.  The ordering of the phi nodes should
      be the same as the ordering of the arguments.  */
+  auto_vec<tree> copies;
   for (param = DECL_ARGUMENTS (current_function_decl),
 	 idx = 0, gpi = gsi_start_phis (first);
        param;
@@ -1220,12 +1415,46 @@ eliminate_tail_call (struct tailcall *t, class loop *&new_loop)
       if (!bitmap_bit_p (tailr_arg_needs_copy, idx))
 	continue;
 
+      if (!is_gimple_reg_type (TREE_TYPE (param)))
+	{
+	  if (param == gimple_call_arg (stmt, idx))
+	    continue;
+	  /* First check if param isn't used by any of the following
+	     call arguments.  If it is, we need to copy first to
+	     a temporary and only after doing all the assignments copy it
+	     to param.  */
+	  size_t idx2 = idx + 1;
+	  tree param2 = DECL_CHAIN (param);
+	  for (; param2; param2 = DECL_CHAIN (param2), idx2++)
+	    if (!is_gimple_reg_type (TREE_TYPE (param)))
+	      {
+		tree base = get_base_address (gimple_call_arg (stmt, idx2));
+		if (base == param)
+		  break;
+	      }
+	  tree tmp = param;
+	  if (param2)
+	    {
+	      tmp = create_tmp_var (TREE_TYPE (param));
+	      copies.safe_push (param);
+	      copies.safe_push (tmp);
+	    }
+	  gimple *g = gimple_build_assign (tmp, gimple_call_arg (stmt, idx));
+	  gsi_insert_before (&t->call_gsi, g, GSI_SAME_STMT);
+	  continue;
+	}
+
       arg = gimple_call_arg (stmt, idx);
       phi = gpi.phi ();
       gcc_assert (param == SSA_NAME_VAR (PHI_RESULT (phi)));
 
       add_phi_arg (phi, arg, e, gimple_location (stmt));
       gsi_next (&gpi);
+    }
+  for (unsigned i = 0; i < copies.length (); i += 2)
+    {
+      gimple *g = gimple_build_assign (copies[i], copies[i + 1]);
+      gsi_insert_before (&t->call_gsi, g, GSI_SAME_STMT);
     }
 
   /* Update the values of accumulators.  */
@@ -1325,7 +1554,9 @@ tree_optimize_tail_calls_1 (bool opt_tailcalls, bool only_musttail,
     {
       basic_block bb;
       FOR_EACH_BB_FN (bb, cfun)
-	if (EDGE_COUNT (bb->succs) == 0)
+	if (EDGE_COUNT (bb->succs) == 0
+	    || (single_succ_p (bb)
+		&& (single_succ_edge (bb)->flags & EDGE_EH)))
 	  if (gimple *c = last_nondebug_stmt (bb))
 	    if (is_gimple_call (c)
 		&& gimple_call_must_tail_p (as_a <gcall *> (c))
@@ -1341,6 +1572,38 @@ tree_optimize_tail_calls_1 (bool opt_tailcalls, bool only_musttail,
       live_vars = NULL;
     }
 
+  if (cfun->has_musttail)
+    {
+      /* We can't mix non-recursive must tail calls with tail recursive
+	 calls which require accumulators, because in that case we have to
+	 emit code in between the musttail calls and return, which prevent
+	 calling them as tail calls.  So, in that case give up on the
+	 tail recursion.  */
+      for (act = tailcalls; act; act = act->next)
+	if (!act->tail_recursion)
+	  {
+	    gcall *call = as_a <gcall *> (gsi_stmt (act->call_gsi));
+	    if (gimple_call_must_tail_p (call))
+	      break;
+	  }
+      if (act)
+	for (struct tailcall **p = &tailcalls; *p; )
+	  {
+	    if ((*p)->tail_recursion && ((*p)->add || (*p)->mult))
+	      {
+		struct tailcall *a = *p;
+		*p = (*p)->next;
+		gcall *call = as_a <gcall *> (gsi_stmt (a->call_gsi));
+		maybe_error_musttail (call,
+				      _("tail recursion with accumulation "
+					"mixed with musttail "
+					"non-recursive call"), diag_musttail);
+		free (a);
+	      }
+	    else
+	      p = &(*p)->next;
+	  }
+    }
   /* Construct the phi nodes and accumulators if necessary.  */
   a_acc = m_acc = NULL_TREE;
   for (act = tailcalls; act; act = act->next)
@@ -1354,8 +1617,8 @@ tree_optimize_tail_calls_1 (bool opt_tailcalls, bool only_musttail,
 	     or if there are existing degenerate PHI nodes.  */
 	  if (!single_pred_p (first)
 	      || !gimple_seq_empty_p (phi_nodes (first)))
-	    first =
-	      split_edge (single_succ_edge (ENTRY_BLOCK_PTR_FOR_FN (cfun)));
+	    first
+	      = split_edge (single_succ_edge (ENTRY_BLOCK_PTR_FOR_FN (cfun)));
 
 	  /* Copy the args if needed.  */
 	  unsigned idx;
@@ -1364,6 +1627,8 @@ tree_optimize_tail_calls_1 (bool opt_tailcalls, bool only_musttail,
 	       param = DECL_CHAIN (param), idx++)
 	    if (bitmap_bit_p (tailr_arg_needs_copy, idx))
 	      {
+		if (!is_gimple_reg_type (TREE_TYPE (param)))
+		  continue;
 		tree name = ssa_default_def (cfun, param);
 		tree new_name = make_ssa_name (param, SSA_NAME_DEF_STMT (name));
 		gphi *phi;

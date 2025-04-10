@@ -548,7 +548,8 @@ template <Namespace N> class ForeverStack
 public:
   ForeverStack ()
     : root (Node (Rib (Rib::Kind::Normal), UNKNOWN_NODEID)),
-      prelude (Node (Rib (Rib::Kind::Prelude), UNKNOWN_NODEID, root)),
+      lang_prelude (Node (Rib (Rib::Kind::Prelude), UNKNOWN_NODEID, root)),
+      extern_prelude (Node (Rib (Rib::Kind::Prelude), UNKNOWN_NODEID)),
       cursor_reference (root)
   {
     rust_assert (root.is_root ());
@@ -658,8 +659,8 @@ public:
    * the current map, an empty one otherwise.
    */
   tl::optional<Rib::Definition> get (const Identifier &name);
-  tl::optional<Rib::Definition> get_prelude (const Identifier &name);
-  tl::optional<Rib::Definition> get_prelude (const std::string &name);
+  tl::optional<Rib::Definition> get_lang_prelude (const Identifier &name);
+  tl::optional<Rib::Definition> get_lang_prelude (const std::string &name);
 
   /**
    * Resolve a path to its definition in the current `ForeverStack`
@@ -671,7 +672,7 @@ public:
    */
   template <typename S>
   tl::optional<Rib::Definition> resolve_path (
-    const std::vector<S> &segments,
+    const std::vector<S> &segments, bool has_opening_scope_resolution,
     std::function<void (const S &, NodeId)> insert_segment_resolution);
 
   // FIXME: Documentation
@@ -767,7 +768,11 @@ private:
    * It has the root node as a parent, and acts as a "special case" for name
    * resolution
    */
-  Node prelude;
+  Node lang_prelude;
+  /*
+   * The extern prelude, used for resolving external crates
+   */
+  Node extern_prelude;
 
   std::reference_wrapper<Node> cursor_reference;
 
@@ -794,6 +799,10 @@ private:
     Node &starting_point, const std::vector<S> &segments,
     SegIterator<S> iterator,
     std::function<void (const S &, NodeId)> insert_segment_resolution);
+
+  tl::optional<Rib::Definition> resolve_final_segment (Node &final_node,
+						       std::string &seg_name,
+						       bool is_lower_self);
 
   /* Helper functions for forward resolution (to_canonical_path, to_rib...) */
   struct DfsResult

@@ -73,44 +73,8 @@ TypeCheckTopLevelExternItem::visit (HIR::ExternalFunctionItem &function)
   std::vector<TyTy::SubstitutionParamMapping> substitutions;
   if (function.has_generics ())
     {
-      for (auto &generic_param : function.get_generic_params ())
-	{
-	  switch (generic_param.get ()->get_kind ())
-	    {
-	    case HIR::GenericParam::GenericKind::LIFETIME:
-	      context->intern_and_insert_lifetime (
-		static_cast<HIR::LifetimeParam &> (*generic_param)
-		  .get_lifetime ());
-	      // TODO: handle bounds
-	      break;
-	    case HIR::GenericParam::GenericKind::CONST:
-	      // FIXME: Skipping Lifetime and Const completely until better
-	      // handling.
-	      if (parent.get_abi () != Rust::ABI::INTRINSIC)
-		{
-		  rust_error_at (function.get_locus (), ErrorCode::E0044,
-				 "foreign items may not have const parameters");
-		}
-	      break;
-
-	      case HIR::GenericParam::GenericKind::TYPE: {
-		if (parent.get_abi () != Rust::ABI::INTRINSIC)
-		  {
-		    rust_error_at (
-		      function.get_locus (), ErrorCode::E0044,
-		      "foreign items may not have type parameters");
-		  }
-		auto param_type
-		  = TypeResolveGenericParam::Resolve (*generic_param);
-		context->insert_type (generic_param->get_mappings (),
-				      param_type);
-
-		substitutions.push_back (TyTy::SubstitutionParamMapping (
-		  static_cast<HIR::TypeParam &> (*generic_param), param_type));
-	      }
-	      break;
-	    }
-	}
+      resolve_generic_params (function.get_generic_params (), substitutions,
+			      true /*is_foreign*/, parent.get_abi ());
     }
 
   TyTy::RegionConstraints region_constraints;
@@ -200,128 +164,7 @@ void
 TypeCheckTopLevelExternItem::visit (HIR::ExternalTypeItem &type)
 {
   rust_sorry_at (type.get_locus (), "extern types are not supported yet");
-  //  auto binder_pin = context->push_clean_lifetime_resolver ();
-
-  //  std::vector<TyTy::SubstitutionParamMapping> substitutions;
-  //  if (function.has_generics ())
-  //    {
-  //      for (auto &generic_param : function.get_generic_params ())
-  // {
-  //   switch (generic_param.get ()->get_kind ())
-  //     {
-  //     case HIR::GenericParam::GenericKind::LIFETIME:
-  //       context->intern_and_insert_lifetime (
-  // 	static_cast<HIR::LifetimeParam &> (*generic_param)
-  // 	  .get_lifetime ());
-  //       // TODO: handle bounds
-  //       break;
-  //     case HIR::GenericParam::GenericKind::CONST:
-  //       // FIXME: Skipping Lifetime and Const completely until better
-  //       // handling.
-  //       break;
-
-  //       case HIR::GenericParam::GenericKind::TYPE: {
-  // 	auto param_type
-  // 	  = TypeResolveGenericParam::Resolve (generic_param.get ());
-  // 	context->insert_type (generic_param->get_mappings (),
-  // 			      param_type);
-
-  // 	substitutions.push_back (TyTy::SubstitutionParamMapping (
-  // 	  static_cast<HIR::TypeParam &> (*generic_param), param_type));
-  //       }
-  //       break;
-  //     }
-  // }
-  //    }
-
-  //  TyTy::RegionConstraints region_constraints;
-  //  if (function.has_where_clause ())
-  //    {
-  //      for (auto &where_clause_item : function.get_where_clause ().get_items
-  //      ())
-  // {
-  //   ResolveWhereClauseItem::Resolve (*where_clause_item.get (),
-  // 				   region_constraints);
-  // }
-  //    }
-
-  //  TyTy::BaseType *ret_type = nullptr;
-  //  if (!function.has_return_type ())
-  //    ret_type
-  //      = TyTy::TupleType::get_unit_type (function.get_mappings ().get_hirid
-  //      ());
-  //  else
-  //    {
-  //      auto resolved
-  // = TypeCheckType::Resolve (function.get_return_type ().get ());
-  //      if (resolved == nullptr)
-  // {
-  //   rust_error_at (function.get_locus (),
-  // 		 "failed to resolve return type");
-  //   return;
-  // }
-
-  //      ret_type = resolved->clone ();
-  //      ret_type->set_ref (
-  // function.get_return_type ()->get_mappings ().get_hirid ());
-  //    }
-
-  //  std::vector<std::pair<HIR::Pattern *, TyTy::BaseType *> > params;
-  //  for (auto &param : function.get_function_params ())
-  //    {
-  //      // get the name as well required for later on
-  //      auto param_tyty = TypeCheckType::Resolve (param.get_type ().get ());
-
-  //      // these are implicit mappings and not used
-  //      auto crate_num = mappings->get_current_crate ();
-  //      Analysis::NodeMapping mapping (crate_num, mappings->get_next_node_id
-  //      (),
-  // 			     mappings->get_next_hir_id (crate_num),
-  // 			     UNKNOWN_LOCAL_DEFID);
-
-  //      HIR::IdentifierPattern *param_pattern
-  // = new HIR::IdentifierPattern (mapping, param.get_param_name (),
-  // 			      UNDEF_LOCATION, false, Mutability::Imm,
-  // 			      std::unique_ptr<HIR::Pattern> (nullptr));
-
-  //      params.push_back (
-  // std::pair<HIR::Pattern *, TyTy::BaseType *> (param_pattern,
-  // 					     param_tyty));
-
-  //      context->insert_type (param.get_mappings (), param_tyty);
-
-  //      // FIXME do we need error checking for patterns here?
-  //      // see https://github.com/Rust-GCC/gccrs/issues/995
-  //    }
-
-  //  uint8_t flags = TyTy::FnType::FNTYPE_IS_EXTERN_FLAG;
-  //  if (function.is_variadic ())
-  //    {
-  //      flags |= TyTy::FnType::FNTYPE_IS_VARADIC_FLAG;
-  //      if (parent.get_abi () != Rust::ABI::C)
-  // {
-  //   rust_error_at (
-  //     function.get_locus (), ErrorCode::E0045,
-  //     "C-variadic function must have C or cdecl calling convention");
-  // }
-  //    }
-
-  //  RustIdent ident{
-  //    CanonicalPath::new_seg (function.get_mappings ().get_nodeid (),
-  // 		    function.get_item_name ().as_string ()),
-  //    function.get_locus ()};
-
-  //  auto fnType = new TyTy::FnType (
-  //    function.get_mappings ().get_hirid (),
-  //    function.get_mappings ().get_defid (),
-  //    function.get_item_name ().as_string (), ident, flags, parent.get_abi (),
-  //    std::move (params), ret_type, std::move (substitutions),
-  //    TyTy::SubstitutionArgumentMappings::empty (
-  //      context->get_lifetime_resolver ().get_num_bound_regions ()),
-  //    region_constraints);
-
-  //  context->insert_type (function.get_mappings (), fnType);
-  //  resolved = fnType;
+  // TODO
 }
 
 TypeCheckImplItem::TypeCheckImplItem (
@@ -399,7 +242,7 @@ TypeCheckImplItem::visit (HIR::Function &function)
       // add the synthetic self param at the front, this is a placeholder for
       // compilation to know parameter names. The types are ignored but we
       // reuse the HIR identifier pattern which requires it
-      HIR::SelfParam &self_param = function.get_self_param ();
+      HIR::SelfParam &self_param = function.get_self_param_unchecked ();
       // FIXME: which location should be used for Rust::Identifier for `self`?
       std::unique_ptr<HIR::Pattern> self_pattern
 	= std::make_unique<HIR::IdentifierPattern> (
@@ -424,13 +267,21 @@ TypeCheckImplItem::visit (HIR::Function &function)
 	      break;
 
 	      case HIR::SelfParam::IMM_REF: {
-		auto region = context->lookup_and_resolve_lifetime (
-		  self_param.get_lifetime ());
-		if (!region.has_value ())
+		tl::optional<TyTy::Region> region;
+		if (self_param.has_lifetime ())
 		  {
-		    rust_inform (self_param.get_locus (),
-				 "failed to resolve lifetime");
-		    region = TyTy::Region::make_anonymous (); // FIXME
+		    region = context->lookup_and_resolve_lifetime (
+		      self_param.get_lifetime ());
+		    if (!region.has_value ())
+		      {
+			rust_inform (self_param.get_locus (),
+				     "failed to resolve lifetime");
+			return;
+		      }
+		  }
+		else
+		  {
+		    region = TyTy::Region::make_anonymous ();
 		  }
 		self_type = new TyTy::ReferenceType (
 		  self_param.get_mappings ().get_hirid (),
@@ -440,13 +291,21 @@ TypeCheckImplItem::visit (HIR::Function &function)
 	      break;
 
 	      case HIR::SelfParam::MUT_REF: {
-		auto region = context->lookup_and_resolve_lifetime (
-		  self_param.get_lifetime ());
-		if (!region.has_value ())
+		tl::optional<TyTy::Region> region;
+		if (self_param.has_lifetime ())
 		  {
-		    rust_error_at (self_param.get_locus (),
-				   "failed to resolve lifetime");
-		    return;
+		    region = context->lookup_and_resolve_lifetime (
+		      self_param.get_lifetime ());
+		    if (!region.has_value ())
+		      {
+			rust_error_at (self_param.get_locus (),
+				       "failed to resolve lifetime");
+			return;
+		      }
+		  }
+		else
+		  {
+		    region = TyTy::Region::make_anonymous ();
 		  }
 		self_type = new TyTy::ReferenceType (
 		  self_param.get_mappings ().get_hirid (),

@@ -597,8 +597,10 @@ ASTLoweringExpr::visit (AST::ForLoopExpr &expr)
 void
 ASTLoweringExpr::visit (AST::BreakExpr &expr)
 {
-  HIR::Lifetime break_label
-    = lower_lifetime (expr.get_label ().get_lifetime ());
+  tl::optional<HIR::Lifetime> break_label = tl::nullopt;
+  if (expr.has_label ())
+    break_label = lower_lifetime (expr.get_label_unchecked ().get_lifetime ());
+
   HIR::Expr *break_expr
     = expr.has_break_expr ()
 	? ASTLoweringExpr::translate (expr.get_break_expr ())
@@ -618,7 +620,9 @@ ASTLoweringExpr::visit (AST::BreakExpr &expr)
 void
 ASTLoweringExpr::visit (AST::ContinueExpr &expr)
 {
-  HIR::Lifetime break_label = lower_lifetime (expr.get_label ());
+  tl::optional<HIR::Lifetime> break_label;
+  if (expr.has_label ())
+    break_label = lower_lifetime (expr.get_label_unchecked ());
 
   auto crate_num = mappings.get_current_crate ();
   Analysis::NodeMapping mapping (crate_num, expr.get_node_id (),
@@ -633,9 +637,6 @@ ASTLoweringExpr::visit (AST::ContinueExpr &expr)
 void
 ASTLoweringExpr::visit (AST::BorrowExpr &expr)
 {
-  if (expr.is_raw_borrow ())
-    rust_unreachable ();
-
   HIR::Expr *borrow_lvalue
     = ASTLoweringExpr::translate (expr.get_borrowed_expr ());
 
@@ -646,8 +647,8 @@ ASTLoweringExpr::visit (AST::BorrowExpr &expr)
 
   auto *borrow_expr
     = new HIR::BorrowExpr (mapping, std::unique_ptr<HIR::Expr> (borrow_lvalue),
-			   expr.get_mutability (), expr.get_outer_attrs (),
-			   expr.get_locus ());
+			   expr.get_mutability (), expr.is_raw_borrow (),
+			   expr.get_outer_attrs (), expr.get_locus ());
 
   if (expr.get_is_double_borrow ())
     {
@@ -659,8 +660,8 @@ ASTLoweringExpr::visit (AST::BorrowExpr &expr)
       borrow_expr
 	= new HIR::BorrowExpr (mapping,
 			       std::unique_ptr<HIR::Expr> (borrow_expr),
-			       expr.get_mutability (), expr.get_outer_attrs (),
-			       expr.get_locus ());
+			       expr.get_mutability (), expr.is_raw_borrow (),
+			       expr.get_outer_attrs (), expr.get_locus ());
     }
 
   translated = borrow_expr;

@@ -549,7 +549,7 @@ HIRCompileBase::mark_addressable (tree exp, location_t locus)
 }
 
 tree
-HIRCompileBase::address_expression (tree expr, location_t location)
+HIRCompileBase::address_expression (tree expr, location_t location, tree ptrty)
 {
   if (expr == error_mark_node)
     return error_mark_node;
@@ -557,7 +557,22 @@ HIRCompileBase::address_expression (tree expr, location_t location)
   if (!mark_addressable (expr, location))
     return error_mark_node;
 
-  return build_fold_addr_expr_loc (location, expr);
+  if (ptrty == NULL || ptrty == error_mark_node)
+    ptrty = build_pointer_type (TREE_TYPE (expr));
+
+  return build_fold_addr_expr_with_type_loc (location, expr, ptrty);
+}
+
+tree
+HIRCompileBase::compile_constant_expr (
+  Context *ctx, HirId coercion_id, TyTy::BaseType *resolved_type,
+  TyTy::BaseType *expected_type, const Resolver::CanonicalPath &canonical_path,
+  HIR::Expr &const_value_expr, location_t locus, location_t expr_locus)
+{
+  HIRCompileBase c (ctx);
+  return c.compile_constant_item (coercion_id, resolved_type, expected_type,
+				  canonical_path, const_value_expr, locus,
+				  expr_locus);
 }
 
 tree
@@ -651,7 +666,8 @@ get_abi (const AST::AttrVec &outer_attrs,
 
 tree
 HIRCompileBase::compile_function (
-  const std::string &fn_name, HIR::SelfParam &self_param,
+  bool is_root_item, const std::string &fn_name,
+  tl::optional<HIR::SelfParam> &self_param,
   std::vector<HIR::FunctionParam> &function_params,
   const HIR::FunctionQualifiers &qualifiers, HIR::Visibility &visibility,
   AST::AttrVec &outer_attrs, location_t locus, HIR::BlockExpr *function_body,
@@ -662,7 +678,7 @@ HIRCompileBase::compile_function (
     = canonical_path.get () + fntype->subst_as_string ();
 
   // we don't mangle the main fn since we haven't implemented the main shim
-  bool is_main_fn = fn_name.compare ("main") == 0;
+  bool is_main_fn = fn_name.compare ("main") == 0 && is_root_item;
   if (is_main_fn)
     {
       rust_assert (!main_identifier_node);
@@ -698,24 +714,24 @@ HIRCompileBase::compile_function (
   // setup the params
   TyTy::BaseType *tyret = fntype->get_return_type ();
   std::vector<Bvariable *> param_vars;
-  if (!self_param.is_error ())
+  if (self_param)
     {
       rust_assert (fntype->is_method ());
       TyTy::BaseType *self_tyty_lookup = fntype->get_self_type ();
 
       tree self_type = TyTyResolveCompile::compile (ctx, self_tyty_lookup);
       Bvariable *compiled_self_param
-	= CompileSelfParam::compile (ctx, fndecl, self_param, self_type,
-				     self_param.get_locus ());
+	= CompileSelfParam::compile (ctx, fndecl, self_param.value (),
+				     self_type, self_param->get_locus ());
 
       param_vars.push_back (compiled_self_param);
-      ctx->insert_var_decl (self_param.get_mappings ().get_hirid (),
+      ctx->insert_var_decl (self_param->get_mappings ().get_hirid (),
 			    compiled_self_param);
     }
 
   // offset from + 1 for the TyTy::FnType being used when this is a method to
   // skip over Self on the FnType
-  bool is_method = !self_param.is_error ();
+  bool is_method = self_param.has_value ();
   size_t i = is_method ? 1 : 0;
   for (auto &referenced_param : function_params)
     {
@@ -1011,7 +1027,7 @@ HIRCompileBase::resolve_method_address (TyTy::FnType *fntype,
 tree
 HIRCompileBase::unit_expression (location_t locus)
 {
-  tree unit_type = TyTyResolveCompile::get_unit_type ();
+  tree unit_type = TyTyResolveCompile::get_unit_type (ctx);
   return Backend::constructor_expression (unit_type, false, {}, -1, locus);
 }
 

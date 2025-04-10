@@ -162,7 +162,7 @@ RawPointerType::operator= (RawPointerType const &other)
 
 ReferenceType::ReferenceType (Analysis::NodeMapping mappings, Mutability mut,
 			      std::unique_ptr<Type> type_no_bounds,
-			      location_t locus, Lifetime lifetime)
+			      location_t locus, tl::optional<Lifetime> lifetime)
   : TypeNoBounds (mappings, locus), lifetime (std::move (lifetime)), mut (mut),
     type (std::move (type_no_bounds))
 {}
@@ -268,7 +268,8 @@ BareFunctionType::BareFunctionType (BareFunctionType const &other)
     for_lifetimes (other.for_lifetimes),
     function_qualifiers (other.function_qualifiers), params (other.params),
     is_variadic (other.is_variadic),
-    return_type (other.return_type->clone_type ())
+    return_type (other.has_return_type () ? other.return_type->clone_type ()
+					  : nullptr)
 {}
 
 BareFunctionType &

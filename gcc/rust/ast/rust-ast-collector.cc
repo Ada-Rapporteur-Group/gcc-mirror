@@ -22,6 +22,7 @@
 #include "rust-expr.h"
 #include "rust-item.h"
 #include "rust-keyword-values.h"
+#include "rust-location.h"
 #include "rust-path.h"
 #include "rust-system.h"
 #include "rust-token.h"
@@ -1278,7 +1279,7 @@ TokenCollector::visit (ContinueExpr &expr)
 {
   push (Rust::Token::make (CONTINUE, expr.get_locus ()));
   if (expr.has_label ())
-    visit (expr.get_label ());
+    visit (expr.get_label_unchecked ());
 }
 
 void
@@ -1286,7 +1287,7 @@ TokenCollector::visit (BreakExpr &expr)
 {
   push (Rust::Token::make (BREAK, expr.get_locus ()));
   if (expr.has_label ())
-    visit (expr.get_label ());
+    visit (expr.get_label_unchecked ());
   if (expr.has_break_expr ())
     visit (expr.get_break_expr ());
 }
@@ -2587,6 +2588,13 @@ TokenCollector::visit (LetStmt &stmt)
       push (Rust::Token::make (EQUAL, UNDEF_LOCATION));
       visit (stmt.get_init_expr ());
     }
+
+  if (stmt.has_else_expr ())
+    {
+      push (Rust::Token::make (ELSE, UNDEF_LOCATION));
+      visit (stmt.get_else_expr ());
+    }
+
   push (Rust::Token::make (SEMICOLON, UNDEF_LOCATION));
 }
 

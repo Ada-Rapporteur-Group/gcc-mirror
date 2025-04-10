@@ -1294,6 +1294,22 @@ struct constexpr_ctx {
   mce_value manifestly_const_eval;
 };
 
+/* True if the constexpr relaxations afforded by P2280R4 for unknown
+   references and objects are in effect.  */
+
+static bool
+p2280_active_p (const constexpr_ctx *ctx)
+{
+  if (ctx->manifestly_const_eval != mce_true)
+    /* Disable these relaxations during speculative constexpr folding,
+       as it can significantly increase compile time/memory use
+       (PR119387).  */
+    return false;
+
+  /* P2280R4 was accepted as a DR against C++11.  */
+  return cxx_dialect >= cxx11;
+}
+
 /* Remove T from the global values map, checking for attempts to destroy
    a value that has already finished its lifetime.  */
 
@@ -7792,7 +7808,7 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
 	r = TARGET_EXPR_INITIAL (r);
       if (DECL_P (r)
 	  /* P2280 allows references to unknown.  */
-	  && !(VAR_P (t) && TYPE_REF_P (TREE_TYPE (t))))
+	  && !(p2280_active_p (ctx) && VAR_P (t) && TYPE_REF_P (TREE_TYPE (t))))
 	{
 	  if (!ctx->quiet)
 	    non_const_var_error (loc, r, /*fundef_p*/false);
@@ -7844,9 +7860,9 @@ cxx_eval_constant_expression (const constexpr_ctx *ctx, tree t,
 	  r = build_constructor (TREE_TYPE (t), NULL);
 	  TREE_CONSTANT (r) = true;
 	}
-      else if (TYPE_REF_P (TREE_TYPE (t)))
+      else if (p2280_active_p (ctx) && TYPE_REF_P (TREE_TYPE (t)))
 	/* P2280 allows references to unknown...  */;
-      else if (is_this_parameter (t))
+      else if (p2280_active_p (ctx) && is_this_parameter (t))
 	/* ...as well as the this pointer.  */;
       else
 	{
@@ -9300,7 +9316,8 @@ cxx_eval_outermost_constant_expr (tree t, bool allow_non_constant,
       if (TREE_CODE (t) == TARGET_EXPR
 	  && TARGET_EXPR_INITIAL (t) == r)
 	return t;
-      else if (TREE_CODE (t) == CONSTRUCTOR || TREE_CODE (t) == CALL_EXPR)
+      else if (TREE_CODE (t) == CONSTRUCTOR || TREE_CODE (t) == CALL_EXPR
+	       || TREE_CODE (t) == AGGR_INIT_EXPR)
 	/* Don't add a TARGET_EXPR if our argument didn't have one.  */;
       else if (TREE_CODE (t) == TARGET_EXPR && TARGET_EXPR_CLEANUP (t))
 	r = get_target_expr (r);
@@ -10263,22 +10280,7 @@ potential_constant_expression_1 (tree t, bool want_rval, bool strict, bool now,
       return true;
 
     case INDIRECT_REF:
-      {
-        tree x = TREE_OPERAND (t, 0);
-        STRIP_NOPS (x);
-        if (is_this_parameter (x) && !is_capture_proxy (x))
-	  {
-	    if (now || !var_in_maybe_constexpr_fn (x))
-	      {
-		if (flags & tf_error)
-		  constexpr_error (loc, fundef_p, "use of %<this%> in a "
-				   "constant expression");
-		return false;
-	      }
-	    return true;
-	  }
-	return RECUR (x, rval);
-      }
+      return RECUR (TREE_OPERAND (t, 0), rval);
 
     case STATEMENT_LIST:
       for (tree stmt : tsi_range (t))

@@ -140,6 +140,9 @@ Late::visit (AST::LetStmt &let)
     visit (let.get_init_expr ());
   visit (let.get_pattern ());
 
+  if (let.has_else_expr ())
+    visit (let.get_init_expr ());
+
   // how do we deal with the fact that `let a = blipbloup` should look for a
   // label and cannot go through function ribs, but `let a = blipbloup()` can?
 
@@ -184,6 +187,9 @@ Late::visit (AST::SelfParam &param)
 void
 Late::visit (AST::BreakExpr &expr)
 {
+  if (expr.has_label ())
+    resolve_label (expr.get_label_unchecked ().get_lifetime ());
+
   if (expr.has_break_expr ())
     {
       auto &break_expr = expr.get_break_expr ();
@@ -210,6 +216,38 @@ Late::visit (AST::BreakExpr &expr)
 }
 
 void
+Late::visit (AST::LoopLabel &label)
+{
+  auto &lifetime = label.get_lifetime ();
+  ctx.labels.insert (Identifier (lifetime.as_string (), lifetime.get_locus ()),
+		     lifetime.get_node_id ());
+}
+
+void
+Late::resolve_label (AST::Lifetime &lifetime)
+{
+  if (auto resolved = ctx.labels.get (lifetime.as_string ()))
+    {
+      if (resolved->get_node_id () != lifetime.get_node_id ())
+	ctx.map_usage (Usage (lifetime.get_node_id ()),
+		       Definition (resolved->get_node_id ()));
+    }
+  else
+    rust_error_at (lifetime.get_locus (), ErrorCode::E0426,
+		   "use of undeclared label %qs",
+		   lifetime.as_string ().c_str ());
+}
+
+void
+Late::visit (AST::ContinueExpr &expr)
+{
+  if (expr.has_label ())
+    resolve_label (expr.get_label_unchecked ());
+
+  DefaultResolver::visit (expr);
+}
+
+void
 Late::visit (AST::IdentifierExpr &expr)
 {
   // TODO: same thing as visit(PathInExpression) here?
@@ -232,7 +270,7 @@ Late::visit (AST::IdentifierExpr &expr)
     }
   else
     {
-      if (auto type = ctx.types.get_prelude (expr.get_ident ()))
+      if (auto type = ctx.types.get_lang_prelude (expr.get_ident ()))
 	{
 	  resolved = type;
 	}
@@ -304,8 +342,7 @@ Late::visit (AST::PathInExpression &expr)
       return;
     }
 
-  auto resolved = ctx.resolve_path (expr.get_segments (), Namespace::Values,
-				    Namespace::Types);
+  auto resolved = ctx.resolve_path (expr, Namespace::Values, Namespace::Types);
 
   if (!resolved)
     {
@@ -337,13 +374,9 @@ Late::visit (AST::TypePath &type)
 
   DefaultResolver::visit (type);
 
-  // take care of only simple cases
-  // TODO: remove this?
-  rust_assert (!type.has_opening_scope_resolution_op ());
-
   // this *should* mostly work
   // TODO: make sure typepath-like path resolution (?) is working
-  auto resolved = ctx.resolve_path (type.get_segments (), Namespace::Types);
+  auto resolved = ctx.resolve_path (type, Namespace::Types);
 
   if (!resolved.has_value ())
     {
@@ -391,8 +424,7 @@ Late::visit (AST::StructExprStruct &s)
   visit_inner_attrs (s);
   DefaultResolver::visit (s.get_struct_name ());
 
-  auto resolved
-    = ctx.resolve_path (s.get_struct_name ().get_segments (), Namespace::Types);
+  auto resolved = ctx.resolve_path (s.get_struct_name (), Namespace::Types);
 
   ctx.map_usage (Usage (s.get_struct_name ().get_node_id ()),
 		 Definition (resolved->get_node_id ()));
@@ -406,8 +438,7 @@ Late::visit (AST::StructExprStructBase &s)
   DefaultResolver::visit (s.get_struct_name ());
   visit (s.get_struct_base ());
 
-  auto resolved
-    = ctx.resolve_path (s.get_struct_name ().get_segments (), Namespace::Types);
+  auto resolved = ctx.resolve_path (s.get_struct_name (), Namespace::Types);
 
   ctx.map_usage (Usage (s.get_struct_name ().get_node_id ()),
 		 Definition (resolved->get_node_id ()));
@@ -424,8 +455,7 @@ Late::visit (AST::StructExprStructFields &s)
   for (auto &field : s.get_fields ())
     visit (field);
 
-  auto resolved
-    = ctx.resolve_path (s.get_struct_name ().get_segments (), Namespace::Types);
+  auto resolved = ctx.resolve_path (s.get_struct_name (), Namespace::Types);
 
   ctx.map_usage (Usage (s.get_struct_name ().get_node_id ()),
 		 Definition (resolved->get_node_id ()));

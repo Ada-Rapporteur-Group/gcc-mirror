@@ -1,3 +1,220 @@
+2025-04-09  Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/115046
+	PR libstdc++/112490
+	* include/bits/stl_iterator.h (basic_const_iterator::operator-):
+	Replace non-dependent basic_const_iterator function parameter with
+	a dependent one of type basic_const_iterator<_It2> where _It2
+	matches _It.
+	* testsuite/std/ranges/adaptors/as_const/1.cc (test04): New test.
+
+2025-04-08  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/119671
+	* include/std/format (__formatter_fp::format): Do not invalidate
+	__wstr unless _M_localized returns a valid string.
+	* testsuite/std/format/functions/format.cc: Check wide string
+	formatting of floating-point types with classic locale.
+
+2025-04-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/119642
+	* include/bits/formatfwd.h: Remove stray pragma.
+
+2025-04-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/precompiled/stdc++.h: Include <stdbit.h> and
+	<stdckdint.h>. Include <stacktrace> unconditionally.
+
+2025-04-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	* doc/doxygen/user.cfg.in (INPUT): Add flat_map, flat_set,
+	text_encoding, stdbit.h and stdckdint.h.
+
+2025-04-07  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	PR target/119645
+	* acinclude.m4 (GLIBCXX_ENABLE_LOCK_POLICY) [GCN, nvptx]:
+	Hard-code results.
+	* configure: Regenerate.
+	* configure.host [GCN, nvptx] (atomicity_dir): Set to
+	'cpu/generic/atomicity_builtins'.
+
+2025-04-04  Patrick Palka  <ppalka@redhat.com>
+
+	PR libstdc++/119620
+	* include/std/flat_set (_Flat_set_impl::_M_try_emplace): Split
+	out into two overloads, one taking at least one argument and one
+	taking zero arguments.  Turn __k into an auto&& reference bound
+	to __arg if it's already a value_type and otherwise bound to a
+	lifetime-extended value_type temporary.
+	* testsuite/23_containers/flat_multiset/1.cc (test08): New test.
+	* testsuite/23_containers/flat_set/1.cc (test08): New test.
+
+2025-04-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/101587
+	* include/bits/ranges_uninitialized.h (__detail::__mindist):
+	Remove.
+	(ranges::uninitialized_copy, ranges::uninitialized_copy_n)
+	(ranges::uninitialized_move, ranges::uninitialized_move_n): Use
+	comparison and assignment instead of __mindist.
+	* testsuite/20_util/specialized_algorithms/uninitialized_copy/constrained.cc:
+	Check with ranges that use integer-like class type for
+	difference type.
+	* testsuite/20_util/specialized_algorithms/uninitialized_move/constrained.cc:
+	Likewise.
+
+2025-04-04  Tomasz Kamiński  <tkaminsk@redhat.com>
+
+	PR libstdc++/109162
+	* include/Makefile.am: Add bits/formatfwd.h.
+	* include/Makefile.in: Add bits/formatfwd.h.
+	* include/bits/version.def: Define __glibcxx_format_ranges without
+	corresponding std name.
+	* include/bits/version.h: Regenerate.
+	* include/std/format (basic_format_context, __format::__char):
+	Move declartions to bits/formatfwd.h.
+	(formatter<_Tp, _CharT>): Remove default argument for _CharT
+	parameter, now specified in forward declaration in bits/formatfwd.h.
+	* include/std/vector (formatter<_Bit_reference, _CharT>): Define.
+	* include/bits/formatfwd.h: New file with forward declarations
+	for bits of std/format.
+	* testsuite/23_containers/vector/bool/format.cc: New test.
+
+2025-04-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/basic_string.h: Check __glibcxx_string_view and
+	__glibcxx_variant instead of __cplusplus >= 2017L.
+	* include/bits/cow_string.h: Likewise.
+
+2025-04-04  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/basic_string.tcc: Fix whitespace.
+
+2025-04-04  Arsen Arsenović  <arsen@aarsen.me>
+
+	* include/bits/version.tpl: Implement no_stdname.
+	* include/bits/version.def: Document no_stdname.
+
+2025-04-03  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* config/cpu/nvptx/t-nvptx: Remove.
+	* configure.host [nvptx]: Adjust.
+
+2025-04-03  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	PR target/119573
+	* config/cpu/nvptx/t-nvptx (AM_MAKEFLAGS): Don't amend.
+
+2025-04-03  Tomasz Kamiński  <tkaminsk@redhat.com>
+
+	* testsuite/std/format/functions/format.cc: Restored line.
+
+2025-04-03  Tomasz Kamiński  <tkaminsk@redhat.com>
+
+	PR libstdc++/119593
+	* include/bits/unicode.h
+	(__unicode::__literal_encoding_is_unicode<_CharT>):
+	Corrected handing for UTF-16 and UTF-32 with "LE" or "BE" suffix.
+	* include/std/format (__formatter_str::_S_character_width):
+	Define.
+	(__formatter_str::_S_character_width): Updated passed char
+	length.
+	* testsuite/std/format/functions/format.cc: Test for wchar_t.
+
+2025-04-02  John David Anglin  <danglin@gcc.gnu.org>
+
+	* config/os/hpux/os_defines.h: Only use long long when
+	__cplusplus >= 201103L.
+
+2025-04-02  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* testsuite/lib/prune.exp: Prune ld warning about duplicatei
+	rpaths.
+
+2025-04-01  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/114945
+	* include/bits/vector.tcc (vector::_M_default_append): Add
+	unreachable condition so the compiler knows that _M_finish is
+	not null.
+	* testsuite/23_containers/vector/capacity/114945.cc: New test.
+
+2025-04-01  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	PR target/119369
+	* config/cpu/gcn/cpu_defines.h: New.
+	* configure.host [GCN] (cpu_defines_dir): Point to it.
+
+2025-03-31  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/110498
+	* include/bits/vector.tcc (vector<bool, A>::_M_reallocate):
+	Hoist loads of begin() and end() before allocation and use them
+	to state an unreachable condition.
+	* testsuite/23_containers/vector/bool/capacity/110498.cc: New
+	test.
+
+2025-03-31  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/114758
+	* include/bits/vector.tcc (vector<bool, A>::_M_fill_insert):
+	Hoist loads of begin() and end() before allocation.
+	* testsuite/23_containers/vector/bool/capacity/114758.cc: New
+	test.
+
+2025-03-31  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/119550
+	* acinclude.m4 (GLIBCXX_STRUCT_TM_TM_ZONE): New macro.
+	* config.h.in: Regenerate.
+	* configure: Regenerate.
+	* configure.ac: Use GLIBCXX_STRUCT_TM_TM_ZONE.
+	* include/bits/chrono_io.h (__formatter_chrono::_M_c): Check
+	_GLIBCXX_USE_STRUCT_TM_TM_ZONE instead of
+	_GLIBCXX_HAVE_STRUCT_TM_TM_ZONE.
+
+2025-03-31  Jonathan Wakely  <jwakely@redhat.com>
+
+	* config/abi/pre/gnu.ver (GLIBCXX_3.4.21): Make
+	std::basic_string::_M_construct patterns more precise.
+
+2025-03-31  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/119545
+	* include/std/tuple (operator==): Convert comparison results to
+	bool.
+	* testsuite/20_util/tuple/comparison_operators/119545.cc: New
+	test.
+
+2025-03-31  Tomasz Kamiński  <tkaminsk@redhat.com>
+
+	PR libstdc++/119517
+	* include/bits/chrono_io.h (formatter):
+	Add __format::__char for _CharT and adjust parse and format
+	method signatures.
+	* testsuite/std/time/format/pr119517.cc: New test.
+
+2025-03-31  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/103827
+	PR tree-optimization/80331
+	PR tree-optimization/87502
+	* config/abi/pre/gnu.ver (GLIBCXX_3.4.34): Use [jmy] rather than m
+	in pattern for _M_construct<bool>(char const*, size_t).
+
+2025-03-30  Jan Hubicka  <hubicka@ucw.cz>
+
+	PR tree-optimization/103827
+	PR tree-optimization/80331
+	PR tree-optimization/87502
+	* config/abi/pre/gnu.ver: Add version for _M_construct<bool>
+	* include/bits/basic_string.h: (basic_string::_M_construct<bool>): Declare.
+	(basic_string constructors): Use it.
+	* include/bits/basic_string.tcc: (basic_string::_M_construct<bool>): New template.
+	* src/c++11/string-inst.cc: Instantated S::_M_construct<bool>.
+
 2025-03-28  Jonathan Wakely  <jwakely@redhat.com>
 
 	PR libstdc++/117983

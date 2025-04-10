@@ -22,6 +22,7 @@
 #include "rust-ast-lower-expr.h"
 #include "rust-ast-lower-pattern.h"
 #include "rust-ast-lower-block.h"
+#include "rust-hir-item.h"
 #include "rust-item.h"
 
 namespace Rust {
@@ -131,7 +132,7 @@ ASTLowerImplItem::visit (AST::Function &function)
   Identifier function_name = function.get_function_name ();
   location_t locus = function.get_locus ();
 
-  HIR::SelfParam self_param = HIR::SelfParam::error ();
+  tl::optional<HIR::SelfParam> self_param = tl::nullopt;
   if (function.has_self_param ())
     self_param = lower_self (function.get_self_param ());
 
@@ -139,6 +140,9 @@ ASTLowerImplItem::visit (AST::Function &function)
     = function.has_return_type () ? std::unique_ptr<HIR::Type> (
 	ASTLoweringType::translate (function.get_return_type ()))
 				  : nullptr;
+
+  Defaultness defaultness
+    = function.is_default () ? Defaultness::Default : Defaultness::Final;
 
   std::vector<HIR::FunctionParam> function_params;
   for (auto &p : function.get_function_params ())
@@ -183,15 +187,15 @@ ASTLowerImplItem::visit (AST::Function &function)
 			 std::move (function_params), std::move (return_type),
 			 std::move (where_clause), std::move (function_body),
 			 std::move (vis), function.get_outer_attrs (),
-			 std::move (self_param), locus);
+			 std::move (self_param), defaultness, locus);
 
-  if (!fn->get_self_param ().is_error ())
+  if (fn->is_method ())
     {
       // insert mappings for self
-      mappings.insert_hir_self_param (&fn->get_self_param ());
+      mappings.insert_hir_self_param (&fn->get_self_param_unchecked ());
       mappings.insert_location (
-	fn->get_self_param ().get_mappings ().get_hirid (),
-	fn->get_self_param ().get_locus ());
+	fn->get_self_param_unchecked ().get_mappings ().get_hirid (),
+	fn->get_self_param_unchecked ().get_locus ());
     }
 
   // add the mappings for the function params at the end
@@ -245,9 +249,9 @@ ASTLowerTraitItem::visit (AST::Function &func)
 
   // set self parameter to error if this is a method
   // else lower to hir
-  HIR::SelfParam self_param = func.has_self_param ()
-				? lower_self (func.get_self_param ())
-				: HIR::SelfParam::error ();
+  tl::optional<HIR::SelfParam> self_param = tl::nullopt;
+  if (func.has_self_param ())
+    self_param = lower_self (func.get_self_param ());
 
   std::vector<HIR::FunctionParam> function_params;
   for (auto &p : func.get_function_params ())
@@ -299,9 +303,10 @@ ASTLowerTraitItem::visit (AST::Function &func)
   if (func.has_self_param ())
     {
       // insert mappings for self
-      mappings.insert_hir_self_param (&self_param);
-      mappings.insert_location (self_param.get_mappings ().get_hirid (),
-				self_param.get_locus ());
+      // TODO: Is this correct ? Looks fishy
+      mappings.insert_hir_self_param (&*self_param);
+      mappings.insert_location (self_param->get_mappings ().get_hirid (),
+				self_param->get_locus ());
     }
 
   // add the mappings for the function params at the end

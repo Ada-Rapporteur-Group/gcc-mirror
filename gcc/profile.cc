@@ -1340,11 +1340,11 @@ branch_prob (bool thunk)
 	  EDGE_INFO (e)->ignore = 1;
 	  ignored_edges++;
 	}
-      /* Ignore fake edges after musttail calls.  */
-      if ((e->flags & EDGE_FAKE)
-	  && e->dest == EXIT_BLOCK_PTR_FOR_FN (cfun))
+      /* Ignore edges after musttail calls.  */
+      if (cfun->has_musttail
+	  && e->src != ENTRY_BLOCK_PTR_FOR_FN (cfun))
 	{
-	  gimple_stmt_iterator gsi = gsi_last_bb (e->src);
+	  gimple_stmt_iterator gsi = gsi_last_nondebug_bb (e->src);
 	  gimple *stmt = gsi_stmt (gsi);
 	  if (stmt
 	      && is_gimple_call (stmt)
@@ -1611,9 +1611,17 @@ branch_prob (bool thunk)
 	instrument_values (values);
     }
 
-  void find_paths (struct function*);
+  unsigned instrument_prime_paths (struct function*);
   if (path_coverage_flag)
-    find_paths (cfun);
+    {
+      const unsigned npaths = instrument_prime_paths (cfun);
+      if (output_to_file)
+	{
+	  gcov_position_t offset = gcov_write_tag (GCOV_TAG_PATHS);
+	  gcov_write_unsigned (npaths);
+	  gcov_write_length (offset);
+	}
+    }
 
   free_aux_for_edges ();
 

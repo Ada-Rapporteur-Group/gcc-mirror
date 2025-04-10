@@ -309,6 +309,7 @@ static int *uid_insn_cost;
 struct insn_link {
   rtx_insn *insn;
   unsigned int regno;
+  int insn_count;
   struct insn_link *next;
 };
 
@@ -342,6 +343,7 @@ alloc_insn_link (rtx_insn *insn, unsigned int regno, struct insn_link *next)
 					  sizeof (struct insn_link));
   l->insn = insn;
   l->regno = regno;
+  l->insn_count = 0;
   l->next = next;
   return l;
 }
@@ -472,7 +474,8 @@ static void move_deaths (rtx, rtx, int, rtx_insn *, rtx *);
 static bool reg_bitfield_target_p (rtx, rtx);
 static void distribute_notes (rtx, rtx_insn *, rtx_insn *, rtx_insn *,
 			      rtx, rtx, rtx);
-static void distribute_links (struct insn_link *);
+static void distribute_links (struct insn_link *, rtx_insn * = nullptr,
+			      int limit = INT_MAX);
 static void mark_used_regs_combine (rtx);
 static void record_promoted_value (rtx_insn *, rtx);
 static bool unmentioned_reg_p (rtx, rtx);
@@ -4012,18 +4015,19 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
       rtx set1 = XVECEXP (newpat, 0, 1);
 
       /* Normally, it doesn't matter which of the two is done first, but
-	 one which uses any regs/memory set in between i2 and i3 can't
-	 be first.  The PARALLEL might also have been pre-existing in i3,
-	 so we need to make sure that we won't wrongly hoist a SET to i2
-	 that would conflict with a death note present in there, or would
-	 have its dest modified between i2 and i3.  */
+	 one which uses any regs/memory set or used in between i2 and i3
+	 can't be first.  The PARALLEL might also have been pre-existing
+	 in i3, so we need to make sure that we won't wrongly hoist a SET
+	 to i2 that would conflict with a death note present in there, or
+	 would have its dest modified or used between i2 and i3.  */
       if (!modified_between_p (SET_SRC (set1), i2, i3)
 	  && !(REG_P (SET_DEST (set1))
 	       && find_reg_note (i2, REG_DEAD, SET_DEST (set1)))
 	  && !(GET_CODE (SET_DEST (set1)) == SUBREG
 	       && find_reg_note (i2, REG_DEAD,
 				 SUBREG_REG (SET_DEST (set1))))
-	  && !modified_between_p (SET_DEST (set1), i2, i3)
+	  && SET_DEST (set1) != pc_rtx
+	  && !reg_used_between_p (SET_DEST (set1), i2, i3)
 	  /* If I3 is a jump, ensure that set0 is a jump so that
 	     we do not create invalid RTL.  */
 	  && (!JUMP_P (i3) || SET_DEST (set0) == pc_rtx)
@@ -4038,7 +4042,8 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
 	       && !(GET_CODE (SET_DEST (set0)) == SUBREG
 		    && find_reg_note (i2, REG_DEAD,
 				      SUBREG_REG (SET_DEST (set0))))
-	       && !modified_between_p (SET_DEST (set0), i2, i3)
+	       && SET_DEST (set0) != pc_rtx
+	       && !reg_used_between_p (SET_DEST (set0), i2, i3)
 	       /* If I3 is a jump, ensure that set1 is a jump so that
 		  we do not create invalid RTL.  */
 	       && (!JUMP_P (i3) || SET_DEST (set1) == pc_rtx)
@@ -4208,16 +4213,13 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
       adjust_for_new_dest (i3);
     }
 
-  /* If I2 didn't change, this is not a combination (but a simplification or
-     canonicalisation with context), which should not be done here.  Doing
-     it here explodes the algorithm.  Don't.  */
-  if (rtx_equal_p (newi2pat, PATTERN (i2)))
-    {
-      if (dump_file)
-	fprintf (dump_file, "i2 didn't change, not doing this\n");
-      undo_all ();
-      return 0;
-    }
+  bool only_i3_changed = !i0 && !i1 && rtx_equal_p (newi2pat, PATTERN (i2));
+
+  /* If only i3 has changed, any split of the combined instruction just
+     restored i2 to its original state.  No destinations moved from i3
+     to i2.  */
+  if (only_i3_changed)
+    split_i2i3 = false;
 
   /* We now know that we can do this combination.  Merge the insns and
      update the status of registers and LOG_LINKS.  */
@@ -4593,10 +4595,15 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
 			    NULL_RTX, NULL_RTX, NULL_RTX);
       }
 
-    distribute_links (i3links);
-    distribute_links (i2links);
-    distribute_links (i1links);
-    distribute_links (i0links);
+    if (only_i3_changed)
+      distribute_links (i3links, i3, param_max_combine_search_insns);
+    else
+      {
+	distribute_links (i3links);
+	distribute_links (i2links, i2);
+	distribute_links (i1links);
+	distribute_links (i0links);
+      }
 
     if (REG_P (i2dest))
       {
@@ -4784,6 +4791,9 @@ try_combine (rtx_insn *i3, rtx_insn *i2, rtx_insn *i1, rtx_insn *i0,
 
   combine_successes++;
   undo_commit ();
+
+  if (only_i3_changed)
+    return i3;
 
   rtx_insn *ret = newi2pat ? i2 : i3;
   if (added_links_insn && DF_INSN_LUID (added_links_insn) < DF_INSN_LUID (ret))
@@ -14984,10 +14994,15 @@ distribute_notes (rtx notes, rtx_insn *from_insn, rtx_insn *i3, rtx_insn *i2,
 
 /* Similarly to above, distribute the LOG_LINKS that used to be present on
    I3, I2, and I1 to new locations.  This is also called to add a link
-   pointing at I3 when I3's destination is changed.  */
+   pointing at I3 when I3's destination is changed.
+
+   If START is nonnull and an insn, we know that the next location for each
+   link is no earlier than START.  LIMIT is the maximum number of nondebug
+   instructions that can be scanned when looking for the next use of a
+   definition.  */
 
 static void
-distribute_links (struct insn_link *links)
+distribute_links (struct insn_link *links, rtx_insn *start, int limit)
 {
   struct insn_link *link, *next_link;
 
@@ -15053,7 +15068,13 @@ distribute_links (struct insn_link *links)
 	 I3 to I2.  Also note that not much searching is typically done here
 	 since most links don't point very far away.  */
 
-      for (insn = NEXT_INSN (link->insn);
+      int count = 0;
+      insn = start;
+      if (!insn || NOTE_P (insn))
+	insn = NEXT_INSN (link->insn);
+      else
+	count = link->insn_count;
+      for (;
 	   (insn && (this_basic_block->next_bb == EXIT_BLOCK_PTR_FOR_FN (cfun)
 		     || BB_HEAD (this_basic_block->next_bb) != insn));
 	   insn = NEXT_INSN (insn))
@@ -15073,6 +15094,11 @@ distribute_links (struct insn_link *links)
 	  }
 	else if (INSN_P (insn) && reg_set_p (reg, insn))
 	  break;
+	else if (count >= limit)
+	  break;
+	else
+	  count += 1;
+      link->insn_count = count;
 
       /* If we found a place to put the link, place it there unless there
 	 is already a link to the same insn as LINK at that point.  */

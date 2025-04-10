@@ -9004,25 +9004,28 @@ trees_out::decl_node (tree decl, walk_kind ref)
 	if (streaming_p ())
 	  i (tt_parm);
 	tree_node (DECL_CONTEXT (decl));
-	if (streaming_p ())
-	  {
-	    /* That must have put this in the map.  */
-	    walk_kind ref = ref_node (decl);
-	    if (ref != WK_none)
-	      // FIXME:OPTIMIZATION We can wander into bits of the
-	      // template this was instantiated from.  For instance
-	      // deferred noexcept and default parms.  Currently we'll
-	      // end up cloning those bits of tree.  It would be nice
-	      // to reference those specific nodes.  I think putting
-	      // those things in the map when we reference their
-	      // template by name.  See the note in add_indirects.
-	      return true;
 
-	    dump (dumper::TREE)
-	      && dump ("Wrote %s reference %N",
-		       TREE_CODE (decl) == PARM_DECL ? "parameter" : "result",
-		       decl);
-	  }
+	/* That must have put this in the map.  */
+	walk_kind ref = ref_node (decl);
+	if (ref != WK_none)
+	  // FIXME:OPTIMIZATION We can wander into bits of the
+	  // template this was instantiated from, for instance
+	  // deferred noexcept and default parms, or references
+	  // to parms from earlier forward-decls (PR c++/119608).
+	  //
+	  // Currently we'll end up cloning those bits of tree. 
+	  // It would be nice to reference those specific nodes.
+	  // I think putting those things in the map when we
+	  // reference their template by name.
+	  //
+	  // See the note in add_indirects.
+	  return true;
+
+	if (streaming_p ())
+	  dump (dumper::TREE)
+	    && dump ("Wrote %s reference %N",
+		     TREE_CODE (decl) == PARM_DECL ? "parameter" : "result",
+		     decl);
       }
       return false;
 
@@ -12122,7 +12125,7 @@ trees_in::is_matching_decl (tree existing, tree decl, bool is_typedef)
 	 instantiate it in the middle of loading.   */
       tree e_spec = TYPE_RAISES_EXCEPTIONS (e_type);
       tree d_spec = TYPE_RAISES_EXCEPTIONS (d_type);
-      if (DEFERRED_NOEXCEPT_SPEC_P (e_spec))
+      if (DECL_MAYBE_DELETED (e_inner) || DEFERRED_NOEXCEPT_SPEC_P (e_spec))
 	{
 	  if (!DEFERRED_NOEXCEPT_SPEC_P (d_spec)
 	      || (UNEVALUATED_NOEXCEPT_SPEC_P (e_spec)
@@ -12161,6 +12164,20 @@ trees_in::is_matching_decl (tree existing, tree decl, bool is_typedef)
       else if (type_uses_auto (d_ret)
 	       && !same_type_p (TREE_TYPE (d_type), TREE_TYPE (e_type)))
 	goto mismatch;
+
+      /* Similarly if EXISTING has undeduced constexpr, but DECL's
+	 is already deduced.  */
+      if (DECL_MAYBE_DELETED (e_inner) && !DECL_MAYBE_DELETED (d_inner)
+	  && DECL_DECLARED_CONSTEXPR_P (d_inner))
+	DECL_DECLARED_CONSTEXPR_P (e_inner) = true;
+      else if (DECL_DECLARED_CONSTEXPR_P (e_inner)
+	       != DECL_DECLARED_CONSTEXPR_P (d_inner))
+	goto mismatch;
+
+      /* Don't synthesize a defaulted function if we're importing one
+	 we've already determined.  */
+      if (!DECL_MAYBE_DELETED (d_inner))
+	DECL_MAYBE_DELETED (e_inner) = false;
     }
   else if (is_typedef)
     {
@@ -12679,9 +12696,10 @@ trees_in::read_function_def (tree decl, tree maybe_template)
 void
 trees_out::write_var_def (tree decl)
 {
-  /* The initializer of a variable or variable template is ignored for
-     determining exposures.  */
-  auto ovr = make_temp_override (dep_hash->ignore_tu_local, VAR_P (decl));
+  /* The initializer of a non-inline variable or variable template is
+     ignored for determining exposures.  */
+  auto ovr = make_temp_override (dep_hash->ignore_tu_local,
+				 VAR_P (decl) && !DECL_INLINE_VAR_P (decl));
 
   tree init = DECL_INITIAL (decl);
   tree_node (init);
@@ -16678,6 +16696,15 @@ module_state::read_cluster (unsigned snum)
 #endif
 	  cfun->returns_struct = aggr;
 	  expand_or_defer_fn (decl);
+
+	  /* If we first see this function after at_eof, it doesn't get
+	     note_vague_linkage_fn from tentative_decl_linkage, so the loop in
+	     c_parse_final_cleanups won't consider it.  But with DECL_COMDAT we
+	     can just clear DECL_EXTERNAL and let cgraph decide.
+	     FIXME handle this outside module.cc after GCC 15.  */
+	  if (at_eof && DECL_COMDAT (decl) && DECL_EXTERNAL (decl)
+	      && DECL_NOT_REALLY_EXTERN (decl))
+	    DECL_EXTERNAL (decl) = false;
 	}
 
     }
@@ -19158,6 +19185,10 @@ post_load_processing ()
 
       gcc_checking_assert (DECL_MAYBE_IN_CHARGE_CDTOR_P (decl));
       expand_or_defer_fn (decl);
+      /* As in module_state::read_cluster.  */
+      if (at_eof && DECL_COMDAT (decl) && DECL_EXTERNAL (decl)
+	  && DECL_NOT_REALLY_EXTERN (decl))
+	DECL_EXTERNAL (decl) = false;
     }
 
   cfun = old_cfun;

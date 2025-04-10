@@ -614,11 +614,11 @@ Warn when an optimization pass is disabled.
 
 Werror
 Common Var(warnings_are_errors)
-Treat all warnings as errors.
+Turn all warnings into errors.
 
 Werror=
 Common Joined
-Treat specified warning as error.
+Turn the specified warning into an error.
 
 Wextra
 Common Var(extra_warnings) Warning
@@ -692,6 +692,14 @@ Does nothing. Preserved for backward compatibility.
 
 Wmissing-noreturn
 Common Warning Alias(Wsuggest-attribute=noreturn)
+
+Wmusttail-local-addr
+Common Var(warn_musttail_local_addr) Init(1) Warning
+Warn about passing a pointer/reference to a local or temporary variable to a musttail call argument.
+
+Wmaybe-musttail-local-addr
+Common Var(warn_maybe_musttail_local_addr) Warning EnabledBy(Wextra)
+Warn about pointer/reference to a local or temporary variable possibly escaping to a musttail call.
 
 Wodr
 Common Var(warn_odr_violations) Init(1) Warning
@@ -2047,6 +2055,7 @@ Enum(ilsop_fn) String(memset) Value(ILSOP_MEMSET) Set(4)
 
 fcf-protection
 Common RejectNegative Alias(fcf-protection=,full)
+Equivalent to -fcf-protection=full.
 
 fcf-protection=
 Common Joined RejectNegative Enum(cf_protection_level) EnumSet Var(flag_cf_protection) Init(CF_NONE)
@@ -3797,7 +3806,7 @@ Common Alias(Wpedantic)
 
 pedantic-errors
 Common Var(flag_pedantic_errors)
-Like -pedantic but issue them as errors.
+Like -pedantic but issue errors instead of warnings.
 
 pg
 Driver
