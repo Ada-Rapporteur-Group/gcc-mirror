@@ -2514,7 +2514,8 @@ gfc_copy_descriptor (stmtblock_t *block, tree dest, tree src,
   gfc_add_modify (block, dest, tmp1);
 
   /* Add any offsets from subreferences.  */
-  gfc_get_dataptr_offset (block, dest, src, NULL_TREE, subref, src_expr);
+  if (subref)
+    gfc_get_dataptr_offset (block, dest, src, subref, src_expr);
 
   /* ....and set the span field.  */
   tree tmp2;
@@ -3183,8 +3184,7 @@ gfc_set_descriptor (stmtblock_t *block, tree dest, tree src, gfc_expr *src_expr,
 
   if (data_needed)
     /* Point the data pointer at the 1st element in the section.  */
-    gfc_get_dataptr_offset (block, dest, src, gfc_index_zero_node,
-			    subref, src_expr);
+    gfc_get_dataptr_offset (block, dest, src, subref, src_expr);
   else
     gfc_conv_descriptor_data_set (block, dest,
 				  gfc_index_zero_node);
