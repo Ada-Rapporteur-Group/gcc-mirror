@@ -3722,6 +3722,8 @@ add_array_offset (stmtblock_t *pblock, gfc_loopinfo *loop, gfc_ss *ss,
 
   info = &ss->info->data.array;
 
+  tree type = TREE_TYPE (info->data);
+
   gfc_init_se (&se, NULL);
   se.loop = loop;
   se.expr = info->descriptor;
@@ -3731,6 +3733,7 @@ add_array_offset (stmtblock_t *pblock, gfc_loopinfo *loop, gfc_ss *ss,
 
   tree tmp = build_array_ref_dim (ss, index, info->spacing[array_dim]);
   tmp = gfc_build_addr_expr (NULL_TREE, tmp);
+  tmp = fold_convert_loc (input_location, type, tmp);
   info->data = gfc_evaluate_now (tmp, pblock);
 }
 
