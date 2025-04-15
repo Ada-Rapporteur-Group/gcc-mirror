@@ -123,6 +123,8 @@ can_delete_call (rtx_insn *insn)
   return true;
 }
 
+static bool inside_ud = false;
+
 /* Return true if INSN is a normal instruction that can be deleted by
    the DCE pass.  */
 
@@ -578,8 +580,6 @@ reset_unmarked_insns_debug_uses (void)
 }
 
 /* Delete every instruction that hasn't been marked.  */
-static bool inside_ud = false;
-
 static void
 delete_unmarked_insns (void)
 {
@@ -819,7 +819,6 @@ fini_dce (bool fast)
 static unsigned int
 rest_of_handle_ud_dce (void)
 {
-  inside_ud = true;
   rtx_insn *insn;
 
   init_dce (false);
@@ -833,6 +832,7 @@ rest_of_handle_ud_dce (void)
     }
   worklist.release ();
 
+  inside_ud = true;
   if (MAY_HAVE_DEBUG_BIND_INSNS)
     reset_unmarked_insns_debug_uses ();
 
@@ -1381,9 +1381,8 @@ bool is_rtx_insn_prelive(rtx_insn *insn) {
   gcc_assert(GET_CODE(insn) == INSN);
 
   /* Don't delete insns that may throw if we cannot do so.  */
-  if (!(cfun->can_delete_dead_exceptions && can_alter_cfg)
-      && !insn_nothrow_p (insn))
-    return true;
+  if (!cfun->can_delete_dead_exceptions && !insn_nothrow_p (insn))
+      return true;
  
   /* Callee-save restores are needed.  */
   if (RTX_FRAME_RELATED_P (insn) && crtl->shrink_wrapped_separate 
@@ -1410,8 +1409,8 @@ bool is_rtx_insn_prelive(rtx_insn *insn) {
 
 bool is_prelive(insn_info *insn)
 {
-  /* Phi insns are never prelive, bb head and end contain artificial uses that
-     we need to mark as prelive */
+  /* Phi insns and debug insns are never prelive, bb head and end contain 
+     artificial uses that we need to mark as prelive */
   if (insn->is_bb_head() || insn->is_bb_end())
     return true;
 
@@ -1468,6 +1467,9 @@ rtl_ssa_dce_mark_prelive_insn(insn_info *insn, auto_vec<set_info *> &worklist,
 static auto_vec<set_info *>
 rtl_ssa_dce_mark_prelive(std::unordered_set<insn_info *> &marked)
 {
+  if (dump_file)
+    fprintf(dump_file, "DCE: prelive phase\n");
+
   auto_vec<set_info *> worklist;
   for (insn_info * insn : crtl->ssa->all_insns()) {
     if (is_prelive(insn))
@@ -1478,12 +1480,13 @@ rtl_ssa_dce_mark_prelive(std::unordered_set<insn_info *> &marked)
 }
 
 static std::unordered_set<insn_info *>
-rtl_ssa_dce_mark()
+rtl_ssa_dce_mark(std::unordered_set<phi_info *> &marked_phis)
 {
-  std::unordered_set<insn_info *> marked{};
   /* Phi insn might have more that one phi node: gcc/gcc/testsuite/gcc.c-torture/execute/20000224-1.c */
-  std::unordered_set<phi_info *> marked_phi_nodes{};
+  std::unordered_set<insn_info *> marked{};
   auto worklist = rtl_ssa_dce_mark_prelive(marked);
+  if (dump_file)
+    fprintf(dump_file, "DCE: marking phase\n");
 
   while (!worklist.is_empty()) {
     set_info* set = worklist.pop();
@@ -1505,10 +1508,10 @@ rtl_ssa_dce_mark()
          might be used. */
       phi_info* pi = as_a<phi_info *> (set);
       auto pi_uid = pi->uid();
-      if (marked_phi_nodes.count(pi) > 0)
+      if (marked_phis.count(pi) > 0)
         continue;
 
-      marked_phi_nodes.emplace(pi);
+        marked_phis.emplace(pi);
       uses = pi->inputs();
     }
 
@@ -1527,37 +1530,43 @@ rtl_ssa_dce_mark()
   return marked;
 }
 
+// Iterate over non-debug instructions in RPO and remove all aren't marked.
 static void
 rtl_ssa_dce_sweep(std::unordered_set<insn_info *> marked)
 {
-  /* We can get the number of items in the `marked` set and create an array
-     of changes with appropriate size */
+  if (dump_file)
+    fprintf(dump_file, "DCE: Sweep phase\n");
+
   auto_vec<insn_change> to_delete;
-  for (insn_info * insn : crtl->ssa->all_insns()) {
-    /* Artificial and marked insns cannot be deleted.
-       There is a slight problem with phis, because we might want to delete
-       some phi nodes from phi insn. */
-    if (insn->is_artificial() || insn->is_debug_insn() || marked.count(insn) > 0)
+  for (insn_info * insn : crtl->ssa->nondebug_insns()) {
+    // Artificial or marked insns cannot be deleted.
+    if (insn->is_artificial() || marked.count(insn) > 0)
       continue;
 
-    auto change = insn_change::delete_insn(insn);
-    to_delete.safe_push(change);
     if (dump_file)
-      fprintf(dump_file, "Sweeping insn %d\n", insn->uid());
-    /* crtl->ssa->change_insn(change); */
+      fprintf(dump_file, "Sweeping insn: %d\n", insn->uid());
+
+    auto change = insn_change::delete_insn(insn);
+    to_delete.safe_push(std::move(change));
+
+    // If we use following way with reverse_nondebug_insns, not all insns seem
+    // to be deleted...
+    // crtl->ssa->change_insn(change);
   }
 
-  auto attempt = crtl->ssa->new_change_attempt ();
   auto_vec<insn_change*> changes(to_delete.length());
   for (size_t i = 0; i != to_delete.length(); ++i) {
     changes.safe_push(&to_delete[i]);
   }
 
   gcc_assert (crtl->ssa->verify_insn_changes(changes));
-  /* segfault: gcc.c-torture/execute/20000224-1.c */
   crtl->ssa->change_insns(changes);
+
+  if (dump_file)
+    fprintf(dump_file, "DCE: finish sweep phase\n");
 }
 
+// Clear debug_insn uses and set gen_rtx_UNKNOWN_VAR_LOC
 static void reset_debug_insn_uses(insn_info * insn) {
   gcc_assert(insn->is_debug_insn());
 
@@ -1570,15 +1579,19 @@ static void reset_debug_insn_uses(insn_info * insn) {
   crtl->ssa->change_insn (change);
 }
 
-// WIP
+// Iterate over all debug_insns and reset those for which at least one of the 
+// uses isn't marked.
 static void
-rtl_ssa_dce_reset_dead_debug(std::unordered_set<insn_info *> &marked) {
+rtl_ssa_dce_reset_dead_debug(std::unordered_set<insn_info *> &marked, std::unordered_set<phi_info *> &marked_phis) {
   for (insn_info *insn : crtl->ssa->all_insns()) {
     if (!insn->is_debug_insn())
       continue;
 
+    // TODO : use iterate_safely?
     for (use_info * use: insn->uses()) {
-      if (marked.count(use->def()->insn()) == 0) {
+      insn_info *parent_insn = use->def()->insn();
+      if ((parent_insn->is_phi() && marked_phis.count(as_a<phi_info *>(use->def())) == 0) 
+      || (!parent_insn->is_phi() && marked.count(parent_insn) == 0)) {
         reset_debug_insn_uses(insn);
         break;
       }
@@ -1610,10 +1623,14 @@ rtl_ssa_dce()
 {
   rtl_ssa_dce_init();
   // debug(crtl->ssa);
-  std::unordered_set<insn_info *> marked = rtl_ssa_dce_mark();
+  if (dump_file)
+    dump(dump_file, crtl->ssa);
+  std::unordered_set<phi_info *> marked_phis;
+  std::unordered_set<insn_info *> marked = rtl_ssa_dce_mark(marked_phis);
   if (MAY_HAVE_DEBUG_BIND_INSNS)
-    rtl_ssa_dce_reset_dead_debug(marked);
+    rtl_ssa_dce_reset_dead_debug(marked, marked_phis); 
   rtl_ssa_dce_sweep(marked);
+
   // std::cerr << "\033[31m" << "SSA debug start" << "\033[0m" << "\n";
   // debug (crtl->ssa);
   // for (insn_info * insn : crtl->ssa->all_insns()) {
@@ -1623,14 +1640,6 @@ rtl_ssa_dce()
   // }
   // std::cerr << "\033[31m" << "SSA debug end" << "\033[0m" << "\n";
   rtl_ssa_dce_done();
-
-  /* We need to perform some kind of reset_unmarked_insns_debug_uses
-     to be able to reproduce ud_dce - now only 4 tests are falling
-     because of debug_insn being dependent on parallel with set flags 
-     - gcc.c-torture/execute/20051215-1.c
-     - gcc.c-torture/execute/20100805-1.c
-     - gcc.c-torture/execute/pr39339.c
-     - gcc.c-torture/execute/pr47925.c */
 
   /*
   if (delete_trivially_dead_insns(get_insns (), max_reg_num ())) {
