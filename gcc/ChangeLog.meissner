@@ -1,4 +1,4 @@
-==================== Branch work201, patch #21 ====================
+==================== Branch work201, patch #22 ====================
 
 Use architecture flags for defining _ARCH_PWR macros.
 
@@ -22,7 +22,7 @@ were no regressions.
 
 Can I install this patch on the GCC 15 trunk?
 
-2025-04-14  Michael Meissner  <meissner@linux.ibm.com>
+2025-04-15  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
@@ -61,6 +61,8 @@ gcc/
 	(-mpower10): Likewise.
 	(-mpower11): Likewise.
 	(-mfuture): Likewise.
+
+==================== Branch work201, patch #21 was reverted ====================
 
 ==================== Branch work201, patch #20 ====================
 
