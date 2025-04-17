@@ -11772,6 +11772,10 @@ tsubst_friend_function (tree decl, tree args)
 		      elt.args = DECL_TI_ARGS (spec);
 		      elt.spec = NULL_TREE;
 
+		      if (TMPL_ARGS_HAVE_MULTIPLE_LEVELS (DECL_TI_ARGS (spec))
+			  && !is_specialization_of_friend (spec, new_template))
+			continue;
+
 		      decl_specializations->remove_elt (&elt);
 
 		      tree& spec_args = DECL_TI_ARGS (spec);
@@ -12425,6 +12429,8 @@ apply_late_template_attributes (tree *decl_p, tree attributes, int attr_flags,
   auto o4 = make_temp_override (scope_chain->omp_declare_target_attribute,
 				NULL);
   auto o5 = make_temp_override (scope_chain->omp_begin_assumes, NULL);
+  auto o6 = make_temp_override (target_option_current_node,
+				target_option_default_node);
 
   cplus_decl_attributes (decl_p, late_attrs, attr_flags);
 
@@ -13748,6 +13754,8 @@ add_extra_args (tree extra, tree args, tsubst_flags_t complain, tree in_decl)
 	      inst = local;
 	  /* else inst is already a full instantiation of the pack.  */
 	  register_local_specialization (inst, gen);
+	  if (is_normal_capture_proxy (gen))
+	    register_local_specialization (inst, DECL_CAPTURED_VARIABLE (gen));
 	}
       gcc_assert (!TREE_PURPOSE (extra));
       extra = TREE_VALUE (extra);
@@ -27750,6 +27758,11 @@ instantiate_body (tree pattern, tree args, tree d, bool nested_p)
 
       if (DECL_OMP_DECLARE_REDUCTION_P (code_pattern))
 	cp_check_omp_declare_reduction (d);
+
+      if (int errs = errorcount + sorrycount)
+	if (errs > current_tinst_level->errors)
+	  if (function *f = DECL_STRUCT_FUNCTION (d))
+	    f->language->erroneous = true;
     }
 
   /* We're not deferring instantiation any more.  */
@@ -30936,9 +30949,8 @@ alias_ctad_tweaks (tree tmpl, tree uguides)
   tree aguides = NULL_TREE;
   tree atparms = INNERMOST_TEMPLATE_PARMS (fullatparms);
   unsigned natparms = TREE_VEC_LENGTH (atparms);
-  for (ovl_iterator iter (uguides); iter; ++iter)
+  for (tree f : lkp_range (uguides))
     {
-      tree f = *iter;
       tree in_decl = f;
       location_t loc = DECL_SOURCE_LOCATION (f);
       tree ret = TREE_TYPE (TREE_TYPE (f));

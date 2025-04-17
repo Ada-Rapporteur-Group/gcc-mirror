@@ -41,6 +41,7 @@
 #include <algorithm>
 
 #include "config.h"
+#include "libgcobol-fp.h"
 
 #include "ec.h"
 #include "io.h"
@@ -4054,34 +4055,6 @@ file_indexed_close(cblc_file_t *file)
   file->supplemental = NULL;
   }
 
-static void
-report_open_failure(const char *type,
-                    const char *structure_name,
-                    const char *filename)
-  {
-  bool quiet = true;
-  if( !quiet )
-    {
-    if( getenv(filename) )
-      {
-      fprintf(stderr,
-              "Trying to 'OPEN %s %s %s -> \"%s\"', which doesn't exist\n",
-              type,
-              structure_name,
-              filename,
-              getenv(filename));
-      }
-    else
-      {
-      fprintf(stderr,
-              "Trying to 'OPEN %s %s \"%s\"', which doesn't exist\n",
-              type,
-              structure_name,
-              filename);
-      }
-    }
-  }
-
 extern "C"
 void
 __gg__file_reopen(cblc_file_t *file, int mode_char)
@@ -4210,7 +4183,6 @@ __gg__file_reopen(cblc_file_t *file, int mode_char)
           }
         else
           {
-          report_open_failure("INPUT", file->name, trimmed_name);
           file->io_status = FsNoFile;    // "35"
           goto done;
           }
@@ -4252,7 +4224,6 @@ __gg__file_reopen(cblc_file_t *file, int mode_char)
         else
           {
           // Trying to extend a non-optional non-existing file is against the rules
-          report_open_failure("EXTEND", file->name, trimmed_name);
           file->io_status = FsNoFile;    // "35"
           goto done;
           }
@@ -4268,7 +4239,6 @@ __gg__file_reopen(cblc_file_t *file, int mode_char)
           }
         else
           {
-          report_open_failure("I-O", file->name, trimmed_name);
           file->io_status = FsNoFile;    // "35"
           goto done;
           }

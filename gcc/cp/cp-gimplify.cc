@@ -1199,8 +1199,11 @@ cp_build_init_expr_for_ctor (tree call, tree init)
   tree s = build_fold_indirect_ref_loc (loc, a);
   init = cp_build_init_expr (s, init);
   if (return_this)
-    init = build2_loc (loc, COMPOUND_EXPR, TREE_TYPE (call), init,
-		    fold_convert_loc (loc, TREE_TYPE (call), a));
+    {
+      init = build2_loc (loc, COMPOUND_EXPR, TREE_TYPE (call), init,
+			 fold_convert_loc (loc, TREE_TYPE (call), a));
+      suppress_warning (init);
+    }
   return init;
 }
 
@@ -1480,7 +1483,9 @@ cp_fold_r (tree *stmt_p, int *walk_subtrees, void *data_)
 	  *walk_subtrees = 0;
 	  if (!flag_no_inline)
 	    {
-	      tree folded = maybe_constant_init (init, TARGET_EXPR_SLOT (stmt));
+	      tree folded = maybe_constant_init (init, TARGET_EXPR_SLOT (stmt),
+						 (data->flags & ff_mce_false
+						  ? mce_false : mce_unknown));
 	      if (folded != init && TREE_CONSTANT (folded))
 		init = folded;
 	    }

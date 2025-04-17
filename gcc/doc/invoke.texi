@@ -211,8 +211,7 @@ in the following sections.
 @item C++ Language Options
 @xref{C++ Dialect Options,,Options Controlling C++ Dialect}.
 @gccoptlist{-fabi-version=@var{n}  -fno-access-control
--faligned-new=@var{n}  -fargs-in-order=@var{n}
--fno-assume-sane-operators-new-delete
+-faligned-new=@var{n}  -fno-assume-sane-operators-new-delete
 -fchar8_t  -fcheck-new
 -fconcepts  -fconstexpr-depth=@var{n}  -fconstexpr-cache-depth=@var{n}
 -fconstexpr-loop-limit=@var{n}  -fconstexpr-ops-limit=@var{n}
@@ -235,6 +234,7 @@ in the following sections.
 -fno-optional-diags
 -fno-pretty-templates  -frange-for-ext-temps
 -fno-rtti  -fsized-deallocation
+-fstrong-eval-order@r{[}=@var{kind}@r{]}
 -ftemplate-backtrace-limit=@var{n}
 -ftemplate-depth=@var{n}
 -fno-threadsafe-statics  -fuse-cxa-atexit
@@ -593,7 +593,7 @@ Objective-C and Objective-C++ Dialects}.
 -finline-functions  -finline-functions-called-once  -finline-limit=@var{n}
 -finline-small-functions -fipa-modref -fipa-cp  -fipa-cp-clone
 -fipa-bit-cp  -fipa-vrp  -fipa-pta  -fipa-profile  -fipa-pure-const
--fipa-reference  -fipa-reference-addressable
+-fipa-reference  -fipa-reference-addressable -fipa-reorder-for-locality
 -fipa-stack-alignment  -fipa-icf  -fira-algorithm=@var{algorithm}
 -flate-combine-instructions -flifetime-dse -flive-patching=@var{level}
 -fira-region=@var{region}  -fira-hoist-pressure
@@ -642,8 +642,8 @@ Objective-C and Objective-C++ Dialects}.
 -fsplit-wide-types  -fsplit-wide-types-early  -fssa-backprop  -fssa-phiopt
 -fstdarg-opt  -fstore-merging  -fstrict-aliasing -fipa-strict-aliasing
 -fthread-jumps  -ftracer  -ftree-bit-ccp
--ftree-builtin-call-dce  -ftree-ccp  -ftree-ch
--ftree-coalesce-vars  -ftree-copy-prop  -ftree-dce  -ftree-dominator-opts
+-ftree-builtin-call-dce  -ftree-ccp  -ftree-ch  -ftree-coalesce-vars
+-ftree-copy-prop  -ftree-cselim  -ftree-dce  -ftree-dominator-opts
 -ftree-dse  -ftree-forwprop  -ftree-fre  -fcode-hoisting
 -ftree-loop-if-convert  -ftree-loop-im
 -ftree-phiprop  -ftree-loop-distribution  -ftree-loop-distribute-patterns
@@ -2199,6 +2199,7 @@ those that have already been displayed.  If @option{--help} is also
 specified anywhere on the command line then this takes precedence
 over any @option{--help=} option.
 
+@opindex Q
 If the @option{-Q} option appears on the command line before the
 @option{--help=} option, then the descriptive text displayed by
 @option{--help=} is changed.  Instead of describing the displayed
@@ -3581,12 +3582,19 @@ type.
 
 @opindex fstrong-eval-order
 @item -fstrong-eval-order
+@itemx -fstrong-eval-order=@var{kind}
 Evaluate member access, array subscripting, and shift expressions in
 left-to-right order, and evaluate assignment in right-to-left order,
-as adopted for C++17.  Enabled by default with @option{-std=c++17}.
+as adopted for C++17.  @option{-fstrong-eval-order} is equivalent to
+@option{-fstrong-eval-order=all},
+and is enabled by default with @option{-std=c++17} or later.
+
 @option{-fstrong-eval-order=some} enables just the ordering of member
-access and shift expressions, and is the default without
-@option{-std=c++17}.
+access and shift expressions, and is the default for C++ dialects prior to
+C++17.
+
+@option{-fstrong-eval-order=none} is equivalent to
+@option{-fno-strong-eval-order}.
 
 @opindex ftemplate-backtrace-limit
 @item -ftemplate-backtrace-limit=@var{n}
@@ -12739,6 +12747,7 @@ complexity than at @option{-O}.
 -fipa-pure-const
 -fipa-reference
 -fipa-reference-addressable
+-fivopts
 -fmerge-constants
 -fmove-loop-invariants
 -fmove-loop-stores
@@ -12846,6 +12855,13 @@ by @option{-O2} and also turns on the following optimization flags:
 @item -O0
 Reduce compilation time and make debugging produce the expected
 results.  This is the default.
+
+At @option{-O0}, GCC completely disables most optimization passes;
+they are not run even if you explicitly enable them on the command
+line, or are listed by @option{-Q --help=optimizers} as being enabled by
+default.  Many optimizations performed by GCC depend on code analysis
+or canonicalization passes that are enabled by @option{-O}, and it would
+not be useful to run individual optimization passes in isolation.
 
 @opindex Os
 @item -Os
@@ -13864,6 +13880,21 @@ Enabled by default at @option{-O1} and higher.
 Discover read-only, write-only and non-addressable static variables.
 Enabled by default at @option{-O1} and higher.
 
+@opindex fipa-reorder-for-locality
+@item -fipa-reorder-for-locality
+Group call chains close together in the binary layout to improve code
+locality and minimize jump distances between frequently called functions.
+Unlike @option{-freorder-functions} this pass considers the call
+chains between functions and groups them together, rather than grouping all
+hot/normal/cold/never-executed functions into separate sections.
+Unlike @option{-fprofile-reorder-functions} it aims to improve code locality
+throughout the runtime of the program rather than focusing on program startup.
+This option is incompatible with an explicit
+@option{-flto-partition=} option since it enforces a custom partitioning
+scheme.
+If using this option it is recommended to also use profile feedback, but this
+option is not enabled by default otherwise.
+
 @opindex fipa-stack-alignment
 @item -fipa-stack-alignment
 Reduce stack alignment on call sites if possible.
@@ -14072,6 +14103,12 @@ in this pass can
 be limited using @option{max-tail-merge-comparisons} parameter and
 @option{max-tail-merge-iterations} parameter.
 
+@opindex ftree-cselim
+@item -ftree-cselim
+Perform conditional store elimination on trees.  This flag is enabled by
+default at @option{-O1} and higher on targets that have conditional
+move instructions.
+
 @opindex ftree-dce
 @item -ftree-dce
 Perform dead code elimination (DCE) on trees.  This flag is enabled by
@@ -14278,6 +14315,7 @@ Enabled by default at @option{-O1} and higher.
 @item -fivopts
 Perform induction variable optimizations (strength reduction, induction
 variable merging and induction variable elimination) on trees.
+Enabled by default at @option{-O1} and higher.
 
 @opindex ftree-parallelize-loops
 @item -ftree-parallelize-loops=n
@@ -14593,11 +14631,13 @@ Enabled for x86 at levels @option{-O2}, @option{-O3}, @option{-Os}.
 @opindex freorder-functions
 @item -freorder-functions
 Reorder functions in the object file in order to
-improve code locality.  This is implemented by using special
-subsections @code{.text.hot} for most frequently executed functions and
-@code{.text.unlikely} for unlikely executed functions.  Reordering is done by
-the linker so object file format must support named sections and linker must
-place them in a reasonable way.
+improve code locality.  Unlike @option{-fipa-reorder-for-locality} this option
+prioritises grouping all functions within a category
+(hot/normal/cold/never-executed) together.
+This is implemented by using special subsections @code{.text.hot} for most
+frequently executed functions and @code{.text.unlikely} for unlikely executed
+functions.  Reordering is done by the linker so object file format must support
+named sections and linker must place them in a reasonable way.
 
 This option isn't effective unless you either provide profile feedback
 (see @option{-fprofile-arcs} for details) or manually annotate functions with
@@ -15318,32 +15358,24 @@ arithmetic.  These options trade off between speed and
 correctness.  All must be specifically enabled.
 
 @table @gcctabopt
-@opindex ffloat-store
-@item -ffloat-store
-Do not store floating-point variables in registers, and inhibit other
-options that might change whether a floating-point value is taken from a
-register or memory.
-
-@cindex floating-point precision
-This option prevents undesirable excess precision on machines such as
-the 68000 where the floating registers (of the 68881) keep more
-precision than a @code{double} is supposed to have.  Similarly for the
-x86 architecture.  For most programs, the excess precision does only
-good, but a few programs rely on the precise definition of IEEE floating
-point.  Use @option{-ffloat-store} for such programs, after modifying
-them to store all pertinent intermediate computations into variables.
-
 @opindex fexcess-precision
 @item -fexcess-precision=@var{style}
-This option allows further control over excess precision on machines
+This option allows control over excess precision on machines
 where floating-point operations occur in a format with more precision or
-range than the IEEE standard and interchange floating-point types.  By
-default, @option{-fexcess-precision=fast} is in effect; this means that
+range than the IEEE standard and interchange floating-point types.
+An example of such a target is x87 floating point on x86 processors,
+which uses an 80-bit representation internally instead of the 64-bit
+IEEE format.  For most programs, the excess precision is harmless,
+but some programs may rely on the
+requirements of the C or C++ language standards for handling IEEE values.
+
+By default, @option{-fexcess-precision=fast} is in effect; this means that
 operations may be carried out in a wider precision than the types specified
 in the source if that would result in faster code, and it is unpredictable
 when rounding to the types specified in the source code takes place.
 When compiling C or C++, if @option{-fexcess-precision=standard} is specified
-then excess precision follows the rules specified in ISO C99 or C++; in particular,
+then excess precision follows the rules specified in ISO C99 or C++;
+in particular,
 both casts and assignments cause values to be rounded to their
 semantic types (whereas @option{-ffloat-store} only affects
 assignments).  This option is enabled by default for C or C++ if a strict
@@ -15360,6 +15392,18 @@ other than C or C++.  On the x86, it has no effect if @option{-mfpmath=sse}
 or @option{-mfpmath=sse+387} is specified; in the former case, IEEE
 semantics apply without excess precision, and in the latter, rounding
 is unpredictable.
+
+@opindex ffloat-store
+@item -ffloat-store
+Do not store floating-point variables in registers, and inhibit other
+options that might change whether a floating-point value is taken from a
+register or memory.  This option has generally been subsumed by
+@option{-fexcess-precision=standard}, which is more general.  If you do use
+@option{-ffloat-store}, you may need to modify your program to explicitly
+store intermediate computations in temporary variables since
+@option{-ffloat-store} handles rounding to IEEE format
+only on assignments and not casts as @option{-fexcess-precision=standard}
+does.
 
 @opindex ffast-math
 @item -ffast-math
@@ -15495,9 +15539,8 @@ default state for @code{FENV_ACCESS}.
 @opindex frounding-math
 @item -frounding-math
 Disable transformations and optimizations that assume default floating-point
-rounding behavior.  This is round-to-zero for all floating point
-to integer conversions, and round-to-nearest for all other arithmetic
-truncations.  This option should be specified for programs that change
+rounding behavior (round-to-nearest).
+This option should be specified for programs that change
 the FP rounding mode dynamically, or that may be executed with a
 non-default rounding mode.  This option disables constant folding of
 floating-point expressions at compile time (which may be affected by
@@ -15619,7 +15662,8 @@ Enabled by @option{-fprofile-generate}, @option{-fprofile-use}, and
 @item -fprofile-reorder-functions
 Function reordering based on profile instrumentation collects
 first time of execution of a function and orders these functions
-in ascending order.
+in ascending order, aiming to optimize program startup through more
+efficient loading of text segments.
 
 Enabled with @option{-fprofile-use}.
 
@@ -21268,8 +21312,13 @@ Toggle @option{-fvar-tracking-assignments}, in the same way that
 
 @opindex Q
 @item -Q
-Makes the compiler print out each function name as it is compiled, and
-print some statistics about each pass when it finishes.
+When used on the command line prior to @option{--help=}, @option{-Q}
+acts as a modifier to the help output.  @xref{Overall Options},
+for details about @option{--help=}.
+
+Otherwise, this option makes the compiler print out each function name
+as it is compiled, and print some statistics about each pass when it
+finishes.
 
 @opindex ftime-report
 @item -ftime-report
@@ -33328,7 +33377,7 @@ system representing a certain processor type.  Possible values for
 @samp{z9-109}, @samp{z9-ec}/@samp{arch7}, @samp{z10}/@samp{arch8},
 @samp{z196}/@samp{arch9}, @samp{zEC12}, @samp{z13}/@samp{arch11},
 @samp{z14}/@samp{arch12}, @samp{z15}/@samp{arch13},
-@samp{z16}/@samp{arch14}, and @samp{native}.
+@samp{z16}/@samp{arch14}, @samp{z17}/@samp{arch15}, and @samp{native}.
 
 The default is @option{-march=z900}.
 
@@ -34822,7 +34871,8 @@ produces code optimized for the local machine under the constraints
 of the selected instruction set.
 
 @item x86-64
-A generic CPU with 64-bit extensions.
+A generic CPU with 64-bit extensions, MMX, SSE, SSE2, and FXSR instruction set
+support.
 
 @item x86-64-v2
 @itemx x86-64-v3
@@ -34855,7 +34905,7 @@ Intel Lakemont MCU, based on Intel Pentium CPU.
 Intel Pentium MMX CPU, based on Pentium core with MMX instruction set support.
 
 @item pentiumpro
-Intel Pentium Pro CPU@.
+Intel Pentium Pro CPU with no MMX support.
 
 @item i686
 When used with @option{-march}, the Pentium Pro

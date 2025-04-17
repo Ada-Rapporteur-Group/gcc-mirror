@@ -1,3 +1,553 @@
+2025-04-16  Alexandre Oliva  <oliva@adacore.com>
+
+	* gcc.dg/ipa/ipa-sra-19.c: Add -Wno-psabi on ppc-elf too.
+
+2025-04-16  Peter Bergner  <bergner@linux.ibm.com>
+
+	PR tree-optimization/112822
+	* g++.dg/pr112822.C: Replace altivec vector attribute with a generic
+	vector attribute.
+
+2025-04-16  Eric Botcazou  <ebotcazou@gcc.gnu.org>
+
+	* gnat.dg/opt105.adb: New test.
+	* gnat.dg/opt105_pkg.ads, gnat.dg/opt105_pkg.adb: New helper.
+
+2025-04-16  Jason Merrill  <jason@redhat.com>
+
+	PR c++/114772
+	PR c++/101180
+	* g++.dg/ext/pragma-target2.C: New test.
+
+2025-04-16  Jason Merrill  <jason@redhat.com>
+
+	PR c++/116954
+	* g++.dg/warn/Wformat-3.C: New test.
+
+2025-04-16  Ard Biesheuvel  <ardb@kernel.org>
+
+	PR target/119386
+	* gcc.target/i386/pr119386-3.c: New test.
+
+2025-04-16  Ard Biesheuvel  <ardb@kernel.org>
+
+	PR target/119386
+	* gcc.target/i386/pr119386-1.c: New test.
+	* gcc.target/i386/pr119386-2.c: New test.
+
+2025-04-16  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/106948
+	* gfortran.dg/pure_formal_proc_4.f90: New test.
+
+2025-04-16  Jan Hubicka  <hubicka@ucw.cz>
+
+	* g++.dg/lto/pr119614_0.C: New test.
+
+2025-04-16  Tamar Christina  <tamar.christina@arm.com>
+
+	PR target/119286
+	* gcc.dg/vect/vect-early-break_18.c: Force -march=gfx908 for amdgcn.
+
+2025-04-16  Tamar Christina  <tamar.christina@arm.com>
+
+	PR tree-optimization/119351
+	* gcc.target/aarch64/sve/peel_ind_10.c: New test.
+	* gcc.target/aarch64/sve/peel_ind_10_run.c: New test.
+	* gcc.target/aarch64/sve/peel_ind_5.c: New test.
+	* gcc.target/aarch64/sve/peel_ind_5_run.c: New test.
+	* gcc.target/aarch64/sve/peel_ind_6.c: New test.
+	* gcc.target/aarch64/sve/peel_ind_6_run.c: New test.
+	* gcc.target/aarch64/sve/peel_ind_7.c: New test.
+	* gcc.target/aarch64/sve/peel_ind_7_run.c: New test.
+	* gcc.target/aarch64/sve/peel_ind_8.c: New test.
+	* gcc.target/aarch64/sve/peel_ind_8_run.c: New test.
+	* gcc.target/aarch64/sve/peel_ind_9.c: New test.
+	* gcc.target/aarch64/sve/peel_ind_9_run.c: New test.
+
+2025-04-16  Jakub Jelinek  <jakub@redhat.com>
+
+	PR middle-end/119808
+	* gcc.dg/bitint-121.c: New test.
+
+2025-04-16  Jesse Huang  <jesse.huang@sifive.com>
+
+	* gcc.target/riscv/gnu-property-align-rv32.c: New file.
+	* gcc.target/riscv/gnu-property-align-rv64.c: New file.
+
+2025-04-16  Kito Cheng  <kito.cheng@sifive.com>
+
+	* gcc.target/riscv/jump-table-large-code-model.c: New test.
+
+2025-04-16  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/116093
+	* gcc.dg/bitint-122.c: New test.
+
+2025-04-16  Alice Carlotti  <alice.carlotti@arm.com>
+
+	* gcc.target/aarch64/acle/rwsr-ungated.c: New test.
+
+2025-04-15  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/119826
+	* gdc.dg/debug/imports/pr119826b.d: New test.
+	* gdc.dg/debug/pr119826.d: New test.
+
+2025-04-15  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/119755
+	* g++.dg/modules/lambda-10_a.H: New test.
+	* g++.dg/modules/lambda-10_b.C: New test.
+
+2025-04-15  Jakub Jelinek  <jakub@redhat.com>
+
+	* gcc.dg/completion-2.c: Expect also -flto-partition=default line.
+
+2025-04-15  Qing Zhao  <qing.zhao@oracle.com>
+
+	PR c/119717
+	* gcc.dg/pr119717.c: New test.
+
+2025-04-15  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/119784
+	* gcc.target/i386/apx-interrupt-1.c: Expect 31 .cfi_restore
+	directives.
+
+2025-04-15  Vineet Gupta  <vineetg@rivosinc.com>
+
+	PR target/119533
+	* go.dg/pr119533-riscv.go: New test.
+	* go.dg/pr119533-riscv-2.go: New test.
+
+2025-04-15  Robin Dapp  <rdapp@ventanamicro.com>
+
+	PR target/119547
+	* gcc.target/riscv/rvv/vsetvl/avl_single-68.c: xfail.
+	* g++.target/riscv/rvv/autovec/pr119547.C: New test.
+	* g++.target/riscv/rvv/autovec/pr119547-2.C: New test.
+	* gcc.target/riscv/rvv/vsetvl/vlmax_switch_vtype-10.c: Adjust.
+
+2025-04-15  Tobias Burnus  <tburnus@baylibre.com>
+
+	* gfortran.dg/gomp/map-alloc-comp-1.f90: Remove dg-error.
+	* gfortran.dg/gomp/polymorphic-mapping-2.f90: Update warn wording.
+	* gfortran.dg/gomp/polymorphic-mapping.f90: Change expected
+	diagnostic; some tests moved to ...
+	* gfortran.dg/gomp/polymorphic-mapping-1.f90: ... here as new test.
+	* gfortran.dg/gomp/polymorphic-mapping-3.f90: New test.
+	* gfortran.dg/gomp/polymorphic-mapping-4.f90: New test.
+	* gfortran.dg/gomp/polymorphic-mapping-5.f90: New test.
+
+2025-04-15  Martin Jambor  <mjambor@suse.cz>
+	    Jakub Jelinek  <jakub@redhat.com>
+
+	PR ipa/119803
+	* gcc.dg/ipa/pr119803.c: New test.
+
+2025-04-15  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/119799
+	* gdc.dg/import-c/pr119799.d: New test.
+	* gdc.dg/import-c/pr119799c.c: New test.
+
+2025-04-15  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/119807
+	PR c++/112288
+	* g++.dg/template/friend86.C: New test.
+	* g++.dg/template/friend87.C: New test.
+
+2025-04-15  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/119817
+	* gdc.dg/debug/imports/m119817/a.d: New test.
+	* gdc.dg/debug/imports/m119817/b.d: New test.
+	* gdc.dg/debug/imports/m119817/package.d: New test.
+	* gdc.dg/debug/pr119817.d: New test.
+
+2025-04-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR sanitizer/119801
+	* c-c++-common/tsan/pr119801.c: New test.
+
+2025-04-15  Jonathan Yong  <10walls@gmail.com>
+
+	* gcc.dg/Wbuiltin-declaration-mismatch-4.c: Make diagnostic
+	accept long long.
+
+2025-04-15  Jakub Jelinek  <jakub@redhat.com>
+
+	PR ipa/119318
+	* gcc.dg/ipa/pr119318.c: Remove dg-additional-options, add -w to
+	dg-options.
+
+2025-04-15  Jason Merrill  <jason@redhat.com>
+
+	PR c++/113835
+	* g++.dg/cpp2a/constexpr-vector1.C: New test.
+
+2025-04-14  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	PR target/118794
+	* g++.target/gcn/exceptions-bad_cast-2.C: Set
+	'-mno-fake-exceptions'.
+	* g++.target/gcn/exceptions-pr118794-1.C: Likewise.
+	* g++.target/gcn/exceptions-throw-2.C: Likewise.
+	* g++.target/nvptx/exceptions-bad_cast-2.C: Likewise.
+	* g++.target/nvptx/exceptions-pr118794-1.C: Likewise.
+	* g++.target/nvptx/exceptions-throw-2.C: Likewise.
+	* g++.target/gcn/exceptions-bad_cast-2_-mfake-exceptions.C: New.
+	* g++.target/gcn/exceptions-pr118794-1_-mfake-exceptions.C:
+	Likewise.
+	* g++.target/gcn/exceptions-throw-2_-mfake-exceptions.C: Likewise.
+	* g++.target/nvptx/exceptions-bad_cast-2_-mfake-exceptions.C:
+	Likewise.
+	* g++.target/nvptx/exceptions-pr118794-1_-mfake-exceptions.C:
+	Likewise.
+	* g++.target/nvptx/exceptions-throw-2_-mfake-exceptions.C:
+	Likewise.
+
+2025-04-14  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* g++.target/gcn/exceptions-throw-3.C: New.
+	* g++.target/nvptx/exceptions-throw-3.C: Likewise.
+
+2025-04-14  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* g++.target/gcn/exceptions-throw-2.C: New.
+	* g++.target/nvptx/exceptions-throw-2.C: Likewise.
+
+2025-04-14  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* g++.target/gcn/exceptions-throw-1.C: New.
+	* g++.target/nvptx/exceptions-throw-1.C: Likewise.
+
+2025-04-14  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* g++.target/gcn/exceptions-bad_cast-3.C: New.
+	* g++.target/nvptx/exceptions-bad_cast-3.C: Likewise.
+
+2025-04-14  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* g++.target/gcn/exceptions-bad_cast-2.C: New.
+	* g++.target/nvptx/exceptions-bad_cast-2.C: Likewise.
+
+2025-04-14  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* g++.target/gcn/exceptions-bad_cast-1.C: New.
+	* g++.target/nvptx/exceptions-bad_cast-1.C: Likewise.
+
+2025-04-14  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	PR target/118794
+	* g++.target/gcn/exceptions-pr118794-1.C: New.
+	* g++.target/nvptx/exceptions-pr118794-1.C: Likewise.
+
+2025-04-14  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	PR c++/119692
+	* g++.target/gcn/pr119692-1-1.C: New.
+	* g++.target/nvptx/pr119692-1-1.C: Likewise.
+
+2025-04-14  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* g++.target/gcn/gcn.exp: New.
+
+2025-04-14  Thomas Schwinge  <tschwinge@baylibre.com>
+
+	* lib/gcc-dg.exp (${tool}_load): Polish 'dg-output-file' test
+	logs.
+
+2025-04-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR ipa/119318
+	* gcc.dg/ipa/pr119530.c (d): Change type from char to signed char.
+	(e): Change argument type from long to long long.
+
+2025-04-14  beamandala  <mandalapubhavesh@gmail.com>
+
+	* rust/compile/track_caller.rs: New test.
+
+2025-04-14  Owen Avery  <powerboat9.gamer@gmail.com>
+
+	* rust/compile/enum_discriminant2.rs: New test.
+
+2025-04-14  Arthur Cohen  <arthur.cohen@embecosm.com>
+
+	* rust/compile/format_args_extra_comma.rs: New test.
+
+2025-04-14  Arthur Cohen  <arthur.cohen@embecosm.com>
+
+	* rust/compile/macros/mbe/macro-issue3709-1.rs: New test.
+	* rust/compile/macros/mbe/macro-issue3709-2.rs: New test.
+	* rust/compile/macros/mbe/macro-issue3693.rs: New file.
+
+2025-04-14  Arthur Cohen  <arthur.cohen@embecosm.com>
+
+	* rust/compile/macros/mbe/macro-issue3708.rs: New test.
+
+2025-04-14  Arthur Cohen  <arthur.cohen@embecosm.com>
+
+	* rust/execute/torture/min_specialization2.rs: New test.
+	* rust/execute/torture/min_specialization3.rs: New test.
+
+2025-04-14  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR tree-optimization/118476
+	* gcc.dg/torture/pr118476-1.c: New test.
+
+2025-04-14  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/99214
+	* g++.dg/concepts/diagnostic20.C: New test.
+
+2025-04-14  H.J. Lu  <hjl.tools@gmail.com>
+
+	PR target/119784
+	* gcc.target/i386/pr119784a.c: New test.
+	* gcc.target/i386/pr119784b.c: Likewise.
+
+2025-04-14  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/119318
+	* gcc.dg/ipa/pr119318.c: New test.
+	* gcc.dg/ipa/pr119530.c: Likwise.
+
+2025-04-14  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/119757
+	* gcc.dg/vect/pr119757.c: New testcase.
+
+2025-04-14  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/119778
+	* g++.dg/torture/pr119778.C: New testcase.
+
+2025-04-14  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/119779
+	* gm2.dg/doc/examples/pass/doc-examples-pass.exp: New test.
+	* gm2.dg/doc/examples/pass/exampleadd.mod: New test.
+	* gm2.dg/doc/examples/pass/exampleadd2.mod: New test.
+	* gm2.dg/doc/examples/pass/hello.mod: New test.
+	* gm2.dg/doc/examples/pass/hellopim.mod: New test.
+
+2025-04-14  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR lto/119792
+	* gnat.dg/lto29.adb: New test.
+	* gnat.dg/lto29_pkg.ads: New helper.
+
+2025-04-13  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+
+	PR libfortran/119502
+	* gfortran.dg/pr119502.f90: New test.
+
+2025-04-13  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	* g++.dg/modules/noexcept-4_a.H: New test.
+	* g++.dg/modules/noexcept-4_b.C: New test.
+
+2025-04-13  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	* g++.dg/modules/lambda-8_b.C: Adjust error.
+	* g++.dg/modules/leg-merge-4_c.C: Likewise.
+
+2025-04-13  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/119669
+	* gfortran.dg/interface_59.f90: New test.
+
+2025-04-12  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/119761
+	* gdc.dg/import-c/import-c.exp: New test.
+	* gdc.dg/import-c/pr119761.d: New test.
+	* gdc.dg/import-c/pr119761c.c: New test.
+
+2025-04-12  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/109023
+	* gdc.dg/torture/imports/pr109023.d: New test.
+	* gdc.dg/torture/pr109023.d: New test.
+
+2025-04-12  Iain Buclaw  <ibuclaw@gdcproject.org>
+
+	PR d/119758
+	* gdc.dg/driver_fonly1.d: New test.
+	* gdc.dg/driver_fonly2.d: New test.
+	* gdc.dg/driver_fonly3.d: New test.
+	* gdc.dg/imports/fonly.d: New test.
+
+2025-04-12  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR testsuite/117706
+	* gcc.dg/ira-shrinkwrap-prep-1.c: Unxfail for i?68-*-* and x86_64-*-*.
+	* gcc.dg/ira-shrinkwrap-prep-2.c: Likewise.
+
+2025-04-12  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/116416
+	* g++.dg/cpp1y/constexpr-prvalue1.C: Adjust to instead inspect
+	the 'original' dump.
+	* g++.dg/cpp1y/constexpr-prvalue1a.C: New test.
+
+2025-04-12  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/119722
+	* gcc.dg/torture/bitint-77.c: New test.
+
+2025-04-12  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gnat.dg/renaming17.adb: New test.
+
+2025-04-12  Bob Dubner  <rdubner@symas.com>
+
+	PR cobol/119694
+	* cobol.dg/group2/ACCEPT_DATE___DAY_and_intrinsic_functions__2_.cob: GCOBOL_CURRENT_DATE.
+	* cobol.dg/group2/ACCEPT_FROM_TIME___DATE___DAY___DAY-OF-WEEK__2_.cob: Likewise
+	* cobol.dg/group2/FUNCTION_DATE___TIME_OMNIBUS.cob: Likewise
+
+2025-04-11  Christophe Lyon  <christophe.lyon@linaro.org>
+
+	* lib/target-supports.exp: Rename arm_v8_1_lob_ok into
+	arm_v8_1m_lob_hw.
+	Rename arm_thumb2_no_arm_v8_1_lob into
+	arm_thumb2_no_arm_v8_1m_lob.
+	Rename arm_thumb2_ok_no_arm_v8_1_lob into
+	arm_thumb2_ok_no_arm_v8_1m_lob.
+	* gcc.target/arm/lob1.c: Likewise.
+	* gcc.target/arm/lob6.c: Likewise.
+	* gcc.target/arm/ivopts.c: Likewise.
+	* gcc.target/arm/unsigned-extend-2.c: Likewise.
+
+2025-04-11  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR rtl-optimization/118502
+	* g++.dg/opt/shrink-wrapping-vector-1.C: New test.
+
+2025-04-11  Jeff Law  <jlaw@ventanamicro.com>
+
+	* gcc.target/riscv/rvv/base/pr115068-run.c: Turn off pedantic diagnostics.
+	* gcc.target/riscv/rvv/base/pr115068.c: Likewise.
+	* gcc.target/riscv/rvv/base/vwaddsub-1.c: Likewise.
+
+2025-04-11  Jason Merrill  <jason@redhat.com>
+
+	PR c++/114970
+	* g++.dg/opt/is_constant_evaluated4.C: New test.
+
+2025-04-11  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/119707
+	* gcc.dg/torture/bitint-76.c: New test.
+
+2025-04-11  Jennifer Schmitz  <jschmitz@nvidia.com>
+
+	PR tree-optimization/119706
+	* g++.target/aarch64/sve/pr119706.C: New test.
+
+2025-04-11  Jonathan Yong  <10walls@gmail.com>
+
+	PR target/113633
+	* gcc.dg/bf-ms-attrib.c: Fix expected __ms_struct__ layout
+	size.
+
+2025-04-11  Jonathan Yong  <10walls@gmail.com>
+
+	* c-c++-common/analyzer/realloc-1.c: Make diagnostic accept
+	long long for __builtin_realloc warning.
+
+2025-04-10  Jason Merrill  <jason@redhat.com>
+
+	PR c++/119345
+	* g++.dg/cpp2a/lambda-targ14.C: New test.
+
+2025-04-10  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/119687
+	* g++.dg/cpp23/class-deduction-inherited8.C: New test.
+
+2025-04-10  Bob Dubner  <rdubner@symas.com>
+
+	* cobol.dg/group2/Dynamic_reference_modification.cob: New testcase.
+	* cobol.dg/group2/Length_overflow__1_.cob: Likewise.
+	* cobol.dg/group2/Length_overflow__2_.cob: Likewise.
+	* cobol.dg/group2/Length_overflow_with_offset__1_.cob: Likewise.
+	* cobol.dg/group2/Length_overflow_with_offset__2_.cob: Likewise.
+	* cobol.dg/group2/Length_overflow_with_offset__3_.cob: Likewise.
+	* cobol.dg/group2/Offset_overflow.cob: Likewise.
+	* cobol.dg/group2/Offset_underflow.cob: Likewise.
+	* cobol.dg/group2/Refmod__comparisons_inside_numeric-display.cob: Likewise.
+	* cobol.dg/group2/Refmod_sources_are_figurative_constants.cob: Likewise.
+	* cobol.dg/group2/Static_reference_modification.cob: Likewise.
+	* cobol.dg/group2/Dynamic_reference_modification.out: New known-good result.
+	* cobol.dg/group2/Length_overflow__1_.out: Likewise.
+	* cobol.dg/group2/Length_overflow__2_.out: Likewise.
+	* cobol.dg/group2/Length_overflow_with_offset__1_.out: Likewise.
+	* cobol.dg/group2/Length_overflow_with_offset__2_.out: Likewise.
+	* cobol.dg/group2/Length_overflow_with_offset__3_.out: Likewise.
+	* cobol.dg/group2/Offset_overflow.out: Likewise.
+	* cobol.dg/group2/Offset_underflow.out: Likewise.
+	* cobol.dg/group2/Refmod__comparisons_inside_numeric-display.out: Likewise.
+	* cobol.dg/group2/Refmod_sources_are_figurative_constants.out: Likewise.
+	* cobol.dg/group2/Static_reference_modification.out: Likewise.
+
+2025-04-10  Jason Merrill  <jason@redhat.com>
+
+	PR c++/119175
+	* g++.dg/cpp2a/concepts-lambda23.C: New test.
+
+2025-04-10  Iain Sandoe  <iain@sandoe.co.uk>
+
+	* lib/cobol.exp: Add libquadmath paths.
+
+2025-04-10  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR tree-optimization/119399
+	* gcc.dg/vect/pr119399.c: New test.
+
+2025-04-10  Kito Cheng  <kito.cheng@sifive.com>
+
+	* gcc.target/riscv/rvv/base/abi-callee-saved-1-fixed-1.c: Include local
+	riscv_vector.h.
+	* gcc.target/riscv/rvv/base/abi-callee-saved-1-fixed-2.c: Ditto.
+	* gcc.target/riscv/rvv/base/abi-callee-saved-1-save-restore.c: Ditto.
+	* gcc.target/riscv/rvv/base/abi-callee-saved-1-zcmp.c: Ditto.
+	* gcc.target/riscv/rvv/base/abi-callee-saved-1.c: Ditto.
+	* gcc.target/riscv/rvv/base/abi-callee-saved-2-save-restore.c: Ditto.
+	* gcc.target/riscv/rvv/base/abi-callee-saved-2-zcmp.c: Ditto.
+	* gcc.target/riscv/rvv/base/abi-callee-saved-2.c: Ditto.
+	* gcc.target/riscv/rvv/base/bug-10-2.c: Ditto.
+	* gcc.target/riscv/rvv/base/bug-10.c: Ditto.
+	* gcc.target/riscv/rvv/base/bug-7.c: Ditto.
+	* gcc.target/riscv/rvv/base/bug-8.c: Ditto.
+	* gcc.target/riscv/rvv/base/bug-9.c: Ditto.
+	* gcc.target/riscv/rvv/base/pr110943.c: Ditto.
+	* gcc.target/riscv/rvv/base/pr112431-21.c: Ditto.
+	* gcc.target/riscv/rvv/base/pr114639-1.c: Ditto.
+	* gcc.target/riscv/rvv/base/pr115068.c: Ditto.
+	* gcc.target/riscv/rvv/base/pr117286.c: Ditto.
+	* gcc.target/riscv/rvv/base/pr117544.c: Ditto.
+	* gcc.target/riscv/rvv/base/pr117955.c: Ditto.
+	* gcc.target/riscv/rvv/base/pr118872.c: Ditto.
+	* gcc.target/riscv/rvv/base/vlmul_ext-1.c: Ditto.
+	* gcc.target/riscv/rvv/base/vssubu-1.c: Ditto.
+	* gcc.target/riscv/rvv/base/vssubu-2.c: Ditto.
+	* gcc.target/riscv/rvv/base/vwaddsub-1.c: Ditto.
+	* gcc.target/riscv/rvv/vsetvl/pr111234.c: Ditto.
+	* gcc.target/riscv/rvv/vsetvl/pr115214.c: Ditto.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl-24.c: Ditto.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl_bug-3.c: Ditto.
+	* gcc.target/riscv/rvv/vsetvl/vsetvl_bug-4.c: Ditto.
+	* gcc.target/riscv/rvv/xtheadvector/pr116591.c: Ditto.
+	* gcc.target/riscv/rvv/xtheadvector/pr116592.c: Ditto.
+	* gcc.target/riscv/rvv/xtheadvector/pr118357.c: Ditto.
+	* gcc.target/riscv/rvv/xtheadvector/vsext.c: Ditto.
+	* gcc.target/riscv/rvv/xtheadvector/vzext.c: Ditto.
+
 2025-04-09  Patrick Palka  <ppalka@redhat.com>
 
 	PR c++/119574

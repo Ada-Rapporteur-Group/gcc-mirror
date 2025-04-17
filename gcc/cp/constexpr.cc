@@ -1048,6 +1048,12 @@ explain_invalid_constexpr_fn (tree fun)
 {
   static hash_set<tree> *diagnosed;
   tree body;
+
+  /* Don't try to explain a function we already complained about.  */
+  if (function *f = DECL_STRUCT_FUNCTION (fun))
+    if (f->language->erroneous)
+      return;
+
   /* In C++23, a function marked 'constexpr' may not actually be a constant
      expression.  We haven't diagnosed the problem yet: -Winvalid-constexpr
      wasn't enabled.  The function was called, so diagnose why it cannot be
@@ -1119,20 +1125,22 @@ explain_invalid_constexpr_fn (tree fun)
 
 struct GTY((for_user)) constexpr_call {
   /* Description of the constexpr function definition.  */
-  constexpr_fundef *fundef;
+  constexpr_fundef *fundef = nullptr;
   /* Parameter bindings environment.  A TREE_VEC of arguments.  */
-  tree bindings;
-  /* Result of the call.
-       NULL means the call is being evaluated.
+  tree bindings = NULL_TREE;
+  /* Result of the call, indexed by the value of
+     constexpr_ctx::manifestly_const_eval.
+       unknown_type_node means the call is being evaluated.
        error_mark_node means that the evaluation was erroneous or otherwise
        uncacheable (e.g. because it depends on the caller).
        Otherwise, the actual value of the call.  */
-  tree result;
+  tree results[3] = { NULL_TREE, NULL_TREE, NULL_TREE };
   /* The hash of this call; we remember it here to avoid having to
      recalculate it when expanding the hash table.  */
-  hashval_t hash;
-  /* The value of constexpr_ctx::manifestly_const_eval.  */
-  enum mce_value manifestly_const_eval;
+  hashval_t hash = 0;
+
+  /* The result slot corresponding to the given mce_value.  */
+  tree& result (mce_value mce) { return results[1 + int(mce)]; }
 };
 
 struct constexpr_call_hasher : ggc_ptr_hash<constexpr_call>
@@ -1426,8 +1434,6 @@ constexpr_call_hasher::equal (constexpr_call *lhs, constexpr_call *rhs)
   if (lhs == rhs)
     return true;
   if (lhs->hash != rhs->hash)
-    return false;
-  if (lhs->manifestly_const_eval != rhs->manifestly_const_eval)
     return false;
   if (!constexpr_fundef_hasher::equal (lhs->fundef, rhs->fundef))
     return false;
@@ -2855,9 +2861,6 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 {
   location_t loc = cp_expr_loc_or_input_loc (t);
   tree fun = get_function_named_in_call (t);
-  constexpr_call new_call
-    = { NULL, NULL, NULL, 0, ctx->manifestly_const_eval };
-  int depth_ok;
 
   if (fun == NULL_TREE)
     return cxx_eval_internal_function (ctx, t, lval,
@@ -3082,6 +3085,7 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
     }
 
   constexpr_ctx new_ctx = *ctx;
+  ctx = &new_ctx;
   if (DECL_CONSTRUCTOR_P (fun) && !ctx->object
       && TREE_CODE (t) == AGGR_INIT_EXPR)
     {
@@ -3091,27 +3095,26 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
       tree ctor = new_ctx.ctor = build_constructor (DECL_CONTEXT (fun), NULL);
       CONSTRUCTOR_NO_CLEARING (ctor) = true;
       ctx->global->put_value (new_ctx.object, ctor);
-      ctx = &new_ctx;
     }
   /* An immediate invocation is manifestly constant evaluated including the
      arguments of the call, so use mce_true even for the argument
      evaluation.  */
   if (DECL_IMMEDIATE_FUNCTION_P (fun))
-    {
-      new_ctx.manifestly_const_eval = mce_true;
-      new_call.manifestly_const_eval = mce_true;
-      ctx = &new_ctx;
-    }
+    new_ctx.manifestly_const_eval = mce_true;
 
   /* We used to shortcut trivial constructor/op= here, but nowadays
      we can only get a trivial function here with -fno-elide-constructors.  */
   gcc_checking_assert (!trivial_fn_p (fun)
 		       || !flag_elide_constructors
+		       /* Or it's a call from maybe_thunk_body (111075).  */
+		       || (TREE_CODE (t) == CALL_EXPR ? CALL_FROM_THUNK_P (t)
+			   : AGGR_INIT_FROM_THUNK_P (t))
 		       /* We don't elide constructors when processing
 			  a noexcept-expression.  */
 		       || cp_noexcept_operand);
 
   bool non_constant_args = false;
+  constexpr_call new_call;
   new_call.bindings
     = cxx_bind_parameters_in_call (ctx, t, fun, non_constant_p,
 				   overflow_p, &non_constant_args);
@@ -3185,7 +3188,12 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
         }
     }
 
-  depth_ok = push_cx_call_context (t);
+  /* Don't complain about problems evaluating an ill-formed function.  */
+  if (function *f = DECL_STRUCT_FUNCTION (fun))
+    if (f->language->erroneous)
+      new_ctx.quiet = true;
+
+  int depth_ok = push_cx_call_context (t);
 
   /* Remember the object we are constructing or destructing.  */
   tree new_obj = NULL_TREE;
@@ -3227,8 +3235,6 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
       new_call.hash = constexpr_fundef_hasher::hash (new_call.fundef);
       new_call.hash
 	= iterative_hash_template_arg (new_call.bindings, new_call.hash);
-      new_call.hash
-	= iterative_hash_object (ctx->manifestly_const_eval, new_call.hash);
 
       /* If we have seen this call before, we are done.  */
       maybe_initialize_constexpr_call_table ();
@@ -3246,22 +3252,23 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
 		 the slot can move during evaluation of the body.  */
 	      *slot = entry = ggc_alloc<constexpr_call> ();
 	      *entry = new_call;
+	      entry->result (ctx->manifestly_const_eval) = unknown_type_node;
 	      fb.preserve ();
 	    }
 	}
-      /* Calls that are in progress have their result set to NULL, so that we
-	 can detect circular dependencies.  Now that we only cache up to
-	 constexpr_cache_depth this won't catch circular dependencies that
+      /* Calls that are in progress have their result set to unknown_type_node,
+	 so that we can detect circular dependencies.  Now that we only cache
+	 up to constexpr_cache_depth this won't catch circular dependencies that
 	 start deeper, but they'll hit the recursion or ops limit.  */
-      else if (entry->result == NULL)
+      else if (entry->result (ctx->manifestly_const_eval) == unknown_type_node)
 	{
 	  if (!ctx->quiet)
 	    error ("call has circular dependency");
 	  *non_constant_p = true;
-	  entry->result = result = error_mark_node;
+	  entry->result (ctx->manifestly_const_eval) = result = error_mark_node;
 	}
       else
-	result = entry->result;
+	result = entry->result (ctx->manifestly_const_eval);
     }
 
   if (!depth_ok)
@@ -3482,7 +3489,22 @@ cxx_eval_call_expression (const constexpr_ctx *ctx, tree t,
       else if (!result)
 	result = void_node;
       if (entry)
-	entry->result = cacheable ? result : error_mark_node;
+	{
+	  entry->result (ctx->manifestly_const_eval)
+	    = cacheable ? result : error_mark_node;
+
+	  if (result != error_mark_node
+	      && ctx->manifestly_const_eval == mce_unknown)
+	    {
+	      /* Evaluation succeeded and was independent of whether we're in a
+		 manifestly constant-evaluated context, so we can also reuse
+		 this result when evaluating this call with a fixed context.  */
+	      if (!entry->result (mce_true))
+		entry->result (mce_true) = entry->result (mce_unknown);
+	      if (!entry->result (mce_false))
+		entry->result (mce_false) = entry->result (mce_unknown);
+	    }
+	}
     }
 
   /* The result of a constexpr function must be completely initialized.
@@ -9116,6 +9138,15 @@ cxx_eval_outermost_constant_expr (tree t, bool allow_non_constant,
       tree fndecl = cp_get_callee_fndecl_nofold (x);
       if (fndecl && DECL_IMMEDIATE_FUNCTION_P (fndecl))
 	is_consteval = true;
+      /* Don't try to evaluate a std::vector constructor taking an integer, it
+	 will fail in the 'if (heap_var)' block below after doing all the work
+	 (c++/113835).  This will need adjustment if P3554 is accepted.  Note
+	 that evaluation of e.g. the vector default constructor can succeed, so
+	 we don't shortcut all vector constructors.  */
+      if (fndecl && DECL_CONSTRUCTOR_P (fndecl) && allow_non_constant
+	  && is_std_class (type, "vector") && call_expr_nargs (x) > 1
+	  && TREE_CODE (TREE_TYPE (get_nth_callarg (x, 1))) == INTEGER_TYPE)
+	return t;
     }
   if (AGGREGATE_TYPE_P (type) || VECTOR_TYPE_P (type))
     {
@@ -9679,7 +9710,7 @@ fold_non_dependent_init (tree t,
 
 static tree
 maybe_constant_init_1 (tree t, tree decl, bool allow_non_constant,
-		       bool manifestly_const_eval)
+		       mce_value manifestly_const_eval)
 {
   if (!t)
     return t;
@@ -9709,13 +9740,13 @@ maybe_constant_init_1 (tree t, tree decl, bool allow_non_constant,
       bool is_static = (decl && DECL_P (decl)
 			&& (TREE_STATIC (decl) || DECL_EXTERNAL (decl)));
       if (is_static)
-	manifestly_const_eval = true;
+	manifestly_const_eval = mce_true;
 
-      if (cp_unevaluated_operand && !manifestly_const_eval)
+      if (cp_unevaluated_operand && manifestly_const_eval != mce_true)
 	return fold_to_constant (t);
 
       t = cxx_eval_outermost_constant_expr (t, allow_non_constant, !is_static,
-					    mce_value (manifestly_const_eval),
+					    manifestly_const_eval,
 					    false, decl);
     }
   if (TREE_CODE (t) == TARGET_EXPR)
@@ -9732,6 +9763,12 @@ maybe_constant_init_1 (tree t, tree decl, bool allow_non_constant,
 tree
 maybe_constant_init (tree t, tree decl, bool manifestly_const_eval)
 {
+  return maybe_constant_init_1 (t, decl, true, mce_value (manifestly_const_eval));
+}
+
+tree
+maybe_constant_init (tree t, tree decl, mce_value manifestly_const_eval)
+{
   return maybe_constant_init_1 (t, decl, true, manifestly_const_eval);
 }
 
@@ -9740,7 +9777,7 @@ maybe_constant_init (tree t, tree decl, bool manifestly_const_eval)
 tree
 cxx_constant_init (tree t, tree decl)
 {
-  return maybe_constant_init_1 (t, decl, false, true);
+  return maybe_constant_init_1 (t, decl, false, mce_true);
 }
 
 #if 0

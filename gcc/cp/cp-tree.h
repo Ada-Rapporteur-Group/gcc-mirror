@@ -2206,6 +2206,8 @@ struct GTY(()) language_function {
 
   BOOL_BITFIELD invalid_constexpr : 1;
   BOOL_BITFIELD throwing_cleanup : 1;
+  /* True if we gave any errors in this function.  */
+  BOOL_BITFIELD erroneous : 1;
 
   hash_table<named_label_hash> *x_named_labels;
 
@@ -8837,6 +8839,7 @@ extern void cxx_constant_dtor			(tree, tree);
 extern tree cxx_constant_init			(tree, tree = NULL_TREE);
 extern tree maybe_constant_value		(tree, tree = NULL_TREE, mce_value = mce_unknown);
 extern tree maybe_constant_init			(tree, tree = NULL_TREE, bool = false);
+extern tree maybe_constant_init			(tree, tree, mce_value);
 extern tree fold_non_dependent_expr		(tree,
 						 tsubst_flags_t = tf_warning_or_error,
 						 bool = false, tree = NULL_TREE);

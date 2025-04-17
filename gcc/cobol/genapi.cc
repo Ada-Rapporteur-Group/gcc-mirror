@@ -34,6 +34,7 @@
 #include "tree-iterator.h"
 #include "stringpool.h"
 #include "diagnostic-core.h"
+#include "target.h"
 
 #include "../../libgcobol/ec.h"
 #include "../../libgcobol/common-defs.h"
@@ -75,7 +76,7 @@ static int pseudo_label = 1;
 static bool suppress_cobol_entry_point = false;
 static char ach_cobol_entry_point[256] = "";
 
-bool bSHOW_PARSE = getenv("SHOW_PARSE");
+bool bSHOW_PARSE = getenv("GCOBOL_SHOW");
 bool show_parse_sol = true;
 int  show_parse_indent = 0;
 
@@ -198,7 +199,7 @@ trace1_init()
     trace_handle = gg_define_variable(INT, "trace_handle", vs_static);
     trace_indent = gg_define_variable(INT, "trace_indent", vs_static);
 
-    bTRACE1 = getenv("TRACE1") ? getenv("TRACE1") : gv_trace_switch;
+    bTRACE1 = getenv("GCOBOL_TRACE") ? getenv("GCOBOL_TRACE") : gv_trace_switch;
 
     if( bTRACE1 && strcmp(bTRACE1, "0") != 0 )
       {
@@ -2357,7 +2358,8 @@ section_label(struct cbl_proc_t *procedure)
 
   cbl_label_t *label = procedure->label;
   // The _initialize_program section isn't relevant.
-  char *psz = xasprintf("# SECTION %s in %s (%ld)",
+  char *psz = xasprintf("%s SECTION %s in %s (%ld)",
+                        ASM_COMMENT_START,
                         label->name,
                         current_function->our_unmangled_name,
                         deconflictor);
@@ -2408,7 +2410,8 @@ paragraph_label(struct cbl_proc_t *procedure)
   
   char *psz1 = 
   xasprintf(
-          "# PARAGRAPH %s of %s in %s (%ld)",
+          "%s PARAGRAPH %s of %s in %s (%ld)",
+          ASM_COMMENT_START,
           para_name ? para_name: "" ,
           section_name ? section_name: "(null)" ,
           current_function->our_unmangled_name ? current_function->our_unmangled_name: "" ,
@@ -3006,7 +3009,8 @@ parser_perform(cbl_label_t *label, bool suppress_nexting)
     para_name = label->name;
     sect_name = section_label->name;
     sprintf(ach,
-            "# PERFORM %s of %s of %s (%ld)",
+            "%s PERFORM %s of %s of %s (%ld)",
+            ASM_COMMENT_START,
             para_name,
             sect_name,
             program_name,
@@ -3018,7 +3022,8 @@ parser_perform(cbl_label_t *label, bool suppress_nexting)
     {
     sect_name = label->name;
     sprintf(ach,
-            "# PERFORM %s of %s (%ld)",
+            "%s PERFORM %s of %s (%ld)",
+            ASM_COMMENT_START,
             sect_name,
             program_name,
             deconflictor);
@@ -3170,8 +3175,8 @@ internal_perform_through( cbl_label_t *proc_1,
   pseudo_return_push(proc2, return_addr);
 
   // Create the code that will launch the first procedure
-  gg_insert_into_assembler("# PERFORM %s THROUGH %s",
-                        proc_1->name, proc_2->name);
+  gg_insert_into_assembler("%s PERFORM %s THROUGH %s",
+                        ASM_COMMENT_START, proc_1->name, proc_2->name);
 
   if( !suppress_nexting )
     {
@@ -6631,22 +6636,6 @@ parser_division(cbl_division_t division,
             parameter = TREE_CHAIN(parameter);
             }
           gg_assign(base, gg_cast(UCHAR_P, parameter));
-
-          IF( gg_call_expr( CHAR_P,
-                            "getenv",
-                            gg_string_literal("PARAMETERS_ON_ENTRY"),
-                            NULL_TREE),
-              ne_op,
-              gg_cast(CHAR_P, null_pointer_node));
-            {
-            gg_printf("parameter_on_entry: %s(): %d %p\n",
-                      gg_string_literal(current_function->our_unmangled_name),
-                      build_int_cst_type(INT, i+1),
-                      base,
-                      NULL_TREE);
-            }
-          ELSE
-            ENDIF
 
           if( args[i].refer.field->attr & any_length_e )
             {
@@ -13622,7 +13611,7 @@ hijack_for_development(const char *funcname)
   // Assume that funcname is lowercase with no hyphens
   enter_program_common(funcname, funcname);
   parser_display_literal("You have been hijacked by a program named \"dubner\"");
-  gg_insert_into_assembler("# HIJACKED DUBNER CODE START");
+  gg_insert_into_assembler("%s HIJACKED DUBNER CODE START", ASM_COMMENT_START);
 
   for(int i=0; i<10; i++)
     {
@@ -13635,7 +13624,7 @@ hijack_for_development(const char *funcname)
             NULL_TREE);
     }
 
-  gg_insert_into_assembler("# HIJACKED DUBNER CODE END");
+  gg_insert_into_assembler("%s HIJACKED DUBNER CODE END", ASM_COMMENT_START);
   gg_return(0);
   }
 
@@ -15870,38 +15859,6 @@ psa_global(cbl_field_t *new_var)
   char ach[2*sizeof(cbl_name_t)];
   sprintf(ach, "__gg__%s", mname);
   free(mname);
-
-  if( getenv("SHOW_GLOBAL_VARIABLES") )
-    {
-    char ach_type[32];
-    strcpy(ach_type, cbl_field_type_str(new_var->type));
-
-    fprintf(stderr, "struct cblc_field_t %s = {\n", ach);
-    fprintf(stderr, "  .data           = NULL ,\n"  );
-    fprintf(stderr, "  .capacity       = %d ,\n", new_var->data.capacity  );
-    fprintf(stderr, "  .offset         = %ld ,\n" , new_var->offset );
-    fprintf(stderr, "  .name           = \"%s\" ,\n" , new_var->name );
-    fprintf(stderr, "  .picture        = \"%s\" ,\n" , new_var->data.picture ? new_var->data.picture : "" );
-    if( new_var->data.initial || new_var->type == FldPointer )
-      {
-      fprintf(stderr, "  .initial        = \"%s\" ,\n" , new_var->data.picture ? new_var->data.picture : "" );
-      }
-    else
-      {
-      fprintf(stderr, "  .initial        = NULL ,\n" );
-      }
-    fprintf(stderr, "  .parent         = NULL,\n" );
-    fprintf(stderr, "  .depending_on   = NULL ,\n" );
-    fprintf(stderr, "  .depends_on     = NULL ,\n" );
-    fprintf(stderr, "  .occurs_lower   = 0 ,\n" );
-    fprintf(stderr, "  .occurs_upper   = 0 ,\n" );
-    fprintf(stderr, "  .attr           = 0x%lx ,\n" , new_var->attr );
-    fprintf(stderr, "  .type           = %s ,\n" , ach_type);
-    fprintf(stderr, "  .level          = %d ,\n" , new_var->level );
-    fprintf(stderr, "  .digits         = %d ,\n" , new_var->data.digits );
-    fprintf(stderr, "  .rdigits        = %d ,\n" , new_var->data.rdigits );
-    fprintf(stderr, "  };\n");
-    }
 
   if( strcmp(new_var->name, "_VERY_TRUE") == 0 )
     {

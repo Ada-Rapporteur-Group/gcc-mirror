@@ -1,3 +1,77 @@
+2025-04-16  Bob Dubner  <rdubner@symas.com>
+
+	PR cobol/119759
+	* LICENSE: Deleted.
+
+2025-04-15  Richard Biener  <rguenther@suse.de>
+
+	PR cobol/119302
+	* Make-lang.in (GCOBOLIO_INSTALL_NAME): Define.
+	Use $(GCOBOLIO_INSTALL_NAME) for gcobol.3 manpage source
+	upon install.
+
+2025-04-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR cobol/119776
+	* lang.opt (fmax-errors): Remove.
+	* lang.opt.urls: Regenerate.
+	* cobol1.cc (cobol_langhook_handle_option) <case OPT_fmax_errors>:
+	Remove.
+	* gcobol.1: Document -fmax-errors=nerror rather than
+	-fmax-errors nerror.
+
+2025-04-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR cobol/119777
+	* lang.opt (include): Remove Var(cobol_include).
+	* cobol1.cc (cobol_langhook_handle_option) <case OPT_include>: Use
+	arg instead of cobol_include.
+
+2025-04-14  Jakub Jelinek  <jakub@redhat.com>
+
+	PR cobol/119777
+	* lang.opt (fsyntax-only): Remove.
+	* lang.opt.urls: Regenerate.
+
+2025-04-13  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+	    Simon Sobisch  <simonsobisch@gnu.org>
+
+	PR cobol/119217
+	* parse.y: Rename OVERFLOW to OVERFLOW_kw.
+	Specify type name in %token directive.
+	* scan.l: Likewise.
+	* token_names.h: Regenerate.
+
+2025-04-13  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	PR cobol/119217
+	* util.cc (class timespec_t): Rename to cbl_timespec.
+
+2025-04-13  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	* genapi.cc: Include target.h.
+	(section_label): Use ASM_COMMENT_START.
+	(paragraph_label): Likewise.
+	(parser_perform): Likewise.
+	(internal_perform_through): Likewise.
+	(hijack_for_development): Likewise.
+
+2025-04-12  Bob Dubner  <rdubner@symas.com>
+
+	PR cobol/119694
+	* cbldiag.h: Eliminate getenv() calls.
+	* cdf.y: Likewise.
+	* cobol1.cc: Likewise.
+	* except.cc: Likewise.
+	* genapi.cc: Likewise.
+	* lexio.cc: Likewise.
+	* parse.y: Likewise.
+	* scan_ante.h: Likewise.
+	* show_parse.h: Likewise.
+	* symbols.cc: Likewise.
+	* symfind.cc: Likewise.
+	* util.cc: Likewise.
+
 2025-04-09  Bob Dubner  <rdubner@symas.com>
 
 	PR cobol/119682

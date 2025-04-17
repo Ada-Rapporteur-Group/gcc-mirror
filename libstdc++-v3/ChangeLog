@@ -1,3 +1,262 @@
+2025-04-16  Tomasz Kamiński  <tkaminsk@redhat.com>
+
+	PR libstdc++/109162
+	* include/std/format (range_formatter::format): Format const range,
+	only if reference type is not changed.
+	* testsuite/std/format/ranges/formatter.cc: New tests.
+
+2025-04-16  Tomasz Kamiński  <tkaminsk@redhat.com>
+
+	PR libstdc++/109162
+	* include/std/format (__formatter_int::_M_format_character_escaped)
+	(__formatter_str::format): Use __sink.out() to produce _Sink_iter.
+	(__format::__const_formattable_range): Moved closer to range_formatter.
+	(__format::__maybe_const_range): Use `__conditional_t` and moved closer
+	to range_formatter.
+	(__format::__format_padded, __format::maybe_const)
+	(__format::__indexed_formatter_storage, __format::__tuple_formatter)
+	(std::formatter<pair<_Fp, _Sp>, _CharT>>)
+	(std::formatter<tuple<_Tps...>, _CharT): Define.
+	(std::formatter<_Rg, _CharT>::format): Cast incoming range to
+	__format::__maybe_const_range<_Rg, _CharT>&.
+	(std::formatter<_Rg, _CharT>::_M_format): Extracted from format,
+	and use __format_padded.
+	(std::formatter<_Rg, _CharT>::_M_format_no_padding): Rename...
+	(std::formatter<_Rg, _CharT>::_M_format_elems): ...to this.
+	(std::formatter<_Rg, _CharT>::_M_format_with_padding): Extracted as
+	__format_padded.
+	* testsuite/util/testsuite_iterators.h (test_input_range_nocopy):
+	Define.
+	* testsuite/std/format/ranges/formatter.cc: Tests for `m` specifier.
+	* testsuite/std/format/ranges/sequence.cc: Tests for array and subrange.
+	* testsuite/std/format/ranges/map.cc: New test.
+	* testsuite/std/format/tuple.cc: New test.
+
+2025-04-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/ranges (__glibcxx_want_ranges_iota): Do not
+	define.
+
+2025-04-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/numeric (ranges): Only declare namespace for C++23
+	and later.
+	(ranges::iota_result): Fix indentation.
+	* testsuite/17_intro/names.cc: Check ranges is not used as an
+	identifier before C++20.
+
+2025-04-15  Tomasz Kamiński  <tkaminsk@redhat.com>
+
+	PR libstdc++/109162
+	* include/std/format (__format::__has_debug_format, _Pres_type::_Pres_seq)
+	(_Pres_type::_Pres_str, __format::__Stackbuf_size): Define.
+	(_Separators::_S_squares, _Separators::_S_parens, _Separators::_S_comma)
+	(_Separators::_S_colon): Define additional constants.
+	(_Spec::_M_parse_fill_and_align): Define overload accepting
+	list of excluded characters for fill, and forward existing overload.
+	(__formatter_str::_M_format_range): Define.
+	(__format::_Buf_sink) Use __Stackbuf_size for size of array.
+	(__format::__is_map_formattable, std::range_formatter)
+	(std::formatter<_Rg, _CharT>): Define.
+	* src/c++23/std.cc.in (std::format_kind, std::range_format)
+	(std::range_formatter): Export.
+	* testsuite/std/format/formatter/lwg3944.cc: Guarded tests with
+	__glibcxx_format_ranges.
+	* testsuite/std/format/formatter/requirements.cc: Adjusted for standard
+	behavior.
+	* testsuite/23_containers/vector/bool/format.cc: Test vector<bool> formatting.
+	* testsuite/std/format/ranges/format_kind.cc: New test.
+	* testsuite/std/format/ranges/formatter.cc: New test.
+	* testsuite/std/format/ranges/sequence.cc: New test.
+	* testsuite/std/format/ranges/string.cc: New test.
+
+2025-04-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/119748
+	* include/bits/basic_string.h (_S_copy_chars): Only optimize for
+	contiguous iterators that are convertible to const charT*. Use
+	explicit conversion to charT after dereferencing iterator.
+	(_S_copy_range): Likewise for contiguous ranges.
+	* include/bits/basic_string.tcc (_M_construct): Use explicit
+	conversion to charT after dereferencing iterator.
+	* include/bits/cow_string.h (_S_copy_chars): Likewise.
+	(basic_string(from_range_t, R&&, const Allocator&)): Likewise.
+	Only optimize for contiguous iterators that are convertible to
+	const charT*.
+	* testsuite/21_strings/basic_string/cons/char/119748.cc: New
+	test.
+	* testsuite/21_strings/basic_string/cons/wchar_t/119748.cc:
+	New test.
+
+2025-04-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/util/testsuite_iterators.h (test_container): Define
+	array constructor for C++98 as well.
+
+2025-04-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/21334
+	* doc/xml/manual/using.xml: Document that container data race
+	avoidance rules do not apply to COW std::string.
+	* doc/html/*: Regenerate.
+
+2025-04-14  Tomasz Kamiński  <tkaminsk@redhat.com>
+
+	PR libstdc++/119725
+	* testsuite/std/format/debug.cc: Updated dg-options.
+	* testsuite/std/format/debug_nonunicode.cc: Updated dg-options.
+
+2025-04-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	* src/c++17/fast_float/LOCAL_PATCHES: Update.
+
+2025-04-11  Evgeny Karpov  <Evgeny.Karpov@microsoft.com>
+
+	* src/c++17/fast_float/fast_float.h (full_multiplication):
+	Support aarch64-w64-mingw32 target.
+
+2025-04-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/basic_string.h (_S_copy_chars): Replace overloads
+	with constexpr-if and extend optimization to all contiguous
+	iterators.
+	* src/c++11/string-inst.cc: Extend comment.
+
+2025-04-11  Tomasz Kamiński  <tkaminsk@redhat.com>
+
+	PR libstdc++/111055
+	* include/bits/version.def (containers_ranges): Define.
+	* include/bits/version.h: Regenerate.
+	* include/bits/ranges_base.h (__detail::__container_compatible_range)
+	(__detail::__range_to_alloc_type, __detail::__range_mapped_type)
+	(__detail::__range_key_type): Depend on __glibcxx_containers_ranges
+	instead of __glibcxx_ranges_to_container.
+	* include/bits/basic_string.h: Replace __glibcxx_ranges_to_container with
+	__glibcxx_containers_ranges.
+	* include/bits/cow_string.h: Likewise.
+	* include/bits/deque.tcc: Likewise.
+	* include/bits/forward_list.h: Likewise.
+	* include/bits/stl_bvector.h: Likewise.
+	* include/bits/stl_deque.h: Likewise.
+	* include/bits/stl_list.h: Likewise.
+	* include/bits/stl_map.h: Likewise.
+	* include/bits/stl_multimap.h: Likewise.
+	* include/bits/stl_multiset.h: Likewise.
+	* include/bits/stl_queue.h: Likewise.
+	* include/bits/stl_set.h: Likewise.
+	* include/bits/stl_stack.h: Likewise.
+	* include/bits/stl_vector.h: Likewise.
+	* include/bits/unordered_map.h: Likewise.
+	* include/bits/unordered_set.h: Likewise.
+	* include/bits/vector.tcc: Likewise.
+	* include/debug/deque: Likewise.
+	* include/debug/forward_list: Likewise.
+	* include/debug/list: Likewise.
+	* include/debug/map.h: Likewise.
+	* include/debug/multimap.h: Likewise.
+	* include/debug/multiset.h: Likewise.
+	* include/debug/set.h: Likewise.
+	* include/debug/unordered_map: Likewise.
+	* include/debug/unordered_set: Likewise.
+	* include/debug/vector: Likewise.
+	* include/std/deque: Provide __cpp_lib_containers_ranges.
+	* include/std/forward_list: Likewise.
+	* include/std/list: Likewise.
+	* include/std/map: Likewise.
+	* include/std/queue: Likewise.
+	* include/std/set: Likewise.
+	* include/std/stack: Likewise.
+	* include/std/string: Likewise.
+	* include/std/unordered_map: Likewise.
+	* include/std/unordered_set: Likewise.
+	* include/std/vector: Likewise.
+	* testsuite/21_strings/basic_string/cons/from_range.cc: Test for value
+	__cpp_lib_containers_ranges.
+	* testsuite/23_containers/deque/cons/from_range.cc: Likewise.
+	* testsuite/23_containers/forward_list/cons/from_range.cc: Likewise.
+	* testsuite/23_containers/list/cons/from_range.cc: Likewise.
+	* testsuite/23_containers/map/cons/from_range.cc: Likewise.
+	* testsuite/23_containers/multimap/cons/from_range.cc: Likewise.
+	* testsuite/23_containers/multiset/cons/from_range.cc: Likewise.
+	* testsuite/23_containers/priority_queue/cons_from_range.cc: Likewise.
+	* testsuite/23_containers/queue/cons_from_range.cc: Likewise.
+	* testsuite/23_containers/set/cons/from_range.cc: Likewise.
+	* testsuite/23_containers/stack/cons_from_range.cc: Likewise.
+	* testsuite/23_containers/unordered_map/cons/from_range.cc: Likewise.
+	* testsuite/23_containers/unordered_multimap/cons/from_range.cc: Likewise.
+	* testsuite/23_containers/unordered_multiset/cons/from_range.cc: Likewise.
+	* testsuite/23_containers/unordered_set/cons/from_range.cc: Likewise.
+	* testsuite/23_containers/vector/bool/cons/from_range.cc: Likewise.
+	* testsuite/23_containers/vector/cons/from_range.cc: Likewise.
+
+2025-04-11  Jonathan Wakely  <jwakely@redhat.com>
+	    Tomasz Kamiński  <tkaminsk@redhat.com>
+
+	PR libstdc++/111055
+	* include/bits/basic_string.h (_S_copy_range): New function.
+	(basic_string(from_range_t, R%%, const Alloc&)): New
+	constructor.
+	(append_range, assign_range, insert_range, replace_with_range):
+	New functions.
+	* include/bits/cow_string.h: Likewise.
+	* testsuite/21_strings/basic_string/cons/from_range.cc: New
+	test.
+	* testsuite/21_strings/basic_string/modifiers/append/append_range.cc:
+	New test.
+	* testsuite/21_strings/basic_string/modifiers/assign/assign_range.cc:
+	New test.
+	* testsuite/21_strings/basic_string/modifiers/insert/insert_range.cc:
+	New test.
+	* testsuite/21_strings/basic_string/modifiers/replace/replace_with_range.cc:
+	New test.
+
+2025-04-11  Tomasz Kamiński  <tkaminsk@redhat.com>
+
+	PR libstdc++/109162
+	* include/bits/chrono_io.h (__detail::_Widen): Moved to std/format file.
+	* include/bits/unicode-data.h: Regnerate.
+	* include/bits/unicode.h (__unicode::_Utf_iterator::_M_units)
+	(__unicode::__should_escape_category): Define.
+	* include/std/format (_GLIBCXX_WIDEN_, _GLIBCXX_WIDEN):	Copied from
+	include/bits/chrono_io.h.
+	(__format::_Widen): Moved from include/bits/chrono_io.h.
+	(__format::_Term_char, __format::_Escapes, __format::_Separators)
+	(__format::__should_escape_ascii, __format::__should_escape_unicode)
+	(__format::__write_escape_seq, __format::__write_escaped_char)
+	(__format::__write_escaped_acii, __format::__write_escaped_unicode)
+	(__format::__write_escaped): Define.
+	(__formatter_str::_S_trunc): Extracted truncation of character
+	sequences.
+	(__formatter_str::format): Handle _Pres_esc.
+	(__formatter_int::_M_do_parse) [__glibcxx_format_ranges]: Parse '?'.
+	(__formatter_int::_M_format_character_escaped): Define.
+	(formatter<_CharT, _CharT>::format, formatter<char, wchar_t>::format):
+	Handle _Pres_esc.
+	(__formatter_str::set_debug_format, formatter<...>::set_debug_format)
+	Guard with __glibcxx_format_ranges.
+	(__format::_Fixedbuf_sink): Define.
+	* testsuite/23_containers/vector/bool/format.cc: Use __format::_Widen
+	and remove unnecessary <chrono> include.
+	* testsuite/std/format/debug.cc: New test.
+	* testsuite/std/format/debug_nonunicode.cc: New test.
+	* testsuite/std/format/parse_ctx.cc (escaped_strings_supported): Define
+	to true if __glibcxx_format_ranges is defined.
+	* testsuite/std/format/string.cc (escaped_strings_supported): Define to
+	true if __glibcxx_format_ranges is defined.
+
+2025-04-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/version.def (constrained_equality): Only define
+	as 202411 for C++23 and later, use 202403 for C++20.
+	* include/bits/version.h: Regenerate.
+	* testsuite/20_util/expected/equality_constrained.cc: Remove
+	TODO comment.
+
+2025-04-10  John David Anglin  <danglin@gcc.gnu.org>
+
+	* config/os/hpux/os_defines.h: Remove _GLIBCXX_USE_LONG_LONG
+	define.
+
 2025-04-09  Patrick Palka  <ppalka@redhat.com>
 
 	PR libstdc++/115046

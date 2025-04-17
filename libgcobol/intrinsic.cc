@@ -45,6 +45,7 @@
 #include <string.h>
 
 #include "config.h"
+#include "libgcobol-fp.h"
 
 #include "ec.h"
 #include "common-defs.h"
@@ -53,11 +54,12 @@
 #include "libgcobol.h"
 #include "charmaps.h"
 
+
 #pragma GCC diagnostic ignored "-Wformat-truncation"
 
 #define JD_OF_1601_01_02 2305812.5
 
-#define WEIRD_TRANSCENDENT_RETURN_VALUE (0.0Q)
+#define WEIRD_TRANSCENDENT_RETURN_VALUE GCOB_FP128_LITERAL (0.0)
 #define NO_RDIGITS (0)
 
 struct cobol_tm
@@ -406,7 +408,7 @@ get_value_as_double_from_qualified_field( cblc_field_t *input,
   }
 
 static
-_Float128 kahan_summation(size_t ncount,
+GCOB_FP128 kahan_summation(size_t ncount,
                           cblc_field_t **source,
                           size_t        *source_o,
                           size_t        *source_s,
@@ -420,11 +422,11 @@ _Float128 kahan_summation(size_t ncount,
   //  an aggressive optimizing compiler from just making it go away.
 
   *k_count = 0;
-  _Float128 sum = 0;
-  volatile _Float128 kahan_c = 0;
-  _Float128 input;
-  _Float128 y;
-  _Float128 t;
+  GCOB_FP128 sum = 0;
+  volatile GCOB_FP128 kahan_c = 0;
+  GCOB_FP128 input;
+  GCOB_FP128 y;
+  GCOB_FP128 t;
 
   for(size_t i=0; i<ncount; i++)
     {
@@ -452,7 +454,7 @@ _Float128 kahan_summation(size_t ncount,
   }
 
 static
-_Float128
+GCOB_FP128
 variance( size_t         ncount,
           cblc_field_t **source,
           size_t        *source_o,
@@ -463,13 +465,13 @@ variance( size_t         ncount,
   // algorithm that is a bit wasteful of time, but is described as particularly
   // robust.
 
-  _Float128 retval = 0;
+  GCOB_FP128 retval = 0;
   if( ncount )
     {
     // First, we calculate the mean of the input variables, which we will use
     // as an offset in the second stage:
     size_t k_count;
-    _Float128 offset = kahan_summation( ncount,
+    GCOB_FP128 offset = kahan_summation( ncount,
                                         source,
                                         source_o,
                                         source_s,
@@ -480,11 +482,11 @@ variance( size_t         ncount,
     // Next, we use Welford's algorithm on the residuals:
 
     size_t count = 0;
-    _Float128 mean  = 0;
-    _Float128 M2    = 0;
-    _Float128 delta;
-    _Float128 delta2;
-    _Float128 newValue;
+    GCOB_FP128 mean  = 0;
+    GCOB_FP128 M2    = 0;
+    GCOB_FP128 delta;
+    GCOB_FP128 delta2;
+    GCOB_FP128 newValue;
 
     for(size_t i=0; i<ncount; i++)
       {
@@ -958,7 +960,7 @@ __gg__abs(cblc_field_t *dest,
           size_t source_size)
   {
   // FUNCTION ABS
-  _Float128 value;
+  GCOB_FP128 value;
   value = __gg__float128_from_qualified_field(source,
                                               source_offset,
                                               source_size);
@@ -980,17 +982,17 @@ __gg__acos( cblc_field_t *dest,
             size_t        source_size)
   {
   // FUNCTION ACOS
-  _Float128 value;
+  GCOB_FP128 value;
   value = __gg__float128_from_qualified_field(source, source_offset, source_size);
 
-  if( value < -1.00Q || value > +1.00Q )
+  if( value < GCOB_FP128_LITERAL(-1.00) || value > GCOB_FP128_LITERAL(+1.00) )
     {
     exception_raise(ec_argument_function_e);
     value = WEIRD_TRANSCENDENT_RETURN_VALUE;
     }
   else
     {
-    value = acosf128(value);
+    value = FP128_FUNC(acos)(value);
     }
 
   __gg__float128_to_field( dest,
@@ -1011,12 +1013,12 @@ __gg__annuity(cblc_field_t *dest,
   {
   // FUNCTION ANNUITY
 
-  _Float128 retval = 0;
+  GCOB_FP128 retval = 0;
 
-  _Float128 val1 = fabsf128(__gg__float128_from_qualified_field(arg1,
+  GCOB_FP128 val1 = FP128_FUNC(fabs)(__gg__float128_from_qualified_field(arg1,
                                                                 arg1_offset,
                                                                 arg1_size));
-  _Float128 val2 = fabsf128(__gg__float128_from_qualified_field(arg2,
+  GCOB_FP128 val2 = FP128_FUNC(fabs)(__gg__float128_from_qualified_field(arg2,
                                                                 arg2_offset,
                                                                 arg2_size));
   if( val2 > 0)
@@ -1031,7 +1033,7 @@ __gg__annuity(cblc_field_t *dest,
       }
     else
       {
-      retval = val1 / (1- powf128( (1+val1), -val2 ));
+      retval = val1 / (1- FP128_FUNC(pow)( (1+val1), -val2 ));
       }
     }
   else
@@ -1053,19 +1055,19 @@ __gg__asin( cblc_field_t *dest,
   {
   // FUNCTION ASIN
 
-  _Float128 value;
+  GCOB_FP128 value;
   value = __gg__float128_from_qualified_field(source,
                                               source_offset,
                                               source_size);
 
-  if( value < -1.0Q || value > +1.00Q )
+  if( value < GCOB_FP128_LITERAL(-1.0) || value > GCOB_FP128_LITERAL(+1.00) )
     {
     exception_raise(ec_argument_function_e);
     value = WEIRD_TRANSCENDENT_RETURN_VALUE;
     }
   else
     {
-    value = asinf128(value);
+    value = FP128_FUNC(asin)(value);
     }
 
   __gg__float128_to_field( dest,
@@ -1083,12 +1085,12 @@ __gg__atan( cblc_field_t *dest,
   {
   // FUNCTION ATAN
 
-  _Float128 value;
+  GCOB_FP128 value;
   value = __gg__float128_from_qualified_field(source,
                                               source_offset,
                                               source_size);
 
-  value = atanf128(value);
+  value = FP128_FUNC(atan)(value);
 
   __gg__float128_to_field( dest,
                            value,
@@ -1195,10 +1197,10 @@ __gg__cos(cblc_field_t *dest,
   {
   // FUNCTION COS
 
-  _Float128 value = __gg__float128_from_qualified_field(source,
+  GCOB_FP128 value = __gg__float128_from_qualified_field(source,
                                                         source_offset,
                                                         source_size);
-  value = cosf128(value);
+  value = FP128_FUNC(cos)(value);
   __gg__float128_to_field(dest,
                           value,
                           truncation_e,
@@ -1368,7 +1370,8 @@ void
 __gg__e(cblc_field_t *dest)
   {
   // FUNCTION E
-  static _Float128 e = 2.7182818284590452353602874713526624977572Q;
+  static GCOB_FP128 e
+    = GCOB_FP128_LITERAL(2.7182818284590452353602874713526624977572);
   __gg__float128_to_field(dest,
                           e,
                           truncation_e,
@@ -1384,10 +1387,10 @@ __gg__exp(cblc_field_t *dest,
   {
   // FUNCTION EXP
 
-  _Float128 value = __gg__float128_from_qualified_field(source,
+  GCOB_FP128 value = __gg__float128_from_qualified_field(source,
                                                         source_offset,
                                                         source_size);
-  value = expf128(value);
+  value = FP128_FUNC(exp)(value);
   __gg__float128_to_field(dest,
                           value,
                           truncation_e,
@@ -1403,10 +1406,10 @@ __gg__exp10(cblc_field_t *dest,
   {
   // FUNCTION EXP10
 
-  _Float128 value = __gg__float128_from_qualified_field(source,
+  GCOB_FP128 value = __gg__float128_from_qualified_field(source,
                                                         source_offset,
                                                         source_size);
-  value = powf128(10.0Q, value);
+  value = FP128_FUNC(pow)(GCOB_FP128_LITERAL(10.0), value);
   __gg__float128_to_field(dest,
                           value,
                           truncation_e,
@@ -1658,10 +1661,10 @@ __gg__integer(cblc_field_t *dest,
               size_t source_size)
   {
   // FUNCTION INTEGER
-  _Float128 value = __gg__float128_from_qualified_field(source,
+  GCOB_FP128 value = __gg__float128_from_qualified_field(source,
                                                         source_offset,
                                                         source_size);
-  value = floorf128(value);
+  value = FP128_FUNC(floor)(value);
   __gg__float128_to_field(dest,
                           value,
                           truncation_e,
@@ -1758,10 +1761,10 @@ __gg__integer_part( cblc_field_t *dest,
                     size_t source_size)
   {
   // FUNCTION INTEGER-PART
-  _Float128 value = __gg__float128_from_qualified_field(source,
+  GCOB_FP128 value = __gg__float128_from_qualified_field(source,
                                                         source_offset,
                                                         source_size);
-  _Float128 retval = floorf128(fabsf128(value));
+  GCOB_FP128 retval = FP128_FUNC(floor)(FP128_FUNC(fabs)(value));
 
   if( value < 0 )
     {
@@ -1781,7 +1784,7 @@ __gg__fraction_part(cblc_field_t *dest,
                     size_t source_size)
   {
   // FUNCTION INTEGER-PART
-  _Float128 value = __gg__float128_from_qualified_field(source,
+  GCOB_FP128 value = __gg__float128_from_qualified_field(source,
                                                         source_offset,
                                                         source_size);
   bool is_negative = false;
@@ -1791,7 +1794,7 @@ __gg__fraction_part(cblc_field_t *dest,
     value = -value;
     }
 
-  _Float128 retval = value - floorf128(value);
+  GCOB_FP128 retval = value - FP128_FUNC(floor)(value);
 
   if( is_negative )
     {
@@ -1811,7 +1814,7 @@ __gg__log( cblc_field_t *dest,
                       size_t source_size)
   {
   // FUNCTION LOG
-  _Float128 value = __gg__float128_from_qualified_field(source,
+  GCOB_FP128 value = __gg__float128_from_qualified_field(source,
                                                         source_offset,
                                                         source_size);
   if( value <= 0.00 )
@@ -1820,7 +1823,7 @@ __gg__log( cblc_field_t *dest,
     }
   else
     {
-    _Float128 retval = logf128(value);
+    GCOB_FP128 retval = FP128_FUNC(log)(value);
     __gg__float128_to_field(dest,
                             retval,
                             truncation_e,
@@ -1836,7 +1839,7 @@ __gg__log10( cblc_field_t *dest,
                       size_t source_size)
   {
   // FUNCTION LOG10
-  _Float128 value = __gg__float128_from_qualified_field(source,
+  GCOB_FP128 value = __gg__float128_from_qualified_field(source,
                                                         source_offset,
                                                         source_size);
   if( value <= 0.00 )
@@ -1845,7 +1848,7 @@ __gg__log10( cblc_field_t *dest,
     }
   else
     {
-    _Float128 retval = log10f128(value);
+    GCOB_FP128 retval = FP128_FUNC(log10)(value);
     __gg__float128_to_field(dest,
                             retval,
                             truncation_e,
@@ -1931,7 +1934,7 @@ __gg__max(cblc_field_t *dest,
     }
   else
     {
-    _Float128 retval;
+    GCOB_FP128 retval;
     bool first_time = true;
     assert(ncount);
     for(size_t i=0; i<ncount; i++)
@@ -1948,7 +1951,7 @@ __gg__max(cblc_field_t *dest,
           }
         else
           {
-          _Float128 candidate = __gg__float128_from_qualified_field(__gg__treeplet_1f[i], __gg__treeplet_1o[i], __gg__treeplet_1s[i]);
+          GCOB_FP128 candidate = __gg__float128_from_qualified_field(__gg__treeplet_1f[i], __gg__treeplet_1o[i], __gg__treeplet_1s[i]);
           if( candidate >= retval )
             {
             retval = candidate;
@@ -1992,7 +1995,7 @@ __gg__mean( cblc_field_t *dest,
   {
   // FUNCTION MEAN
   size_t k_count;
-  _Float128 sum = kahan_summation(ninputs,
+  GCOB_FP128 sum = kahan_summation(ninputs,
                                   __gg__treeplet_1f,
                                   __gg__treeplet_1o,
                                   __gg__treeplet_1s,
@@ -2021,7 +2024,7 @@ __gg__median( cblc_field_t *dest,
 
   size_t list_size = 1;
 
-  _Float128 *the_list = (_Float128 *)malloc(list_size *sizeof(_Float128));
+  GCOB_FP128 *the_list = (GCOB_FP128 *)malloc(list_size *sizeof(GCOB_FP128));
   size_t k_count = 0;
   assert(ncount);
   for(size_t i=0; i<ncount; i++)
@@ -2034,7 +2037,7 @@ __gg__median( cblc_field_t *dest,
       if(k_count >= list_size)
         {
         list_size *= 2;
-        the_list = (_Float128 *)realloc(the_list, list_size *sizeof(_Float128));
+        the_list = (GCOB_FP128 *)realloc(the_list, list_size *sizeof(GCOB_FP128));
         }
 
       the_list[k_count] = __gg__float128_from_qualified_field(__gg__treeplet_1f[i],
@@ -2050,7 +2053,7 @@ __gg__median( cblc_field_t *dest,
     }
   std::sort(the_list, the_list+k_count);
 
-  _Float128 retval;
+  GCOB_FP128 retval;
   size_t i=k_count/2;
   if( k_count & 1 )
     {
@@ -2073,9 +2076,9 @@ __gg__midrange( cblc_field_t *dest,
                 size_t        ncount)
   {
   // FUNCTION MIDRANGE
-  _Float128 val;
-  _Float128 min=0;
-  _Float128 max=0;
+  GCOB_FP128 val;
+  GCOB_FP128 min=0;
+  GCOB_FP128 max=0;
   bool first_time = true;
   assert(ncount);
   for(size_t i=0; i<ncount; i++)
@@ -2102,7 +2105,7 @@ __gg__midrange( cblc_field_t *dest,
         }
       }
     }
-  _Float128 retval = (min + max)/2.0;
+  GCOB_FP128 retval = (min + max)/2.0;
   __gg__float128_to_field(dest,
                           retval,
                           truncation_e,
@@ -2187,7 +2190,7 @@ __gg__min(cblc_field_t *dest,
     }
   else
     {
-    _Float128 retval;
+    GCOB_FP128 retval;
     bool first_time = true;
     assert(ncount);
     for(size_t i=0; i<ncount; i++)
@@ -2204,7 +2207,7 @@ __gg__min(cblc_field_t *dest,
           }
         else
           {
-          _Float128 candidate = __gg__float128_from_qualified_field(__gg__treeplet_1f[i], __gg__treeplet_1o[i], __gg__treeplet_1s[i]);
+          GCOB_FP128 candidate = __gg__float128_from_qualified_field(__gg__treeplet_1f[i], __gg__treeplet_1o[i], __gg__treeplet_1s[i]);
           if( candidate < retval )
             {
             retval = candidate;
@@ -2576,7 +2579,7 @@ numval_c( cblc_field_t *dest,
   char *pend   = pstart + src_size;
   char *p      = pstart;
 
-  _Float128 retval = 0;
+  GCOB_FP128 retval = 0;
   int sign = 0;
   int rdigits = 0;
   int rdigit_bump = 0;
@@ -3146,7 +3149,8 @@ __gg__pi(cblc_field_t *dest)
   {
   // FUNCTION PI
 
-  static _Float128 pi = 3.141592653589793238462643383279502884Q;
+  static GCOB_FP128 pi
+    = GCOB_FP128_LITERAL(3.141592653589793238462643383279502884);
   __gg__float128_to_field(dest,
                           pi,
                           truncation_e,
@@ -3158,10 +3162,10 @@ void
 __gg__present_value(cblc_field_t *dest,
                     size_t        ncount)
   {
-  _Float128 discount = 0;;
-  _Float128 denom = 1;
+  GCOB_FP128 discount = 0;;
+  GCOB_FP128 denom = 1;
 
-  _Float128 retval = 0;
+  GCOB_FP128 retval = 0;
   bool first_time = true;
   for(size_t i=0; i<ncount; i++)
     {
@@ -3172,19 +3176,19 @@ __gg__present_value(cblc_field_t *dest,
       if(first_time)
         {
         first_time = false;
-        _Float128 arg1 = __gg__float128_from_qualified_field(__gg__treeplet_1f[i],
+        GCOB_FP128 arg1 = __gg__float128_from_qualified_field(__gg__treeplet_1f[i],
                                                              __gg__treeplet_1o[i],
                                                              __gg__treeplet_1s[i]);
-        if( arg1 <= -1.0Q )
+        if( arg1 <= GCOB_FP128_LITERAL(-1.0) )
           {
           exception_raise(ec_argument_function_e);
           break;
           }
-        discount = 1.0Q / (1.0Q + arg1);
+        discount = GCOB_FP128_LITERAL(1.0) / (GCOB_FP128_LITERAL(1.0) + arg1);
         }
       else
         {
-        _Float128 arg = __gg__float128_from_qualified_field(__gg__treeplet_1f[i],
+        GCOB_FP128 arg = __gg__float128_from_qualified_field(__gg__treeplet_1f[i],
                                                             __gg__treeplet_1o[i],
                                                             __gg__treeplet_1s[i]);
         denom *= discount;
@@ -3210,9 +3214,9 @@ __gg__range(cblc_field_t *dest,
   {
   // FUNCTION RANGE
   bool first_time = true;
-  _Float128 val;
-  _Float128 min;
-  _Float128 max;
+  GCOB_FP128 val;
+  GCOB_FP128 min;
+  GCOB_FP128 max;
 
   assert(ncount > 0);
   for(size_t i=0; i<ncount; i++)
@@ -3240,7 +3244,7 @@ __gg__range(cblc_field_t *dest,
       }
     }
 
-  _Float128 retval = max - min;
+  GCOB_FP128 retval = max - min;
   __gg__float128_to_field(dest,
                           retval,
                           truncation_e,
@@ -3264,15 +3268,15 @@ __gg__rem(cblc_field_t *dest,
   // The ISO spec says:
   // ((argument-1) – ((argument-2) * FUNCTION INTEGER-PART ((argument-1) / (argument-2))))
 
-  _Float128 arg1 = __gg__float128_from_qualified_field( par1,
+  GCOB_FP128 arg1 = __gg__float128_from_qualified_field( par1,
                                                         par1_offset,
                                                         par1_size);
-  _Float128 arg2 = __gg__float128_from_qualified_field( par2,
+  GCOB_FP128 arg2 = __gg__float128_from_qualified_field( par2,
                                                         par2_offset,
                                                         par2_size);
 
-  _Float128 intpart;
-  _Float128 retval;
+  GCOB_FP128 intpart;
+  GCOB_FP128 retval;
   if( arg2 == 0 )
     {
     exception_raise(ec_argument_function_e);
@@ -3280,7 +3284,7 @@ __gg__rem(cblc_field_t *dest,
     }
   else
     {
-    modff128(arg1 / arg2, &intpart);
+    FP128_FUNC(modf)(arg1 / arg2, &intpart);
     retval = arg1 - arg2 * intpart;
     }
 
@@ -3500,7 +3504,7 @@ __gg__sign( cblc_field_t *dest,
   {
   // FUNCTION SIGN
 
-  _Float128 value = __gg__float128_from_qualified_field(source,
+  GCOB_FP128 value = __gg__float128_from_qualified_field(source,
                                                         source_offset,
                                                         source_size);
 
@@ -3533,11 +3537,11 @@ __gg__sin(cblc_field_t *dest,
   {
   // FUNCTION SIN
 
-  _Float128 value = __gg__float128_from_qualified_field(source,
+  GCOB_FP128 value = __gg__float128_from_qualified_field(source,
                                                         source_offset,
                                                         source_size);
 
-  value = sinf128(value);
+  value = FP128_FUNC(sin)(value);
 
   __gg__float128_to_field(dest,
                           value,
@@ -3554,17 +3558,17 @@ __gg__sqrt( cblc_field_t *dest,
   {
   // FUNCTION SQRT
 
-  _Float128 value = __gg__float128_from_qualified_field(source,
+  GCOB_FP128 value = __gg__float128_from_qualified_field(source,
                                                         source_offset,
                                                         source_size);
 
-  if( value <= 0.0Q )
+  if( value <= GCOB_FP128_LITERAL(0.0) )
     {
     exception_raise(ec_argument_function_e);
     }
   else
     {
-    value = sqrtf128(value);
+    value = FP128_FUNC(sqrt)(value);
     }
 
   __gg__float128_to_field(dest,
@@ -3579,12 +3583,12 @@ __gg__standard_deviation( cblc_field_t *dest,
                           size_t        ninputs)
   {
   // FUNCTION STANDARD-DEVIATION
-  _Float128 retval = variance(ninputs,
+  GCOB_FP128 retval = variance(ninputs,
                               __gg__treeplet_1f,
                               __gg__treeplet_1o,
                               __gg__treeplet_1s,
                               __gg__fourplet_flags);
-  retval = sqrtf128(retval);
+  retval = FP128_FUNC(sqrt)(retval);
 
   __gg__float128_to_field(dest,
                           retval,
@@ -3599,7 +3603,7 @@ __gg__sum(cblc_field_t *dest,
   {
   // FUNCTION SUM
   size_t k_count;
-  _Float128 sum = kahan_summation(ninputs,
+  GCOB_FP128 sum = kahan_summation(ninputs,
                                   __gg__treeplet_1f,
                                   __gg__treeplet_1o,
                                   __gg__treeplet_1s,
@@ -3620,10 +3624,10 @@ __gg__tan(cblc_field_t *dest,
   {
   // FUNCTION TAN
 
-  _Float128 value = __gg__float128_from_qualified_field(source,
+  GCOB_FP128 value = __gg__float128_from_qualified_field(source,
                                                         source_offset,
                                                         source_size);
-  value = tanf128(value);
+  value = FP128_FUNC(tan)(value);
   __gg__float128_to_field(dest,
                           value,
                           truncation_e,
@@ -3743,7 +3747,7 @@ __gg__variance( cblc_field_t *dest,
                 size_t        ncount)
   {
   // FUNCTION VARIANCE
-  _Float128 retval = variance(ncount,
+  GCOB_FP128 retval = variance(ncount,
                               __gg__treeplet_1f,
                               __gg__treeplet_1o,
                               __gg__treeplet_1s,
@@ -4980,7 +4984,7 @@ __gg__numval_f( cblc_field_t *dest,
                 size_t source_offset,
                 size_t source_size)
   {
-  _Float128 value = 0;
+  GCOB_FP128 value = 0;
   char *data     = (char * )(source->data + source_offset);
   char *data_end = data + source_size;
 
@@ -5004,7 +5008,7 @@ __gg__numval_f( cblc_field_t *dest,
         }
       }
     *p++ = '\0';
-    value = strtof128(ach, NULL);
+    value = strtofp128(ach, NULL);
     }
   __gg__float128_to_field(dest,
                           value,
