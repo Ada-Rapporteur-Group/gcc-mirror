@@ -1511,7 +1511,7 @@ rtl_ssa_dce_mark(std::unordered_set<phi_info *> &marked_phis)
       if (marked_phis.count(pi) > 0)
         continue;
 
-        marked_phis.emplace(pi);
+      marked_phis.emplace(pi);
       uses = pi->inputs();
     }
 
@@ -1564,6 +1564,45 @@ rtl_ssa_dce_sweep(std::unordered_set<insn_info *> marked)
 
   if (dump_file)
     fprintf(dump_file, "DCE: finish sweep phase\n");
+}
+
+static void propagate_dead_phis(std::unordered_set<insn_info *> &marked, std::unordered_set<phi_info *> &marked_phis) {
+  auto_vec<set_info *> worklist;
+  // TODO : add visited to speedup following section
+  for (ebb_info *ebb : crtl->ssa->ebbs()) {
+    for (phi_info *phi : ebb->phis()) {
+      if (marked_phis.count(phi) > 0) 
+        continue;
+
+      worklist.safe_push(phi);
+    }
+  }
+
+  // suppose that debug insns are marked - non marked will be removed later
+  while (!worklist.is_empty ()) {
+    set_info *set = worklist.pop ();
+    insn_info *insn = set->insn ();
+
+    if (insn->is_debug_insn ()) {
+      marked.erase (insn);
+      // debug instructions dont have chains
+      continue;
+    }
+
+    for (use_info *use : set->all_uses()) {
+      if (use->is_in_phi()) {
+        worklist.emplace (use->phi ());
+      } else {
+        gcc_assert(use->is_in_any_insn ());
+        for (def_info *def : use->insn()->defs()) {
+          if (def->kind() != access_kind::SET)
+            continue;
+
+          worklist.emplace(static_cast<set_info *>(def));
+        }
+      }
+    }
+  }
 }
 
 // Clear debug_insn uses and set gen_rtx_UNKNOWN_VAR_LOC
