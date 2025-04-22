@@ -1327,8 +1327,9 @@ struct offset_bitmap {
   public:
     offset_bitmap(size_t size, int offset) : m_offset{offset},
       m_bitmap{sbitmap_alloc(size)} {}
+
     offset_bitmap(int min_index, int max_index) : 
-      offset_bitmap(size_t(max_index - min_index), min_index) {}
+      offset_bitmap(size_t(max_index - min_index + 1), -min_index) {}
 
     void clear_bit(int index) {
       bitmap_clear_bit(m_bitmap, index + m_offset);
@@ -1731,7 +1732,7 @@ is_rtx_insn_prelive(rtx_insn *insn) {
 
   rtx body = PATTERN(insn);
   switch (GET_CODE(body)) {
-    // Clobbers are handled inside is_prelive
+    // Clobbers are handled inside is_prelive - what about parallel?
     // case CLOBBER: // gcc/gcc/testsuite/gcc.c-torture/compile/20000605-1.c
     case USE:
     case VAR_LOCATION:
@@ -1971,6 +1972,19 @@ propagate_dead_phis(std::unordered_set<insn_info *> &marked, std::unordered_set<
   }
 
   return depends_on_dead_phi;
+}
+
+static void
+rtl_ssa_dce_debuggize(insn_info *insn) {
+  if (insn->is_phi()) {
+    return;
+  }
+
+  if (insn->is_debug_insn()) {
+    // we need to fix dependencies of this instruction because they might have
+    // changed
+    return;
+  }
 }
 
 static void
