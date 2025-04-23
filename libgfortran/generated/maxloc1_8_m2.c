@@ -27,6 +27,8 @@ see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
 #include <assert.h>
 
 
+
+
 #if defined (HAVE_GFC_UINTEGER_2) && defined (HAVE_GFC_INTEGER_8)
 
 #define HAVE_BACK_ARG 1
@@ -160,7 +162,7 @@ maxloc1_8_m2 (gfc_array_i8 * const restrict retarray,
 #endif
 
 #if defined (GFC_UINTEGER_2_QUIET_NAN)
-     	     for (n = 0; n < len; n++, src += delta)
+     	     for (n = 0; n < len; n++)
 	       {
 		if (*src >= maxval)
 		  {
@@ -168,11 +170,13 @@ maxloc1_8_m2 (gfc_array_i8 * const restrict retarray,
 		    result = (GFC_INTEGER_8)n + 1;
 		    break;
 		  }
+
+		src = (const GFC_UINTEGER_2 * restrict) (((char*)src) + delta);
 	      }
 #else
 	    n = 0;
 #endif
-	    for (; n < len; n++, src += delta)
+	    for (; n < len; n++)
 	      {
 		if (back ? *src >= maxval : *src > maxval)
 		  {
@@ -390,6 +394,8 @@ mmaxloc1_8_m2 (gfc_array_i8 * const restrict retarray,
 			break;
 		      }
 		  }
+
+		src = (const GFC_UINTEGER_2 * restrict) (((char*)src) + delta);
 	      }
 #if defined (GFC_UINTEGER_2_QUIET_NAN)
 	    if (unlikely (n >= len))
@@ -397,16 +403,18 @@ mmaxloc1_8_m2 (gfc_array_i8 * const restrict retarray,
 	    else
 #endif
 	    if (back)
-	      for (; n < len; n++, src += delta, msrc += mdelta)
+	      for (; n < len; n++, msrc += mdelta)
 	      	{
 		  if (*msrc && unlikely (*src >= maxval))
 		    {
 		      maxval = *src;
 		      result = (GFC_INTEGER_8)n + 1;
 		    }
+
+		  src = (const GFC_UINTEGER_2 * restrict) (((char*)src) + delta);
 		}
 	    else
-	      for (; n < len; n++, src += delta, msrc += mdelta)
+	      for (; n < len; n++, msrc += mdelta)
 	        {
 		  if (*msrc && unlikely (*src > maxval))
 		    {
