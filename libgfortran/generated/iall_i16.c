@@ -146,11 +146,13 @@ iall_i16 (gfc_array_i16 * const restrict retarray,
 	else
 	  {
 #if ! defined HAVE_BACK_ARG
-	    for (n = 0; n < len; n++, src += delta)
+	    for (n = 0; n < len; n++)
 	      {
 #endif
 
   result &= *src;
+
+		src = (const GFC_INTEGER_16 * restrict) (((char*) src) + delta);
 	      }
 	    
 	    *dest = result;
@@ -335,12 +337,14 @@ miall_i16 (gfc_array_i16 * const restrict retarray,
       {
 
   result = (GFC_INTEGER_16) -1;
-	for (n = 0; n < len; n++, src += delta, msrc += mdelta)
+	for (n = 0; n < len; n++, msrc += mdelta)
 	  {
 
   if (*msrc)
     result &= *src;
-	  }
+
+	  src = (const GFC_INTEGER_16 * restrict) (((char*)src) + delta);
+	}
 	*dest = result;
       }
       /* Advance to the next element.  */

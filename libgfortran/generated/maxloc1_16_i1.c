@@ -155,7 +155,7 @@ maxloc1_16_i1 (gfc_array_i16 * const restrict retarray,
 	else
 	  {
 #if ! defined HAVE_BACK_ARG
-	    for (n = 0; n < len; n++, src += delta)
+	    for (n = 0; n < len; n++)
 	      {
 #endif
 
@@ -179,6 +179,8 @@ maxloc1_16_i1 (gfc_array_i16 * const restrict retarray,
 		    maxval = *src;
 		    result = (GFC_INTEGER_16)n + 1;
 		  }
+
+		src = (const GFC_INTEGER_1 * restrict) (((char*) src) + delta);
 	      }
 	    
 	    *dest = result;
@@ -372,7 +374,7 @@ mmaxloc1_16_i1 (gfc_array_i16 * const restrict retarray,
 	GFC_INTEGER_16 result2 = 0;
 #endif
 	result = 0;
-	for (n = 0; n < len; n++, src += delta, msrc += mdelta)
+	for (n = 0; n < len; n++, msrc += mdelta)
 	  {
 
 		if (*msrc)
@@ -411,7 +413,9 @@ mmaxloc1_16_i1 (gfc_array_i16 * const restrict retarray,
 		      maxval = *src;
 		      result = (GFC_INTEGER_16)n + 1;
 		    }
-	  }
+
+	  src = (const GFC_INTEGER_1 * restrict) (((char*)src) + delta);
+	}
 	*dest = result;
       }
       /* Advance to the next element.  */

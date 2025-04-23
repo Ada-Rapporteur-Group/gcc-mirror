@@ -150,7 +150,7 @@ minval_m8 (gfc_array_m8 * const restrict retarray,
 	else
 	  {
 #if ! defined HAVE_BACK_ARG
-	    for (n = 0; n < len; n++, src += delta)
+	    for (n = 0; n < len; n++)
 	      {
 #endif
 
@@ -165,6 +165,8 @@ minval_m8 (gfc_array_m8 * const restrict retarray,
 #endif
 		if (*src < result)
 		  result = *src;
+
+		src = (const GFC_UINTEGER_8 * restrict) (((char*) src) + delta);
 	      }
 	    
 	    *dest = result;
@@ -356,7 +358,7 @@ mminval_m8 (gfc_array_m8 * const restrict retarray,
 #if defined (GFC_UINTEGER_8_QUIET_NAN)
 	int non_empty_p = 0;
 #endif
-	for (n = 0; n < len; n++, src += delta, msrc += mdelta)
+	for (n = 0; n < len; n++, msrc += mdelta)
 	  {
 
 #if defined (GFC_UINTEGER_8_INFINITY) || defined (GFC_UINTEGER_8_QUIET_NAN)
@@ -382,7 +384,9 @@ mminval_m8 (gfc_array_m8 * const restrict retarray,
 #endif
 		if (*msrc && *src < result)
 		  result = *src;
-	  }
+
+	  src = (const GFC_UINTEGER_8 * restrict) (((char*)src) + delta);
+	}
 	*dest = result;
       }
       /* Advance to the next element.  */
