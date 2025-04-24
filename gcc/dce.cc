@@ -1733,7 +1733,7 @@ is_rtx_insn_prelive(rtx_insn *insn) {
   rtx body = PATTERN(insn);
   switch (GET_CODE(body)) {
     // Clobbers are handled inside is_prelive - what about parallel?
-    // case CLOBBER: // gcc/gcc/testsuite/gcc.c-torture/compile/20000605-1.c
+    case CLOBBER: // gcc/gcc/testsuite/gcc.c-torture/compile/20000605-1.c
     case USE:
     case VAR_LOCATION:
       return true;
@@ -1767,13 +1767,20 @@ is_prelive(insn_info *insn)
       return true;
 
     gcc_assert(def->is_reg());
+    // if (def->regno() == HARD_FRAME_POINTER_REGNUM)
+      // std::cout << "set frame pointer (bp): " << def->regno() << " in: " << def->insn()->uid() << '\n';
+
+    if (frame_pointer_needed && def->regno() == HARD_FRAME_POINTER_REGNUM) {
+      // std::cerr << "bp marked as prelive\n";
+      return true;
+    }
 
     /* gcc.c-torture/execute/20000503-1.c - flags register is unused. Not all
        hard registers should be marked... */
 
     /* this ignores clobbers, which is probably fine */
     if (def->kind() == access_kind::CLOBBER)
-      return true;
+      continue;
 
     gcc_assert (def->kind() == access_kind::SET);
 
@@ -2092,6 +2099,16 @@ rtl_ssa_dce_fn()
   // debug(crtl->ssa);
   if (dump_file)
     dump(dump_file, crtl->ssa);
+  // std::cout << '\n' << function_name(cfun) << '\n';
+  // std::cout << "HARD_FRAME_POINTER_IS_ARG_POINTER: " << HARD_FRAME_POINTER_IS_ARG_POINTER << '\n';
+  // std::cout << "HARD_FRAME_POINTER_IS_FRAME_POINTER: " << HARD_FRAME_POINTER_IS_FRAME_POINTER << '\n';
+  // std::cout << "HARD_FRAME_POINTER_REGNUM: " << HARD_FRAME_POINTER_REGNUM << '\n';
+  // std::cout << "FRAME_POINTER_REGNUM: " << FRAME_POINTER_REGNUM << '\n';
+  // std::cout << "fixed_regs[HARD_FRAME_POINTER_REGNUM]: " << (fixed_regs[HARD_FRAME_POINTER_REGNUM] == 1) << '\n';
+  // std::cout << "fixed_regs[FRAME_POINTER_REGNUM]: " << (fixed_regs[FRAME_POINTER_REGNUM] == 1) << '\n';
+  // std::cout << "global_regs[HARD_FRAME_POINTER_REGNUM]: " << (global_regs[HARD_FRAME_POINTER_REGNUM] == 1) << '\n';
+  // std::cout << "global_regs[FRAME_POINTER_REGNUM]: " << (global_regs[FRAME_POINTER_REGNUM] == 1) << '\n';
+  // std::cout << "frame_pointer_needed: " << frame_pointer_needed << '\n';
   std::unordered_set<insn_info *> marked;
   std::unordered_set<phi_info *> marked_phis;
   rtl_ssa_dce_mark(marked, marked_phis);
