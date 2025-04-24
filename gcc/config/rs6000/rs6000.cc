@@ -3922,11 +3922,11 @@ rs6000_option_override_internal (bool global_init_p)
     rs6000_isa_flags |= (ISA_2_6_MASKS_EMBEDDED & ~ignore_masks);
   else if (TARGET_DFP)
     rs6000_isa_flags |= (ISA_2_5_MASKS_SERVER & ~ignore_masks);
-  else if (TARGET_POWER6)
+  else if (TARGET_CMPB)
     rs6000_isa_flags |= (ISA_2_5_MASKS_EMBEDDED & ~ignore_masks);
-  else if (TARGET_POWER5X)
+  else if (TARGET_FPRND)
     rs6000_isa_flags |= (ISA_2_4_MASKS & ~ignore_masks);
-  else if (TARGET_POWER5)
+  else if (TARGET_POPCNTB)
     rs6000_isa_flags |= (ISA_2_2_MASKS & ~ignore_masks);
   else if (TARGET_ALTIVEC)
     rs6000_isa_flags |= (OPTION_MASK_PPC_GFXOPT & ~ignore_masks);
@@ -3951,7 +3951,7 @@ rs6000_option_override_internal (bool global_init_p)
       rs6000_isa_flags &= ~OPTION_MASK_CRYPTO;
     }
 
-  if (!TARGET_POWER5X && TARGET_VSX)
+  if (!TARGET_FPRND && TARGET_VSX)
     {
       if (rs6000_isa_flags_explicit & OPTION_MASK_FPRND)
 	/* TARGET_VSX = 1 implies Power 7 and newer */
@@ -4797,7 +4797,7 @@ rs6000_option_override_internal (bool global_init_p)
      DERAT mispredict penalty.  However the LVE and STVE altivec instructions
      need indexed accesses and the type used is the scalar type of the element
      being loaded or stored.  */
-    TARGET_AVOID_XFORM = (rs6000_tune == PROCESSOR_POWER6 && TARGET_POWER6
+    TARGET_AVOID_XFORM = (rs6000_tune == PROCESSOR_POWER6 && TARGET_CMPB
 			  && !TARGET_ALTIVEC);
 
   /* Set the -mrecip options.  */
@@ -22396,7 +22396,7 @@ rs6000_rtx_costs (rtx x, machine_mode mode, int outer_code,
       return false;
 
     case PARITY:
-      *total = COSTS_N_INSNS (TARGET_POWER6 ? 2 : 6);
+      *total = COSTS_N_INSNS (TARGET_CMPB ? 2 : 6);
       return false;
 
     case NOT:
@@ -23223,7 +23223,7 @@ rs6000_emit_parity (rtx dst, rtx src)
   tmp = gen_reg_rtx (mode);
 
   /* Use the PPC ISA 2.05 prtyw/prtyd instruction if we can.  */
-  if (TARGET_POWER6)
+  if (TARGET_CMPB)
     {
       if (mode == SImode)
 	{
