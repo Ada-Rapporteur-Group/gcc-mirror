@@ -350,8 +350,8 @@
 })
 
 (define_insn_and_split "*movxo_nodm"
-  [(set (match_operand:XO 0 "nonimmediate_operand" "=d,ZwO,d")
-	(match_operand:XO 1 "input_operand" "ZwO,d,d"))]
+  [(set (match_operand:XO 0 "nonimmediate_operand" "=wD,ZwO,wD")
+	(match_operand:XO 1 "input_operand" "ZwO,wD,wD"))]
   "TARGET_MMA && !TARGET_DENSE_MATH
    && (gpc_reg_operand (operands[0], XOmode)
        || gpc_reg_operand (operands[1], XOmode))"
@@ -427,7 +427,7 @@
 })
 
 (define_expand "mma_assemble_acc"
-  [(match_operand:XO 0 "fpr_reg_operand")
+  [(match_operand:XO 0 "accumulator_operand")
    (match_operand:V16QI 1 "mma_assemble_input_operand")
    (match_operand:V16QI 2 "mma_assemble_input_operand")
    (match_operand:V16QI 3 "mma_assemble_input_operand")
@@ -446,7 +446,7 @@
 ;; as an early clobber so we don't accidentally clobber the input operands.  */
 
 (define_insn_and_split "*mma_assemble_acc"
-  [(set (match_operand:XO 0 "fpr_reg_operand" "=&d")
+  [(set (match_operand:XO 0 "accumulator_operand" "=&wD")
 	(unspec_volatile:XO
 	  [(match_operand:V16QI 1 "mma_assemble_input_operand" "mwa")
 	   (match_operand:V16QI 2 "mma_assemble_input_operand" "mwa")
@@ -454,7 +454,7 @@
 	   (match_operand:V16QI 4 "mma_assemble_input_operand" "mwa")]
 	  UNSPECV_MMA_ASSEMBLE))]
   "TARGET_MMA
-   && fpr_reg_operand (operands[0], XOmode)"
+   && accumulator_operand (operands[0], XOmode)"
   "#"
   "&& reload_completed"
   [(const_int 0)]
@@ -469,7 +469,7 @@
 
 (define_expand "mma_disassemble_acc"
   [(match_operand:V16QI 0 "mma_disassemble_output_operand")
-   (match_operand:XO 1 "fpr_reg_operand")
+   (match_operand:XO 1 "accumulator_operand")
    (match_operand 2 "const_0_to_3_operand")]
   "TARGET_MMA"
 {
@@ -487,7 +487,7 @@
 
 (define_insn "mma_<acc>"
   [(set (match_operand:XO 0 "accumulator_operand" "=&wD")
-	(unspec:XO [(match_operand:XO 1 "fpr_reg_operand" "0")]
+	(unspec:XO [(match_operand:XO 1 "accumulator_operand" "0")]
 		    MMA_ACC))]
   "TARGET_MMA && !TARGET_DENSE_MATH"
   "<acc> %A0"
@@ -511,7 +511,7 @@
 })
 
 (define_insn "*mma_xxsetaccz"
-  [(set (match_operand:XO 0 "fpr_reg_operand" "=d")
+  [(set (match_operand:XO 0 "accumulator_operand" "=wD")
 	(unspec_volatile:XO [(const_int 0)]
 			    UNSPECV_MMA_XXSETACCZ))]
   "TARGET_MMA && !TARGET_DENSE_MATH"
