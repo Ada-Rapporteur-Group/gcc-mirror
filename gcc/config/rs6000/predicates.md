@@ -213,7 +213,7 @@
     return 1;
 
   int r = REGNO (op);
-  return (TARGET_MMA_DENSE_MATH
+  return (TARGET_DENSE_MATH
 	  ? DMR_REGNO_P (r)
 	  : FP_REGNO_P (r) && (r & 3) == 0);
 })

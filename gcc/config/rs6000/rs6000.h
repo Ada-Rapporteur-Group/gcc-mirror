@@ -575,9 +575,7 @@ extern int rs6000_vector_align[];
 
 /* Whether we have dense math support.  At present, we don't have a dense math
    ISA bit, just use the future bit set by -mcpu=future.  */
-#define TARGET_DENSE_MATH		TARGET_FUTURE
-#define TARGET_MMA_DENSE_MATH		(TARGET_MMA && TARGET_DENSE_MATH)
-#define TARGET_MMA_NO_DENSE_MATH	(TARGET_MMA && !TARGET_DENSE_MATH)
+#define TARGET_DENSE_MATH		(TARGET_FUTURE && TARGET_MMA)
 
 /* Inlining allows targets to define the meanings of bits in target_info
    field of ipa_fn_summary by itself, the used bits for rs6000 are listed

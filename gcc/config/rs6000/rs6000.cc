@@ -13618,7 +13618,7 @@ rs6000_preferred_reload_class (rtx x, enum reg_class rclass)
 	return VSX_REGS;
 
       if (mode == XOmode)
-	return TARGET_MMA_DENSE_MATH ? VSX_REGS : FLOAT_REGS;
+	return TARGET_DENSE_MATH ? VSX_REGS : FLOAT_REGS;
 
       if (mode == TDOmode)
 	return VSX_REGS;
@@ -13748,7 +13748,7 @@ rs6000_secondary_reload_class (enum reg_class rclass, machine_mode mode,
 
   /* DMR registers don't have loads or stores.  We have to go through the VSX
      registers to load XOmode (vector quad).  */
-  if (TARGET_MMA_DENSE_MATH && rclass == DM_REGS)
+  if (TARGET_DENSE_MATH && rclass == DM_REGS)
     return VSX_REGS;
 
   /* If we have VSX register moves, prefer moving scalar values between
@@ -14287,7 +14287,7 @@ print_operand (FILE *file, rtx x, int code)
 	 overlapping with the FPR registers.  */
       if (!REG_P (x))
 	output_operand_lossage ("invalid %%A value");
-      else if (TARGET_MMA_DENSE_MATH)
+      else if (TARGET_DENSE_MATH)
 	{
 	  if (DMR_REGNO_P (REGNO (x)))
 	    fprintf (file, "%d", REGNO (x) - FIRST_DMR_REGNO);
@@ -22933,7 +22933,7 @@ rs6000_dmr_register_move_cost (machine_mode mode, reg_class_t rclass)
   HARD_REG_SET vsx_set = (reg_class_contents[rclass]
 			  & reg_class_contents[VSX_REGS]);
 
-  if (TARGET_MMA_DENSE_MATH && !hard_reg_set_empty_p (vsx_set))
+  if (TARGET_DENSE_MATH && !hard_reg_set_empty_p (vsx_set))
     {
       /* __vector_quad (i.e. XOmode) is tranfered in 1 instruction.  */
       if (mode == XOmode)
@@ -24292,7 +24292,7 @@ rs6000_compute_pressure_classes (enum reg_class *pressure_classes)
       if (TARGET_HARD_FLOAT)
 	pressure_classes[n++] = FLOAT_REGS;
     }
-  if (TARGET_MMA_DENSE_MATH)
+  if (TARGET_DENSE_MATH)
     pressure_classes[n++] = DM_REGS;
   pressure_classes[n++] = CR_REGS;
   pressure_classes[n++] = SPECIAL_REGS;
@@ -27857,7 +27857,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 
 	  /* If we are reading an accumulator register, we have to deprime it
 	     before we can access it unless we have dense math registers.  */
-	  if (TARGET_MMA_NO_DENSE_MATH
+	  if (TARGET_MMA && !TARGET_DENSE_MATH
 	      && GET_MODE (src) == XOmode && FP_REGNO_P (REGNO (src)))
 	    emit_insn (gen_mma_xxmfacc (src, src));
 
@@ -27891,7 +27891,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 
 	  /* If we are writing an accumulator register, we have to prime it
 	     after we've written it unless we have dense math registers.  */
-	  if (TARGET_MMA_NO_DENSE_MATH
+	  if (TARGET_MMA && !TARGET_DENSE_MATH
 	      && GET_MODE (dst) == XOmode && FP_REGNO_P (REGNO (dst)))
 	    emit_insn (gen_mma_xxmtacc (dst, dst));
 
@@ -27905,7 +27905,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 		      || XINT (src, 1) == UNSPECV_MMA_ASSEMBLE);
 	  gcc_assert (REG_P (dst));
 	  if (GET_MODE (src) == XOmode)
-	    gcc_assert ((TARGET_MMA_DENSE_MATH
+	    gcc_assert ((TARGET_DENSE_MATH
 			 ? VSX_REGNO_P (REGNO (dst))
 			 : FP_REGNO_P (REGNO (dst))));
 	  if (GET_MODE (src) == OOmode)
@@ -27975,7 +27975,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
     {
       /* If we are reading an accumulator register, we have to deprime it
 	 before we can access it unless we have dense math registers.  */
-      if (TARGET_MMA_NO_DENSE_MATH
+      if (TARGET_MMA && !TARGET_DENSE_MATH
 	  && GET_MODE (src) == XOmode && FP_REGNO_P (REGNO (src)))
 	emit_insn (gen_mma_xxmfacc (src, src));
 
@@ -28003,7 +28003,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 
       /* If we are writing an accumulator register, we have to prime it after
 	 we've written it unless we have dense math registers.  */
-      if (TARGET_MMA_NO_DENSE_MATH
+      if (TARGET_MMA && !TARGET_DENSE_MATH
 	  && GET_MODE (dst) == XOmode && FP_REGNO_P (REGNO (dst)))
 	emit_insn (gen_mma_xxmtacc (dst, dst));
     }
@@ -28140,7 +28140,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 
       /* If we are reading an accumulator register, we have to deprime it
 	 before we can access it unless we have dense math registers.  */
-      if (TARGET_MMA_NO_DENSE_MATH && REG_P (src)
+      if (TARGET_MMA && !TARGET_DENSE_MATH && REG_P (src)
 	  && GET_MODE (src) == XOmode && FP_REGNO_P (REGNO (src)))
 	emit_insn (gen_mma_xxmfacc (src, src));
 
@@ -28172,7 +28172,7 @@ rs6000_split_multireg_move (rtx dst, rtx src)
 
       /* If we are writing an accumulator register, we have to prime it after
 	 we've written it unless we have dense math registers.  */
-      if (TARGET_MMA_NO_DENSE_MATH && REG_P (dst)
+      if (TARGET_MMA && !TARGET_DENSE_MATH && REG_P (dst)
 	  && GET_MODE (dst) == XOmode && FP_REGNO_P (REGNO (dst)))
 	emit_insn (gen_mma_xxmtacc (dst, dst));
 

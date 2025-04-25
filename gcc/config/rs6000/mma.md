@@ -352,7 +352,7 @@
 (define_insn_and_split "*movxo_nodm"
   [(set (match_operand:XO 0 "nonimmediate_operand" "=d,ZwO,d")
 	(match_operand:XO 1 "input_operand" "ZwO,d,d"))]
-  "TARGET_MMA_NO_DENSE_MATH
+  "TARGET_MMA && !TARGET_DENSE_MATH
    && (gpc_reg_operand (operands[0], XOmode)
        || gpc_reg_operand (operands[1], XOmode))"
   "@
@@ -372,7 +372,7 @@
 (define_insn_and_split "*movxo_dm"
   [(set (match_operand:XO 0 "nonimmediate_operand" "=wa,ZwO,wa,wD,wD,wa")
 	(match_operand:XO 1 "input_operand"        "ZwO,wa, wa,wa,wD,wD"))]
-  "TARGET_MMA_DENSE_MATH
+  "TARGET_DENSE_MATH
    && (gpc_reg_operand (operands[0], XOmode)
        || gpc_reg_operand (operands[1], XOmode))"
   "@
@@ -502,7 +502,7 @@
   [(set (match_operand:XO 0 "accumulator_operand" "=&wD")
 	(unspec:XO [(match_operand:XO 1 "fpr_reg_operand" "0")]
 		    MMA_ACC))]
-  "TARGET_MMA_NO_DENSE_MATH"
+  "TARGET_MMA && !TARGET_DENSE_MATH"
   "<acc> %A0"
   [(set_attr "type" "mma")])
 
@@ -527,7 +527,7 @@
   [(set (match_operand:XO 0 "fpr_reg_operand" "=d")
 	(unspec_volatile:XO [(const_int 0)]
 			    UNSPECV_MMA_XXSETACCZ))]
-  "TARGET_MMA_NO_DENSE_MATH"
+  "TARGET_MMA && !TARGET_DENSE_MATH"
   "xxsetaccz %A0"
   [(set_attr "type" "mma")])
 
@@ -535,7 +535,7 @@
   [(set (match_operand:XO 0 "accumulator_operand" "=wD")
 	(unspec [(const_int 0)]
 		UNSPEC_MMA_DMSETDMRZ))]
-  "TARGET_MMA_DENSE_MATH"
+  "TARGET_DENSE_MATH"
   "dmsetdmrz %A0"
   [(set_attr "type" "mma")])
 
@@ -760,7 +760,7 @@
 (define_expand "movtdo"
   [(set (match_operand:TDO 0 "nonimmediate_operand")
 	(match_operand:TDO 1 "input_operand"))]
-  "TARGET_MMA_DENSE_MATH"
+  "TARGET_DENSE_MATH"
 {
   rs6000_emit_move (operands[0], operands[1], TDOmode);
   DONE;
@@ -769,7 +769,7 @@
 (define_insn_and_split "*movtdo"
   [(set (match_operand:TDO 0 "nonimmediate_operand" "=wa,m,wa,wD,wD,wa")
 	(match_operand:TDO 1 "input_operand" "m,wa,wa,wa,wD,wD"))]
-  "TARGET_MMA_DENSE_MATH
+  "TARGET_DENSE_MATH
    && (gpc_reg_operand (operands[0], TDOmode)
        || gpc_reg_operand (operands[1], TDOmode))"
   "@
@@ -826,7 +826,7 @@
   [(set (match_operand:TDO 0 "dmr_operand" "=wD")
 	(unspec:TDO [(match_operand:XO 1 "vsx_register_operand" "wa")]
 		    UNSPEC_DM_INSERT512_UPPER))]
-  "TARGET_MMA_DENSE_MATH"
+  "TARGET_DENSE_MATH"
   "dmxxinstdmr512 %0,%1,%Y1,0"
   [(set_attr "type" "mma")])
 
@@ -835,7 +835,7 @@
 	(unspec:TDO [(match_operand:TDO 1 "dmr_operand" "0")
 		     (match_operand:XO 2 "vsx_register_operand" "wa")]
 		    UNSPEC_DM_INSERT512_LOWER))]
-  "TARGET_MMA_DENSE_MATH"
+  "TARGET_DENSE_MATH"
   "dmxxinstdmr512 %0,%2,%Y2,1"
   [(set_attr "type" "mma")])
 
@@ -846,7 +846,7 @@
 	(unspec:XO [(match_operand:TDO 1 "dmr_operand" "wD")
 		    (match_operand 2 "const_0_to_1_operand" "n")]
 		   UNSPEC_DM_EXTRACT512))]
-  "TARGET_MMA_DENSE_MATH"
+  "TARGET_DENSE_MATH"
   "dmxxextfdmr512 %0,%Y0,%1,%2"
   [(set_attr "type" "mma")])
 
@@ -856,7 +856,7 @@
 	(unspec:TDO [(match_operand:TDO 1 "memory_operand" "m")]
 		    UNSPEC_DMR_RELOAD_FROM_MEMORY))
    (clobber (match_operand:XO 2 "vsx_register_operand" "=wa"))]
-  "TARGET_MMA_DENSE_MATH"
+  "TARGET_DENSE_MATH"
   "#"
   "&& reload_completed"
   [(const_int 0)]
@@ -884,7 +884,7 @@
 	(unspec:TDO [(match_operand:TDO 1 "dmr_operand" "wD")]
 		    UNSPEC_DMR_RELOAD_TO_MEMORY))
    (clobber (match_operand:XO 2 "vsx_register_operand" "=wa"))]
-  "TARGET_MMA_DENSE_MATH"
+  "TARGET_DENSE_MATH"
   "#"
   "&& reload_completed"
   [(const_int 0)]
