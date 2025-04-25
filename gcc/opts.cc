@@ -1047,9 +1047,9 @@ validate_ipa_reorder_locality_lto_partition (struct gcc_options *opts,
 {
   static bool validated_p = false;
 
-  if (opts->x_flag_lto_partition != LTO_PARTITION_DEFAULT)
+  if (opts_set->x_flag_lto_partition)
     {
-      if (opts_set->x_flag_ipa_reorder_for_locality && !validated_p)
+      if (opts->x_flag_ipa_reorder_for_locality && !validated_p)
 	error ("%<-fipa-reorder-for-locality%> is incompatible with"
 	       " an explicit %qs option", "-flto-partition");
     }
@@ -1269,8 +1269,6 @@ finish_options (struct gcc_options *opts, struct gcc_options *opts_set,
     SET_OPTION_IF_UNSET (opts, opts_set, flag_reorder_functions, 1);
 
   validate_ipa_reorder_locality_lto_partition (opts, opts_set);
-  if (opts_set->x_flag_lto_partition != LTO_PARTITION_DEFAULT)
-    opts_set->x_flag_lto_partition = opts->x_flag_lto_partition = LTO_PARTITION_BALANCED;
 
   /* The -gsplit-dwarf option requires -ggnu-pubnames.  */
   if (opts->x_dwarf_split_debug_info)
