@@ -1,3 +1,266 @@
+2025-04-17  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2023-06-26  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/debug/helper_functions.h (__get_distance)
+	(__check_singular, __valid_range_aux, __valid_range): Qualify
+	calls to disable ADL.
+	(__check_singular_aux(const _Safe_iterator_base*)): Declare
+	overload that was previously found via ADL.
+
+2025-04-17  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-04-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/93672
+	* src/c++98/istream.cc (istream::ignore(streamsize, int_type)):
+	Treat all negative delimiter values as eof().
+	* testsuite/27_io/basic_istream/ignore/char/93672.cc: New test.
+	* testsuite/27_io/basic_istream/ignore/wchar_t/93672.cc: New
+	test.
+
+2025-04-17  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2025-03-28  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/117983
+	* include/bits/vector.tcc (vector::_M_range_insert): Add
+	unreachable condition to tell the compiler begin() <= end().
+	* testsuite/23_containers/vector/modifiers/insert/117983.cc: New
+	test.
+
+2025-04-17  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-12-17  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/118035
+	* include/bits/deque.tcc (_M_range_insert_aux): Return
+	immediately if inserting an empty range.
+	* testsuite/23_containers/deque/modifiers/insert/118035.cc: New
+	test.
+
+2025-04-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2025-04-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/20_util/integer_sequence/112473.cc: Compile with
+	-std=gnu++20.
+	* testsuite/21_strings/char_traits/requirements/113200.cc:
+	Likewise.
+	* testsuite/23_containers/array/comparison_operators/106212.cc:
+	Likewise.
+	* testsuite/23_containers/span/117966.cc: Likewise.
+	* testsuite/23_containers/vector/cons/113841.cc: Compile with
+	-std=gnu++20.
+	* testsuite/24_iterators/move_iterator/lwg3736.cc: Likewise.
+	* testsuite/25_algorithms/lexicographical_compare_three_way/113960.cc:
+	Likewise.
+	* testsuite/27_io/filesystem/iterators/lwg3480.cc: Likewise.
+	* testsuite/29_atomics/headers/stdatomic.h/115807.cc: Compile
+	with -std=gnu++23.
+	* testsuite/std/ranges/subrange/lwg3589.cc: Likewise.
+	* testsuite/std/time/month/2.cc: Likewise.
+	* testsuite/std/time/weekday/2.cc: Likewise.
+
+2025-04-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-11-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/bits/ranges_util.h (subrange::begin): Fix constraint,
+	as per LWG 3589.
+	* testsuite/std/ranges/subrange/lwg3589.cc: New test.
+
+2025-04-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-12-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/106212
+	* include/std/array (operator==): Use std::__equal_aux1 instead
+	of std::equal.
+	* testsuite/23_containers/array/comparison_operators/106212.cc:
+	New test.
+
+2025-04-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-12-11  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/117966
+	* include/std/span (span(T (&)[N])): Do not delegate to
+	constructor that performs redundant checks.
+	(span(array<T, N>&), span(const array<T, N>&)): Likewise.
+	(span(Range&&), span(const span<T, N>&)): Likewise.
+	* testsuite/23_containers/span/117966.cc: New test.
+
+2025-04-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-03-22  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/113841
+	* include/bits/allocator.h (allocator<cv T>): Add default
+	constructor to partial specializations for cv-qualified types.
+	* include/bits/stl_vector.h (_Vector_impl::_Vector_impl()):
+	Constrain so that it's only present if the allocator is default
+	constructible.
+	* include/bits/stl_bvector.h (_Bvector_impl::_Bvector_impl()):
+	Likewise.
+	* testsuite/23_containers/vector/cons/113841.cc: New test.
+
+2025-04-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-09-03  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/116549
+	* include/bits/stl_iterator.h (disable_sized_sentinel_for):
+	Define specialization for two move_iterator types, as per LWG
+	3736.
+	* testsuite/24_iterators/move_iterator/lwg3736.cc: New test.
+
+2025-04-16  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-11-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/117560
+	* include/bits/fs_dir.h (enable_borrowed_range, enable_view):
+	Define specializations for directory iterators, as per LWG 3480.
+	* testsuite/27_io/filesystem/iterators/lwg3480.cc: New test.
+
+2025-04-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2025-04-14  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/21334
+	* doc/xml/manual/using.xml: Document that container data race
+	avoidance rules do not apply to COW std::string.
+	* doc/html/*: Regenerate.
+
+2025-04-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2023-03-31  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR tree-optimization/107087
+	* include/bits/cow_string.h (basic_string::size()): Add
+	optimizer hint that _S_empty_rep()._M_length is always zero.
+	(basic_string::length()): Call size().
+
+2025-04-02  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-02-15  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/99117
+	* include/std/valarray (valarray::operator=(const _Expr&)):
+	Use loop to copy instead of __valarray_copy with _Array.
+	* testsuite/26_numerics/valarray/99117.cc: New test.
+
+2024-10-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/string_view (basic_string_view::copy) Use explicit
+	template argument for call to std::min<size_t>.
+	(basic_string_view::substr): Likewise.
+
+2024-10-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-06-21  Jonathan Wakely  <jwakely@redhat.com>
+
+	* testsuite/util/testsuite_allocator.h (tracker_allocator):
+	Initialize base class in copy constructor.
+
+2024-10-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	* src/c++17/fs_ops.cc (remove_all) [__FreeBSD__ || __DragonFly__]:
+	Check for EMLINK as well as ELOOP.
+	[__NetBSD__]: Check for EFTYPE as well as ELOOP.
+
+2024-10-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-06-12  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/115399
+	* include/tr2/dynamic_bitset (operator>>=): Remove redundant
+	call to _M_do_sanitize.
+	* include/tr2/dynamic_bitset.tcc (_M_do_left_shift): Zero out
+	low bits in words that should no longer be populated.
+	(_M_do_right_shift): Likewise for high bits.
+	* testsuite/tr2/dynamic_bitset/pr115399.cc: New test.
+
+2024-10-07  Kim Gräsman  <kim.grasman@gmail.com>
+
+	Backported from master:
+	2024-08-28  Kim Gräsman  <kim.grasman@gmail.com>
+
+	* include/bits/cpp_type_traits.h: Improve doxygen file docs.
+
+2024-10-07  Kim Gräsman  <kim.grasman@gmail.com>
+
+	Backported from master:
+	2024-08-28  Kim Gräsman  <kim.grasman@gmail.com>
+
+	* config/cpu/aarch64/opt/ext/opt_random.h: Improve doxygen file
+	docs.
+	* config/cpu/i486/opt/ext/opt_random.h: Likewise.
+
+2024-10-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-07-06  Jonathan Wakely  <jwakely@redhat.com>
+
+	* include/std/variant (_Variant_storage::_M_reset): Use
+	__unlikely__ form of attribute instead of unlikely.
+
+2024-10-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-08-28  Jonathan Wakely  <jwakely@redhat.com>
+
+	* configure.ac: Fix check for O_NONBLOCK.
+	* config.h.in: Regenerate.
+	* configure: Regenerate.
+
+2024-10-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-09-10  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/116641
+	* include/bits/basic_string.h (operator=(basic_string&&)): Call
+	_M_assign instead of assign.
+	* testsuite/21_strings/basic_string/allocator/116641.cc: New
+	test.
+
+2024-10-07  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-06-28  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/115585
+	* src/c++11/assert_fail.cc (__glibcxx_assert_fail): Add
+	definition for non-verbose builds.
+
+2024-07-09  Jonathan Wakely  <jwakely@redhat.com>
+
+	Backported from master:
+	2024-07-08  Jonathan Wakely  <jwakely@redhat.com>
+
+	PR libstdc++/115807
+	* include/c_compatibility/stdatomic.h (_Atomic): Ensure it
+	refers to std::atomic in the global namespace.
+	* testsuite/29_atomics/headers/stdatomic.h/115807.cc: New test.
+
 2024-06-27  Alexandre Oliva  <oliva@adacore.com>
 
 	Backported from master:

@@ -4929,10 +4929,15 @@ package body Exp_Aggr is
       --  done top down from above.
 
       if
-         --  Internal aggregate (transformed when expanding the parent)
+         --  Internal aggregates (transformed when expanding the parent),
+         --  excluding container aggregates as these are transformed into
+         --  subprogram calls later.
 
-         Parent_Kind in
-           N_Aggregate | N_Extension_Aggregate | N_Component_Association
+         (Parent_Kind = N_Component_Association
+           and then not Is_Container_Aggregate (Parent (Parent_Node)))
+
+         or else (Parent_Kind in N_Aggregate | N_Extension_Aggregate
+                   and then not Is_Container_Aggregate (Parent_Node))
 
          --  Allocator (see Convert_Aggr_In_Allocator)
 
@@ -6785,7 +6790,8 @@ package body Exp_Aggr is
       --  STEP 3
 
       --  Delay expansion for nested aggregates: it will be taken care of when
-      --  the parent aggregate is expanded.
+      --  the parent aggregate is expanded, excluding container aggregates as
+      --  these are transformed into subprogram calls later.
 
       Parent_Node := Parent (N);
       Parent_Kind := Nkind (Parent_Node);
@@ -6795,9 +6801,10 @@ package body Exp_Aggr is
          Parent_Kind := Nkind (Parent_Node);
       end if;
 
-      if Parent_Kind = N_Aggregate
-        or else Parent_Kind = N_Extension_Aggregate
-        or else Parent_Kind = N_Component_Association
+      if (Parent_Kind = N_Component_Association
+           and then not Is_Container_Aggregate (Parent (Parent_Node)))
+        or else (Parent_Kind in N_Aggregate | N_Extension_Aggregate
+                  and then not Is_Container_Aggregate (Parent_Node))
         or else (Parent_Kind = N_Object_Declaration
                   and then Needs_Finalization (Typ))
         or else (Parent_Kind = N_Assignment_Statement

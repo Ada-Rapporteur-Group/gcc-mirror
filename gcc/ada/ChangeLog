@@ -1,3 +1,81 @@
+2025-04-04  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* libgnat/a-ngcoar.adb (Eigensystem): Adjust notation and fix the
+	layout of the real symmetric matrix in the main comment.  Adjust
+	the layout of the associated code accordingly and correctly turn
+	the 2Nx1 real vectors into Nx1 complex ones.
+	(Eigenvalues): Minor similar tweaks.
+	* libgnat/a-ngrear.adb (Jacobi): Minor tweaks in the main comment.
+	Adjust notation and corresponding parameter names of functions.
+	Fix call to Unit_Matrix routine.  Adjust the comment describing
+	the various kinds of iterations to match the implementation.
+
+2025-01-05  Estevan Castilho (Tevo)  <estevan.cps@gmail.com>
+
+	* libgnarl/s-taprop__dummy.adb: Remove use clause for
+	System.Parameters.
+	(Unlock): Remove Global_Lock formal parameter.
+	(Write_Lock): Likewise.
+
+2025-01-05  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR ada/118234
+	* exp_aggr.adb (Convert_To_Assignments): In the case of a
+	component association, call Is_Container_Aggregate on the parent's
+	parent.
+	(Expand_Array_Aggregate): Likewise.
+
+2025-01-05  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR ada/118234
+	* exp_aggr.adb (Convert_To_Assignments): Tweak comment.
+	(Expand_Array_Aggregate): Do not delay the expansion if the parent
+	node is a container aggregate.
+
+2025-01-05  Marc Poulhiès  <poulhies@adacore.com>
+
+	PR ada/118234
+	* exp_aggr.adb (Convert_To_Assignments): Do not mark node for
+	delayed expansion if parent type has the Aggregate aspect.
+	* sem_util.adb (Is_Container_Aggregate): Move...
+	* sem_util.ads (Is_Container_Aggregate): ... here and make it
+	public.
+
+2024-12-12  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR ada/117996
+	* libgnat/a-ngrear.adb (Jacobi): Remove default value for
+	Compute_Vectors formal parameter.
+	(Sort_Eigensystem): Add Compute_Vectors formal parameter.  Do not
+	modify the Vectors if Compute_Vectors is False.
+	(Eigensystem): Pass True as Compute_Vectors to Sort_Eigensystem.
+	(Eigenvalues): Pass False as Compute_Vectors to Sort_Eigensystem.
+
+2024-11-26  Arsen Arsenović  <arsen@aarsen.me>
+
+	Backported from master:
+	2024-08-19  Arsen Arsenović  <arsen@aarsen.me>
+
+	PR ada/115917
+	* gnatvsn.ads: Add note about the duplication of this value in
+	version.c.
+	* version.c (VER_LEN_MAX): Define to the same value as
+	Gnatvsn.Ver_Len_Max.
+	(gnat_version_string): Use VER_LEN_MAX as bound.
+
+2024-11-04  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* checks.adb (Selected_Length_Checks.Get_E_Length): For a
+	component of a record with discriminants and if the expression is
+	a selected component, try to build an actual subtype from its
+	prefix instead of from the discriminal.
+
+2024-10-14  Steve Baird  <baird@adacore.com>
+
+	PR ada/114593
+	* sem_res.adb (Valid_Conversion): Test In_Instance instead of
+	In_Instance_Body.
+
 2024-06-20  Release Manager
 
 	* GCC 12.4.0 released.
