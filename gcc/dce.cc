@@ -1318,33 +1318,28 @@ public:
 
 } // namespace
 
-struct offset_bitmap {
-  private:
-    const int m_offset;
-    sbitmap m_bitmap;
-  
-  public:
-    offset_bitmap(size_t size, int offset) : m_offset{offset},
-      m_bitmap{sbitmap_alloc(size)} {}
+struct offset_bitmap
+{
+private:
+  const int m_offset;
+  sbitmap m_bitmap;
 
-    offset_bitmap(int min_index, int max_index) : 
-      offset_bitmap(size_t(max_index - min_index + 1), -min_index) {}
+public:
+  offset_bitmap (size_t size, int offset)
+    : m_offset{offset}, m_bitmap{sbitmap_alloc (size)}
+  {}
 
-    void clear_bit(int index) {
-      bitmap_clear_bit(m_bitmap, index + m_offset);
-    }
+  offset_bitmap (int min_index, int max_index)
+    : offset_bitmap (size_t (max_index - min_index + 1), -min_index)
+  {}
 
-    void set_bit(int index) {
-      bitmap_set_bit(m_bitmap, index + m_offset);
-    }
+  void clear_bit (int index) { bitmap_clear_bit (m_bitmap, index + m_offset); }
 
-    bool get_bit(int index) {
-      return bitmap_bit_p(m_bitmap, index + m_offset);
-    }
+  void set_bit (int index) { bitmap_set_bit (m_bitmap, index + m_offset); }
 
-    ~offset_bitmap() {
-      sbitmap_free(m_bitmap);
-    }
+  bool get_bit (int index) { return bitmap_bit_p (m_bitmap, index + m_offset); }
+
+  ~offset_bitmap () { sbitmap_free (m_bitmap); }
 };
 
 class rtl_ssa_dce
@@ -1353,33 +1348,37 @@ public:
   unsigned int execute (function *);
 
 private:
-  bool is_rtx_body_prelive(const_rtx);
-  bool can_delete_call(const_rtx);
-  bool is_rtx_prelive(const_rtx);
-  bool is_prelive(insn_info *);
-  void mark_prelive_insn(insn_info *, auto_vec<set_info *>&);
-  auto_vec<set_info *> mark_prelive();
-  void mark();
-  std::unordered_set<insn_info *> propagate_dead_phis();
-  void reset_dead_debug_insn(insn_info *);
-  void reset_dead_debug();
-  void sweep();
+  bool is_rtx_body_prelive (const_rtx);
+  bool can_delete_call (const_rtx);
+  bool is_rtx_prelive (const_rtx);
+  bool is_prelive (insn_info *);
+  void mark_prelive_insn (insn_info *, auto_vec<set_info *> &);
+  auto_vec<set_info *> mark_prelive ();
+  void mark ();
+  std::unordered_set<insn_info *> propagate_dead_phis ();
+  void reset_dead_debug_insn (insn_info *);
+  void reset_dead_debug ();
+  void sweep ();
 
+  offset_bitmap mm_marked;
+  offset_bitmap mm_marked_phis;
   std::unordered_set<insn_info *> m_marked;
   std::unordered_set<phi_info *> m_marked_phis;
 };
 
 bool
-rtl_ssa_dce::is_rtx_body_prelive(const_rtx insn) {
-  switch (GET_CODE(insn)) {
+rtl_ssa_dce::is_rtx_body_prelive (const_rtx insn)
+{
+  switch (GET_CODE (insn))
+    {
     case PREFETCH:
     case UNSPEC:
     case TRAP_IF: /* testsuite/gcc.c-torture/execute/20020418-1.c */
       return true;
 
     default:
-      return side_effects_p(insn);
-  }
+      return side_effects_p (insn);
+    }
 }
 
 bool
@@ -1387,10 +1386,9 @@ rtl_ssa_dce::can_delete_call (const_rtx insn)
 {
   if (cfun->can_delete_dead_exceptions)
     return true;
-  if (!insn_nothrow_p (insn))
-    return false;
-  // if (can_alter_cfg)
-  return true;
+  // if (!insn_nothrow_p (insn))
+    // return false;
+  return insn_nothrow_p (insn);
 
   // UD_DCE ignores this and works...
   /* If we can't alter cfg, even when the call can't throw exceptions, it
@@ -1403,45 +1401,49 @@ rtl_ssa_dce::can_delete_call (const_rtx insn)
   //     edge_iterator ei;
 
   //     FOR_EACH_EDGE (e, ei, BLOCK_FOR_INSN (insn)->succs)
-	// if ((e->flags & EDGE_ABNORMAL_CALL) != 0)
-	//   return false;
+  // if ((e->flags & EDGE_ABNORMAL_CALL) != 0)
+  //   return false;
   //   }
   // return true;
 }
 
 bool
-rtl_ssa_dce::is_rtx_prelive(const_rtx insn) {
-  gcc_assert(insn != nullptr);
+rtl_ssa_dce::is_rtx_prelive (const_rtx insn)
+{
+  gcc_assert (insn != nullptr);
 
   if (CALL_P (insn)
-    // We cannot delete pure or const sibling calls because it is
-    // hard to see the result.
-    && (!SIBLING_CALL_P (insn))
-    // We can delete dead const or pure calls as long as they do not
-    // infinite loop.
-    && (RTL_CONST_OR_PURE_CALL_P (insn) && !RTL_LOOPING_CONST_OR_PURE_CALL_P (insn))
-    // Don't delete calls that may throw if we cannot do so.
-    && can_delete_call (insn))
-  return false;
+      // We cannot delete pure or const sibling calls because it is
+      // hard to see the result.
+      && (!SIBLING_CALL_P (insn))
+      // We can delete dead const or pure calls as long as they do not
+      // infinite loop.
+      && (RTL_CONST_OR_PURE_CALL_P (insn)
+	  && !RTL_LOOPING_CONST_OR_PURE_CALL_P (insn))
+      // Don't delete calls that may throw if we cannot do so.
+      && can_delete_call (insn))
+    return false;
 
   if (!NONJUMP_INSN_P (insn))
     // This handles jumps, notes, call_insns, debug_insns, ...
     return true;
 
   // Only rtx_insn should be handled here
-  gcc_assert(GET_CODE(insn) == INSN);
+  gcc_assert (GET_CODE (insn) == INSN);
 
   // Don't delete insns that may throw if we cannot do so.
-  if (!cfun->can_delete_dead_exceptions && !insn_nothrow_p (insn)  && can_alter_cfg)
+  if (!cfun->can_delete_dead_exceptions && !insn_nothrow_p (insn)
+      && can_alter_cfg)
     return true;
- 
+
   // Callee-save restores are needed.
-  if (RTX_FRAME_RELATED_P (insn) && crtl->shrink_wrapped_separate 
+  if (RTX_FRAME_RELATED_P (insn) && crtl->shrink_wrapped_separate
       && find_reg_note (insn, REG_CFA_RESTORE, NULL))
     return true;
 
-  rtx body = PATTERN(insn);
-  switch (GET_CODE(body)) {
+  rtx body = PATTERN (insn);
+  switch (GET_CODE (body))
+    {
     case CLOBBER:
     case USE:
     case VAR_LOCATION:
@@ -1449,238 +1451,260 @@ rtl_ssa_dce::is_rtx_prelive(const_rtx insn) {
 
     case PARALLEL:
       for (int i = XVECLEN (body, 0) - 1; i >= 0; i--)
-        if (is_rtx_body_prelive (XVECEXP (body, 0, i)))
-          return true;
+	if (is_rtx_body_prelive (XVECEXP (body, 0, i)))
+	  return true;
       return false;
 
     default:
       return is_rtx_body_prelive (body);
-  }
+    }
 }
 
 bool
-rtl_ssa_dce::is_prelive(insn_info *insn) {
+rtl_ssa_dce::is_prelive (insn_info *insn)
+{
   // bb head and end contain artificial uses that we need to mark as prelive
   // debug instructions are also prelive, however, they are not added to the
   // worklist
-  if (insn->is_bb_head() || insn->is_bb_end() || insn->is_debug_insn())
+  if (insn->is_bb_head () || insn->is_bb_end () || insn->is_debug_insn ())
     return true;
 
   // Phi instructions are never prelive
-  if (insn->is_artificial())
+  if (insn->is_artificial ())
     return false;
 
-  gcc_assert (insn->is_real());
-  for (def_info *def : insn->defs()) {
-    // The purpose of this pass is not to eliminate memory stores...
-    if (def->is_mem())
-      return true;
+  gcc_assert (insn->is_real ());
+  for (def_info *def : insn->defs ())
+    {
+      // The purpose of this pass is not to eliminate memory stores...
+      if (def->is_mem ())
+	return true;
 
-    gcc_assert(def->is_reg());
+      gcc_assert (def->is_reg ());
 
-    // we should not delete the frame pointer because of the dward2frame pass
-    if (frame_pointer_needed && def->regno() == HARD_FRAME_POINTER_REGNUM)
-      return true;
- 
-    // skip clobbers, they are handled inside is_rtx_prelive
-    if (def->kind() == access_kind::CLOBBER)
-      continue;
+      // we should not delete the frame pointer because of the dward2frame pass
+      if (frame_pointer_needed && def->regno () == HARD_FRAME_POINTER_REGNUM)
+	return true;
 
-    gcc_assert (def->kind() == access_kind::SET);
+      // skip clobbers, they are handled inside is_rtx_prelive
+      if (def->kind () == access_kind::CLOBBER)
+	continue;
 
-    // needed by gcc.c-torture/execute/pr51447.c
-    if (HARD_REGISTER_NUM_P (def->regno()) && global_regs[def->regno()])
-      return true;
+      gcc_assert (def->kind () == access_kind::SET);
 
-    unsigned int picreg = PIC_OFFSET_TABLE_REGNUM;
-    if (picreg != INVALID_REGNUM
-        && fixed_regs[picreg]
-        && def->regno() == picreg)
-      return true;
-  }
+      // needed by gcc.c-torture/execute/pr51447.c
+      if (HARD_REGISTER_NUM_P (def->regno ()) && global_regs[def->regno ()])
+	return true;
 
-  return is_rtx_prelive(insn->rtl());
+      unsigned int picreg = PIC_OFFSET_TABLE_REGNUM;
+      if (picreg != INVALID_REGNUM && fixed_regs[picreg]
+	  && def->regno () == picreg)
+	return true;
+    }
+
+  return is_rtx_prelive (insn->rtl ());
 }
 
 void
-rtl_ssa_dce::mark_prelive_insn(insn_info *insn, auto_vec<set_info *> &worklist) {
+rtl_ssa_dce::mark_prelive_insn (insn_info *insn, auto_vec<set_info *> &worklist)
+{
   if (dump_file)
-    fprintf(dump_file, "Insn %d marked as prelive\n", insn->uid());
+    fprintf (dump_file, "Insn %d marked as prelive\n", insn->uid ());
 
-  m_marked.emplace(insn);
+  m_marked.emplace (insn);
   // debug instruction are not added to worklist not to wake up possibly dead
-  // instructions 
-  if (insn->is_debug_insn())
+  // instructions
+  if (insn->is_debug_insn ())
     return;
 
-  for (use_info *use : insn->uses()) {
-    set_info* set = use->def();
-    if (set)
-      worklist.safe_push(set);
-  }
+  for (use_info *use : insn->uses ())
+    {
+      set_info *set = use->def ();
+      if (set)
+	worklist.safe_push (set);
+    }
 }
 
 auto_vec<set_info *>
-rtl_ssa_dce::mark_prelive() {
+rtl_ssa_dce::mark_prelive ()
+{
   if (dump_file)
-    fprintf(dump_file, "DCE: prelive phase\n");
+    fprintf (dump_file, "DCE: prelive phase\n");
 
   auto_vec<set_info *> worklist;
-  for (insn_info *insn : crtl->ssa->all_insns()) {
-    if (is_prelive(insn))
-      mark_prelive_insn(insn, worklist);
-  }
+  for (insn_info *insn : crtl->ssa->all_insns ())
+    {
+      if (is_prelive (insn))
+	mark_prelive_insn (insn, worklist);
+    }
 
   return worklist;
 }
 
 void
-rtl_ssa_dce::mark() {
-  auto worklist = mark_prelive();
+rtl_ssa_dce::mark ()
+{
+  auto worklist = mark_prelive ();
   if (dump_file)
-    fprintf(dump_file, "DCE: marking phase\n");
+    fprintf (dump_file, "DCE: marking phase\n");
 
-  while (!worklist.is_empty()) {
-    set_info* set = worklist.pop();
-    insn_info* insn = set->insn();
-    if (!insn) // TODO: is this possible?
-      continue;
+  while (!worklist.is_empty ())
+    {
+      set_info *set = worklist.pop ();
+      insn_info *insn = set->insn ();
+      if (!insn) // TODO: is this possible?
+	continue;
 
-    // Skip already visited visited instructions.
-    auto uid = insn->uid();
-    if ((m_marked.count(insn) > 0) && !insn->is_phi())
-      continue;
+      // Skip already visited visited instructions.
+      auto uid = insn->uid ();
+      if ((m_marked.count (insn) > 0) && !insn->is_phi ())
+	continue;
 
-    m_marked.emplace(insn);
+      m_marked.emplace (insn);
 
-    use_array uses = insn->uses();
-    if (insn->is_phi()) {
-      phi_info* pi = as_a<phi_info *> (set);
-      auto pi_uid = pi->uid();
-      // Skip already visited phi node.
-      if (m_marked_phis.count(pi) > 0)
-        continue;
+      use_array uses = insn->uses ();
+      if (insn->is_phi ())
+	{
+	  phi_info *pi = static_cast<phi_info *> (set);
+	  auto pi_uid = pi->uid ();
+	  // Skip already visited phi node.
+	  if (m_marked_phis.count (pi) > 0)
+	    continue;
 
-      m_marked_phis.emplace(pi);
-      uses = pi->inputs();
+	  m_marked_phis.emplace (pi);
+	  uses = pi->inputs ();
+	}
+
+      if (dump_file)
+	fprintf (dump_file, "Adding insn %d to worklist\n", insn->uid ());
+
+      for (use_info *use : uses)
+	{
+	  set_info *parent_set = use->def ();
+	  if (!parent_set)
+	    continue;
+
+	  worklist.safe_push (parent_set);
+	}
     }
-
-    if (dump_file)
-      fprintf(dump_file, "Adding insn %d to worklist\n", insn->uid());
-    
-    for (use_info *use : uses) {
-      set_info* parent_set = use->def();
-      if (!parent_set)
-        continue;
-
-      worklist.safe_push(parent_set);
-    }
-  }
 }
 
 // Clear debug_insn uses and set gen_rtx_UNKNOWN_VAR_LOC
 void
-rtl_ssa_dce::reset_dead_debug_insn(insn_info *insn) {
-  gcc_assert(insn->is_debug_insn());
+rtl_ssa_dce::reset_dead_debug_insn (insn_info *insn)
+{
+  gcc_assert (insn->is_debug_insn ());
 
   if (dump_file)
-    fprintf(dump_file, "Resetting debug insn: %d\n", insn->uid());
+    fprintf (dump_file, "Resetting debug insn: %d\n", insn->uid ());
 
   insn_change change (insn);
   change.new_uses = {};
-  INSN_VAR_LOCATION_LOC (insn->rtl()) = gen_rtx_UNKNOWN_VAR_LOC ();
+  INSN_VAR_LOCATION_LOC (insn->rtl ()) = gen_rtx_UNKNOWN_VAR_LOC ();
   crtl->ssa->change_insn (change);
 }
 
-// Iterate over all debug_insns and reset those for which at least one of the 
+// Iterate over all debug_insns and reset those for which at least one of the
 // uses isn't marked.
 void
-rtl_ssa_dce::reset_dead_debug() {
-  for (insn_info *insn : crtl->ssa->all_insns()) {
-    if (!insn->is_debug_insn())
-      continue;
+rtl_ssa_dce::reset_dead_debug ()
+{
+  for (insn_info *insn : crtl->ssa->all_insns ())
+    {
+      if (!insn->is_debug_insn ())
+	continue;
 
-    // When propagate_dead_phis is ready, check if insn is in marked. If true, then try
-    // to create debug instructions
-    // RTL SSA does not contain debug insntructions... we have to make sure that uses are correct
+      // When propagate_dead_phis is ready, check if insn is in marked. If true,
+      // then try to create debug instructions RTL SSA does not contain debug
+      // insntructions... we have to make sure that uses are correct
 
-    // TODO : use iterate_safely?
-    for (use_info *use: insn->uses()) {
-      insn_info *parent_insn = use->def()->insn();
-      if ((parent_insn->is_phi() && m_marked_phis.count(as_a<phi_info *>(use->def())) == 0) 
-      || (!parent_insn->is_phi() && m_marked.count(parent_insn) == 0)) {
-        reset_dead_debug_insn(insn);
-        break;
-      }
+      // TODO : use iterate_safely?
+      for (use_info *use : insn->uses ())
+	{
+	  insn_info *parent_insn = use->def ()->insn ();
+	  if ((parent_insn->is_phi ()
+	       && m_marked_phis.count (as_a<phi_info *> (use->def ())) == 0)
+	      || (!parent_insn->is_phi () && m_marked.count (parent_insn) == 0))
+	    {
+	      reset_dead_debug_insn (insn);
+	      break;
+	    }
+	}
     }
-  }
 }
 
 // Iterate over non-debug instructions in RPO and remove all that aren't marked.
 void
-rtl_ssa_dce::sweep() {
+rtl_ssa_dce::sweep ()
+{
   if (dump_file)
-    fprintf(dump_file, "DCE: Sweep phase\n");
+    fprintf (dump_file, "DCE: Sweep phase\n");
 
   auto_vec<insn_change> to_delete;
-  for (insn_info *insn : crtl->ssa->nondebug_insns()) {
-    // Artificial or marked insns should not be deleted.
-    if (insn->is_artificial() || m_marked.count(insn) > 0)
-      continue;
+  for (insn_info *insn : crtl->ssa->nondebug_insns ())
+    {
+      // Artificial or marked insns should not be deleted.
+      if (insn->is_artificial () || m_marked.count (insn) > 0)
+	continue;
 
-    if (dump_file)
-      fprintf(dump_file, "Sweeping insn: %d\n", insn->uid());
+      if (dump_file)
+	fprintf (dump_file, "Sweeping insn: %d\n", insn->uid ());
 
-    auto change = insn_change::delete_insn(insn);
-    to_delete.safe_push(std::move(change));
+      auto change = insn_change::delete_insn (insn);
+      to_delete.safe_push (std::move (change));
 
-    // If we use following way with reverse_nondebug_insns, not all insns seem
-    // to be deleted...
-    // crtl->ssa->change_insn(change);
-  }
+      // If we use following way with reverse_nondebug_insns, not all insns seem
+      // to be deleted...
+      // crtl->ssa->change_insn(change);
+    }
 
-  auto_vec<insn_change*> changes(to_delete.length());
-  for (size_t i = 0; i != to_delete.length(); ++i) {
-    changes.safe_push(&to_delete[i]);
-  }
+  auto_vec<insn_change *> changes (to_delete.length ());
+  for (size_t i = 0; i != to_delete.length (); ++i)
+    changes.safe_push (&to_delete[i]);
 
-  gcc_assert (crtl->ssa->verify_insn_changes(changes));
-  crtl->ssa->change_insns(changes);
+  gcc_assert (crtl->ssa->verify_insn_changes (changes));
+  crtl->ssa->change_insns (changes);
 
   if (dump_file)
-    fprintf(dump_file, "DCE: finish sweep phase\n");
+    fprintf (dump_file, "DCE: finish sweep phase\n");
 }
 
-
 unsigned int
-rtl_ssa_dce::execute(function *fn) {
-  calculate_dominance_info(CDI_DOMINATORS);
-  // internal compiler error: gcc.c-torture/execute/20040811-1.c - rtl_ssa::function_info::add_phi_nodes
-  crtl->ssa = new rtl_ssa::function_info(fn);
+rtl_ssa_dce::execute (function *fn)
+{
+  calculate_dominance_info (CDI_DOMINATORS);
+  // internal compiler error: gcc.c-torture/execute/20040811-1.c -
+  // rtl_ssa::function_info::add_phi_nodes
+  crtl->ssa = new rtl_ssa::function_info (fn);
 
   if (dump_file)
-    dump(dump_file, crtl->ssa);
+    dump (dump_file, crtl->ssa);
 
   // std::cout << '\n' << function_name(cfun) << '\n';
-  // std::cout << "HARD_FRAME_POINTER_IS_ARG_POINTER: " << HARD_FRAME_POINTER_IS_ARG_POINTER << '\n';
-  // std::cout << "HARD_FRAME_POINTER_IS_FRAME_POINTER: " << HARD_FRAME_POINTER_IS_FRAME_POINTER << '\n';
-  // std::cout << "HARD_FRAME_POINTER_REGNUM: " << HARD_FRAME_POINTER_REGNUM << '\n';
+  // std::cout << "HARD_FRAME_POINTER_IS_ARG_POINTER: " <<
+  // HARD_FRAME_POINTER_IS_ARG_POINTER << '\n'; std::cout <<
+  // "HARD_FRAME_POINTER_IS_FRAME_POINTER: " <<
+  // HARD_FRAME_POINTER_IS_FRAME_POINTER << '\n'; std::cout <<
+  // "HARD_FRAME_POINTER_REGNUM: " << HARD_FRAME_POINTER_REGNUM << '\n';
   // std::cout << "FRAME_POINTER_REGNUM: " << FRAME_POINTER_REGNUM << '\n';
-  // std::cout << "fixed_regs[HARD_FRAME_POINTER_REGNUM]: " << (fixed_regs[HARD_FRAME_POINTER_REGNUM] == 1) << '\n';
-  // std::cout << "fixed_regs[FRAME_POINTER_REGNUM]: " << (fixed_regs[FRAME_POINTER_REGNUM] == 1) << '\n';
-  // std::cout << "global_regs[HARD_FRAME_POINTER_REGNUM]: " << (global_regs[HARD_FRAME_POINTER_REGNUM] == 1) << '\n';
-  // std::cout << "global_regs[FRAME_POINTER_REGNUM]: " << (global_regs[FRAME_POINTER_REGNUM] == 1) << '\n';
-  // std::cout << "frame_pointer_needed: " << frame_pointer_needed << '\n';
+  // std::cout << "fixed_regs[HARD_FRAME_POINTER_REGNUM]: " <<
+  // (fixed_regs[HARD_FRAME_POINTER_REGNUM] == 1) << '\n'; std::cout <<
+  // "fixed_regs[FRAME_POINTER_REGNUM]: " << (fixed_regs[FRAME_POINTER_REGNUM]
+  // == 1) << '\n'; std::cout << "global_regs[HARD_FRAME_POINTER_REGNUM]: " <<
+  // (global_regs[HARD_FRAME_POINTER_REGNUM] == 1) << '\n'; std::cout <<
+  // "global_regs[FRAME_POINTER_REGNUM]: " << (global_regs[FRAME_POINTER_REGNUM]
+  // == 1) << '\n'; std::cout << "frame_pointer_needed: " <<
+  // frame_pointer_needed << '\n';
 
-  mark();
+  mark ();
   // propagate_dead_phis();
   if (MAY_HAVE_DEBUG_BIND_INSNS)
-    reset_dead_debug();
-  sweep();
+    reset_dead_debug ();
+  sweep ();
 
-  free_dominance_info(CDI_DOMINATORS);
-  if (crtl->ssa->perform_pending_updates())
-    cleanup_cfg(0);
+  free_dominance_info (CDI_DOMINATORS);
+  if (crtl->ssa->perform_pending_updates ())
+    cleanup_cfg (0);
 
   delete crtl->ssa;
   crtl->ssa = nullptr;
@@ -1688,163 +1712,181 @@ rtl_ssa_dce::execute(function *fn) {
 
 // mark instructions that depend on a dead phi
 std::unordered_set<insn_info *>
-rtl_ssa_dce::propagate_dead_phis() {
+rtl_ssa_dce::propagate_dead_phis ()
+{
   std::unordered_set<phi_info *> visited_dead_phis;
   std::unordered_set<insn_info *> depends_on_dead_phi;
   auto_vec<set_info *> worklist;
 
   // add dead phis to worklist
-  for (ebb_info *ebb : crtl->ssa->ebbs()) {
-    for (phi_info *phi : ebb->phis()) {
-      if (marked_phis.count(phi) > 0) 
-        continue;
+  for (ebb_info *ebb : crtl->ssa->ebbs ())
+    {
+      for (phi_info *phi : ebb->phis ())
+	{
+	  if (marked_phis.count (phi) > 0)
+	    continue;
 
-      worklist.safe_push(phi);
+	  worklist.safe_push (phi);
+	}
     }
-  }
 
   // suppose that debug insns are marked - non marked will be removed later
   // propagate dead phis via du chains and unmark reachable debug instructions
-  while (!worklist.is_empty ()) {
-    set_info *set = worklist.pop ();
-    insn_info *insn = set->insn ();
+  while (!worklist.is_empty ())
+    {
+      set_info *set = worklist.pop ();
+      insn_info *insn = set->insn ();
 
-    if (insn->is_debug_insn ()) {
-      if (dump_file)
-        fprintf (dump_file, "Debug insns %d depends on dead phi.\n", insn->uid());
-      marked.erase (insn);
-      // debug instructions dont have chains
-      continue;
+      if (insn->is_debug_insn ())
+	{
+	  if (dump_file)
+	    fprintf (dump_file, "Debug insns %d depends on dead phi.\n",
+		     insn->uid ());
+	  marked.erase (insn);
+	  // debug instructions dont have chains
+	  continue;
+	}
+
+      // mark
+      if (insn->is_phi ())
+	{
+	  gcc_assert (marked_phis.count (static_cast<phi_info *> (set)) == 0);
+	  visited_dead_phis.emplace (static_cast<phi_info *> (set));
+	}
+      else
+	{
+	  gcc_assert (marked.count (insn) == 0);
+	  depends_on_dead_phi.emplace (insn);
+	}
+
+      for (use_info *use : set->all_uses ())
+	{
+	  if (use->is_in_phi ())
+	    {
+	      // do not add already visited dead phis
+	      if (visited_dead_phis.count (use->phi ()) == 0)
+		worklist.safe_push (use->phi ());
+	    }
+	  else
+	    {
+	      gcc_assert (use->is_in_any_insn ());
+	      // add all defs from insn to worklist
+	      for (def_info *def : use->insn ()->defs ())
+		{
+		  if (def->kind () != access_kind::SET)
+		    continue;
+
+		  worklist.safe_push (static_cast<set_info *> (def));
+		}
+	    }
+	}
     }
-
-    // mark
-    if (insn->is_phi())
-      {
-        gcc_assert (marked_phis.count (static_cast<phi_info *>(set)) == 0);
-        visited_dead_phis.emplace (static_cast<phi_info *>(set));
-      }
-    else
-      {
-        gcc_assert (marked.count (insn) == 0);
-        depends_on_dead_phi.emplace (insn);
-      }
-
-    for (use_info *use : set->all_uses()) {
-      if (use->is_in_phi()) {
-        // do not add already visited dead phis
-        if (visited_dead_phis.count (use->phi()) == 0)
-          worklist.safe_push (use->phi ());
-      } else {
-        gcc_assert(use->is_in_any_insn ());
-        // add all defs from insn to worklist
-        for (def_info *def : use->insn()->defs()) {
-          if (def->kind() != access_kind::SET)
-            continue;
-
-          worklist.safe_push (static_cast<set_info *>(def));
-        }
-      }
-    }
-  }
 
   return depends_on_dead_phi;
 }
 
 static void
-rtl_ssa_dce_debuggize(insn_info *insn) {
-  if (insn->is_phi()) {
-    return;
-  }
+rtl_ssa_dce_debuggize (insn_info *insn)
+{
+  if (insn->is_phi ())
+    {
+      return;
+    }
 
-  if (insn->is_debug_insn()) {
-    // we need to fix dependencies of this instruction because they might have
-    // changed
-    return;
-  }
+  if (insn->is_debug_insn ())
+    {
+      // we need to fix dependencies of this instruction because they might have
+      // changed
+      return;
+    }
 }
 
 static void
-test(insn_info *insn) {
-  rtx_insn *rtl = insn->rtl();
-  rtx set = single_set(rtl);
-  if (set == NULL_RTX 
-    || side_effects_p (SET_SRC (set))
-    || asm_noperands (PATTERN (rtl)) >= 0)
+test (insn_info *insn)
+{
+  rtx_insn *rtl = insn->rtl ();
+  rtx set = single_set (rtl);
+  if (set == NULL_RTX || side_effects_p (SET_SRC (set))
+      || asm_noperands (PATTERN (rtl)) >= 0)
     return;
 
   rtx dval = make_debug_expr_from_rtl (SET_DEST (set));
-  rtx bind_var_loc = gen_rtx_VAR_LOCATION (GET_MODE (SET_DEST (set)),
-      DEBUG_EXPR_TREE_DECL (dval),
-      SET_SRC (set),
-      VAR_INIT_STATUS_INITIALIZED);
-  
+  rtx bind_var_loc
+    = gen_rtx_VAR_LOCATION (GET_MODE (SET_DEST (set)),
+			    DEBUG_EXPR_TREE_DECL (dval), SET_SRC (set),
+			    VAR_INIT_STATUS_INITIALIZED);
+
   // TODO : change ssa form - we have to keep uses in the first debug insn and
   // delete other instructions
   // make dval available in the following iteration
 }
 
 static auto_vec<insn_change>
-wip(std::unordered_set<insn_info *> &marked, std::unordered_set<phi_info *> &marked_phis) {
-  std::unordered_set<insn_info *> depends_on_dead_phi = propagate_dead_phis(marked, marked_phis);
-  for (insn_info *insn : crtl->ssa->all_insns()) {
-    if (insn->is_phi ()) // insn->is_artificial() ??
-      continue;
+wip (std::unordered_set<insn_info *> &marked,
+     std::unordered_set<phi_info *> &marked_phis)
+{
+  std::unordered_set<insn_info *> depends_on_dead_phi
+    = propagate_dead_phis (marked, marked_phis);
+  for (insn_info *insn : crtl->ssa->all_insns ())
+    {
+      if (insn->is_phi ()) // insn->is_artificial() ??
+	continue;
 
-    // skip marked instructions
-    if (marked.count (insn) > 0) // debug instruction are still alive
-      continue;
+      // skip marked instructions
+      if (marked.count (insn) > 0) // debug instruction are still alive
+	continue;
 
-    // we cannot create debug instruction if we depend on a dead phi
-    if (depends_on_dead_phi.count (insn) > 0)
-      continue;
+      // we cannot create debug instruction if we depend on a dead phi
+      if (depends_on_dead_phi.count (insn) > 0)
+	continue;
 
-
-    // insn is nondebug and dead
-
-  }
+      // insn is nondebug and dead
+    }
 }
 
 rtl_opt_pass *
-make_pass_fast_rtl_dce(gcc::context *ctxt)
+make_pass_fast_rtl_dce (gcc::context *ctxt)
 {
-  return new pass_fast_rtl_dce(ctxt);
+  return new pass_fast_rtl_dce (ctxt);
 }
 
-namespace
+namespace {
+
+const pass_data pass_data_rtl_ssa_dce = {
+  RTL_PASS,	  /* type */
+  "rtl_ssa_dce",  /* name */
+  OPTGROUP_NONE,  /* optinfo_flags */
+  TV_DCE,	  /* tv_id */
+  0,		  /* properties_required */
+  0,		  /* properties_provided */
+  0,		  /* properties_destroyed */
+  0,		  /* todo_flags_start */
+  TODO_df_finish, /* todo_flags_finish */
+};
+
+class pass_rtl_ssa_dce : public rtl_opt_pass
 {
+public:
+  pass_rtl_ssa_dce (gcc::context *ctxt)
+    : rtl_opt_pass (pass_data_rtl_ssa_dce, ctxt)
+  {}
 
-  const pass_data pass_data_rtl_ssa_dce = {
-      RTL_PASS,       /* type */
-      "rtl_ssa_dce",  /* name */
-      OPTGROUP_NONE,  /* optinfo_flags */
-      TV_DCE,         /* tv_id */
-      0,              /* properties_required */
-      0,              /* properties_provided */
-      0,              /* properties_destroyed */
-      0,              /* todo_flags_start */
-      TODO_df_finish, /* todo_flags_finish */
-  };
+  opt_pass *clone () final override { return new pass_rtl_ssa_dce (m_ctxt); }
 
-  class pass_rtl_ssa_dce : public rtl_opt_pass
+  /* opt_pass methods: */
+  bool gate (function *) final override { return optimize > 0 && flag_dce; }
+
+  unsigned int execute (function *fn) final override
   {
-  public:
-    pass_rtl_ssa_dce(gcc::context *ctxt)
-        : rtl_opt_pass(pass_data_rtl_ssa_dce, ctxt)
-    {}
+    return rtl_ssa_dce ().execute (fn);
+  }
 
-    opt_pass * clone () final override { return new pass_rtl_ssa_dce (m_ctxt); }
-
-    /* opt_pass methods: */
-    bool gate(function *) final override { return optimize > 0 && flag_dce; }
-
-    unsigned int execute(function * fn) final override { return rtl_ssa_dce().execute(fn); }
-
-  }; // class pass_rtl_ssa_dce
+}; // class pass_rtl_ssa_dce
 
 } // namespace
 
 rtl_opt_pass *
-make_pass_rtl_ssa_dce(gcc::context *ctxt)
+make_pass_rtl_ssa_dce (gcc::context *ctxt)
 {
-  return new pass_rtl_ssa_dce(ctxt);
+  return new pass_rtl_ssa_dce (ctxt);
 }
