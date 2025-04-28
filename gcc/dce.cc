@@ -1511,6 +1511,7 @@ rtl_ssa_dce::mark_prelive_insn (insn_info *insn, auto_vec<set_info *> &worklist)
   if (dump_file)
     fprintf (dump_file, "Insn %d marked as prelive\n", insn->uid ());
 
+  mm_marked.set_bit(insn->uid());
   m_marked.emplace (insn);
   // debug instruction are not added to worklist not to wake up possibly dead
   // instructions
@@ -1561,6 +1562,7 @@ rtl_ssa_dce::mark ()
 	continue;
 
       m_marked.emplace (insn);
+      mm_marked.set_bit(uid);
 
       use_array uses = insn->uses ();
       if (insn->is_phi ())
@@ -1571,6 +1573,7 @@ rtl_ssa_dce::mark ()
 	  if (m_marked_phis.count (pi) > 0)
 	    continue;
 
+    mm_marked_phis.set_bit(pi_uid);
 	  m_marked_phis.emplace (pi);
 	  uses = pi->inputs ();
 	}
@@ -1742,7 +1745,8 @@ rtl_ssa_dce::propagate_dead_phis ()
 	  if (dump_file)
 	    fprintf (dump_file, "Debug insns %d depends on dead phi.\n",
 		     insn->uid ());
-	  marked.erase (insn);
+	  m_marked.erase (insn);
+    mm_marked.clear_bit(insn->uid());
 	  // debug instructions dont have chains
 	  continue;
 	}
@@ -1750,12 +1754,12 @@ rtl_ssa_dce::propagate_dead_phis ()
       // mark
       if (insn->is_phi ())
 	{
-	  gcc_assert (marked_phis.count (static_cast<phi_info *> (set)) == 0);
+	  gcc_assert (m_marked_phis.count (static_cast<phi_info *> (set)) == 0);
 	  visited_dead_phis.emplace (static_cast<phi_info *> (set));
 	}
       else
 	{
-	  gcc_assert (marked.count (insn) == 0);
+	  gcc_assert (m_marked.count (insn) == 0);
 	  depends_on_dead_phi.emplace (insn);
 	}
 
