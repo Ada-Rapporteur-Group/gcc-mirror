@@ -1318,30 +1318,6 @@ public:
 
 } // namespace
 
-struct offset_bitmap
-{
-private:
-  const int m_offset;
-  sbitmap m_bitmap;
-
-public:
-  offset_bitmap (size_t size, int offset)
-    : m_offset{offset}, m_bitmap{sbitmap_alloc (size)}
-  {}
-
-  offset_bitmap (int min_index, int max_index)
-    : offset_bitmap (size_t (max_index - min_index + 1), -min_index)
-  {}
-
-  void clear_bit (int index) { bitmap_clear_bit (m_bitmap, index + m_offset); }
-
-  void set_bit (int index) { bitmap_set_bit (m_bitmap, index + m_offset); }
-
-  bool get_bit (int index) { return bitmap_bit_p (m_bitmap, index + m_offset); }
-
-  ~offset_bitmap () { sbitmap_free (m_bitmap); }
-};
-
 class rtl_ssa_dce
 {
 public:
@@ -1360,8 +1336,9 @@ private:
   void reset_dead_debug ();
   void sweep ();
 
-  offset_bitmap mm_marked;
-  offset_bitmap mm_marked_phis;
+  int phi_min, real_max, artificial_min;
+  sbitmap mm_marked;
+  sbitmap mm_marked_phis;
   std::unordered_set<insn_info *> m_marked;
   std::unordered_set<phi_info *> m_marked_phis;
 };
@@ -1511,8 +1488,7 @@ rtl_ssa_dce::mark_prelive_insn (insn_info *insn, auto_vec<set_info *> &worklist)
   if (dump_file)
     fprintf (dump_file, "Insn %d marked as prelive\n", insn->uid ());
 
-  mm_marked.set_bit(insn->uid());
-  m_marked.emplace (insn);
+  bitmap_set_bit (mm_marked, insn->uid ());
   // debug instruction are not added to worklist not to wake up possibly dead
   // instructions
   if (insn->is_debug_insn ())
@@ -1558,24 +1534,22 @@ rtl_ssa_dce::mark ()
 
       // Skip already visited visited instructions.
       auto uid = insn->uid ();
-      if ((m_marked.count (insn) > 0) && !insn->is_phi ())
+      if (bitmap_bit_p (mm_marked, uid) && !insn->is_phi ())
 	continue;
 
-      m_marked.emplace (insn);
-      mm_marked.set_bit(uid);
+      bitmap_set_bit (mm_marked, uid);
 
       use_array uses = insn->uses ();
       if (insn->is_phi ())
 	{
-	  phi_info *pi = static_cast<phi_info *> (set);
-	  auto pi_uid = pi->uid ();
+	  phi_info *phi = static_cast<phi_info *> (set);
+	  auto phi_uid = pi->uid ();
 	  // Skip already visited phi node.
-	  if (m_marked_phis.count (pi) > 0)
+	  if (bitmap_bit_p(mm_marked_phis, phi_uid))
 	    continue;
 
-    mm_marked_phis.set_bit(pi_uid);
-	  m_marked_phis.emplace (pi);
-	  uses = pi->inputs ();
+    mm_marked_phis.set_bit(phi_uid);
+	  uses = phi->inputs ();
 	}
 
       if (dump_file)
@@ -1601,6 +1575,7 @@ rtl_ssa_dce::reset_dead_debug_insn (insn_info *insn)
   if (dump_file)
     fprintf (dump_file, "Resetting debug insn: %d\n", insn->uid ());
 
+  bitmap_clear_bit (mm_marked, insn->uid ());
   insn_change change (insn);
   change.new_uses = {};
   INSN_VAR_LOCATION_LOC (insn->rtl ()) = gen_rtx_UNKNOWN_VAR_LOC ();
@@ -1624,7 +1599,12 @@ rtl_ssa_dce::reset_dead_debug ()
       // TODO : use iterate_safely?
       for (use_info *use : insn->uses ())
 	{
-	  insn_info *parent_insn = use->def ()->insn ();
+	  insn_info *parent_insn = use->def ()->insn (); // TODO : check for nullptr
+    sbitmap marked = parent_insn->is_phi () ? mm_marked_phis : mm_marked;
+    int uid = parent_insn->is_phi () ? as_a<phi_info *> (use->def ())->uid () ? parent_insn->uid ();
+    if (!bitmap_bit_p (marked, uid)) {
+      // ...
+    }
 	  if ((parent_insn->is_phi ()
 	       && m_marked_phis.count (as_a<phi_info *> (use->def ())) == 0)
 	      || (!parent_insn->is_phi () && m_marked.count (parent_insn) == 0))
@@ -1679,6 +1659,18 @@ rtl_ssa_dce::execute (function *fn)
   // internal compiler error: gcc.c-torture/execute/20040811-1.c -
   // rtl_ssa::function_info::add_phi_nodes
   crtl->ssa = new rtl_ssa::function_info (fn);
+  for (insn_info *insn : crtl->ssa->all_insns ()) 
+  {
+    artificial_min = std::min (artificial_min, insn->uid ());
+    real_max = std::min (real_max, insn->uid ());
+  }
+
+  for (ebb_info *ebb : crtl->ssa->ebbs ())
+    for (phi_info *phi : ebb->phis ())
+      phi_min = std::min (phi_min, phi->uid ());
+
+  mm_marked = sbitmap_alloc(real_max - artificial_min + 1);
+  mm_marked_phis = sbitmap_alloc(-phi_min);
 
   if (dump_file)
     dump (dump_file, crtl->ssa);
@@ -1709,6 +1701,8 @@ rtl_ssa_dce::execute (function *fn)
   if (crtl->ssa->perform_pending_updates ())
     cleanup_cfg (0);
 
+  sbitmap_free(mm_marked);
+  sbitmap_free(mm_marked_phis);
   delete crtl->ssa;
   crtl->ssa = nullptr;
 }
