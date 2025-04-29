@@ -1336,11 +1336,10 @@ private:
   void reset_dead_debug ();
   void sweep ();
 
-  int phi_min, real_max, artificial_min;
+  int offset;
+  
   sbitmap mm_marked;
   sbitmap mm_marked_phis;
-  std::unordered_set<insn_info *> m_marked;
-  std::unordered_set<phi_info *> m_marked_phis;
 };
 
 bool
@@ -1488,7 +1487,7 @@ rtl_ssa_dce::mark_prelive_insn (insn_info *insn, auto_vec<set_info *> &worklist)
   if (dump_file)
     fprintf (dump_file, "Insn %d marked as prelive\n", insn->uid ());
 
-  bitmap_set_bit (mm_marked, insn->uid ());
+  bitmap_set_bit (mm_marked, insn->uid () + offset);
   // debug instruction are not added to worklist not to wake up possibly dead
   // instructions
   if (insn->is_debug_insn ())
@@ -1533,7 +1532,7 @@ rtl_ssa_dce::mark ()
 	continue;
 
       // Skip already visited visited instructions.
-      auto uid = insn->uid ();
+      auto uid = insn->uid () + offset;
       if (bitmap_bit_p (mm_marked, uid) && !insn->is_phi ())
 	continue;
 
@@ -1543,12 +1542,12 @@ rtl_ssa_dce::mark ()
       if (insn->is_phi ())
 	{
 	  phi_info *phi = static_cast<phi_info *> (set);
-	  auto phi_uid = pi->uid ();
+	  auto phi_uid = phi->uid ();
 	  // Skip already visited phi node.
 	  if (bitmap_bit_p(mm_marked_phis, phi_uid))
 	    continue;
 
-    mm_marked_phis.set_bit(phi_uid);
+    bitmap_set_bit (mm_marked_phis, phi_uid);
 	  uses = phi->inputs ();
 	}
 
@@ -1575,7 +1574,7 @@ rtl_ssa_dce::reset_dead_debug_insn (insn_info *insn)
   if (dump_file)
     fprintf (dump_file, "Resetting debug insn: %d\n", insn->uid ());
 
-  bitmap_clear_bit (mm_marked, insn->uid ());
+  // bitmap_clear_bit (mm_marked, insn->uid () + offset);
   insn_change change (insn);
   change.new_uses = {};
   INSN_VAR_LOCATION_LOC (insn->rtl ()) = gen_rtx_UNKNOWN_VAR_LOC ();
@@ -1599,19 +1598,18 @@ rtl_ssa_dce::reset_dead_debug ()
       // TODO : use iterate_safely?
       for (use_info *use : insn->uses ())
 	{
-	  insn_info *parent_insn = use->def ()->insn (); // TODO : check for nullptr
+    def_info *def = use->def ();
+	  insn_info *parent_insn = def->insn ();
+    // Is this check needed?
+    if (parent_insn == nullptr)
+      continue;
+    // If we depend on a dead instruction, clear current instruction uses.
     sbitmap marked = parent_insn->is_phi () ? mm_marked_phis : mm_marked;
-    int uid = parent_insn->is_phi () ? as_a<phi_info *> (use->def ())->uid () ? parent_insn->uid ();
+    int uid = parent_insn->is_phi () ? static_cast<phi_info *> (def)->uid () : parent_insn->uid () + offset;
     if (!bitmap_bit_p (marked, uid)) {
-      // ...
+      reset_dead_debug_insn (insn);
+	    break;
     }
-	  if ((parent_insn->is_phi ()
-	       && m_marked_phis.count (as_a<phi_info *> (use->def ())) == 0)
-	      || (!parent_insn->is_phi () && m_marked.count (parent_insn) == 0))
-	    {
-	      reset_dead_debug_insn (insn);
-	      break;
-	    }
 	}
     }
 }
@@ -1627,7 +1625,7 @@ rtl_ssa_dce::sweep ()
   for (insn_info *insn : crtl->ssa->nondebug_insns ())
     {
       // Artificial or marked insns should not be deleted.
-      if (insn->is_artificial () || m_marked.count (insn) > 0)
+      if (insn->is_artificial () || bitmap_bit_p (mm_marked, insn->uid () + offset))
 	continue;
 
       if (dump_file)
@@ -1652,6 +1650,8 @@ rtl_ssa_dce::sweep ()
     fprintf (dump_file, "DCE: finish sweep phase\n");
 }
 
+#include <iostream>
+
 unsigned int
 rtl_ssa_dce::execute (function *fn)
 {
@@ -1659,18 +1659,32 @@ rtl_ssa_dce::execute (function *fn)
   // internal compiler error: gcc.c-torture/execute/20040811-1.c -
   // rtl_ssa::function_info::add_phi_nodes
   crtl->ssa = new rtl_ssa::function_info (fn);
+  int real_max = 0, artificial_min = 0;
+  std::size_t count = 0;
   for (insn_info *insn : crtl->ssa->all_insns ()) 
   {
     artificial_min = std::min (artificial_min, insn->uid ());
-    real_max = std::min (real_max, insn->uid ());
+    real_max = std::max (real_max, insn->uid ());
+    count++;
   }
 
+  offset = -artificial_min;
+  // std::cout << "real_max: " << real_max << '\n';
+  // std::cout << "artificial_min: " << artificial_min << '\n';
+  // std::cout << "total: " << real_max - artificial_min + 3 << '\n';
+  // std::cout << "Offset: " << offset << '\n';
+  // std::cout << "count: " << count << '\n';
+
+  unsigned int phi_node_max = 0;
   for (ebb_info *ebb : crtl->ssa->ebbs ())
     for (phi_info *phi : ebb->phis ())
-      phi_min = std::min (phi_min, phi->uid ());
+    phi_node_max = std::max (phi_node_max, phi->uid ());
 
-  mm_marked = sbitmap_alloc(real_max - artificial_min + 1);
-  mm_marked_phis = sbitmap_alloc(-phi_min);
+  // std::cout << "phi_node_max: " << phi_node_max << '\n';
+  mm_marked = sbitmap_alloc(real_max - artificial_min + 3);
+  bitmap_clear(mm_marked);
+  mm_marked_phis = sbitmap_alloc(phi_node_max + 1);
+  bitmap_clear(mm_marked_phis);
 
   if (dump_file)
     dump (dump_file, crtl->ssa);
@@ -1705,6 +1719,7 @@ rtl_ssa_dce::execute (function *fn)
   sbitmap_free(mm_marked_phis);
   delete crtl->ssa;
   crtl->ssa = nullptr;
+  return 0;
 }
 
 // mark instructions that depend on a dead phi
@@ -1720,7 +1735,7 @@ rtl_ssa_dce::propagate_dead_phis ()
     {
       for (phi_info *phi : ebb->phis ())
 	{
-	  if (marked_phis.count (phi) > 0)
+	  if (bitmap_bit_p (mm_marked_phis, phi->uid ()))
 	    continue;
 
 	  worklist.safe_push (phi);
@@ -1739,8 +1754,7 @@ rtl_ssa_dce::propagate_dead_phis ()
 	  if (dump_file)
 	    fprintf (dump_file, "Debug insns %d depends on dead phi.\n",
 		     insn->uid ());
-	  m_marked.erase (insn);
-    mm_marked.clear_bit(insn->uid());
+    bitmap_clear_bit (mm_marked, insn->uid ());
 	  // debug instructions dont have chains
 	  continue;
 	}
@@ -1748,12 +1762,12 @@ rtl_ssa_dce::propagate_dead_phis ()
       // mark
       if (insn->is_phi ())
 	{
-	  gcc_assert (m_marked_phis.count (static_cast<phi_info *> (set)) == 0);
+	  gcc_assert (!bitmap_bit_p(mm_marked_phis, static_cast<phi_info *> (set)->uid ()));
 	  visited_dead_phis.emplace (static_cast<phi_info *> (set));
 	}
       else
 	{
-	  gcc_assert (m_marked.count (insn) == 0);
+	  gcc_assert (!bitmap_bit_p (mm_marked, insn->uid () + offset));
 	  depends_on_dead_phi.emplace (insn);
 	}
 
@@ -1819,28 +1833,27 @@ test (insn_info *insn)
   // make dval available in the following iteration
 }
 
-static auto_vec<insn_change>
-wip (std::unordered_set<insn_info *> &marked,
-     std::unordered_set<phi_info *> &marked_phis)
-{
-  std::unordered_set<insn_info *> depends_on_dead_phi
-    = propagate_dead_phis (marked, marked_phis);
-  for (insn_info *insn : crtl->ssa->all_insns ())
-    {
-      if (insn->is_phi ()) // insn->is_artificial() ??
-	continue;
+// static auto_vec<insn_change>
+// wip (std::unordered_set<insn_info *> &marked,
+//      std::unordered_set<phi_info *> &marked_phis)
+// {
+//   std::unordered_set<insn_info *> depends_on_dead_phi = propagate_dead_phis ();
+//   for (insn_info *insn : crtl->ssa->all_insns ())
+//     {
+//       if (insn->is_phi ()) // insn->is_artificial() ??
+// 	continue;
 
-      // skip marked instructions
-      if (marked.count (insn) > 0) // debug instruction are still alive
-	continue;
+//       // skip marked instructions
+//       if (marked.count (insn) > 0) // debug instruction are still alive
+// 	continue;
 
-      // we cannot create debug instruction if we depend on a dead phi
-      if (depends_on_dead_phi.count (insn) > 0)
-	continue;
+//       // we cannot create debug instruction if we depend on a dead phi
+//       if (depends_on_dead_phi.count (insn) > 0)
+// 	continue;
 
-      // insn is nondebug and dead
-    }
-}
+//       // insn is nondebug and dead
+//     }
+// }
 
 rtl_opt_pass *
 make_pass_fast_rtl_dce (gcc::context *ctxt)
