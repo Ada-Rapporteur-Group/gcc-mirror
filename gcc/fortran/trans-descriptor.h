@@ -95,8 +95,8 @@ void gfc_set_descriptor (stmtblock_t *, tree, tree, gfc_expr *, int, int,
 
 tree gfc_descr_init_count (tree, int, int, gfc_expr **, gfc_expr **,
 			   stmtblock_t *, stmtblock_t *, tree *, tree,
-			   gfc_expr *, tree, bool, gfc_expr *, tree, bool,
-			   tree *);
+			   gfc_expr *, tree, bool, gfc_expr *, tree,
+			   gfc_typespec *, tree *);
 void
 gfc_copy_descriptor_info (stmtblock_t *, tree, tree, int, gfc_ss *);
 void

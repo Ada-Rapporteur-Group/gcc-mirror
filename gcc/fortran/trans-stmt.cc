@@ -7071,7 +7071,8 @@ gfc_trans_allocate (gfc_code * code, gfc_omp_namelist *omp_allocate)
 			       label_finish, tmp, e3rhs ? e3rhs : code->expr3,
 			       e3_is == E3_DESC ? expr3 : NULL_TREE,
 			       e3_has_nodescriptor, omp_alloc_item,
-			       code->ext.alloc.ts.type != BT_UNKNOWN))
+			       code->ext.alloc.ts.type != BT_UNKNOWN
+			       ? &code->ext.alloc.ts : nullptr))
 	{
 	  /* A scalar or derived type.  First compute the size to
 	     allocate.
