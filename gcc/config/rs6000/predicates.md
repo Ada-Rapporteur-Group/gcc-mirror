@@ -1405,7 +1405,18 @@
 			&& (indexed_or_indirect_address (XEXP (op, 0), mode)
 			    || quad_address_p (XEXP (op, 0), mode, false)))))"))
 
-;; Return 1 if this operand is valid for an MMA disassemble insn.
+;; Return 1 if this input operand is valid for an MMA disassemble insn.
+(define_predicate "mma_disassemble_input_operand"
+  (match_code "reg")
+{
+  if (TARGET_DENSE_MATH)
+    return vsx_register_operand (op, mode);
+  else if (TARGET_MMA)
+    return fpr_reg_operand (op, mode);
+  return 0;
+})
+
+;; Return 1 if this output operand is valid for an MMA disassemble insn.
 (define_predicate "mma_disassemble_output_operand"
   (match_code "reg,subreg,mem")
 {

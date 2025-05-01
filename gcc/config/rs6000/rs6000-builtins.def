@@ -139,6 +139,7 @@
 ;   ibm128   Restrict usage to the case where __ibm128 is supported or if ibmld
 ;   future   Restrict usage to future instructions
 ;   dm       Restrict usage to dense math
+;   dmr      MMA instruction using a dmr register as an input operand
 ;
 ; Each attribute corresponds to extra processing required when
 ; the built-in is expanded.  All such special processing should
@@ -3926,6 +3927,60 @@
 
   void __builtin_vsx_stxvp (v256, unsigned long, const v256 *);
     STXVP nothing {mma,pair}
+
+[dm]
+  void __builtin_mma_dmsetdmrz (dm1024 *);
+    DMSETDMRZ nothing {dm,dmint}
+
+  dm1024 __builtin_mma_dmsetdmrz_internal ();
+    DMSETDMRZ_INTERNAL mma_dmsetdmrz {dm}
+
+  void __builtin_mma_dmmr (dm1024 *, dm1024 *);
+    DMMR nothing {dm,dmint}
+
+  dm1024 __builtin_mma_dmmr_internal (dm1024);
+    DMMR_INTERNAL movtdo {dm}
+
+  void __builtin_mma_dmxor (dm1024 *, dm1024 *);
+    DMXOR nothing {dm,dmint,dmr}
+
+  dm1024 __builtin_mma_dmxor_internal (dm1024, dm1024);
+    DMXOR_INTERNAL dmf_dmxor {dm}
+
+  void __builtin_mma_build_dmr (dm1024 *, vuc, vuc, vuc, vuc, vuc, vuc, vuc, vuc);
+    BUILD_DMR nothing {dm,dmint}
+
+  dm1024 __builtin_mma_build_dmr_internal (vuc, vuc, vuc, vuc, vuc, vuc, vuc, vuc);
+    BUILD_DMR_INTERNAL mma_build_dmr {dm}
+
+  void __builtin_mma_dmxvi8gerx4 (dm1024 *, v256, vuc);
+    DMXVI8GERX4 nothing {dm,dmint}
+
+  dm1024 __builtin_mma_dmxvi8gerx4_internal (v256, vuc);
+    DMXVI8GERX4_INTERNAL dmf_dmxvi8gerx4 {dm}
+
+  void __builtin_mma_dmxvi8gerx4pp (dm1024 *, v256, vuc);
+    DMXVI8GERX4PP nothing {dm,dmint,dmr}
+
+  dm1024 __builtin_mma_dmxvi8gerx4pp_internal (dm1024, v256, vuc);
+    DMXVI8GERX4PP_INTERNAL dmf_dmxvi8gerx4pp {dm}
+
+  void __builtin_mma_pmdmxvi8gerx4 (dm1024 *, v256, vuc, const int<8>, \
+				    const int<4>, const int<4>);
+    PMDMXVI8GERX4 nothing {dm,pair,dmint}
+
+  dm1024 __builtin_mma_pmdmxvi8gerx4_internal (v256, vuc, const int<8>, \
+					       const int<4>, const int<4>);
+    PMDMXVI8GERX4_INTERNAL dmf_pmdmxvi8gerx4 {dm,pair}
+
+  void __builtin_mma_pmdmxvi8gerx4pp (dm1024 *, v256, vuc, const int<8>, \
+				      const int<4>, const int<4>);
+    PMDMXVI8GERX4PP nothing {dm,pair,dmint,dmr}
+
+  dm1024 __builtin_mma_pmdmxvi8gerx4pp_internal (dm1024, v256, vuc, \
+						 const int<8>, const int<4>, \
+						 const int<4>);
+    PMDMXVI8GERX4PP_INTERNAL dmf_pmdmxvi8gerx4pp {dm,pair}
 
 [future]
   const signed int __builtin_saturate_subtract32 (signed int, signed int);
