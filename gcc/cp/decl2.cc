@@ -1951,7 +1951,7 @@ build_anon_union_vars (tree type, tree object)
 
       if (processing_template_decl)
 	ref = build_min_nt_loc (UNKNOWN_LOCATION, COMPONENT_REF, object,
-				DECL_NAME (field), NULL_TREE);
+				field, NULL_TREE);
       else
 	ref = build_class_member_access_expr (object, field, NULL_TREE,
 					      false, tf_warning_or_error);
@@ -2172,7 +2172,8 @@ static void
 mark_vtable_entries (tree decl, vec<tree> &consteval_vtables)
 {
   /* It's OK for the vtable to refer to deprecated virtual functions.  */
-  warning_sentinel w(warn_deprecated_decl);
+  auto du = make_temp_override (deprecated_state,
+				UNAVAILABLE_DEPRECATED_SUPPRESS);
 
   bool consteval_seen = false;
 
@@ -2709,6 +2710,14 @@ min_vis_expr_r (tree *tp, int */*walk_subtrees*/, void *data)
       tpvis = type_visibility (TREE_TYPE (t));
       break;
 
+    case ADDR_EXPR:
+      t = TREE_OPERAND (t, 0);
+      if (VAR_P (t))
+	/* If a variable has its address taken, the lvalue-rvalue conversion is
+	   not applied, so skip that case.  */
+	goto addressable;
+      break;
+
     case TEMPLATE_DECL:
       if (DECL_ALIAS_TEMPLATE_P (t) || standard_concept_p (t))
 	/* FIXME: We don't maintain TREE_PUBLIC / DECL_VISIBILITY for
@@ -2722,9 +2731,15 @@ min_vis_expr_r (tree *tp, int */*walk_subtrees*/, void *data)
       if (decl_constant_var_p (t))
 	/* The ODR allows definitions in different TUs to refer to distinct
 	   constant variables with internal or no linkage, so such a reference
-	   shouldn't affect visibility (PR110323).  FIXME but only if the
-	   lvalue-rvalue conversion is applied.  */;
-      else if (! TREE_PUBLIC (t))
+	   shouldn't affect visibility if the lvalue-rvalue conversion is
+	   applied (PR110323).  We still want to restrict visibility according
+	   to the type of the declaration however.  */
+	{
+	  tpvis = type_visibility (TREE_TYPE (t));
+	  break;
+	}
+    addressable:
+      if (! TREE_PUBLIC (t))
 	tpvis = VISIBILITY_ANON;
       else
 	tpvis = DECL_VISIBILITY (t);
@@ -4649,7 +4664,8 @@ decl_maybe_constant_var_p (tree decl)
   tree type = TREE_TYPE (decl);
   if (!VAR_P (decl))
     return false;
-  if (DECL_DECLARED_CONSTEXPR_P (decl) && !TREE_THIS_VOLATILE (decl))
+  if (DECL_DECLARED_CONSTEXPR_P (decl)
+      && (!TREE_THIS_VOLATILE (decl) || NULLPTR_TYPE_P (type)))
     return true;
   if (DECL_HAS_VALUE_EXPR_P (decl))
     /* A proxy isn't constant.  */

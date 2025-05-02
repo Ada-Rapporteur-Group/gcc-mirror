@@ -11361,21 +11361,34 @@ cp_parser_lambda_expression (cp_parser* parser)
   if (cp_parser_error_occurred (parser))
     return error_mark_node;
 
-  type = begin_lambda_type (lambda_expr);
-  if (type == error_mark_node)
-    return error_mark_node;
-
-  record_lambda_scope (lambda_expr);
-  record_lambda_scope_discriminator (lambda_expr);
-
-  /* Do this again now that LAMBDA_EXPR_EXTRA_SCOPE is set.  */
-  determine_visibility (TYPE_NAME (type));
-
-  /* Now that we've started the type, add the capture fields for any
-     explicit captures.  */
-  register_capture_members (LAMBDA_EXPR_CAPTURE_LIST (lambda_expr));
-
   {
+    /* OK, this is a bit tricksy.  cp_parser_requires_expression sets
+       processing_template_decl to make checking more normal, but that confuses
+       lambda parsing terribly.  In non-template context, we want to parse the
+       lambda once and not tsubst_lambda_expr.  So in that case, clear
+       processing_template_decl now, and restore it before the call to
+       build_lambda_object; that way we end up with what looks like a templatey
+       functional cast to the closure type, which is suitable for the
+       requires-expression tsubst_expr.  This is PR99546 and friends.  */
+    processing_template_decl_sentinel ptds (/*reset*/false);
+    if (processing_template_decl && !in_template_context
+	&& current_binding_level->requires_expression)
+      processing_template_decl = 0;
+
+    type = begin_lambda_type (lambda_expr);
+    if (type == error_mark_node)
+      return error_mark_node;
+
+    record_lambda_scope (lambda_expr);
+    record_lambda_scope_discriminator (lambda_expr);
+
+    /* Do this again now that LAMBDA_EXPR_EXTRA_SCOPE is set.  */
+    determine_visibility (TYPE_NAME (type));
+
+    /* Now that we've started the type, add the capture fields for any
+       explicit captures.  */
+    register_capture_members (LAMBDA_EXPR_CAPTURE_LIST (lambda_expr));
+
     /* Inside the class, surrounding template-parameter-lists do not apply.  */
     unsigned int saved_num_template_parameter_lists
         = parser->num_template_parameter_lists;
@@ -11829,6 +11842,11 @@ cp_parser_lambda_declarator_opt (cp_parser* parser, tree lambda_expr)
 	pedwarn (parser->lexer->next_token->location, OPT_Wc__20_extensions,
 		 "lambda templates are only available with "
 		 "%<-std=c++20%> or %<-std=gnu++20%>");
+
+      /* Even though the whole lambda may be a default argument, its
+	 template-parameter-list is a context where it's OK to create
+	 new parameters.  */
+      auto lvf = make_temp_override (parser->local_variables_forbidden_p, 0u);
 
       cp_lexer_consume_token (parser->lexer);
 
@@ -14125,9 +14143,19 @@ cp_parser_range_for (cp_parser *parser, tree scope, tree init, tree range_decl,
 	      decomp = &decomp_d;
 	      decomp->count = tree_to_uhwi (TREE_OPERAND (v, 1)) + 1;
 	      decomp->decl = d;
+	      bool seen_name_independent_decl = false;
 	      for (unsigned int i = 0; i < decomp->count;
 		   i++, d = DECL_CHAIN (d))
 		{
+		  if (name_independent_decl_p (d))
+		    {
+		      /* If there is more than one _ decl in
+			 the structured binding, just push and move it
+			 away once.  */
+		      if (seen_name_independent_decl)
+			continue;
+		      seen_name_independent_decl = true;
+		    }
 		  tree name = DECL_NAME (d);
 		  names.safe_push (name);
 		  bindings.safe_push (IDENTIFIER_BINDING (name));
@@ -14301,11 +14329,13 @@ warn_for_range_copy (tree decl, tree expr)
   else if (!CP_TYPE_CONST_P (type))
     return;
 
-  /* Since small trivially copyable types are cheap to copy, we suppress the
-     warning for them.  64B is a common size of a cache line.  */
+  /* Since small trivially constructible types are cheap to construct, we
+     suppress the warning for them.  64B is a common size of a cache line.  */
+  tree vec = make_tree_vec (1);
+  TREE_VEC_ELT (vec, 0) = TREE_TYPE (expr);
   if (TREE_CODE (TYPE_SIZE_UNIT (type)) != INTEGER_CST
       || (tree_to_uhwi (TYPE_SIZE_UNIT (type)) <= 64
-	  && trivially_copyable_p (type)))
+	  && is_trivially_xible (INIT_EXPR, type, vec)))
     return;
 
   /* If we can initialize a reference directly, suggest that to avoid the
@@ -20776,8 +20806,8 @@ cp_parser_placeholder_type_specifier (cp_parser *parser, location_t loc,
       /* In a default argument we may not be creating new parameters.  */
       if (parser->local_variables_forbidden_p & LOCAL_VARS_FORBIDDEN)
 	{
-	  /* If this assert turns out to be false, do error() instead.  */
-	  gcc_assert (tentative);
+	  if (!tentative)
+	    error_at (loc, "invalid use of concept-name %qD", con);
 	  return error_mark_node;
 	}
       return build_constrained_parameter (con, proto, args);
@@ -27004,6 +27034,7 @@ cp_parser_class_specifier (cp_parser* parser)
     {
       tree decl;
       tree class_type = NULL_TREE;
+      tree class_type_fields = NULL_TREE;
       tree pushed_scope = NULL_TREE;
       unsigned ix;
       cp_default_arg_entry *e;
@@ -27016,6 +27047,33 @@ cp_parser_class_specifier (cp_parser* parser)
 	  vec_safe_truncate (unparsed_nsdmis, 0);
 	  vec_safe_truncate (unparsed_funs_with_definitions, 0);
 	}
+
+      auto switch_to_class = [&] (tree t)
+	{
+	  if (class_type != t)
+	    {
+	      /* cp_parser_late_parsing_default_args etc. could have changed
+		 TYPE_FIELDS (class_type), propagate that to all variants.  */
+	      if (class_type
+		  && RECORD_OR_UNION_TYPE_P (class_type)
+		  && TYPE_FIELDS (class_type) != class_type_fields)
+		for (tree variant = TYPE_NEXT_VARIANT (class_type);
+		     variant; variant = TYPE_NEXT_VARIANT (variant))
+		  TYPE_FIELDS (variant) = TYPE_FIELDS (class_type);
+	      if (pushed_scope)
+		pop_scope (pushed_scope);
+	      class_type = t;
+	      class_type_fields = NULL_TREE;
+	      if (t)
+		{
+		  if (RECORD_OR_UNION_TYPE_P (class_type))
+		    class_type_fields = TYPE_FIELDS (class_type);
+		  pushed_scope = push_scope (class_type);
+		}
+	      else
+		pushed_scope = NULL_TREE;
+	    }
+	};
 
       /* In a first pass, parse default arguments to the functions.
 	 Then, in a second pass, parse the bodies of the functions.
@@ -27032,13 +27090,7 @@ cp_parser_class_specifier (cp_parser* parser)
 	  decl = e->decl;
 	  /* If there are default arguments that have not yet been processed,
 	     take care of them now.  */
-	  if (class_type != e->class_type)
-	    {
-	      if (pushed_scope)
-		pop_scope (pushed_scope);
-	      class_type = e->class_type;
-	      pushed_scope = push_scope (class_type);
-	    }
+	  switch_to_class (e->class_type);
 	  /* Make sure that any template parameters are in scope.  */
 	  maybe_begin_member_template_processing (decl);
 	  /* Parse the default argument expressions.  */
@@ -27054,13 +27106,7 @@ cp_parser_class_specifier (cp_parser* parser)
       FOR_EACH_VEC_SAFE_ELT (unparsed_noexcepts, ix, decl)
 	{
 	  tree ctx = DECL_CONTEXT (decl);
-	  if (class_type != ctx)
-	    {
-	      if (pushed_scope)
-		pop_scope (pushed_scope);
-	      class_type = ctx;
-	      pushed_scope = push_scope (class_type);
-	    }
+	  switch_to_class (ctx);
 
 	  tree def_parse = TYPE_RAISES_EXCEPTIONS (TREE_TYPE (decl));
 	  def_parse = TREE_PURPOSE (def_parse);
@@ -27116,13 +27162,7 @@ cp_parser_class_specifier (cp_parser* parser)
       FOR_EACH_VEC_SAFE_ELT (unparsed_nsdmis, ix, decl)
 	{
 	  tree ctx = type_context_for_name_lookup (decl);
-	  if (class_type != ctx)
-	    {
-	      if (pushed_scope)
-		pop_scope (pushed_scope);
-	      class_type = ctx;
-	      pushed_scope = push_scope (class_type);
-	    }
+	  switch_to_class (ctx);
 	  inject_this_parameter (class_type, TYPE_UNQUALIFIED);
 	  cp_parser_late_parsing_nsdmi (parser, decl);
 	}
@@ -27132,13 +27172,7 @@ cp_parser_class_specifier (cp_parser* parser)
       FOR_EACH_VEC_SAFE_ELT (unparsed_contracts, ix, decl)
 	{
 	  tree ctx = DECL_CONTEXT (decl);
-	  if (class_type != ctx)
-	    {
-	      if (pushed_scope)
-		pop_scope (pushed_scope);
-	      class_type = ctx;
-	      pushed_scope = push_scope (class_type);
-	    }
+	  switch_to_class (ctx);
 
 	  temp_override<tree> cfd(current_function_decl, decl);
 
@@ -27179,8 +27213,7 @@ cp_parser_class_specifier (cp_parser* parser)
 
       current_class_ptr = NULL_TREE;
       current_class_ref = NULL_TREE;
-      if (pushed_scope)
-	pop_scope (pushed_scope);
+      switch_to_class (NULL_TREE);
 
       /* Now parse the body of the functions.  */
       if (flag_openmp)
@@ -35669,7 +35702,6 @@ cp_parser_cache_defarg (cp_parser *parser, bool nsdmi)
 
 	  /* If we run out of tokens, issue an error message.  */
 	case CPP_EOF:
-	case CPP_PRAGMA_EOL:
 	  error_at (token->location, "file ends in default argument");
 	  return error_mark_node;
 

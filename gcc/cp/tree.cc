@@ -191,6 +191,8 @@ lvalue_kind (const_tree ref)
       return op1_lvalue_kind;
 
     case STRING_CST:
+      return clk_ordinary | clk_mergeable;
+
     case COMPOUND_LITERAL_EXPR:
       return clk_ordinary;
 
@@ -210,6 +212,10 @@ lvalue_kind (const_tree ref)
 	  && DECL_LANG_SPECIFIC (ref)
 	  && DECL_IN_AGGR_P (ref))
 	return clk_none;
+
+      if (TREE_CODE (ref) == CONST_DECL || DECL_MERGEABLE (ref))
+	return clk_ordinary | clk_mergeable;
+
       /* FALLTHRU */
     case INDIRECT_REF:
     case ARROW_EXPR:
@@ -405,6 +411,17 @@ bool
 bitfield_p (const_tree ref)
 {
   return (lvalue_kind (ref) & clk_bitfield);
+}
+
+/* True if REF is a glvalue with a unique address, excluding mergeable glvalues
+   such as string constants.  */
+
+bool
+non_mergeable_glvalue_p (const_tree ref)
+{
+  auto kind = lvalue_kind (ref);
+  return (kind != clk_none
+	  && !(kind & (clk_class|clk_mergeable)));
 }
 
 /* C++-specific version of stabilize_reference.  */
@@ -2008,11 +2025,8 @@ strip_typedefs_expr (tree t, bool *remove_attributes, unsigned int flags)
       }
 
     case LAMBDA_EXPR:
+    case STMT_EXPR:
       return t;
-
-    case STATEMENT_LIST:
-      error ("statement-expression in a constant expression");
-      return error_mark_node;
 
     default:
       break;
@@ -3023,15 +3037,7 @@ no_linkage_check (tree t, bool relaxed_p)
       /* Only treat unnamed types as having no linkage if they're at
 	 namespace scope.  This is core issue 966.  */
       if (TYPE_UNNAMED_P (t) && TYPE_NAMESPACE_SCOPE_P (t))
-	{
-	  if (relaxed_p
-	      && TREE_PUBLIC (CP_TYPE_CONTEXT (t))
-	      && module_maybe_has_cmi_p ())
-	    /* This type could possibly be accessed outside this TU.  */
-	    return NULL_TREE;
-	  else
-	    return t;
-	}
+	return t;
 
       for (r = CP_TYPE_CONTEXT (t); ; )
 	{
@@ -5695,6 +5701,7 @@ cp_walk_subtrees (tree *tp, int *walk_subtrees_p, walk_tree_fn func,
 		  && !TREE_STATIC (TREE_OPERAND (t, 0)))))
 	{
 	  tree decl = TREE_OPERAND (t, 0);
+	  WALK_SUBTREE (TREE_TYPE (decl));
 	  WALK_SUBTREE (DECL_INITIAL (decl));
 	  WALK_SUBTREE (DECL_SIZE (decl));
 	  WALK_SUBTREE (DECL_SIZE_UNIT (decl));
@@ -5743,6 +5750,15 @@ cp_walk_subtrees (tree *tp, int *walk_subtrees_p, walk_tree_fn func,
     case STATIC_ASSERT:
       WALK_SUBTREE (STATIC_ASSERT_CONDITION (t));
       WALK_SUBTREE (STATIC_ASSERT_MESSAGE (t));
+      break;
+
+    case INTEGER_TYPE:
+      if (processing_template_decl)
+	{
+	  /* Removed from walk_type_fields in r119481.  */
+	  WALK_SUBTREE (TYPE_MIN_VALUE (t));
+	  WALK_SUBTREE (TYPE_MAX_VALUE (t));
+	}
       break;
 
     default:
@@ -6364,11 +6380,11 @@ test_lvalue_kind ()
   tree string_lit = build_string (4, "foo");
   TREE_TYPE (string_lit) = char_array_type_node;
   string_lit = fix_string_type (string_lit);
-  ASSERT_EQ (clk_ordinary, lvalue_kind (string_lit));
+  ASSERT_EQ (clk_ordinary|clk_mergeable, lvalue_kind (string_lit));
 
   tree wrapped_string_lit = maybe_wrap_with_location (string_lit, loc);
   ASSERT_TRUE (location_wrapper_p (wrapped_string_lit));
-  ASSERT_EQ (clk_ordinary, lvalue_kind (wrapped_string_lit));
+  ASSERT_EQ (clk_ordinary|clk_mergeable, lvalue_kind (wrapped_string_lit));
 
   tree parm = build_decl (UNKNOWN_LOCATION, PARM_DECL,
 			  get_identifier ("some_parm"),

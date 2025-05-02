@@ -955,12 +955,34 @@ get_CFI_desc (gfc_symbol *sym, gfc_expr *expr,
 }
 
 
+/* A helper function for gfc_get_array_span that returns the array element size
+   of a class entity.  */
+static tree
+class_array_element_size (tree decl, bool unlimited)
+{
+  /* Class dummys usually require extraction from the saved descriptor,
+     which gfc_class_vptr_get does for us if necessary. This, of course,
+     will be a component of the class object.  */
+  tree vptr = gfc_class_vptr_get (decl);
+  /* If this is an unlimited polymorphic entity with a character payload,
+     the element size will be corrected for the string length.  */
+  if (unlimited)
+    return gfc_resize_class_size_with_len (NULL,
+					   TREE_OPERAND (vptr, 0),
+					   gfc_vptr_size_get (vptr));
+  else
+    return gfc_vptr_size_get (vptr);
+}
+
+
 /* Return the span of an array.  */
 
 tree
 gfc_get_array_span (tree desc, gfc_expr *expr)
 {
   tree tmp;
+  gfc_symbol *sym = (expr && expr->expr_type == EXPR_VARIABLE) ?
+		    expr->symtree->n.sym : NULL;
 
   if (is_pointer_array (desc)
       || (get_CFI_desc (NULL, expr, &desc, NULL)
@@ -985,24 +1007,17 @@ gfc_get_array_span (tree desc, gfc_expr *expr)
   else if (TREE_CODE (desc) == COMPONENT_REF
 	   && GFC_DESCRIPTOR_TYPE_P (TREE_TYPE (desc))
 	   && GFC_CLASS_TYPE_P (TREE_TYPE (TREE_OPERAND (desc, 0))))
-    {
-      /* The descriptor is a class _data field and so use the vtable
-	 size for the receiving span field.  */
-      tmp = gfc_get_vptr_from_expr (desc);
-      tmp = gfc_vptr_size_get (tmp);
-    }
-  else if (expr && expr->expr_type == EXPR_VARIABLE
-	   && expr->symtree->n.sym->ts.type == BT_CLASS
+    /* The descriptor is the _data field of a class object.  */
+    tmp = class_array_element_size (TREE_OPERAND (desc, 0),
+				    UNLIMITED_POLY (expr));
+  else if (sym && sym->ts.type == BT_CLASS
 	   && expr->ref->type == REF_COMPONENT
 	   && expr->ref->next->type == REF_ARRAY
 	   && expr->ref->next->next == NULL
-	   && CLASS_DATA (expr->symtree->n.sym)->attr.dimension)
-    {
-      /* Dummys come in sometimes with the descriptor detached from
-	 the class field or declaration.  */
-      tmp = gfc_class_vptr_get (expr->symtree->n.sym->backend_decl);
-      tmp = gfc_vptr_size_get (tmp);
-    }
+	   && CLASS_DATA (sym)->attr.dimension)
+    /* Having escaped the above, this can only be a class array dummy.  */
+    tmp = class_array_element_size (sym->backend_decl,
+				    UNLIMITED_POLY (sym));
   else
     {
       /* If none of the fancy stuff works, the span is the element
@@ -8638,6 +8653,7 @@ gfc_conv_array_parameter (gfc_se * se, gfc_expr * expr, bool g77,
   bool good_allocatable;
   bool ultimate_ptr_comp;
   bool ultimate_alloc_comp;
+  bool readonly;
   gfc_symbol *sym;
   stmtblock_t block;
   gfc_ref *ref;
@@ -8992,8 +9008,13 @@ gfc_conv_array_parameter (gfc_se * se, gfc_expr * expr, bool g77,
 
       gfc_start_block (&block);
 
-      /* Copy the data back.  */
-      if (fsym == NULL || fsym->attr.intent != INTENT_IN)
+      /* Copy the data back.  If input expr is read-only, e.g. a PARAMETER
+	 array, copying back modified values is undefined behavior.  */
+      readonly = (expr->expr_type == EXPR_VARIABLE
+		  && expr->symtree
+		  && expr->symtree->n.sym->attr.flavor == FL_PARAMETER);
+
+      if ((fsym == NULL || fsym->attr.intent != INTENT_IN) && !readonly)
 	{
 	  tmp = build_call_expr_loc (input_location,
 				 gfor_fndecl_in_unpack, 2, desc, ptr);
@@ -9673,13 +9694,13 @@ structure_alloc_comps (gfc_symbol * der_type, tree decl, tree dest,
 	  if (c->ts.type == BT_CLASS)
 	    {
 	      attr = &CLASS_DATA (c)->attr;
-	      if (attr->class_pointer)
+	      if (attr->class_pointer || c->attr.proc_pointer)
 		continue;
 	    }
 	  else
 	    {
 	      attr = &c->attr;
-	      if (attr->pointer)
+	      if (attr->pointer || attr->proc_pointer)
 		continue;
 	    }
 
@@ -10829,9 +10850,7 @@ gfc_is_reallocatable_lhs (gfc_expr *expr)
     return true;
 
   /* All that can be left are allocatable components.  */
-  if ((sym->ts.type != BT_DERIVED
-       && sym->ts.type != BT_CLASS)
-	|| !sym->ts.u.derived->attr.alloc_comp)
+  if (sym->ts.type != BT_DERIVED && sym->ts.type != BT_CLASS)
     return false;
 
   /* Find a component ref followed by an array reference.  */
