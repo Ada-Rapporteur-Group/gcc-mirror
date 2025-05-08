@@ -4334,6 +4334,7 @@ check_for_bare_parameter_packs (tree t, location_t loc /* = UNKNOWN_LOCATION */)
 	tree pack = TREE_VALUE (parameter_packs);
 	if (is_capture_proxy (pack)
 	    || (TREE_CODE (pack) == PARM_DECL
+		&& DECL_CONTEXT (pack)
 		&& DECL_CONTEXT (DECL_CONTEXT (pack)) == lam))
 	  break;
       }
@@ -10427,7 +10428,7 @@ lookup_and_finish_template_variable (tree templ, tree targs,
      deduction to work.  */
   complain &= ~tf_partial;
   var = finish_template_variable (var, complain);
-  mark_used (var);
+  mark_used (var, complain);
   return convert_from_reference (var);
 }
 
@@ -12070,6 +12071,8 @@ apply_late_template_attributes (tree *decl_p, tree attributes, int attr_flags,
   auto o4 = make_temp_override (scope_chain->omp_declare_target_attribute,
 				NULL);
   auto o5 = make_temp_override (scope_chain->omp_begin_assumes, NULL);
+  auto o6 = make_temp_override (target_option_current_node,
+				target_option_default_node);
 
   cplus_decl_attributes (decl_p, late_attrs, attr_flags);
 
@@ -12819,7 +12822,16 @@ use_pack_expansion_extra_args_p (tree t,
 
       if (has_expansion_arg && has_non_expansion_arg)
 	{
-	  gcc_checking_assert (false);
+	  /* We can get here with:
+
+	      template <class... Ts> struct X {
+		template <class... Us> using Y = Z<void(Ts, Us)...>;
+	      };
+	      template <class A, class... P>
+	      using foo = X<int, int>::Y<A, P...>;
+
+	     where we compare int and A and then the second int and P...,
+	     whose expansion-ness doesn't match, but that's OK.  */
 	  return true;
 	}
     }
@@ -26772,7 +26784,7 @@ maybe_instantiate_noexcept (tree fn, tsubst_flags_t complain)
 	}
       else if (push_tinst_level (fn))
 	{
-	  push_to_top_level ();
+	  const bool push_to_top = maybe_push_to_top_level (fn);
 	  push_access_scope (fn);
 	  push_deferring_access_checks (dk_no_deferred);
 	  input_location = DECL_SOURCE_LOCATION (fn);
@@ -26809,7 +26821,7 @@ maybe_instantiate_noexcept (tree fn, tsubst_flags_t complain)
 	  pop_deferring_access_checks ();
 	  pop_access_scope (fn);
 	  pop_tinst_level ();
-	  pop_from_top_level ();
+	  maybe_pop_from_top_level (push_to_top);
 	}
       else
 	spec = noexcept_false_spec;

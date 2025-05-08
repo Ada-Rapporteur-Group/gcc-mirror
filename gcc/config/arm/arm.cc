@@ -7947,10 +7947,13 @@ arm_function_ok_for_sibcall (tree decl, tree exp)
       && DECL_WEAK (decl))
     return false;
 
-  /* We cannot do a tailcall for an indirect call by descriptor if all the
-     argument registers are used because the only register left to load the
-     address is IP and it will already contain the static chain.  */
-  if (!decl && CALL_EXPR_BY_DESCRIPTOR (exp) && !flag_trampolines)
+  /* We cannot tailcall an indirect call by descriptor if all the call-clobbered
+     general registers are live (r0-r3 and ip).  This can happen when:
+      - IP contains the static chain, or
+      - IP is needed for validating the PAC signature.  */
+  if (!decl
+      && ((CALL_EXPR_BY_DESCRIPTOR (exp) && !flag_trampolines)
+	  || arm_current_function_pac_enabled_p()))
     {
       tree fntype = TREE_TYPE (TREE_TYPE (CALL_EXPR_FN (exp)));
       CUMULATIVE_ARGS cum;
@@ -7997,8 +8000,8 @@ legitimate_pic_operand_p (rtx x)
 
 /* Record that the current function needs a PIC register.  If PIC_REG is null,
    a new pseudo is allocated as PIC register, otherwise PIC_REG is used.  In
-   both case cfun->machine->pic_reg is initialized if we have not already done
-   so.  COMPUTE_NOW decide whether and where to set the PIC register.  If true,
+   both cases cfun->machine->pic_reg is initialized if we have not already done
+   so.  COMPUTE_NOW decides whether and where to set the PIC register.  If true,
    PIC register is reloaded in the current position of the instruction stream
    irregardless of whether it was loaded before.  Otherwise, it is only loaded
    if not already done so (crtl->uses_pic_offset_table is null).  Note that
@@ -8018,6 +8021,7 @@ require_pic_register (rtx pic_reg, bool compute_now)
   if (!crtl->uses_pic_offset_table || compute_now)
     {
       gcc_assert (can_create_pseudo_p ()
+		  || (arm_pic_register != INVALID_REGNUM)
 		  || (pic_reg != NULL_RTX
 		      && REG_P (pic_reg)
 		      && GET_MODE (pic_reg) == Pmode));

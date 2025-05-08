@@ -1828,7 +1828,7 @@ const_unop (enum tree_code code, tree type, tree arg0)
       if (TREE_CODE (arg0) == INTEGER_CST)
 	return fold_not_const (arg0, type);
       else if (POLY_INT_CST_P (arg0))
-	return wide_int_to_tree (type, -poly_int_cst_value (arg0));
+	return wide_int_to_tree (type, ~poly_int_cst_value (arg0));
       /* Perform BIT_NOT_EXPR on each element individually.  */
       else if (TREE_CODE (arg0) == VECTOR_CST)
 	{
@@ -4803,6 +4803,9 @@ decode_field_reference (location_t loc, tree *exp_, HOST_WIDE_INT *pbitsize,
       || *pbitsize < 0
       || offset != 0
       || TREE_CODE (inner) == PLACEHOLDER_EXPR
+      /* We eventually want to build a larger reference and need to take
+	 the address of this.  */
+      || (!REFERENCE_CLASS_P (inner) && !DECL_P (inner))
       /* Reject out-of-bound accesses (PR79731).  */
       || (! AGGREGATE_TYPE_P (TREE_TYPE (inner))
 	  && compare_tree_int (TYPE_SIZE (TREE_TYPE (inner)),
@@ -13277,6 +13280,8 @@ fold_ternary_loc (location_t loc, enum tree_code code, tree type,
 	{
 	  unsigned HOST_WIDE_INT bitpos = tree_to_uhwi (op2);
 	  unsigned bitsize = TYPE_PRECISION (TREE_TYPE (arg1));
+	  if (BYTES_BIG_ENDIAN)
+	    bitpos = TYPE_PRECISION (type) - bitpos - bitsize;
 	  wide_int tem = (wi::to_wide (arg0)
 			  & wi::shifted_mask (bitpos, bitsize, true,
 					      TYPE_PRECISION (type)));

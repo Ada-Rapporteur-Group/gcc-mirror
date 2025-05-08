@@ -384,8 +384,13 @@
 
     emit_clobber (gen_rtx_MEM (BLKmode, hard_frame_pointer_rtx));
 
-    emit_move_insn (hard_frame_pointer_rtx, r_fp);
+    // PR64242: When r_sp is located in the frame, we must not
+    // change FP prior to reading r_sp.  Hence copy r_fp to a
+    // local register (and hope that reload won't spill it).
+    rtx r_fp_reg = copy_to_reg (r_fp);
     emit_stack_restore (SAVE_NONLOCAL, r_sp);
+
+    emit_move_insn (hard_frame_pointer_rtx, r_fp_reg);
 
     emit_use (hard_frame_pointer_rtx);
     emit_use (stack_pointer_rtx);
@@ -652,12 +657,16 @@
   [(parallel [(set (reg:MOVMODE 22)
               (mem:MOVMODE (lo_sum:PSI (reg:QI 21)
                                        (reg:HI REG_Z))))
+              (clobber (reg:QI 21))
+              (clobber (reg:HI REG_Z))
               (clobber (reg:CC REG_CC))])])
 
 (define_insn "*xload_<mode>_libgcc"
   [(set (reg:MOVMODE 22)
         (mem:MOVMODE (lo_sum:PSI (reg:QI 21)
                                  (reg:HI REG_Z))))
+   (clobber (reg:QI 21))
+   (clobber (reg:HI REG_Z))
    (clobber (reg:CC REG_CC))]
   "avr_xload_libgcc_p (<MODE>mode)
    && reload_completed"
@@ -7625,8 +7634,6 @@
                       (pc)))]
   "dead_or_set_regno_p (insn, REG_CC)"
   {
-    const char *op;
-    int jump_mode;
     if (avr_adiw_reg_p (operands[0]))
       output_asm_insn ("sbiw %0,1" CR_TAB
                        "sbc %C0,__zero_reg__" CR_TAB
@@ -7637,8 +7644,8 @@
                        "sbc %C0,__zero_reg__" CR_TAB
                        "sbc %D0,__zero_reg__", operands);
 
-    jump_mode = avr_jump_mode (operands[2], insn);
-    op = ((EQ == <CODE>) ^ (jump_mode == 1)) ? "brcc" : "brcs";
+    int jump_mode = avr_jump_mode (operands[2], insn, 3 - avr_adiw_reg_p (operands[0]));
+    const char *op = ((EQ == <CODE>) ^ (jump_mode == 1)) ? "brcc" : "brcs";
     operands[1] = gen_rtx_CONST_STRING (VOIDmode, op);
 
     switch (jump_mode)
@@ -7668,16 +7675,14 @@
                       (pc)))]
   "dead_or_set_regno_p (insn, REG_CC)"
   {
-    const char *op;
-    int jump_mode;
     if (avr_adiw_reg_p (operands[0]))
       output_asm_insn ("sbiw %0,1", operands);
     else
       output_asm_insn ("subi %A0,1" CR_TAB
                        "sbc %B0,__zero_reg__", operands);
 
-    jump_mode = avr_jump_mode (operands[2], insn);
-    op = ((EQ == <CODE>) ^ (jump_mode == 1)) ? "brcc" : "brcs";
+    int jump_mode = avr_jump_mode (operands[2], insn, 1 - avr_adiw_reg_p (operands[0]));
+    const char *op = ((EQ == <CODE>) ^ (jump_mode == 1)) ? "brcc" : "brcs";
     operands[1] = gen_rtx_CONST_STRING (VOIDmode, op);
 
     switch (jump_mode)
@@ -7709,16 +7714,14 @@
                       (pc)))]
   "dead_or_set_regno_p (insn, REG_CC)"
   {
-    const char *op;
-    int jump_mode;
     if (avr_adiw_reg_p (operands[0]))
       output_asm_insn ("sbiw %0,1", operands);
     else
       output_asm_insn ("subi %A0,1" CR_TAB
                        "sbc %B0,__zero_reg__", operands);
 
-    jump_mode = avr_jump_mode (operands[2], insn);
-    op = ((EQ == <CODE>) ^ (jump_mode == 1)) ? "brcc" : "brcs";
+    int jump_mode = avr_jump_mode (operands[2], insn, 1 - avr_adiw_reg_p (operands[0]));
+    const char *op = ((EQ == <CODE>) ^ (jump_mode == 1)) ? "brcc" : "brcs";
     operands[1] = gen_rtx_CONST_STRING (VOIDmode, op);
 
     switch (jump_mode)
@@ -7750,14 +7753,12 @@
                       (pc)))]
   "dead_or_set_regno_p (insn, REG_CC)"
   {
-    const char *op;
-    int jump_mode;
     output_asm_insn ("ldi %3,1"   CR_TAB
                      "sub %A0,%3" CR_TAB
                      "sbc %B0,__zero_reg__", operands);
 
-    jump_mode = avr_jump_mode (operands[2], insn);
-    op = ((EQ == <CODE>) ^ (jump_mode == 1)) ? "brcc" : "brcs";
+    int jump_mode = avr_jump_mode (operands[2], insn, 2);
+    const char *op = ((EQ == <CODE>) ^ (jump_mode == 1)) ? "brcc" : "brcs";
     operands[1] = gen_rtx_CONST_STRING (VOIDmode, op);
 
     switch (jump_mode)
