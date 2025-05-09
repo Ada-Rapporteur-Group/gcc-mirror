@@ -1318,13 +1318,55 @@ public:
 
 } // namespace
 
+// TODO: naalokovat prazdnou a pak resize
+// -flto_partition=none
+// -ftime_report a v build adresari zkusit insn*.cc (emit, match, recog)
+struct offset_bitmap
+{
+private:
+  int m_offset;
+  sbitmap m_bitmap;
+
+public:
+  offset_bitmap ()
+    : m_offset{0}, m_bitmap{sbitmap_alloc(0)}
+  {}
+
+  offset_bitmap (size_t size, int offset)
+    : m_offset{offset}, m_bitmap{sbitmap_alloc (size)}
+  {}
+
+  offset_bitmap (int min_index, int max_index)
+    : offset_bitmap (size_t (max_index - min_index + 1), -min_index)
+  {}
+
+  void resize(size_t size, int offset)
+  {
+    sbitmap_resize(m_bitmap, size, 0); 
+    m_offset = offset; 
+  }
+
+  void resize(int min_index, int max_index)
+  {
+    resize(size_t (max_index - min_index + 1), -min_index);
+  }
+
+  void clear_bit (int index) { bitmap_clear_bit (m_bitmap, index + m_offset); }
+
+  void set_bit (int index) { bitmap_set_bit (m_bitmap, index + m_offset); }
+
+  bool get_bit (int index) { return bitmap_bit_p (m_bitmap, index + m_offset); }
+
+  ~offset_bitmap () { sbitmap_free (m_bitmap); }
+};
+
 class rtl_ssa_dce
 {
 public:
   unsigned int execute (function *);
 
 private:
-  bool is_rtx_body_prelive (const_rtx);
+  bool is_rtx_pattern_prelive (const_rtx);
   bool can_delete_call (const_rtx);
   bool is_rtx_prelive (const_rtx);
   bool is_prelive (insn_info *);
@@ -1336,14 +1378,15 @@ private:
   void reset_dead_debug ();
   void sweep ();
 
-  int offset;
-  
-  sbitmap mm_marked;
+  void debuggize_insn (insn_info *);
+  void debbugize_insns (const std::unordered_set<insn_info *> &);
+
+  offset_bitmap m_marked;
   sbitmap mm_marked_phis;
 };
 
 bool
-rtl_ssa_dce::is_rtx_body_prelive (const_rtx insn)
+rtl_ssa_dce::is_rtx_pattern_prelive (const_rtx insn)
 {
   switch (GET_CODE (insn))
     {
@@ -1357,9 +1400,28 @@ rtl_ssa_dce::is_rtx_body_prelive (const_rtx insn)
     }
 }
 
+// odebrat auto
+
 bool
 rtl_ssa_dce::can_delete_call (const_rtx insn)
 {
+  gcc_checking_assert (CALL_P (insn));
+
+  // We cannot delete pure or const sibling calls because it is
+  // hard to see the result.
+  // if (!SIBLING_CALL_P (insn))
+  //     // We can delete dead const or pure calls as long as they do not
+  //     // infinite loop.
+  //     && (RTL_CONST_OR_PURE_CALL_P (insn)
+	//   && !RTL_LOOPING_CONST_OR_PURE_CALL_P (insn)
+
+  //   && cfun->can_delete_dead_exceptions
+  // )
+  //   return true;
+      // Don't delete calls that may throw if we cannot do so.
+
+  // pridat assert na const nebo pure
+  //  pouzivat gcc_checking_assert();
   if (cfun->can_delete_dead_exceptions)
     return true;
   // if (!insn_nothrow_p (insn))
@@ -1408,8 +1470,7 @@ rtl_ssa_dce::is_rtx_prelive (const_rtx insn)
   gcc_assert (GET_CODE (insn) == INSN);
 
   // Don't delete insns that may throw if we cannot do so.
-  if (!cfun->can_delete_dead_exceptions && !insn_nothrow_p (insn)
-      && can_alter_cfg)
+  if (!cfun->can_delete_dead_exceptions && !insn_nothrow_p (insn))
     return true;
 
   // Callee-save restores are needed.
@@ -1417,8 +1478,8 @@ rtl_ssa_dce::is_rtx_prelive (const_rtx insn)
       && find_reg_note (insn, REG_CFA_RESTORE, NULL))
     return true;
 
-  rtx body = PATTERN (insn);
-  switch (GET_CODE (body))
+  rtx pat = PATTERN (insn);
+  switch (GET_CODE (pat))
     {
     case CLOBBER:
     case USE:
@@ -1426,13 +1487,13 @@ rtl_ssa_dce::is_rtx_prelive (const_rtx insn)
       return true;
 
     case PARALLEL:
-      for (int i = XVECLEN (body, 0) - 1; i >= 0; i--)
-	if (is_rtx_body_prelive (XVECEXP (body, 0, i)))
+      for (int i = XVECLEN (pat, 0) - 1; i >= 0; i--)
+	if (is_rtx_pattern_prelive (XVECEXP (pat, 0, i)))
 	  return true;
       return false;
 
     default:
-      return is_rtx_body_prelive (body);
+      return is_rtx_pattern_prelive (pat);
     }
 }
 
@@ -1472,6 +1533,7 @@ rtl_ssa_dce::is_prelive (insn_info *insn)
       if (HARD_REGISTER_NUM_P (def->regno ()) && global_regs[def->regno ()])
 	return true;
 
+  // what about reload? check cse.cc
       unsigned int picreg = PIC_OFFSET_TABLE_REGNUM;
       if (picreg != INVALID_REGNUM && fixed_regs[picreg]
 	  && def->regno () == picreg)
@@ -1487,7 +1549,7 @@ rtl_ssa_dce::mark_prelive_insn (insn_info *insn, auto_vec<set_info *> &worklist)
   if (dump_file)
     fprintf (dump_file, "Insn %d marked as prelive\n", insn->uid ());
 
-  bitmap_set_bit (mm_marked, insn->uid () + offset);
+  m_marked.set_bit(insn->uid ());
   // debug instruction are not added to worklist not to wake up possibly dead
   // instructions
   if (insn->is_debug_insn ())
@@ -1517,6 +1579,7 @@ rtl_ssa_dce::mark_prelive ()
   return worklist;
 }
 
+// kometare + PARAMETRY kapitalkami
 void
 rtl_ssa_dce::mark ()
 {
@@ -1532,11 +1595,12 @@ rtl_ssa_dce::mark ()
 	continue;
 
       // Skip already visited visited instructions.
-      auto uid = insn->uid () + offset;
-      if (bitmap_bit_p (mm_marked, uid) && !insn->is_phi ())
+      auto uid = insn->uid ();
+      if (m_marked.get_bit(uid) && !insn->is_phi ())
 	continue;
 
-      bitmap_set_bit (mm_marked, uid);
+      m_marked.set_bit (uid);
+
 
       use_array uses = insn->uses ();
       if (insn->is_phi ())
@@ -1604,12 +1668,24 @@ rtl_ssa_dce::reset_dead_debug ()
     if (parent_insn == nullptr)
       continue;
     // If we depend on a dead instruction, clear current instruction uses.
-    sbitmap marked = parent_insn->is_phi () ? mm_marked_phis : mm_marked;
-    int uid = parent_insn->is_phi () ? static_cast<phi_info *> (def)->uid () : parent_insn->uid () + offset;
-    if (!bitmap_bit_p (marked, uid)) {
+    bool shouldReset = false;
+    if (parent_insn->is_phi ()) {
+      shouldReset = bitmap_bit_p(mm_marked_phis, static_cast<phi_info *> (def)->uid ());
+    } else {
+      shouldReset = m_marked.get_bit(parent_insn->uid ());
+    }
+
+    if (shouldReset) {
       reset_dead_debug_insn (insn);
 	    break;
     }
+
+    // sbitmap marked = parent_insn->is_phi () ? mm_marked_phis : mm_marked;
+    // int uid = parent_insn->is_phi () ? static_cast<phi_info *> (def)->uid () : parent_insn->uid () + offset;
+    // if (!bitmap_bit_p (marked, uid)) {
+    //   reset_dead_debug_insn (insn);
+	  //   break;
+    // }
 	}
     }
 }
@@ -1625,7 +1701,7 @@ rtl_ssa_dce::sweep ()
   for (insn_info *insn : crtl->ssa->nondebug_insns ())
     {
       // Artificial or marked insns should not be deleted.
-      if (insn->is_artificial () || bitmap_bit_p (mm_marked, insn->uid () + offset))
+      if (insn->is_artificial () || m_marked.get_bit (insn->uid ()))
 	continue;
 
       if (dump_file)
@@ -1668,11 +1744,10 @@ rtl_ssa_dce::execute (function *fn)
     count++;
   }
 
-  offset = -artificial_min;
+  m_marked.resize(artificial_min, real_max);
   // std::cout << "real_max: " << real_max << '\n';
   // std::cout << "artificial_min: " << artificial_min << '\n';
   // std::cout << "total: " << real_max - artificial_min + 3 << '\n';
-  // std::cout << "Offset: " << offset << '\n';
   // std::cout << "count: " << count << '\n';
 
   unsigned int phi_node_max = 0;
@@ -1681,8 +1756,6 @@ rtl_ssa_dce::execute (function *fn)
     phi_node_max = std::max (phi_node_max, phi->uid ());
 
   // std::cout << "phi_node_max: " << phi_node_max << '\n';
-  mm_marked = sbitmap_alloc(real_max - artificial_min + 3);
-  bitmap_clear(mm_marked);
   mm_marked_phis = sbitmap_alloc(phi_node_max + 1);
   bitmap_clear(mm_marked_phis);
 
@@ -1715,7 +1788,6 @@ rtl_ssa_dce::execute (function *fn)
   if (crtl->ssa->perform_pending_updates ())
     cleanup_cfg (0);
 
-  sbitmap_free(mm_marked);
   sbitmap_free(mm_marked_phis);
   delete crtl->ssa;
   crtl->ssa = nullptr;
@@ -1754,7 +1826,8 @@ rtl_ssa_dce::propagate_dead_phis ()
 	  if (dump_file)
 	    fprintf (dump_file, "Debug insns %d depends on dead phi.\n",
 		     insn->uid ());
-    bitmap_clear_bit (mm_marked, insn->uid ());
+
+    m_marked.clear_bit (insn->uid ());
 	  // debug instructions dont have chains
 	  continue;
 	}
@@ -1762,12 +1835,12 @@ rtl_ssa_dce::propagate_dead_phis ()
       // mark
       if (insn->is_phi ())
 	{
-	  gcc_assert (!bitmap_bit_p(mm_marked_phis, static_cast<phi_info *> (set)->uid ()));
+	  gcc_checking_assert (!bitmap_bit_p(mm_marked_phis, static_cast<phi_info *> (set)->uid ()));
 	  visited_dead_phis.emplace (static_cast<phi_info *> (set));
 	}
       else
 	{
-	  gcc_assert (!bitmap_bit_p (mm_marked, insn->uid () + offset));
+	  gcc_checking_assert (!m_marked.get_bit (insn->uid ()));
 	  depends_on_dead_phi.emplace (insn);
 	}
 
@@ -1797,20 +1870,72 @@ rtl_ssa_dce::propagate_dead_phis ()
   return depends_on_dead_phi;
 }
 
-static void
-rtl_ssa_dce_debuggize (insn_info *insn)
+void
+rtl_ssa_dce::debuggize_insn (insn_info *insn)
 {
-  if (insn->is_phi ())
-    {
-      return;
+  
+}
+
+void
+rtl_ssa_dce::debbugize_insns (const std::unordered_set<insn_info *> &depends_on_dead_phi)
+{
+  for (insn_info *insn : crtl->ssa->reverse_all_insns ()) {
+    if (insn->is_artificial () || 
+      (m_marked.get_bit (insn->uid ()) && !insn->is_debug_insn()))
+      continue;
+
+    // TODO: reset dead debug instructions - those that are dependend on a dead phi
+    if (depends_on_dead_phi.count (insn) > 0) {
+      if (insn->is_debug_insn ())
+        reset_dead_debug_insn (insn);
+      continue;
     }
 
-  if (insn->is_debug_insn ())
-    {
-      // we need to fix dependencies of this instruction because they might have
-      // changed
-      return;
-    }
+    gcc_checking_assert(insn->is_real ());
+
+    rtx_insn *rtl = insn->rtl ();
+    def_array defs = insn->defs ();
+    // def_info* s = nullptr;
+    // s->kind() == access_kind::SET
+    rtx set;
+    // debbugize_insns should be called only if MAY_HAVE_DEBUG_BIND_INSNS
+    if (MAY_HAVE_DEBUG_BIND_INSNS
+		  && (set = single_set (rtl)) != NULL_RTX
+      && !(*defs.begin ())->has_nondebug_insn_uses()
+		  // && is_dead_reg (SET_DEST (set), counts)
+      // Proc tam byla tato podminka?
+      // - debug statementy se sypou za kazdou definici ve zdrojaku, tedy 
+      // proto se chci ptat na to, kdyz existuje debug pouziti, tak je to 
+      // zajimava promenna
+		  /* Used at least once in some DEBUG_INSN.  */ 
+		  // && counts[REGNO (SET_DEST (set)) + nreg] > 0
+      // Tohle je ten bind nebo cast debug instrukce?
+		  /* And set exactly once.  */
+		  // && counts[REGNO (SET_DEST (set)) + nreg * 2] == 1
+		  && !side_effects_p (SET_SRC (set))
+		  && asm_noperands (PATTERN (rtl)) < 0)
+		{
+      // TODO: musime predratovat zavisle debug insn - vsechny uses na nove
+      //       vytvorenou debug insn
+		  /* Create DEBUG_EXPR (and DEBUG_EXPR_DECL).  */
+		  rtx dval = make_debug_expr_from_rtl (SET_DEST (set));
+
+		  /* Emit a debug bind insn before the insn in which
+		     reg dies.  */
+		  rtx bind_var_loc =
+		    gen_rtx_VAR_LOCATION (GET_MODE (SET_DEST (set)),
+					  DEBUG_EXPR_TREE_DECL (dval),
+					  SET_SRC (set),
+					  VAR_INIT_STATUS_INITIALIZED);
+		  // count_reg_usage (bind_var_loc, counts + nreg, NULL_RTX, 1);
+
+		  rtx_insn *bind = emit_debug_insn_before (bind_var_loc, rtl);
+
+		  // if (replacements == NULL)
+		    // replacements = XCNEWVEC (rtx, nreg);
+		  // replacements[REGNO (SET_DEST (set))] = dval;
+    }   
+  }
 }
 
 static void
@@ -1827,6 +1952,10 @@ test (insn_info *insn)
     = gen_rtx_VAR_LOCATION (GET_MODE (SET_DEST (set)),
 			    DEBUG_EXPR_TREE_DECL (dval), SET_SRC (set),
 			    VAR_INIT_STATUS_INITIALIZED);
+
+  obstack_watermark watermark = crtl->ssa->new_change_attempt();
+  // Radeji bych zde videl pridani dval do rtl ssa
+  // crtl->ssa->create_insn(watermark, DEBUG_INSN, rtx pat);
 
   // TODO : change ssa form - we have to keep uses in the first debug insn and
   // delete other instructions
