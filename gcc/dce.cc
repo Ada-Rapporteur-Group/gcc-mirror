@@ -1379,7 +1379,7 @@ private:
   void sweep ();
 
   void debuggize_insn (insn_info *);
-  void debbugize_insns (const std::unordered_set<insn_info *> &);
+  void debugize_insns (const std::unordered_set<insn_info *> &);
 
   offset_bitmap m_marked;
   sbitmap mm_marked_phis;
@@ -1877,7 +1877,7 @@ rtl_ssa_dce::debuggize_insn (insn_info *insn)
 }
 
 void
-rtl_ssa_dce::debbugize_insns (const std::unordered_set<insn_info *> &depends_on_dead_phi)
+rtl_ssa_dce::debugize_insns (const std::unordered_set<insn_info *> &depends_on_dead_phi)
 {
   for (insn_info *insn : crtl->ssa->reverse_all_insns ()) {
     if (insn->is_artificial () || 
@@ -1898,7 +1898,7 @@ rtl_ssa_dce::debbugize_insns (const std::unordered_set<insn_info *> &depends_on_
     // def_info* s = nullptr;
     // s->kind() == access_kind::SET
     rtx set;
-    // debbugize_insns should be called only if MAY_HAVE_DEBUG_BIND_INSNS
+    // debugize_insns should be called only if MAY_HAVE_DEBUG_BIND_INSNS
     if (MAY_HAVE_DEBUG_BIND_INSNS
 		  && (set = single_set (rtl)) != NULL_RTX
       && !(*defs.begin ())->has_nondebug_insn_uses()
@@ -1928,6 +1928,20 @@ rtl_ssa_dce::debbugize_insns (const std::unordered_set<insn_info *> &depends_on_
 					  SET_SRC (set),
 					  VAR_INIT_STATUS_INITIALIZED);
 		  // count_reg_usage (bind_var_loc, counts + nreg, NULL_RTX, 1);
+
+      rtl_ssa::obstack_watermark watermark = crtl->ssa->new_change_attempt();
+      insn_info *debug_insn = crtl->ssa->create_insn(watermark, DEBUG_INSN, rtx bind_var_loc);
+      insn_change change(debug_insn);
+      change.move_range = insn_range_info(insn)
+      // TODO: chains
+
+      def_info *d = *defs.begin ();
+      if (d->kind() == access_kind::SET) {
+        set_info *s = static_cast<set_info *>(d);
+        for (use_info *u : s->all_uses()) {
+          // TODO: transform dependent insns
+        }
+      }
 
 		  rtx_insn *bind = emit_debug_insn_before (bind_var_loc, rtl);
 

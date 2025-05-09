@@ -1281,6 +1281,9 @@ function_info::create_insn (obstack_watermark &watermark,
     case INSN:
       rti = make_insn_raw (pat);
       break;
+	case DEBUG_INSN:
+	  rti = make_debug_insn_raw(pat);
+	  break;
     default:
       gcc_unreachable ();
     }
