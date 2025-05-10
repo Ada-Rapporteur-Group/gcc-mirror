@@ -256,7 +256,7 @@ rtl_ssa::changes_are_worthwhile (array_slice<insn_change *const> changes,
 // SET has been deleted.  Clean up all remaining uses.  Such uses are
 // either dead phis or now-redundant live-out uses.
 void
-function_info::process_uses_of_deleted_def (set_info *set)
+function_info::process_uses_of_deleted_def (set_info *set, auto_sbitmap& visited_phis)
 {
   if (!set->has_any_uses ())
     return;
@@ -860,7 +860,10 @@ function_info::change_insns (array_slice<insn_change *> changes)
 	{
 	  auto *set = dyn_cast<set_info *> (def);
 	  if (set && set->has_any_uses ())
-	    process_uses_of_deleted_def (set);
+	    {
+			auto_sbitmap phis(m_next_phi_uid);
+			process_uses_of_deleted_def (set);
+		}
 	  remove_def (def);
 	}
 

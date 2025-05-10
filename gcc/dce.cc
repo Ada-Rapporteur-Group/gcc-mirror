@@ -1876,6 +1876,26 @@ rtl_ssa_dce::debuggize_insn (insn_info *insn)
   
 }
 
+struct register_replacement {
+  unsigned int regno;
+  rtx expr;
+};
+
+static rtx
+replace_dead_reg(rtx x, const_rtx old_rtx ATTRIBUTE_UNUSED, void *data)
+{
+  auto replacement = static_cast<register_replacement *>(data);
+  
+ if (REG_P (x) && REGNO (x) >= FIRST_VIRTUAL_REGISTER && replacement->regno == REGNO (x))
+ {
+  if (GET_MODE (x) == GET_MODE (replacement->expr))
+	  return replacement->expr;
+  return lowpart_subreg (GET_MODE (x), replacement->expr, GET_MODE (replacement->expr));
+ }
+
+ return NULL_RTX;
+}
+
 void
 rtl_ssa_dce::debugize_insns (const std::unordered_set<insn_info *> &depends_on_dead_phi)
 {
@@ -1895,8 +1915,61 @@ rtl_ssa_dce::debugize_insns (const std::unordered_set<insn_info *> &depends_on_d
 
     rtx_insn *rtl = insn->rtl ();
     def_array defs = insn->defs ();
-    // def_info* s = nullptr;
-    // s->kind() == access_kind::SET
+    rtx rtx_set;
+
+    // If insn has debug uses and will be deleted, signalize it
+    if (!MAY_HAVE_DEBUG_BIND_INSNS ||
+      (rtx_set = single_set (rtl)) == NULL_RTX ||
+      side_effects_p (SET_SRC (rtx_set)) ||
+      asm_noperands (PATTERN (rtl)) >= 0)
+      continue;
+
+    // some of the checks might be duplicate:
+    if (insn->num_defs () != 1)
+      continue;
+
+    def_info *def = *defs.begin ();
+    if (def->kind () != access_kind::SET)
+      continue;
+
+    set_info *set = static_cast<set_info *> (def);
+    if (!set->has_nondebug_insn_uses ())
+      continue;
+
+    rtx dval = make_debug_expr_from_rtl (SET_DEST (rtx_set));
+
+    /* Emit a debug bind insn before the insn in which
+        reg dies.  */
+    rtx bind_var_loc =
+      gen_rtx_VAR_LOCATION (GET_MODE (SET_DEST (rtx_set)),
+          DEBUG_EXPR_TREE_DECL (dval),
+          SET_SRC (rtx_set),
+          VAR_INIT_STATUS_INITIALIZED);
+
+    obstack_watermark watermark = crtl->ssa->new_change_attempt();
+    insn_info *debug_insn = crtl->ssa->create_insn(watermark, DEBUG_INSN, bind_var_loc);
+    insn_change change(debug_insn);
+    change.new_uses = insn->uses();
+    change.move_range = insn_range_info(insn);
+
+    rtx_insn *bind = emit_debug_insn_before (bind_var_loc, rtl);
+
+    register_replacement replacement;
+    for (use_info *u : set->all_uses ()) {
+      // TODO: transform dependent insns
+      replacement.regno = u->regno();
+      replacement.expr = dval;
+
+      simplify_replace_fn_rtx(INSN_VAR_LOCATION_LOC(rtl), NULL_RTX, replace_dead_reg, &replacement);
+    }
+
+    // note:
+    // 1. Walk over all insns from last to first. If an insntruction can be
+    //    debugized, update a bitmap. If the instruction is dead, walk over
+    //    its dependencies with worklist and reset the bitmap for visited 
+    //    instructions.
+    // 2. Do the actual debugizing. 
+
     rtx set;
     // debugize_insns should be called only if MAY_HAVE_DEBUG_BIND_INSNS
     if (MAY_HAVE_DEBUG_BIND_INSNS
@@ -1933,7 +2006,7 @@ rtl_ssa_dce::debugize_insns (const std::unordered_set<insn_info *> &depends_on_d
       insn_info *debug_insn = crtl->ssa->create_insn(watermark, DEBUG_INSN, rtx bind_var_loc);
       insn_change change(debug_insn);
       change.move_range = insn_range_info(insn)
-      // TODO: chains
+      // TODO: chains and defs
 
       def_info *d = *defs.begin ();
       if (d->kind() == access_kind::SET) {
@@ -1950,6 +2023,9 @@ rtl_ssa_dce::debugize_insns (const std::unordered_set<insn_info *> &depends_on_d
 		  // replacements[REGNO (SET_DEST (set))] = dval;
     }   
   }
+
+  // TODO: check that all of the debug insn uses are live,
+  // othervise reset the instruction
 }
 
 static void
