@@ -17,6 +17,8 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
+#include "bitmap.h"
+#include "sbitmap.h"
 #include <iostream>
 #include <ostream>
 #define INCLUDE_ALGORITHM
@@ -1894,6 +1896,147 @@ replace_dead_reg(rtx x, const_rtx old_rtx ATTRIBUTE_UNUSED, void *data)
  }
 
  return NULL_RTX;
+}
+
+// visit every marked instruction in INSN dependency tree and unmark it
+static void
+unmark_debugizable(const insn_info& insn, auto_sbitmap &debugizable) 
+{
+  auto_vec<insn_info *> worklist;
+  bitmap_set_bit (debugizable, insn.uid ());
+  worklist.safe_push (&insn);
+
+  while (!worklist.empty ()) {
+    insn_info *current = worklist.pop ();
+    int current_uid = current->uid ();
+
+    // skip instruction that are not marked
+    if (!bitmap_bit_p(debugizable, current_uid))
+      continue;
+
+    bitmap_clear_bit(debugizable, current_uid);
+    // add all marked dependencies to the worklist
+    for (def_info *def : current.defs())
+    {
+      if (def->kind() != access_kind::SET)
+        continue;
+  
+      set_info *set = static_cast<set_info *>(def);
+      for (use_info *use : set->all_uses()) 
+      {
+        insn_info *use_insn = use->insn();
+        if (bitmap_bit_p(debugizable, use_insn->uid()))
+          worklist.safe_push (use_insn);
+      }
+    }
+  }
+}
+
+static auto_sbitmap
+find_debugizable(const std::unordered_set<insn_info *> &depends_on_dead_phi) 
+{
+  // only real instructions
+  auto_sbitmap debugizable(get_max_uid () + 1);
+  bitmap_clear(debugizable);
+
+  for (insn_info *insn : crtl->ssa->reverse_all_insns ()) {
+    if (insn->is_artificial () || 
+      (m_marked.get_bit (insn->uid ()) && !insn->is_debug_insn()))
+      continue;
+
+    // TODO: reset dead debug instructions - those that are dependend on a dead phi
+    if (depends_on_dead_phi.count (insn) > 0) {
+      if (insn->is_debug_insn ())
+        reset_dead_debug_insn (insn);
+      continue;
+    }
+
+    // this insn might have some debugizable dependencies and if we find that
+    // current insn is not debugizable, we have to reset those dependencies
+    gcc_checking_assert(insn->is_real ());
+
+    rtx_insn *rtl = insn->rtl ();
+    def_array defs = insn->defs ();
+    rtx rtx_set;
+
+    // If insn has debug uses and will be deleted, signalize it
+    if (!MAY_HAVE_DEBUG_BIND_INSNS ||
+      (rtx_set = single_set (rtl)) == NULL_RTX ||
+      side_effects_p (SET_SRC (rtx_set)) ||
+      asm_noperands (PATTERN (rtl)) >= 0)
+      {
+        unmark_debugizable(*insn, debugizable);
+        continue; // TODO: call unmark_debugizable
+      }
+
+    // some of the checks might be duplicate:
+    if (insn->num_defs () != 1)
+    {
+      if (insn->num_defs() > 1)
+        unmark_debugizable(*insn, debugizable);
+      continue; // TODO: call unmark_debugizable if num_defs>1
+    }
+
+    def_info *def = *defs.begin ();
+    if (def->kind () != access_kind::SET)
+      continue;
+
+    set_info *set = static_cast<set_info *> (def);
+    // this is a problem a bit
+    // TODO: check instruction dependencies and their debugizability
+    if (!set->has_nondebug_insn_uses ())
+      continue;
+
+    bitmap_set_bit (debugizable, insn->uid ());
+  }
+
+  return debugizable;
+}
+
+static void 
+bruh(const auto_sbitmap& debugizable)
+{
+  for (insn_info *insn : crtl->ssa->reverse_all_insns ())
+  {
+    if (insn->is_artificial () || !bitmap_bit_p(debugizable, insn->uid ()))
+      continue;
+
+    rtx_insn *rtl = insn->rtl ();
+    def_array defs = insn->defs ();
+    rtx rtx_set = single_set (rtl);
+    def_info *def = *defs.begin ();
+    gcc_checking_assert (def->kind () != access_kind::SET);
+
+    set_info *set = static_cast<set_info *> (def);
+
+    // turn instruction into debug
+    rtx dval = make_debug_expr_from_rtl (SET_DEST (rtx_set));
+
+    /* Emit a debug bind insn before the insn in which
+        reg dies.  */
+    rtx bind_var_loc =
+      gen_rtx_VAR_LOCATION (GET_MODE (SET_DEST (rtx_set)),
+          DEBUG_EXPR_TREE_DECL (dval),
+          SET_SRC (rtx_set),
+          VAR_INIT_STATUS_INITIALIZED);
+
+    obstack_watermark watermark = crtl->ssa->new_change_attempt();
+    insn_info *debug_insn = crtl->ssa->create_insn(watermark, DEBUG_INSN, bind_var_loc);
+    insn_change change(debug_insn);
+    change.new_uses = insn->uses();
+    change.move_range = insn_range_info(insn);
+
+    rtx_insn *bind = emit_debug_insn_before (bind_var_loc, rtl);
+
+    register_replacement replacement;
+    for (use_info *u : set->all_uses ()) {
+      // TODO: transform dependent insns
+      replacement.regno = u->regno();
+      replacement.expr = dval;
+
+      simplify_replace_fn_rtx(INSN_VAR_LOCATION_LOC(rtl), NULL_RTX, replace_dead_reg, &replacement);
+    }
+  }
 }
 
 void
