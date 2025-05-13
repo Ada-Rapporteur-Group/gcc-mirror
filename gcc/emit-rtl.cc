@@ -4153,7 +4153,7 @@ make_insn_raw (rtx pattern)
 
 /* Like `make_insn_raw' but make a DEBUG_INSN instead of an insn.  */
 
-static rtx_insn *
+rtx_insn *
 make_debug_insn_raw (rtx pattern)
 {
   rtx_debug_insn *insn;

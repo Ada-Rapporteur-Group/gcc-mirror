@@ -256,7 +256,7 @@ rtl_ssa::changes_are_worthwhile (array_slice<insn_change *const> changes,
 // SET has been deleted.  Clean up all remaining uses.  Such uses are
 // either dead phis or now-redundant live-out uses.
 void
-function_info::process_uses_of_deleted_def (set_info *set, auto_sbitmap& visited_phis)
+function_info::process_uses_of_deleted_def (set_info *set, auto_sbitmap &visited_phis)
 {
   if (!set->has_any_uses ())
     return;
@@ -268,7 +268,7 @@ function_info::process_uses_of_deleted_def (set_info *set, auto_sbitmap& visited
       if (use->is_in_phi ())
 	{
 	  // This call will not recurse.
-	  process_uses_of_deleted_def (use->phi ());
+	  process_uses_of_deleted_def (use->phi (), visited_phis);
 	  delete_phi (use->phi ());
 	}
       else
@@ -861,8 +861,8 @@ function_info::change_insns (array_slice<insn_change *> changes)
 	  auto *set = dyn_cast<set_info *> (def);
 	  if (set && set->has_any_uses ())
 	    {
-			auto_sbitmap phis(m_next_phi_uid);
-			process_uses_of_deleted_def (set);
+			auto_sbitmap visited_phis(m_next_phi_uid);
+			process_uses_of_deleted_def (set, visited_phis);
 		}
 	  remove_def (def);
 	}
