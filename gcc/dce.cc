@@ -1379,7 +1379,7 @@ private:
   void reset_dead_debug ();
   void sweep ();
 
-  void debuggize_insn (insn_info *);
+  void debugize_insn (insn_info *);
 
   void unmark_debugizable(insn_info &, sbitmap &);
   sbitmap find_debugizable(const std::unordered_set<insn_info *> &);
@@ -1875,7 +1875,7 @@ rtl_ssa_dce::propagate_dead_phis ()
 }
 
 void
-rtl_ssa_dce::debuggize_insn (insn_info *insn)
+rtl_ssa_dce::debugize_insn (insn_info *insn)
 {
   
 }
@@ -1908,6 +1908,7 @@ rtl_ssa_dce::unmark_debugizable(insn_info &insn, sbitmap &debugizable)
   bitmap_set_bit (debugizable, insn.uid ());
   worklist.safe_push (&insn);
 
+  // process all marked dependencies and unmark them
   while (!worklist.is_empty ()) {
     insn_info *current = worklist.pop ();
     int current_uid = current->uid ();
@@ -1917,6 +1918,7 @@ rtl_ssa_dce::unmark_debugizable(insn_info &insn, sbitmap &debugizable)
       continue;
 
     bitmap_clear_bit(debugizable, current_uid);
+
     // add all marked dependencies to the worklist
     for (def_info *def : current->defs())
     {
@@ -1934,6 +1936,8 @@ rtl_ssa_dce::unmark_debugizable(insn_info &insn, sbitmap &debugizable)
   }
 }
 
+// return a bitmap which describes whether an instruction can be debugized
+// - that means replaced with a debug instruction
 sbitmap
 rtl_ssa_dce::find_debugizable(const std::unordered_set<insn_info *> &depends_on_dead_phi) 
 {
@@ -1942,26 +1946,24 @@ rtl_ssa_dce::find_debugizable(const std::unordered_set<insn_info *> &depends_on_
   bitmap_clear(debugizable);
 
   for (insn_info *insn : crtl->ssa->reverse_all_insns ()) {
-    if (insn->is_artificial ())
-      continue;
-
-      // TODO: mark debug instructions that do not depend on a
-      // dead phi
-
+    // Skip live nondebug instrunctions. Debug instructions are by default live 
+    // and we cannot skip them here
     if (insn->is_artificial () || 
       (m_marked.get_bit (insn->uid ()) && !insn->is_debug_insn()))
       continue;
 
-    // TODO: reset dead debug instructions - those that are dependend on a dead phi
     if (depends_on_dead_phi.count (insn) > 0) {
       if (insn->is_debug_insn ())
         reset_dead_debug_insn (insn);
+
+      // we don't have to call unmark_debugizable, because dead nondebug
+      // instructions that depend on a dead phi won't be turned into a 
+      // debug instrunction
       continue;
     }
 
-    // this insn might have some debugizable dependencies and if we find that
+    // this insn may have some debugizable dependencies and if we find that
     // current insn is not debugizable, we have to reset those dependencies
-    gcc_checking_assert(insn->is_real ());
 
     rtx_insn *rtl = insn->rtl ();
     def_array defs = insn->defs ();
