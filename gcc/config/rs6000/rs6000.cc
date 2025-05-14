@@ -15383,8 +15383,7 @@ rs6000_reverse_condition (machine_mode mode,
       && (code == UNLT || code == UNLE || code == UNGT || code == UNGE
 	  || code == UNEQ || code == LTGT))
     {
-      if (ordered_cmp_ok == rev_cond_ordered::no_ordered
-	  && !flag_finite_math_only)
+      if (ordered_cmp_ok == rev_cond_ordered::no_ordered)
 	return UNKNOWN;
 
       return reverse_condition_maybe_unordered (code);
