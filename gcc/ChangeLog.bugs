@@ -1,30 +1,9 @@
-==================== Branch work204-bugs, patch #113 ====================
-
-Try to fix crash #2
-
-2025-05-14  Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	PR target/118541
-	* config/rs6000/rs6000.cc (rs6000_reverse_condition): Update test.
-
-
-==================== Branch work204-bugs, patch #112 ====================
-
-Try to fix crash
-
-2025-05-14  Michael Meissner  <meissner@linux.ibm.com>
-
-gcc/
-
-	PR target/118541
-	* config/rs6000/rs6000.cc (rs6000_reverse_condition): Remove test
-	against flag_finite_math_only.
-
-==================== Branch work204-bugs, patch #111 ====================
+==================== Branch work204-bugs, patch #114 ====================
 
 Fix PR 118541, do not generate unordered fp cmoves for IEEE compares.
+
+Bernhard Reutner-Fischer suggested some typos to the patch for 118551.  Here
+is the changed patch.
 
 In bug PR target/118541 on power9, power10, and power11 systems, for the
 function:
@@ -67,22 +46,13 @@ raise an interrupt.
 The following patch changes the PowerPC back end so that ifcvt.c will not change
 the if/then test and move into a conditional move if the comparison is one of
 the comparisons that do not raise an error with signalling NaNs and -Ofast is
-not used.  If a normal comparison is used, GCC will continue to generate
-XSCMPGTDP and XXSEL.
-
-In the previous version of the patch if -Ofast was used, isgreater and other
-IEEE comparison functions would generate the XSCMPGTDP and XSCMPGEDP
-instructions.  This version of the patch just removes trying to invert using
-inverted fpmasks at all, and if UN{GT,GE,LT,LE} are generated, it will always
-fall back to doing a comparison and a jump.
-
-However if -ffinite-math-only (or -Ofast or -ffast-math) is used, the machine
-independent portion of the compiler will convert UNGT into GT, and in that case
-we will generate XSCMPGTDP, etc.
+not used.  If a normal comparison is used or -Ofast is used, GCC will continue
+to generate XSCMPGTDP and XXSEL.
 
 For the following code:
 
-        double ordered_compare (double a, double b, double c, double d)
+        double
+        ordered_compare (double a, double b, double c, double d)
         {
           return __builtin_isgreater (a, b) ? c : d;
         }
@@ -115,16 +85,13 @@ power9/power10 systems and there were no regressions.  Can I check this patch
 into the GCC trunk, and after a waiting period, can I check this into the active
 older branches?
 
-2025-05-13  Michael Meissner  <meissner@linux.ibm.com>
+2025-05-14  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
 	PR target/118541
-	* config/rs6000/predicates.md (invert_fpmask_comparison_operator):
-	Delete predicate, since it was only used to reverse a fpmask comparison
-	that generates XSCMP{EQ,GT,GE}DP instruction for ordered compares.
-	Because those instructions can trap on signalling NaNs, we can't
-	generate the code for ordered compares.
+	* config/rs6000/predicates.md (invert_fpmask_comparison_operator): Do
+	not allow UNLT and UNLE unless -ffast-math.
 	* config/rs6000/rs6000-protos.h (enum rev_cond_ordered): New enumeration.
 	(rs6000_reverse_condition): Add argument.
 	* config/rs6000/rs6000.cc (rs6000_reverse_condition): Do not allow
@@ -132,15 +99,20 @@ gcc/
 	but allow ordered comparisons to be reversed on jumps.
 	(rs6000_emit_sCOND): Adjust rs6000_reverse_condition call.
 	* config/rs6000/rs6000.h (REVERSE_CONDITION): Likewise.
-	* config/rs6000/rs6000.md (mov<SFDF:mode><SFDF2:mode>cc_invert_p):
-	Delete insn, since it was only used to reverse a fpmask comparison
-	that generates XSCMP{EQ,GT,GE}DP instruction for ordered compares.
-	Because those instructions can trap on signalling NaNs, we can't
-	generate the code for ordered compares.
-	(mov<mode>cc_invert_p10): Likewise.
-	(reverse_branch_comparison): Name insn.  Adjust rs6000_reverse_condition
-	calls.
+	* config/rs6000/rs6000.md (reverse_branch_comparison): Name insn.
+	Adjust rs6000_reverse_condition calls.
 
+gcc/testsuite/
+
+	PR target/118541
+	* gcc.target/powerpc/pr118541-1.c: New test.
+	* gcc.target/powerpc/pr118541-2.c: Likewise.
+	* gcc.target/powerpc/pr118541-3.c: Likewise.
+	* gcc.target/powerpc/pr118541-4.c: Likewise.
+
+==================== Branch work204-bugs, patch #113 was reverted ====================
+==================== Branch work204-bugs, patch #112 was reverted ====================
+==================== Branch work204-bugs, patch #111 was reverted ====================
 ==================== Branch work204-bugs, patch #110 was reverted ====================
 
 ==================== Branch work204-bugs, patch #102 ====================
