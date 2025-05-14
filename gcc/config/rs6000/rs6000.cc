@@ -15379,14 +15379,19 @@ rs6000_reverse_condition (machine_mode mode,
      cmove, and the x{s,v}cmp{eq,gt,ge}{dp,qp} instructions will trap if one of
      the arguments is a signalling NaN.  */
 
-  if (mode == CCFPmode
-      && (code == UNLT || code == UNLE || code == UNGT || code == UNGE
-	  || code == UNEQ || code == LTGT))
+  if (mode == CCFPmode)
     {
-      if (ordered_cmp_ok == rev_cond_ordered::no_ordered)
-	return UNKNOWN;
+      if (code == UNLT || code == UNLE || code == UNGT || code == UNGE
+	  || code == UNEQ || code == LTGT)
+	{
+	  if (ordered_cmp_ok == rev_cond_ordered::no_ordered)
+	    return UNKNOWN;
 
-      return reverse_condition_maybe_unordered (code);
+	  return reverse_condition_maybe_unordered (code);
+	}
+
+      else if (!flag_finite_math_only)
+	return reverse_condition_maybe_unordered (code);
     }
 
   return reverse_condition (code);
