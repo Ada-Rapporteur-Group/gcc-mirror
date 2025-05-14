@@ -1,4 +1,4 @@
-==================== Branch work204-bugs, patch #110 ====================
+==================== Branch work204-bugs, patch #111 ====================
 
 Fix PR 118541, do not generate unordered fp cmoves for IEEE compares.
 
@@ -91,13 +91,16 @@ power9/power10 systems and there were no regressions.  Can I check this patch
 into the GCC trunk, and after a waiting period, can I check this into the active
 older branches?
 
-2025-04-30  Michael Meissner  <meissner@linux.ibm.com>
+2025-05-13  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
 	PR target/118541
-	* config/rs6000/predicates.md (invert_fpmask_comparison_operator): Do
-	not allow UNLT and UNLE unless -ffast-math.
+	* config/rs6000/predicates.md (invert_fpmask_comparison_operator):
+	Delete predicate, since it was only used to reverse a fpmask comparison
+	that generates XSCMP{EQ,GT,GE}DP instruction for ordered compares.
+	Because those instructions can trap on signalling NaNs, we can't
+	generate the code for ordered compares.
 	* config/rs6000/rs6000-protos.h (enum rev_cond_ordered): New enumeration.
 	(rs6000_reverse_condition): Add argument.
 	* config/rs6000/rs6000.cc (rs6000_reverse_condition): Do not allow
@@ -105,13 +108,16 @@ gcc/
 	but allow ordered comparisons to be reversed on jumps.
 	(rs6000_emit_sCOND): Adjust rs6000_reverse_condition call.
 	* config/rs6000/rs6000.h (REVERSE_CONDITION): Likewise.
-	* config/rs6000/rs6000.md (reverse_branch_comparison): Name insn.
-	Adjust rs6000_reverse_condition calls.
+	* config/rs6000/rs6000.md (mov<SFDF:mode><SFDF2:mode>cc_invert_p):
+	Delete insn, since it was only used to reverse a fpmask comparison
+	that generates XSCMP{EQ,GT,GE}DP instruction for ordered compares.
+	Because those instructions can trap on signalling NaNs, we can't
+	generate the code for ordered compares.
+	(mov<mode>cc_invert_p10): Likewise.
+	(reverse_branch_comparison): Name insn.  Adjust rs6000_reverse_condition
+	calls.
 
-gcc/testsuite/
-
-	PR target/118541
-	* gcc.target/powerpc/pr118541.c: New test.
+==================== Branch work204-bugs, patch #110 was reverted ====================
 
 ==================== Branch work204-bugs, patch #102 ====================
 
