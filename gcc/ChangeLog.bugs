@@ -1,3 +1,15 @@
+==================== Branch work204-bugs, patch #113 ====================
+
+Try to fix crash #2
+
+2025-05-14  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/118541
+	* config/rs6000/rs6000.cc (rs6000_reverse_condition): Update test.
+
+
 ==================== Branch work204-bugs, patch #112 ====================
 
 Try to fix crash
