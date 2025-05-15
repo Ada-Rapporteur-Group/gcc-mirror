@@ -1473,7 +1473,9 @@
 ;; signalling NaN.  Don't allow the test to be inverted if NaNs are supported
 ;; and the comparison is an ordered comparison.
 (define_predicate "invert_fpmask_comparison_operator"
-  (match_code "ne,lt,le"))
+  (ior (match_code "ne")
+       (and (match_code "unlt,unle")
+	    (match_test "flag_finite_math_only"))))
 
 ;; Return 1 if OP is a comparison operation suitable for integer vector/scalar
 ;; comparisons that generate a -1/0 mask.
