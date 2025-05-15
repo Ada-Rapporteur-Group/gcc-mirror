@@ -1,3 +1,12 @@
+==================== Branch work204-bugs, patch #116 ====================
+
+Fix using fpmask with -ffinite-math-only.
+
+2025-05-14  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/predicates.md (invert_fpmask_comparison_operator): Add
+	support for UNLT and UNLE instead of LT and LE.
+
 ==================== Branch work204-bugs, patch #115 ====================
 
 Don't allow floating point modes to be reversed.
