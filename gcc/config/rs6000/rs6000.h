@@ -1818,7 +1818,8 @@ extern scalar_int_mode rs6000_pmode;
    starting with the power9 because ifcvt.cc will want to create a fp cmove,
    and the x{s,v}cmp{eq,gt,ge}{dp,qp} instructions will trap if one of the
    arguments is a signalling NaN.  */
-#define REVERSIBLE_CC_MODE(MODE) 1
+#define REVERSIBLE_CC_MODE(MODE)					\
+  (flag_finite_math_only || !TARGET_P9_VECTOR || (MODE) != CCFPmode)
 
 /* Given a condition code and a mode, return the inverse condition.  */
 #define REVERSE_CONDITION(CODE, MODE)					\
