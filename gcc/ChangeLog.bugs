@@ -1,3 +1,12 @@
+==================== Branch work204-bugs, patch #115 ====================
+
+Don't allow floating point modes to be reversed.
+
+2025-05-14  Michael Meissner  <meissner@linux.ibm.com>
+
+	* config/rs6000/rs6000.h (REVERSIBLE_CC_MODE): Don't allow FP modes to
+	be reversed on power9 if NaNs are allowed.
+
 ==================== Branch work204-bugs, patch #114 ====================
 
 Fix PR 118541, do not generate unordered fp cmoves for IEEE compares.
