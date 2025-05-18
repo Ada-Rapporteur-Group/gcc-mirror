@@ -101,10 +101,12 @@ minval_m16 (gfc_array_m16 * const restrict retarray,
 
       retarray->offset = 0;
       retarray->dtype.rank = rank;
+      GFC_DESCRIPTOR_SIZE (retarray) = sizeof (GFC_UINTEGER_16);
+      GFC_DESCRIPTOR_SPAN (retarray) = sizeof (GFC_UINTEGER_16);
 
       alloc_size = GFC_DESCRIPTOR_SPACING(retarray,rank-1) * extent[rank-1];
 
-      retarray->base_addr = xmallocarray (alloc_size, sizeof (GFC_UINTEGER_16));
+      retarray->base_addr = xmalloc (alloc_size);
       if (alloc_size == 0)
 	return;
     }
@@ -313,8 +315,10 @@ mminval_m16 (gfc_array_m16 * const restrict retarray,
 
       retarray->offset = 0;
       retarray->dtype.rank = rank;
+      GFC_DESCRIPTOR_SIZE (retarray) = sizeof (GFC_UINTEGER_16);
+      GFC_DESCRIPTOR_SPAN (retarray) = sizeof (GFC_UINTEGER_16);
 
-      retarray->base_addr = xmallocarray (alloc_size, sizeof (GFC_UINTEGER_16));
+      retarray->base_addr = xmalloc (alloc_size);
       if (alloc_size == 0)
 	return;
     }
@@ -502,10 +506,12 @@ sminval_m16 (gfc_array_m16 * const restrict retarray,
 
       retarray->offset = 0;
       retarray->dtype.rank = rank;
+      GFC_DESCRIPTOR_SIZE (retarray) = sizeof (GFC_UINTEGER_16);
+      GFC_DESCRIPTOR_SPAN (retarray) = sizeof (GFC_UINTEGER_16);
 
       alloc_size = GFC_DESCRIPTOR_SPACING(retarray,rank-1) * extent[rank-1];
 
-      retarray->base_addr = xmallocarray (alloc_size, sizeof (GFC_UINTEGER_16));
+      retarray->base_addr = xmalloc (alloc_size);
       if (alloc_size == 0)
 	return;
     }

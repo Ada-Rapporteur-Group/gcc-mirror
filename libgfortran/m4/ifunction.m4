@@ -91,10 +91,12 @@ void
 
       retarray->offset = 0;
       retarray->dtype.rank = rank;
+      GFC_DESCRIPTOR_SIZE (retarray) = sizeof ('rtype_name`);
+      GFC_DESCRIPTOR_SPAN (retarray) = sizeof ('rtype_name`);
 
       alloc_size = GFC_DESCRIPTOR_SPACING(retarray,rank-1) * extent[rank-1];
 
-      retarray->base_addr = xmallocarray (alloc_size, sizeof ('rtype_name`));
+      retarray->base_addr = xmalloc (alloc_size);
       if (alloc_size == 0)
 	return;
     }
@@ -287,8 +289,10 @@ m'name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray,
 
       retarray->offset = 0;
       retarray->dtype.rank = rank;
+      GFC_DESCRIPTOR_SIZE (retarray) = sizeof ('rtype_name`);
+      GFC_DESCRIPTOR_SPAN (retarray) = sizeof ('rtype_name`);
 
-      retarray->base_addr = xmallocarray (alloc_size, sizeof ('rtype_name`));
+      retarray->base_addr = xmalloc (alloc_size);
       if (alloc_size == 0)
 	return;
     }
@@ -445,10 +449,12 @@ s'name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray,
 
       retarray->offset = 0;
       retarray->dtype.rank = rank;
+      GFC_DESCRIPTOR_SIZE (retarray) = sizeof ('rtype_name`);
+      GFC_DESCRIPTOR_SPAN (retarray) = sizeof ('rtype_name`);
 
       alloc_size = GFC_DESCRIPTOR_SPACING(retarray,rank-1) * extent[rank-1];
 
-      retarray->base_addr = xmallocarray (alloc_size, sizeof ('rtype_name`));
+      retarray->base_addr = xmalloc (alloc_size);
       if (alloc_size == 0)
 	return;
     }
