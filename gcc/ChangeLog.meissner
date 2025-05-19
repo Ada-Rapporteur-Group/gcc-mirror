@@ -1,4 +1,4 @@
-==================== Branch work205, patch #21 ====================
+==================== Branch work206, patch #21 ====================
 
 Use architecture flags for defining _ARCH_PWR macros.
 
@@ -62,7 +62,7 @@ gcc/
 	(-mpower11): Likewise.
 	(-mfuture): Likewise.
 
-==================== Branch work205, patch #20 ====================
+==================== Branch work206, patch #20 ====================
 
 Add rs6000 architecture masks.
 
@@ -125,7 +125,7 @@ gcc/
 	* config/rs6000/rs6000.opt (rs6000_arch_flags): New target variable.
 	(x_rs6000_arch_flags): New save/restore field for rs6000_arch_flags.
 
-==================== Branch work205, patch #13 ====================
+==================== Branch work206, patch #13 ====================
 
 Use vector pair load/store for memcpy with -mcpu=future
 
@@ -151,7 +151,7 @@ gcc/testsuite/
 
 	* gcc.target/powerpc/future-3.c: New test.
 
-==================== Branch work205, patch #12 ====================
+==================== Branch work206, patch #12 ====================
 
 Add -mcpu=future tests.
 
@@ -164,7 +164,7 @@ gcc/testsuite/
 	* gcc.target/powerpc/future-1.c: New test.
 	* gcc.target/powerpc/future-2.c: Likewise.
 
-==================== Branch work205, patch #11 ====================
+==================== Branch work206, patch #11 ====================
 
 Add -mcpu=future tuning support.
 
@@ -177,7 +177,7 @@ gcc/
 	* config/rs6000/power10.md (all reservations): Add future as an
 	alterntive to power10 and power11.
 
-==================== Branch work205, patch #10 ====================
+==================== Branch work206, patch #10 ====================
 
 Add support for -mcpu=future
 
@@ -214,7 +214,7 @@ future PowerPC processors.
 	* config/rs6000/rs6000.md (cpu attribute): Likewise.
 	* config/rs6000/rs6000.opt (-mfuture): New internal option.
 
-==================== Branch work205, patch #5 ====================
+==================== Branch work206, patch #5 ====================
 
 Change TARGET_MODULO to TARGET_POWER9.
 
@@ -240,7 +240,7 @@ gcc/
 	(umod<mode>3): Likewise.
 	(divide/modulo peephole2): Likewise.
 
-==================== Branch work205, patch #4 ====================
+==================== Branch work206, patch #4 ====================
 
 Change TARGET_POPCNTD to TARGET_POWER7.
 
@@ -284,7 +284,7 @@ gcc/
 	(cbcdtd): Likewise.
 	(div<div_extend>_<mode>): Likewise.
 
-==================== Branch work205, patch #3 ====================
+==================== Branch work206, patch #3 ====================
 
 Change TARGET_CMPB to TARGET_POWER6.
 
@@ -314,7 +314,7 @@ gcc/
 	(cmpstrnsi): Likewise.
 	(cmpstrsi): Likewise.
 
-==================== Branch work205, patch #2 ====================
+==================== Branch work206, patch #2 ====================
 
 Change TARGET_FPRND to TARGET_POWER5X.
 
@@ -338,7 +338,7 @@ gcc/
 	(floor<mode>2): Likewise.
 	(round<mode>2): Likewise.
 
-==================== Branch work205, patch #1 ====================
+==================== Branch work206, patch #1 ====================
 
 Change TARGET_POPCNTB to TARGET_POWER5.
 
@@ -361,7 +361,7 @@ gcc/
 	(TARGET_FRSQRTES): Likewise.
 	* gcc/config/rs6000/rs6000.md (enabled attribute): Likewise.
 
-==================== Branch work205, baseline ====================
+==================== Branch work206, baseline ====================
 
 Add ChangeLog.meissner and REVISION.
 
