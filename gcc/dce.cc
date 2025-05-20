@@ -17,7 +17,6 @@ You should have received a copy of the GNU General Public License
 along with GCC; see the file COPYING3.  If not see
 <http://www.gnu.org/licenses/>.  */
 
-#include "sbitmap.h"
 #include <iostream>
 #include <ostream>
 #define INCLUDE_ALGORITHM
@@ -1343,7 +1342,7 @@ public:
 
   void resize(size_t size, int offset)
   {
-    sbitmap_resize(m_bitmap, size, 0); 
+    m_bitmap = sbitmap_resize(m_bitmap, (unsigned int)size, 0); 
     m_offset = offset; 
   }
 
@@ -1381,7 +1380,7 @@ private:
 
   void debugize_insn (insn_info *);
 
-  void unmark_debugizable(insn_info &, sbitmap &);
+  void unmark_debugizable(insn_info &, sbitmap);
   sbitmap find_debugizable(const std::unordered_set<insn_info *> &);
   void debugize_insns (const sbitmap);
 
@@ -1748,7 +1747,7 @@ rtl_ssa_dce::execute (function *fn)
     count++;
   }
 
-  m_marked.resize(artificial_min, real_max);
+  m_marked.resize(artificial_min, real_max + 1);
   // std::cout << "real_max: " << real_max << '\n';
   // std::cout << "artificial_min: " << artificial_min << '\n';
   // std::cout << "total: " << real_max - artificial_min + 3 << '\n';
@@ -1783,9 +1782,14 @@ rtl_ssa_dce::execute (function *fn)
   // frame_pointer_needed << '\n';
 
   mark ();
-  // propagate_dead_phis();
   if (MAY_HAVE_DEBUG_BIND_INSNS)
+   {
+    auto dead_phis = propagate_dead_phis();
+    auto debugizable = find_debugizable(dead_phis);
+    debugize_insns(debugizable);
+    
     reset_dead_debug ();
+   }
   sweep ();
 
   free_dominance_info (CDI_DOMINATORS);
@@ -1902,9 +1906,13 @@ replace_dead_reg(rtx x, const_rtx old_rtx ATTRIBUTE_UNUSED, void *data)
 
 // visit every marked instruction in INSN dependency tree and unmark it
 void
-rtl_ssa_dce::unmark_debugizable(insn_info &insn, sbitmap &debugizable) 
+rtl_ssa_dce::unmark_debugizable(insn_info &insn, sbitmap debugizable) 
 {
   auto_vec<insn_info *> worklist;
+  gcc_assert(!insn.is_artificial());
+  if (insn.uid () < 0)
+    std::cerr << "WTF" << insn.uid() << '\n';
+  std::cout << insn.uid () << '\n';
   bitmap_set_bit (debugizable, insn.uid ());
   worklist.safe_push (&insn);
 
