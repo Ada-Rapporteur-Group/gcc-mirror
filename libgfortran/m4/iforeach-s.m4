@@ -13,20 +13,20 @@ compare_fcn (const atype_name *a, const atype_name *b, gfc_charlen_type n)
 
 }
 
-extern void name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray, 
+extern void 'name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray,
 	'atype` * const restrict array'back_arg`, gfc_charlen_type len);
-export_proto('name`'rtype_qual`_'atype_code);
+export_proto('name`'rtype_qual`_'atype_code`);
 
 void
-name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray, 
+'name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray,
 	'atype` * const restrict array'back_arg`, gfc_charlen_type len)
 {
   index_type count[GFC_MAX_DIMENSIONS];
   index_type extent[GFC_MAX_DIMENSIONS];
   index_type sspacing[GFC_MAX_DIMENSIONS];
   index_type dspacing;
-  const 'atype_name *base;
-  rtype_name * restrict dest;
+  const 'atype_name` *base;
+  'rtype_name` * restrict dest;
   index_type rank;
   index_type n;
 
@@ -36,10 +36,10 @@ name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray,
 
   if (retarray->base_addr == NULL)
     {
-      GFC_DESCRIPTOR_DIMENSION_SET(retarray, 0, 0, rank-1, sizeof (rtype_name));
+      GFC_DESCRIPTOR_DIMENSION_SET(retarray, 0, 0, rank-1, sizeof ('rtype_name`));
       retarray->dtype.rank = 1;
       retarray->offset = 0;
-      retarray->base_addr = xmallocarray (rank, sizeof (rtype_name));
+      retarray->base_addr = xmallocarray (rank, sizeof ('rtype_name`));
     }
   else
     {
@@ -52,14 +52,14 @@ name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray,
   dest = retarray->base_addr;
   for (n = 0; n < rank; n++)
     {
-      sspacing[n] = GFC_DESCRIPTOR_SPACING(array,n) * len;
+      sspacing[n] = GFC_DESCRIPTOR_SPACING(array,n);
       extent[n] = GFC_DESCRIPTOR_EXTENT(array,n);
       count[n] = 0;
       if (extent[n] <= 0)
 	{
 	  /* Set the return value.  */
 	  for (n = 0; n < rank; n++)
-	    GFC_ARRAY_ELEM (rtype_name, dest, n * dspacing) = 0;
+	    GFC_ARRAY_ELEM ('rtype_name`, dest, n * dspacing) = 0;
 	  return;
 	}
     }
@@ -68,7 +68,7 @@ name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray,
 
   /* Initialize the return value.  */
   for (n = 0; n < rank; n++)
-    GFC_ARRAY_ELEM (rtype_name, dest, n * dspacing) = 1;
+    GFC_ARRAY_ELEM ('rtype_name`, dest, n * dspacing) = 1;
   {
 ')dnl
 define(START_FOREACH_BLOCK,
@@ -112,13 +112,13 @@ define(FINISH_FOREACH_FUNCTION,
 }')dnl
 define(START_MASKED_FOREACH_FUNCTION,
 `
-extern void `m'name`'rtype_qual`_'atype_code` ('rtype` * const restrict, 
+extern void m'name`'rtype_qual`_'atype_code` ('rtype` * const restrict,
 	'atype` * const restrict, gfc_array_l1 * const restrict 'back_arg`,
 	gfc_charlen_type len);
 export_proto(m'name`'rtype_qual`_'atype_code`);
 
 void
-m'name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray, 
+m'name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray,
 	'atype` * const restrict array,
 	gfc_array_l1 * const restrict mask'back_arg`,
 	gfc_charlen_type len)
@@ -128,7 +128,7 @@ m'name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray,
   index_type sspacing[GFC_MAX_DIMENSIONS];
   index_type mspacing[GFC_MAX_DIMENSIONS];
   index_type dspacing;
-  'rtype_name *dest;
+  'rtype_name` *dest;
   const atype_name *base;
   GFC_LOGICAL_1 *mbase;
   int rank;
@@ -137,10 +137,10 @@ m'name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray,
 
   if (mask == NULL)
     {
-#ifdef HAVE_BACK_ARG    
-      name`'rtype_qual`_'atype_code (retarray, array, back, len);
+#ifdef HAVE_BACK_ARG
+      'name`'rtype_qual`_'atype_code` (retarray, array, back, len);
 #else
-      name`'rtype_qual`_'atype_code (retarray, array, len);
+      'name`'rtype_qual`_'atype_code` (retarray, array, len);
 #endif
       return;
     }
@@ -151,10 +151,10 @@ m'name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray,
 
   if (retarray->base_addr == NULL)
     {
-      GFC_DESCRIPTOR_DIMENSION_SET(retarray, 0, 0, rank - 1, sizeof (rtype_name));
+      GFC_DESCRIPTOR_DIMENSION_SET(retarray, 0, 0, rank - 1, sizeof ('rtype_name`));
       retarray->dtype.rank = 1;
       retarray->offset = 0;
-      retarray->base_addr = xmallocarray (rank, sizeof (rtype_name));
+      retarray->base_addr = xmallocarray (rank, sizeof ('rtype_name`));
     }
   else
     {
@@ -185,7 +185,7 @@ m'name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray,
   dest = retarray->base_addr;
   for (n = 0; n < rank; n++)
     {
-      sspacing[n] = GFC_DESCRIPTOR_SPACING(array,n) * len;
+      sspacing[n] = GFC_DESCRIPTOR_SPACING(array,n);
       mspacing[n] = GFC_DESCRIPTOR_SPACING(mask,n);
       extent[n] = GFC_DESCRIPTOR_EXTENT(array,n);
       count[n] = 0;
@@ -193,7 +193,7 @@ m'name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray,
 	{
 	  /* Set the return value.  */
 	  for (n = 0; n < rank; n++)
-	    GFC_ARRAY_ELEM (rtype_name, dest, n * dspacing) = 0;
+	    GFC_ARRAY_ELEM ('rtype_name`, dest, n * dspacing) = 0;
 	  return;
 	}
     }
@@ -202,7 +202,7 @@ m'name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray,
 
   /* Initialize the return value.  */
   for (n = 0; n < rank; n++)
-    GFC_ARRAY_ELEM (rtype_name, dest, n * dspacing) = 0;
+    GFC_ARRAY_ELEM ('rtype_name`, dest, n * dspacing) = 0;
   {
 ')dnl
 define(START_MASKED_FOREACH_BLOCK, `START_FOREACH_BLOCK')dnl
@@ -255,13 +255,13 @@ $2
 FINISH_MASKED_FOREACH_FUNCTION')dnl
 define(SCALAR_FOREACH_FUNCTION,
 `
-extern void `s'name`'rtype_qual`_'atype_code` ('rtype` * const restrict, 
+extern void s'name`'rtype_qual`_'atype_code` ('rtype` * const restrict,
 	'atype` * const restrict, GFC_LOGICAL_4 *'back_arg`,
 	gfc_charlen_type len);
-export_proto(s'name`'rtype_qual`_'atype_code);
+export_proto(s'name`'rtype_qual`_'atype_code`);
 
 void
-`s'name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray, 
+s'name`'rtype_qual`_'atype_code` ('rtype` * const restrict retarray,
 	'atype` * const restrict array,
 	GFC_LOGICAL_4 * mask'back_arg`,
 	gfc_charlen_type len)
@@ -269,14 +269,14 @@ void
   index_type rank;
   index_type dspacing;
   index_type n;
-  'rtype_name *dest;
+  'rtype_name` *dest;
 
   if (mask == NULL || *mask)
     {
-#ifdef HAVE_BACK_ARG    
-      name`'rtype_qual`_'atype_code (retarray, array, back, len);
+#ifdef HAVE_BACK_ARG
+      'name`'rtype_qual`_'atype_code` (retarray, array, back, len);
 #else
-      name`'rtype_qual`_'atype_code (retarray, array, len);
+      'name`'rtype_qual`_'atype_code` (retarray, array, len);
 #endif
       return;
     }
@@ -288,10 +288,10 @@ void
 
   if (retarray->base_addr == NULL)
     {
-      GFC_DESCRIPTOR_DIMENSION_SET(retarray, 0, 0, rank-1, sizeof (rtype_name));
+      GFC_DESCRIPTOR_DIMENSION_SET(retarray, 0, 0, rank-1, sizeof ('rtype_name`));
       retarray->dtype.rank = 1;
       retarray->offset = 0;
-      retarray->base_addr = xmallocarray (rank, sizeof (rtype_name));
+      retarray->base_addr = xmallocarray (rank, sizeof ('rtype_name`));
     }
   else if (unlikely (compile_options.bounds_check))
     {
@@ -302,5 +302,5 @@ void
   dspacing = GFC_DESCRIPTOR_SPACING(retarray,0);
   dest = retarray->base_addr;
   for (n = 0; n<rank; n++)
-    GFC_ARRAY_ELEM (rtype_name, dest, n * dspacing) = $1 ;
+    GFC_ARRAY_ELEM ('rtype_name`, dest, n * dspacing) = $1 ;
 }')dnl
