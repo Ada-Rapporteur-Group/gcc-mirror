@@ -1,4 +1,4 @@
-==================== Branch work206-bugs, patch #110 ====================
+==================== Branch work206-bugs, patch #111 ====================
 
 Fix PR 118541, do not generate unordered fp cmoves for IEEE compares.
 
@@ -40,11 +40,16 @@ arguments is a signalling NaN and signalling NaNs can generate an interrupt.
 The IEEE comparison functions (isgreater, etc.) require that the comparison not
 raise an interrupt.
 
-The following patch changes the PowerPC back end so that ifcvt.c will not change
-the if/then test and move into a conditional move if the comparison is one of
-the comparisons that do not raise an error with signalling NaNs and -Ofast is
-not used.  If a normal comparison is used or -Ofast is used, GCC will continue
-to generate XSCMPGTDP and XXSEL.
+The root cause of this is we allow floating point comparisons to be reversed
+(i.e. LT will be reversed to UNGE).  Before power9, this was ok because we only
+generated the FCMPU or XSCMPUDP instructions.  But with power9, we can generate
+the XSCMPEQDP, XSCMPGTDP, or XSCMPGEDP instructions.  If NaNs are allowed, we no
+longer allow FP comparisons to be reversed.  If FP comparisons can't be
+reversed, the machine independent portions of the compiler will generate the
+comparison with the arguments reversed.
+
+Since we do not support reversing FP comparisons, the code to support inverting
+fpmask operations on power9 has been removed.
 
 For the following code:
 
@@ -82,30 +87,27 @@ power9/power10 systems and there were no regressions.  Can I check this patch
 into the GCC trunk, and after a waiting period, can I check this into the active
 older branches?
 
-2025-05-20  Michael Meissner  <meissner@linux.ibm.com>
+2025-05-21  Michael Meissner  <meissner@linux.ibm.com>
 
 gcc/
 
 	PR target/118541
-	* config/rs6000/predicates.md (invert_fpmask_comparison_operator): Do
-	not allow UNLT and UNLE unless -ffast-math.
-	* config/rs6000/rs6000-protos.h (enum rev_cond_ordered): New enumeration.
-	(rs6000_reverse_condition): Add argument.
-	* config/rs6000/rs6000.cc (rs6000_reverse_condition): Do not allow
-	ordered comparisons to be reversed for floating point conditional moves,
-	but allow ordered comparisons to be reversed on jumps.
-	(rs6000_emit_sCOND): Adjust rs6000_reverse_condition call.
+	* config/rs6000/predicates.md (invert_fpmask_comparison_operator):
+	Delete.
 	* config/rs6000/rs6000.h (REVERSIBLE_CC_MODE): Do not allow floating
-	point comparisons to be reversed on platforms that can generate the
-	xscmp{eq,gt,ge}{dp,qp} instructions.
-	(REVERSE_CONDITION): Adjust rs6000_reverse_condition call.
-	* config/rs6000/rs6000.md (reverse_branch_comparison): Name insn.
-	Adjust rs6000_reverse_condition calls.
+	point comparisons to be reversed unless -ffinite-math-only is used.
+	(rs6000_reverse_condition): Add argument.
+	* config/rs6000/rs6000.md (mov<SFDF:mode><SFDF2:mode>cc_p9): Add
+	comment.
+	(mov<SFDF:mode><SFDF2:mode>cc_invert_p9): Delete insns.
+	(mov<mode>cc_invert_p10): Likewise.
 
 gcc/testsuite/
 
 	PR target/118541
 	* gcc.target/powerpc/pr118541.c: New test.
+
+==================== Branch work206-bugs, patch #110 was reverted ====================
 
 ==================== Branch work206-bugs, patch #101 ====================
 
