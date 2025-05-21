@@ -1,3 +1,121 @@
+2025-05-20  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2025-05-10  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/102891
+	* dependency.cc (gfc_ref_needs_temporary_p): Within an array
+	reference, inquiry references of complex variables generally
+	need a temporary.
+
+2025-05-19  Tobias Burnus  <tburnus@baylibre.com>
+
+	Backported from master:
+	2025-05-15  Tobias Burnus  <tburnus@baylibre.com>
+
+	* trans-openmp.cc (gfc_omp_deep_mapping_do): Handle SSA_NAME if
+	a def_stmt is available.
+
+2025-05-17  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+
+	Backported from master:
+	2025-05-06  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+
+	PR fortran/120049
+	* check.cc (gfc_check_c_associated): Modify checks to avoid
+	ICE and allow use, intrinsic :: iso_c_binding from a separate
+	module file.
+
+2025-05-15  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	Backported from master:
+	2025-05-14  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/120139
+	* dump-parse-tree.cc (get_c_type_name): If no constant
+	size of an array exists, output an asterisk.
+
+2025-05-15  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	Backported from master:
+	2025-05-14  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/120107
+	* dump-parse-tree.cc (write_type): Do not dump non-interoperable
+	types.
+
+2025-05-13  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/120163
+	* gfortran.h: Add formal_resolved to gfc_symbol.
+	* resolve.cc (gfc_resolve_formal_arglist): Set it.
+	(resolve_function): Do not call gfc_get_formal_from_actual_arglist
+	if we already resolved a formal arglist.
+	(resolve_call): Likewise.
+
+2025-05-13  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2025-05-13  Jakub Jelinek  <jakub@redhat.com>
+		    Daniil Kochergin  <daniil2472s@gmail.com>
+		    Tobias Burnus  <tburnus@baylibre.com>
+
+	PR fortran/120191
+	* trans-intrinsic.cc (strip_kind_from_actual): Remove.
+	(gfc_conv_intrinsic_minmaxloc): Don't call strip_kind_from_actual.
+	Free and clear kind_arg->expr if non-NULL.  Set back_arg->name to
+	"%VAL" instead of a loop looking for last argument.  Remove actual
+	variable, use array_arg instead.  Free and clear dim_arg->expr if
+	non-NULL for BT_CHARACTER cases instead of using a loop.
+
+2025-05-11  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/119928
+	* interface.cc (gfc_check_dummy_characteristics): Do not issue
+	error if one dummy symbol has been generated from an actual
+	argument and the other one has OPTIONAL, INTENT, ALLOCATABLE,
+	POINTER, TARGET, VALUE, ASYNCHRONOUS or CONTIGUOUS.
+	(gfc_get_formal_from_actual_arglist): Do nothing if symbol
+	is a class.
+
+2025-05-09  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2025-05-08  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/120179
+	* match.cc (gfc_match_do): Do not attempt to match end-of-statement
+	twice.
+
+2025-05-09  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2025-05-04  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/119986
+	* expr.cc (is_subref_array): When searching for array references,
+	do not terminate early so that inquiry references to complex
+	components work.
+	* primary.cc (gfc_variable_attr): A substring reference can refer
+	to either a scalar or array character variable.  Adjust search
+	accordingly.
+
+2025-05-03  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2025-04-25  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/102900
+	* trans-decl.cc (gfc_generate_function_code): Use sym->result
+	when generating fake result decl for functions returning
+	allocatable or pointer results.
+	* trans-expr.cc (gfc_conv_procedure_call): When checking the
+	pointer status of an actual argument passed to a non-allocatable,
+	non-pointer dummy which is of type CLASS, do not check the
+	class container of the actual if it is just a procedure pointer.
+	(gfc_trans_pointer_assignment): Fix treatment of assignment to
+	NULL of a procedure pointer.
+
 2025-04-25  Release Manager
 
 	* GCC 15.1.0 released.

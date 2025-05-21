@@ -1,3 +1,232 @@
+2025-05-20  Martin Jambor  <mjambor@suse.cz>
+
+	Backported from master:
+	2025-05-14  Martin Jambor  <mjambor@suse.cz>
+
+	PR tree-optimization/111873
+	* tree-sra.cc (sra_modify_expr): When processing a load which has
+	a type-incompatible replacement, do not store the contents of the
+	replacement into the original aggregate when that aggregate is
+	const.
+
+2025-05-20  Martin Jambor  <mjambor@suse.cz>
+
+	Backported from master:
+	2025-05-16  Martin Jambor  <mjambor@suse.cz>
+		    Michal Jires  <mjires@suse.cz>
+
+	* cgraph.h (symtab_node): Make member function get_uid const.
+	* cgraphclones.cc (dump_callgraph_transformation): Dump m_uid of the
+	call graph nodes instead of order.
+	* cgraph.cc (cgraph_node::remove): Likewise.
+	* ipa-cp.cc (ipcp_lattice<valtype>::print): Likewise.
+	* ipa-sra.cc (ipa_sra_summarize_function): Likewise.
+	* symtab.cc (symtab_node::dump_base): Likewise.
+
+2025-05-16  Maciej W. Rozycki  <macro@orcam.me.uk>
+
+	Backported from master:
+	2025-04-19  Maciej W. Rozycki  <macro@orcam.me.uk>
+
+	* config/alpha/alpha.cc
+	(alpha_get_mem_rtx_alignment_and_offset): Recurse into
+	COMPONENT_REF nodes.
+
+2025-05-14  Kyle Huey  <me@kylehuey.com>
+
+	* dwarf2out.cc (resolve_addr_in_expr): Propagate dtprel into the address
+	table when appropriate.
+
+2025-05-13  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2025-05-12  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/120188
+	* doc/gm2.texi (Semantic checking): Add -fm2-plugin command line option.
+
+2025-05-11  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/120211
+	* tree-vect-stmts.cc (vect_stmt_relevant_p): Only add PHIs
+	from the loop header to LOOP_VINFO_EARLY_BREAKS_LIVE_IVS.
+
+2025-05-11  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2025-05-08  Richard Biener  <rguenther@suse.de>
+
+	PR ipa/120146
+	* tree-ssa-structalias.cc (create_variable_info_for): If
+	the symtab cannot tell us whether all refs to a variable
+	are explicit assume they are not.
+
+2025-05-11  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2025-05-08  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/120143
+	* tree-vect-data-refs.cc (vect_analyze_early_break_dependences):
+	Move/update the original stmts, not the pattern stmts which
+	lack virtual operands and are not in the IL.
+
+2025-05-11  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2025-05-08  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/120089
+	* tree-vect-stmts.cc (vect_stmt_relevant_p): Mark all
+	PHIs live when not already so and doing early-break
+	vectorization.
+	(vect_mark_stmts_to_be_vectorized): Skip virtual PHIs.
+	* tree-vect-slp.cc (vect_analyze_slp): Robustify handling
+	of early-break forced IVs.
+
+2025-05-11  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2025-05-08  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/120043
+	* tree-ssa-phiopt.cc (cond_store_replacement): Check
+	whether the store is to readonly memory.
+
+2025-05-09  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* vr-values.cc (simplify_using_ranges::simplify) <BIT_AND_EXPR>:
+	Do not call simplify_bit_ops_using_ranges for boolean types whose
+	precision is not 1.
+
+2025-05-07  Martin Jambor  <mjambor@suse.cz>
+
+	Backported from master:
+	2025-05-06  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/119852
+	* cgraphclones.cc (dump_callgraph_transformation): Document the
+	function.  Do not dump if suffix is NULL.
+
+2025-05-07  Martin Jambor  <mjambor@suse.cz>
+
+	Backported from master:
+	2025-05-06  Martin Jambor  <mjambor@suse.cz>
+
+	* doc/invoke.texi (Developer Options): Document -fdump-ipa-clones.
+
+2025-05-06  Andrew MacLeod  <amacleod@redhat.com>
+
+	PR tree-optimization/120048
+	* ipa-cp.cc (ipcp_store_vr_results): Check for UNDEFINED.
+
+2025-05-06  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2025-05-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/120074
+	* gimple-fold.cc (fold_truth_andor_for_ifcombine): For
+	lsignbit && l_xor case, punt if ll_bitsize != lr_bitsize.  Similarly
+	for rsignbit && r_xor case, punt if rl_bitsize != rr_bitsize.
+	Formatting fix.
+
+2025-05-05  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2025-04-30  Richard Biener  <rguenther@suse.de>
+
+	PR ipa/120006
+	* tree-ssa-structalias.cc (find_func_clobbers): Handle
+	strdup, strndup, realloc, index, strchr, strrchr, memchr,
+	strstr, strpbrk builtins like find_func_aliases does.
+
+2025-05-05  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2025-04-28  Richard Biener  <rguenther@suse.de>
+
+	PR ipa/119973
+	* tree-ssa-structalias.cc (create_variable_info_for):
+	Build constraints from DECL_INITIAL directly rather than
+	the IPA reference list which is incomplete.
+
+2025-04-30  Andrew MacLeod  <amacleod@redhat.com>
+
+	PR tree-optimization/119712
+	* value-range.cc (range_bitmask::adjust_range): Delete.
+	(irange::set_range_from_bitmask): Integrate adjust_range.
+	(irange::update_bitmask): Do nothing if bitmask doesnt change.
+	(irange:intersect_bitmask): Do not call adjust_range. Exit if there
+	is no second bitmask.
+	* value-range.h (adjust_range): Remove prototype.
+
+2025-04-30  Georg-Johann Lay  <avr@gjlay.de>
+
+	* config/avr/avr.md (fxload_<mode>_libgcc): Use REG_ prefix for
+	magix register numbers (aligns with trunk).
+
+2025-04-30  Georg-Johann Lay  <avr@gjlay.de>
+
+	Backported from master:
+	2025-04-30  Georg-Johann Lay  <avr@gjlay.de>
+
+	* config/avr/avr.md (xload_<mode>_libgcc): Clobber R21, Z.
+
+2025-04-29  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2025-04-24  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR target/119610
+	* config/aarch64/aarch64.cc (aarch64_allocate_and_probe_stack_space):
+	Add a bytes_below_sp parameter and use it to calculate the CFA
+	offsets.  Attach the first SVE CFA note to the move into the
+	associated temporary register.
+	(aarch64_allocate_and_probe_stack_space): Update calls accordingly.
+	Start out with bytes_per_sp set to the frame size and decrement
+	it after each allocation.
+
+2025-04-29  liuhongt  <hongtao.liu@intel.com>
+
+	Backported from master:
+	2025-04-29  liuhongt  <hongtao.liu@intel.com>
+
+	* config/i386/x86-tune.def (X86_TUNE_DEST_FALSE_DEP_FOR_GLC):
+	Remove other processor except for GLC since this one is only
+	for GLC.
+
+2025-04-25  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2025-04-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/119873
+	* config/s390/s390.cc (s390_call_saved_register_used): Don't return
+	true if default definition of PARM_DECL SSA_NAME of the same register
+	is passed in call saved register in the PARALLEL case either.
+
+2025-04-25  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2025-04-24  Jakub Jelinek  <jakub@redhat.com>
+		    Stefan Schulze Frielinghaus  <stefansf@gcc.gnu.org>
+
+	PR target/119873
+	* config/s390/s390.cc (s390_call_saved_register_used): Don't return
+	true if default definition of PARM_DECL SSA_NAME of the same register
+	is passed in call saved register.
+	(s390_function_ok_for_sibcall): Adjust comment.
+
+2025-04-25  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2025-04-22  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/119327
+	* config/rs6000/rs6000.cc (rs6000_can_inline_p): Ignore also
+	OPTION_MASK_SAVE_TOC_INDIRECT differences.
+
 2025-04-25  Release Manager
 
 	* GCC 15.1.0 released.

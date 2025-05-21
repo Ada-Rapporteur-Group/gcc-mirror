@@ -705,8 +705,14 @@ namespace __format
 	    if (__write_direct)
 	      return __out;
 
-	  auto __str = std::move(__sink).get();
-	  return __format::__write_padded_as_spec(__str, __str.size(),
+	  auto __span = __sink.view();
+	  __string_view __str(__span.data(), __span.size());
+	  size_t __width;
+	  if constexpr (__unicode::__literal_encoding_is_unicode<_CharT>())
+	    __width = __unicode::__field_width(__str);
+	  else
+	    __width = __str.size();
+	  return __format::__write_padded_as_spec(__str, __width,
 						  __fc, _M_spec);
 	}
 
@@ -775,6 +781,9 @@ namespace __format
 		  // formatted with an empty chrono-specs, either it's a
 		  // sys_time with period greater or equal to days:
 		  if constexpr (is_convertible_v<_Tp, chrono::sys_days>)
+		    __os << _S_date(__t);
+		  // Or a local_time with period greater or equal to days:
+		  else if constexpr (is_convertible_v<_Tp, chrono::local_days>)
 		    __os << _S_date(__t);
 		  else // Or it's formatted as "{:L%F %T}":
 		    {

@@ -1,3 +1,133 @@
+2025-05-20  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	Backported from master:
+	2025-05-20  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/120013
+	* module.cc (trees_in::install_entity): Handle re-registering
+	the inner TYPE_DECL of a partial specialisation.
+
+2025-05-20  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	Backported from master:
+	2025-05-20  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/120350
+	* rtti.cc (get_tinfo_decl_direct): Mark TREE_ADDRESSABLE.
+
+2025-05-15  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2025-05-15  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/120161
+	* pt.cc (unify) <case RECORD_TYPE>: When comparing specializations
+	of a non-primary template, still perform a type comparison.
+
+2025-05-14  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	Backported from master:
+	2025-05-14  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/120125
+	* module.cc (trees_out::write_function_def): Only set
+	DECL_NOT_REALLY_EXTERN if the importer might need to emit it.
+	* optimize.cc (maybe_thunk_body): Don't assume 'fn' has a cgraph
+	node created.
+
+2025-05-14  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	Backported from master:
+	2025-05-14  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/119864
+	* decl2.cc (start_objects): Only use module initialized for
+	host.
+	(c_parse_final_cleanups): Don't always create an OMP offload
+	init function in modules.
+
+2025-05-12  Jason Merrill  <jason@redhat.com>
+
+	Backported from master:
+	2025-05-12  Jason Merrill  <jason@redhat.com>
+
+	PR c++/120012
+	* class.cc (check_non_pod_aggregate): Check is_empty_class.
+
+2025-05-07  Jason Merrill  <jason@redhat.com>
+
+	Backported from master:
+	2025-05-02  Jason Merrill  <jason@redhat.com>
+
+	PR c++/120012
+	* cp-tree.h (struct lang_type): Add non_aggregate_pod.
+	(CLASSTYPE_NON_AGGREGATE_POD): New.
+	* class.cc (check_bases_and_members): Set it.
+	(check_non_pod_aggregate): Diagnose it.
+
+2025-05-01  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	Backported from master:
+	2025-04-30  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/120023
+	* module.cc (depset::hash::find_dependencies): Also call
+	add_deduction_guides when walking one.
+
+2025-05-01  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	Backported from master:
+	2025-04-30  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/119938
+	* pt.cc (get_template_parm_object): When !check_init, add assert
+	that expr really is constant and mark decl as such.
+
+2025-05-01  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	Backported from master:
+	2025-04-30  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/119551
+	PR c++/119996
+	* module.cc (depset::hash::make_dependency): Also mark inline
+	variables referencing TU-local values as exposures here.
+	(depset::hash::finalize_dependencies): Add error message for
+	inline variables.
+
+2025-04-30  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2025-04-30  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/119981
+	PR c++/119378
+	* pt.cc (tsubst) <case UNBOUND_CLASS_TEMPLATE>: Substitute
+	into template parameter list first.  When substituting the
+	context, only set processing_template_decl if there's more
+	than one level of introduced template parameters.
+
+2025-04-27  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	Backported from master:
+	2025-04-27  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/119939
+	* module.cc (trees_out::lang_decl_vals): Also stream
+	lang->u.fn.context when DECL_UNIQUE_FRIEND_P.
+	(trees_in::lang_decl_vals): Likewise.
+
+2025-04-27  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	Backported from master:
+	2025-04-22  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/119863
+	* name-lookup.cc (get_mergeable_namespace_binding): Remove
+	no-longer-used function.
+	(lookup_imported_hidden_friend): Also look for hidden imported
+	decls in an attached decl's module.
+
 2025-04-25  Release Manager
 
 	* GCC 15.1.0 released.

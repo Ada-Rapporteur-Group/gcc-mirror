@@ -1,3 +1,474 @@
+2025-05-20  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2025-05-10  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/102891
+	* gfortran.dg/transfer_array_subref.f90: New test.
+
+2025-05-20  Martin Jambor  <mjambor@suse.cz>
+
+	Backported from master:
+	2025-05-14  Martin Jambor  <mjambor@suse.cz>
+
+	* gcc.dg/ipa/pr120044-1.c: New test.
+	* gcc.dg/ipa/pr120044-2.c: Likewise.
+	* gcc.dg/tree-ssa/pr114864.c: Likewise.
+
+2025-05-20  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	Backported from master:
+	2025-05-20  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/120013
+	* g++.dg/modules/partial-8.h: New test.
+	* g++.dg/modules/partial-8_a.C: New test.
+	* g++.dg/modules/partial-8_b.C: New test.
+	* g++.dg/modules/partial-8_c.C: New test.
+	* g++.dg/modules/partial-8_d.C: New test.
+
+2025-05-20  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	Backported from master:
+	2025-05-20  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/120350
+	* g++.dg/modules/tinfo-3_a.H: New test.
+	* g++.dg/modules/tinfo-3_b.C: New test.
+
+2025-05-17  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+
+	Backported from master:
+	2025-05-06  Jerry DeLisle  <jvdelisle@gcc.gnu.org>
+
+	PR fortran/120049
+	* gfortran.dg/pr120049_a.f90: New test.
+	* gfortran.dg/pr120049_b.f90: New test.
+
+2025-05-16  Maciej W. Rozycki  <macro@orcam.me.uk>
+
+	Backported from master:
+	2025-04-19  Maciej W. Rozycki  <macro@orcam.me.uk>
+
+	* gcc.target/alpha/memcpy-nested-offset-long.c: New file.
+	* gcc.target/alpha/memcpy-nested-offset-quad.c: New file.
+
+2025-05-15  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2025-05-15  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/120161
+	* g++.dg/template/unify13.C: New test.
+
+2025-05-14  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	Backported from master:
+	2025-05-14  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/120125
+	* g++.dg/modules/clone-4_a.C: New test.
+	* g++.dg/modules/clone-4_b.C: New test.
+
+2025-05-14  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	Backported from master:
+	2025-05-14  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/119864
+	* g++.dg/modules/openmp-1.C: New test.
+
+2025-05-13  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/120163
+	* gfortran.dg/interface_61.f90: New test.
+
+2025-05-13  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2025-05-05  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/120117
+	* gm2/pim/pass/highbit.mod: New test.
+	* gm2/pim/pass/highbit2.mod: New test.
+
+2025-05-13  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2025-04-24  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/119915
+	* gm2/pimlib/run/pass/format2.mod: New test.
+
+2025-05-13  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2025-04-24  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/119914
+	* gm2/pim/fail/constintarraybyte.mod: New test.
+
+2025-05-13  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2025-05-13  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/120188
+	* gm2.dg/doc/examples/plugin/fail/doc-examples-plugin-fail.exp:
+	Remove call to gm2-dg-frontend-configure-check and replace with
+	tests for whether plugin variables exist.
+
+2025-05-13  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	Backported from master:
+	2025-05-12  Gaius Mulley  <gaiusmod2@gmail.com>
+
+	PR modula2/120188
+	* lib/gm2-dg.exp (gm2-dg-frontend-configure-check): New function.
+	(gm2-dg-runtest): Add -O2 to the option_list.
+	* gm2.dg/doc/examples/plugin/fail/assignvalue.mod: New test.
+	* gm2.dg/doc/examples/plugin/fail/doc-examples-plugin-fail.exp: New test.
+
+2025-05-13  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2025-05-13  Jakub Jelinek  <jakub@redhat.com>
+
+	PR libfortran/120196
+	* gfortran.dg/pr120196.f90: New test.
+
+2025-05-13  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2025-05-13  Jakub Jelinek  <jakub@redhat.com>
+
+	PR fortran/120191
+	* gfortran.dg/pr120191_3.f90: New test.
+
+2025-05-13  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2025-05-13  Jakub Jelinek  <jakub@redhat.com>
+
+	PR fortran/120191
+	* gfortran.dg/pr120191_2.f90: New test.
+
+2025-05-13  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2025-05-13  Jakub Jelinek  <jakub@redhat.com>
+		    Daniil Kochergin  <daniil2472s@gmail.com>
+		    Tobias Burnus  <tburnus@baylibre.com>
+
+	PR fortran/120191
+	* gfortran.dg/pr120191_1.f90: New test.
+
+2025-05-12  Jason Merrill  <jason@redhat.com>
+
+	Backported from master:
+	2025-05-12  Jason Merrill  <jason@redhat.com>
+
+	PR c++/120012
+	* g++.dg/abi/base-defaulted2.C: New test.
+
+2025-05-11  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/120211
+	* gcc.dg/vect/vect-early-break_135-pr120211.c: New testcase.
+	* gcc.dg/torture/pr120211-1.c: Likewise.
+
+2025-05-11  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2025-05-08  Richard Biener  <rguenther@suse.de>
+
+	PR ipa/120146
+	* g++.dg/ipa/pr120146.C: New testcase.
+
+2025-05-11  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2025-05-08  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/120143
+	* gcc.dg/vect/vect-early-break_135-pr120143.c: New testcase.
+
+2025-05-11  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2025-05-08  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/120089
+	* gcc.dg/vect/vect-early-break_134-pr120089.c: New testcase.
+
+2025-05-11  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2025-05-08  Richard Biener  <rguenther@suse.de>
+
+	PR tree-optimization/120043
+	* gcc.dg/torture/pr120043.c: New testcase.
+
+2025-05-11  Thomas Koenig  <tkoenig@gcc.gnu.org>
+
+	PR fortran/119928
+	* gfortran.dg/interface_60.f90: New test.
+
+2025-05-11  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	Backported from master:
+	2025-05-11  Andrew Pinski  <quic_apinski@quicinc.com>
+
+	PR testsuite/119909
+	* gcc.dg/torture/pr119131-1.c: Add -Wno-psabi.
+
+2025-05-09  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2025-05-08  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/120179
+	* gfortran.dg/do_concurrent_basic.f90: Extend testcase.
+
+2025-05-09  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2025-05-04  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/119986
+	* gfortran.dg/actual_array_subref.f90: New test.
+
+2025-05-09  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gnat.dg/opt106.adb: New test.
+	* gnat.dg/opt106_pkg1.ads, gnat.dg/opt106_pkg1.adb: New helper.
+	* gnat.dg/opt106_pkg2.ads, gnat.dg/opt106_pkg2.adb: Likewise.
+
+2025-05-08  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2025-05-08  Jakub Jelinek  <jakub@redhat.com>
+
+	PR libfortran/120152
+	PR libfortran/120153
+	PR libfortran/120158
+	* gfortran.dg/pr120152_1.f90: New test.
+	* gfortran.dg/pr120152_2.f90: New test.
+	* gfortran.dg/pr120153.f90: New test.
+	* gfortran.dg/pr120158.f90: New test.
+
+2025-05-08  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2025-05-07  Jakub Jelinek  <jakub@redhat.com>
+
+	PR preprocessor/108900
+	PR preprocessor/116047
+	PR preprocessor/120061
+	* gcc.dg/plugin/plugin.exp: Add location-overflow-test-pr116047.c
+	and location-overflow-test-pr120061.c.
+	* gcc.dg/plugin/location_overflow_plugin.cc (plugin_init): Don't error
+	on unknown values, instead just break.  Handle 0x4fHHHHHH arguments
+	differently.
+	* gcc.dg/plugin/location-overflow-test-pr116047.c: New test.
+	* gcc.dg/plugin/location-overflow-test-pr116047-1.h: New test.
+	* gcc.dg/plugin/location-overflow-test-pr116047-2.h: New test.
+	* gcc.dg/plugin/location-overflow-test-pr120061.c: New test.
+	* gcc.dg/plugin/location-overflow-test-pr120061-1.h: New test.
+	* gcc.dg/plugin/location-overflow-test-pr120061-2.h: New test.
+
+2025-05-07  Jason Merrill  <jason@redhat.com>
+
+	Backported from master:
+	2025-05-02  Jason Merrill  <jason@redhat.com>
+
+	PR c++/120012
+	* g++.dg/abi/base-defaulted1.C: New test.
+	* g++.dg/abi/base-defaulted1a.C: New test.
+
+2025-05-07  Martin Jambor  <mjambor@suse.cz>
+
+	Backported from master:
+	2025-05-06  Martin Jambor  <mjambor@suse.cz>
+
+	PR ipa/119852
+	* gcc.dg/ipa/pr119852.c: New test.
+
+2025-05-06  Andrew MacLeod  <amacleod@redhat.com>
+
+	PR tree-optimization/120048
+	* gcc.dg/pr120048.c: New.
+
+2025-05-06  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2025-05-06  Jakub Jelinek  <jakub@redhat.com>
+
+	PR tree-optimization/120074
+	* gcc.dg/pr120074.c: New test.
+
+2025-05-05  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2025-04-30  Richard Biener  <rguenther@suse.de>
+
+	PR ipa/120006
+	* gcc.dg/torture/pr120006.c: New testcase.
+
+2025-05-05  Richard Biener  <rguenther@suse.de>
+
+	Backported from master:
+	2025-04-28  Richard Biener  <rguenther@suse.de>
+
+	PR ipa/119973
+	* gcc.dg/torture/pr119973.c: New testcase.
+
+2025-05-05  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* gnat.dg/specs/finalizable1.ads: New test.
+
+2025-05-03  Harald Anlauf  <anlauf@gmx.de>
+
+	Backported from master:
+	2025-04-25  Harald Anlauf  <anlauf@gmx.de>
+
+	PR fortran/102900
+	* gfortran.dg/proc_ptr_52.f90: Add -fcheck=pointer to options.
+	* gfortran.dg/proc_ptr_57.f90: New test.
+
+2025-05-02  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2025-05-02  Jakub Jelinek  <jakub@redhat.com>
+
+	PR c/120057
+	* gcc.dg/cpp/embed-18.c: New test.
+	* gcc.dg/pr120057-1.c: New test.
+	* gcc.dg/pr120057-2.c: New test.
+
+2025-05-01  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	Backported from master:
+	2025-04-30  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/120023
+	* g++.dg/modules/dguide-7_a.C: New test.
+	* g++.dg/modules/dguide-7_b.C: New test.
+	* g++.dg/modules/dguide-7_c.C: New test.
+
+2025-05-01  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	Backported from master:
+	2025-04-30  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/119938
+	* g++.dg/modules/tpl-nttp-2_a.H: New test.
+	* g++.dg/modules/tpl-nttp-2_b.C: New test.
+
+2025-05-01  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	Backported from master:
+	2025-04-30  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/119551
+	PR c++/119996
+	* g++.dg/modules/internal-13.C: New test.
+
+2025-04-30  Andrew MacLeod  <amacleod@redhat.com>
+
+	PR tree-optimization/119712
+	* gcc.dg/pr119712.c: New.
+	* gcc.dg/pr83072-2.c: Adjust.
+	* gcc.dg/tree-ssa/phi-opt-value-5.c: Adjust.
+	* gcc.dg/tree-ssa/vrp122.c: Adjust
+
+2025-04-30  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2025-04-30  Richard Sandiford  <richard.sandiford@arm.com>
+
+	* gcc.target/aarch64/pr115258.c: Add -mcmodel=small.
+
+2025-04-30  Patrick Palka  <ppalka@redhat.com>
+
+	Backported from master:
+	2025-04-30  Patrick Palka  <ppalka@redhat.com>
+
+	PR c++/119981
+	PR c++/119378
+	* g++.dg/cpp2a/lambda-targ15.C: New test.
+
+2025-04-30  Georg-Johann Lay  <avr@gjlay.de>
+
+	Backported from master:
+	2025-04-30  Georg-Johann Lay  <avr@gjlay.de>
+
+	* gcc.target/avr/torture/pr119989.h: New file.
+	* gcc.target/avr/torture/pr119989-memx-1.c: New test.
+	* gcc.target/avr/torture/pr119989-memx-2.c: New test.
+	* gcc.target/avr/torture/pr119989-memx-3.c: New test.
+	* gcc.target/avr/torture/pr119989-memx-4.c: New test.
+	* gcc.target/avr/torture/pr119989-flashx-1.c: New test.
+	* gcc.target/avr/torture/pr119989-flashx-2.c: New test.
+	* gcc.target/avr/torture/pr119989-flashx-3.c: New test.
+	* gcc.target/avr/torture/pr119989-flashx-4.c: New test.
+
+2025-04-29  Richard Sandiford  <richard.sandiford@arm.com>
+
+	Backported from master:
+	2025-04-24  Richard Sandiford  <richard.sandiford@arm.com>
+
+	PR target/119610
+	* g++.dg/torture/pr119610.C: New test.
+	* g++.target/aarch64/sve/pr119610-sve.C: Likewise.
+
+2025-04-27  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	Backported from master:
+	2025-04-27  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/119939
+	* g++.dg/modules/concept-11_a.H: New test.
+	* g++.dg/modules/concept-11_b.C: New test.
+
+2025-04-27  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	Backported from master:
+	2025-04-22  Nathaniel Shead  <nathanieloshead@gmail.com>
+
+	PR c++/119863
+	* g++.dg/modules/tpl-friend-18_a.C: New test.
+	* g++.dg/modules/tpl-friend-18_b.C: New test.
+	* g++.dg/modules/tpl-friend-18_c.C: New test.
+
+2025-04-25  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2025-04-25  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/119873
+	* gcc.target/s390/pr119873-5.c: New test.
+
+2025-04-25  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2025-04-24  Jakub Jelinek  <jakub@redhat.com>
+		    Stefan Schulze Frielinghaus  <stefansf@gcc.gnu.org>
+
+	PR target/119873
+	* gcc.target/s390/pr119873-1.c: New test.
+	* gcc.target/s390/pr119873-2.c: New test.
+	* gcc.target/s390/pr119873-3.c: New test.
+	* gcc.target/s390/pr119873-4.c: New test.
+
+2025-04-25  Jakub Jelinek  <jakub@redhat.com>
+
+	Backported from master:
+	2025-04-22  Jakub Jelinek  <jakub@redhat.com>
+
+	PR target/119327
+	* g++.dg/opt/pr119327.C: New test.
+
 2025-04-25  Release Manager
 
 	* GCC 15.1.0 released.

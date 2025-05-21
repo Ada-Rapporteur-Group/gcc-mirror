@@ -7386,7 +7386,7 @@ trees_out::lang_decl_vals (tree t)
 	    WU (lang->u.fn.ovl_op_code);
 	}
 
-      if (DECL_CLASS_SCOPE_P (t))
+      if (DECL_CLASS_SCOPE_P (t) || DECL_UNIQUE_FRIEND_P (t))
 	WT (lang->u.fn.context);
 
       if (lang->u.fn.thunk_p)
@@ -7470,7 +7470,7 @@ trees_in::lang_decl_vals (tree t)
 	    lang->u.fn.ovl_op_code = code;
 	}
 
-      if (DECL_CLASS_SCOPE_P (t))
+      if (DECL_CLASS_SCOPE_P (t) || DECL_UNIQUE_FRIEND_P (t))
 	RT (lang->u.fn.context);
 
       if (lang->u.fn.thunk_p)
@@ -8097,18 +8097,37 @@ trees_in::install_entity (tree decl)
       gcc_checking_assert (!existed);
       slot = ident;
     }
-  else if (state->is_partition ())
+  else
     {
-      /* The decl is already in the entity map, but we see it again now from a
-	 partition: we want to overwrite if the original decl wasn't also from
-	 a (possibly different) partition.  Otherwise, for things like template
-	 instantiations, make_dependency might not realise that this is also
-	 provided from a partition and should be considered part of this module
-	 (and thus always emitted into the primary interface's CMI).  */
       unsigned *slot = entity_map->get (DECL_UID (decl));
-      module_state *imp = import_entity_module (*slot);
-      if (!imp->is_partition ())
-	*slot = ident;
+
+      /* The entity must be in the entity map already.  However, DECL may
+	 be the DECL_TEMPLATE_RESULT of an existing partial specialisation
+	 if we matched it while streaming another instantiation; in this
+	 case we already registered that TEMPLATE_DECL.  */
+      if (!slot)
+	{
+	  tree type = TREE_TYPE (decl);
+	  gcc_checking_assert (TREE_CODE (decl) == TYPE_DECL
+			       && CLASS_TYPE_P (type)
+			       && CLASSTYPE_TEMPLATE_SPECIALIZATION (type));
+	  slot = entity_map->get (DECL_UID (CLASSTYPE_TI_TEMPLATE (type)));
+	}
+      gcc_checking_assert (slot);
+
+      if (state->is_partition ())
+	{
+	  /* The decl is already in the entity map, but we see it again now
+	     from a partition: we want to overwrite if the original decl
+	     wasn't also from a (possibly different) partition.  Otherwise,
+	     for things like template instantiations, make_dependency might
+	     not realise that this is also provided from a partition and
+	     should be considered part of this module (and thus always
+	     emitted into the primary interface's CMI).  */
+	  module_state *imp = import_entity_module (*slot);
+	  if (!imp->is_partition ())
+	    *slot = ident;
+	}
     }
 
   return true;
@@ -12638,7 +12657,11 @@ trees_out::write_function_def (tree decl)
     {
       unsigned flags = 0;
 
-      flags |= 1 * DECL_NOT_REALLY_EXTERN (decl);
+      /* Whether the importer should emit this definition, if used.  */
+      flags |= 1 * (DECL_NOT_REALLY_EXTERN (decl)
+		    && (get_importer_interface (decl)
+			!= importer_interface::always_import));
+
       if (f)
 	{
 	  flags |= 2;
@@ -14062,9 +14085,10 @@ depset::hash::make_dependency (tree decl, entity_kind ek)
 		     streaming the definition in such cases.  */
 		  dep->clear_flag_bit<DB_DEFN_BIT> ();
 
-		  if (DECL_DECLARED_CONSTEXPR_P (decl))
-		    /* Also, a constexpr variable initialized to a TU-local
-		       value is an exposure.  */
+		  if (DECL_DECLARED_CONSTEXPR_P (decl)
+		      || DECL_INLINE_VAR_P (decl))
+		    /* A constexpr variable initialized to a TU-local value,
+		       or an inline value (PR c++/119996), is an exposure.  */
 		    dep->set_flag_bit<DB_EXPOSURE_BIT> ();
 		}
 	    }
@@ -14822,9 +14846,16 @@ depset::hash::find_dependencies (module_state *module)
 		}
 	      walker.end ();
 
+	      /* If we see either a class template or a deduction guide, make
+		 sure to add all visible deduction guides.  We need to check
+		 both in case they have been added in separate modules, or
+		 one is in the GMF and would have otherwise been discarded.  */
 	      if (!is_key_order ()
 		  && DECL_CLASS_TEMPLATE_P (decl))
 		add_deduction_guides (decl);
+	      if (!is_key_order ()
+		  && deduction_guide_p (decl))
+		add_deduction_guides (TYPE_NAME (TREE_TYPE (TREE_TYPE (decl))));
 
 	      if (!is_key_order ()
 		  && TREE_CODE (decl) == TEMPLATE_DECL
@@ -15025,12 +15056,24 @@ depset::hash::finalize_dependencies ()
 		break;
 	      }
 
-	  if (!explained && VAR_P (decl) && DECL_DECLARED_CONSTEXPR_P (decl))
+	  if (!explained
+	      && VAR_P (decl)
+	      && (DECL_DECLARED_CONSTEXPR_P (decl)
+		  || DECL_INLINE_VAR_P (decl)))
 	    {
 	      auto_diagnostic_group d;
-	      error_at (DECL_SOURCE_LOCATION (decl),
-			"%qD is declared %<constexpr%> and is initialized to "
-			"a TU-local value", decl);
+	      if (DECL_DECLARED_CONSTEXPR_P (decl))
+		error_at (DECL_SOURCE_LOCATION (decl),
+			  "%qD is declared %<constexpr%> and is initialized to "
+			  "a TU-local value", decl);
+	      else
+		{
+		  /* This can only occur with references.  */
+		  gcc_checking_assert (TYPE_REF_P (TREE_TYPE (decl)));
+		  error_at (DECL_SOURCE_LOCATION (decl),
+			    "%qD is a reference declared %<inline%> and is "
+			    "constant-initialized to a TU-local value", decl);
+		}
 	      bool informed = is_tu_local_value (decl, DECL_INITIAL (decl),
 						 /*explain=*/true);
 	      gcc_checking_assert (informed);

@@ -7492,8 +7492,13 @@ get_template_parm_object (tree expr, tree name, bool check_init/*=true*/)
     {
       /* The EXPR is the already processed initializer, set it on the NTTP
 	 object now so that cp_finish_decl doesn't do it again later.  */
+      gcc_checking_assert (reduced_constant_expression_p (expr));
       DECL_INITIAL (decl) = expr;
-      DECL_INITIALIZED_P (decl) = 1;
+      DECL_INITIALIZED_P (decl) = true;
+      DECL_INITIALIZED_BY_CONSTANT_EXPRESSION_P (decl) = true;
+      /* FIXME setting TREE_CONSTANT on refs breaks the back end.  */
+      if (!TYPE_REF_P (type))
+	TREE_CONSTANT (decl) = true;
     }
 
   pushdecl_top_level_and_finish (decl, expr);
@@ -17177,18 +17182,24 @@ tsubst (tree t, tree args, tsubst_flags_t complain, tree in_decl)
 
     case UNBOUND_CLASS_TEMPLATE:
       {
-	++processing_template_decl;
-	tree ctx = tsubst_entering_scope (TYPE_CONTEXT (t), args,
-					  complain, in_decl);
-	--processing_template_decl;
 	tree name = TYPE_IDENTIFIER (t);
-	tree parm_list = DECL_TEMPLATE_PARMS (TYPE_NAME (t));
-
-	if (ctx == error_mark_node || name == error_mark_node)
+	if (name == error_mark_node)
 	  return error_mark_node;
 
-	if (parm_list)
-	  parm_list = tsubst_template_parms (parm_list, args, complain);
+	tree parm_list = DECL_TEMPLATE_PARMS (TYPE_NAME (t));
+	parm_list = tsubst_template_parms (parm_list, args, complain);
+	if (parm_list == error_mark_node)
+	  return error_mark_node;
+
+	if (parm_list && TMPL_PARMS_DEPTH (parm_list) > 1)
+	  ++processing_template_decl;
+	tree ctx = tsubst_entering_scope (TYPE_CONTEXT (t), args,
+					  complain, in_decl);
+	if (parm_list && TMPL_PARMS_DEPTH (parm_list) > 1)
+	  --processing_template_decl;
+	if (ctx == error_mark_node)
+	  return error_mark_node;
+
 	return make_unbound_class_template (ctx, name, parm_list, complain);
       }
 
@@ -25786,10 +25797,10 @@ unify (tree tparms, tree targs, tree parm, tree arg, int strict,
 			  INNERMOST_TEMPLATE_ARGS (CLASSTYPE_TI_ARGS (parm)),
 			  INNERMOST_TEMPLATE_ARGS (CLASSTYPE_TI_ARGS (t)),
 			  UNIFY_ALLOW_NONE, explain_p);
-	  else
-	    return unify_success (explain_p);
+	  gcc_checking_assert (t == arg);
 	}
-      else if (!same_type_ignoring_top_level_qualifiers_p (parm, arg))
+
+      if (!same_type_ignoring_top_level_qualifiers_p (parm, arg))
 	return unify_type_mismatch (explain_p, parm, arg);
       return unify_success (explain_p);
 

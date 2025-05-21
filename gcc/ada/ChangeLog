@@ -1,3 +1,21 @@
+2025-05-05  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR ada/120104
+	* exp_ch3.adb (Expand_Freeze_Record_Type): For a controlled tagged
+	type, freeze only the controlled primitives that are present.
+
+2025-04-30  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR ada/112958
+	* Makefile.rtl (LIBGNAT_TARGET_PAIRS) [x86 FreeBSD]: Add specific
+	version of s-dorepr.adb.
+	* libgnat/s-dorepr__freebsd.adb: New file.
+
+2025-04-30  Eric Botcazou  <ebotcazou@adacore.com>
+
+	PR ada/112958
+	* init.c (__gnat_error_handler) [__FreeBSD__]: Fix typo.
+
 2025-04-25  Release Manager
 
 	* GCC 15.1.0 released.
