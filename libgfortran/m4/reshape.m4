@@ -124,6 +124,7 @@ reshape_'rtype_ccode` ('rtype` * const restrict ret,
 
       ret->base_addr = xmallocarray (alloc_size, sizeof ('rtype_name`));
       ret->dtype.rank = rdim;
+      ret->span = sizeof ('rtype_name`);
     }
 
   if (shape_empty)
