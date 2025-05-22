@@ -1,3 +1,15 @@
+==================== Branch work206-bugs, patch #115 ====================
+
+Update tests.
+
+2025-05-22  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/testsuite/
+
+	PR target/118541
+	* gcc.target/powerpc/p9-minmax-2.c: Delete test.
+	* gcc.target/powerpc/float128-minmax-3.c: Use -Ofast, not -O2.
+
 ==================== Branch work206-bugs, patch #114 ====================
 
 Disable fp cmove on power9
