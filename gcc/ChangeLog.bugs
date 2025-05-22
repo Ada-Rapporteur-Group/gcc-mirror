@@ -1,4 +1,4 @@
-==================== Branch work206-bugs, patch #111 ====================
+==================== Branch work206-bugs, patch #112 ====================
 
 Fix PR 118541, do not generate unordered fp cmoves for IEEE compares.
 
@@ -42,14 +42,18 @@ raise an interrupt.
 
 The root cause of this is we allow floating point comparisons to be reversed
 (i.e. LT will be reversed to UNGE).  Before power9, this was ok because we only
-generated the FCMPU or XSCMPUDP instructions.  But with power9, we can generate
-the XSCMPEQDP, XSCMPGTDP, or XSCMPGEDP instructions.  If NaNs are allowed, we no
-longer allow FP comparisons to be reversed.  If FP comparisons can't be
-reversed, the machine independent portions of the compiler will generate the
-comparison with the arguments reversed.
+generated the FCMPU or XSCMPUDP instructions.
 
-Since we do not support reversing FP comparisons, the code to support inverting
-fpmask operations on power9 has been removed.
+But with power9, we can generate the XSCMPEQDP, XSCMPGTDP, or XSCMPGEDP
+instructions.  This code now does not convert an unordered compare into an
+ordered compare.  Instead, it does the opposite comparison and swaps the
+arguments.  I.e. it converts:
+
+	r = (a < b) ? c : d;
+
+into:
+
+	r = (b >= a) ? c : d;
 
 For the following code:
 
@@ -94,12 +98,17 @@ gcc/
 	PR target/118541
 	* config/rs6000/predicates.md (invert_fpmask_comparison_operator):
 	Delete.
+	(fpmask_reverse_args_comparison_operator): New predicate.
+	* config/rs6000/rs6000-proto.h (rs6000_fpmask_reverse_args): New
+	declaration.
+	* config/rs6000/rs6000.cc (rs6000_fpmask_reverse_args): New function.
 	* config/rs6000/rs6000.h (REVERSIBLE_CC_MODE): Do not allow floating
 	point comparisons to be reversed unless -ffinite-math-only is used.
-	(rs6000_reverse_condition): Add argument.
 	* config/rs6000/rs6000.md (mov<SFDF:mode><SFDF2:mode>cc_p9): Add
 	comment.
-	(mov<SFDF:mode><SFDF2:mode>cc_invert_p9): Delete insns.
+	(mov<SFDF:mode><SFDF2:mode>cc_invert_p9): Reverse the argument order for
+	the comparison, and use an unordered comparison, instead of ordered
+	comparison.
 	(mov<mode>cc_invert_p10): Likewise.
 
 gcc/testsuite/
@@ -107,6 +116,7 @@ gcc/testsuite/
 	PR target/118541
 	* gcc.target/powerpc/pr118541.c: New test.
 
+==================== Branch work206-bugs, patch #111 was reverted ====================
 ==================== Branch work206-bugs, patch #110 was reverted ====================
 
 ==================== Branch work206-bugs, patch #101 ====================
