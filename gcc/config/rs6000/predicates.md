@@ -1465,9 +1465,9 @@
 
 ;; Return 1 if OP is a comparison operator suitable for vector/scalar
 ;; comparisons that generate a 0/-1 mask (i.e. the inverse of
-;; fpmask_comparison_operator when the arguments are swapped).
-(define_predicate "fpmask_reverse_args_comparison_operator"
-  (match_code "ne,lt,le"))
+;; fpmask_comparison_operator).
+(define_predicate "invert_fpmask_comparison_operator"
+  (match_code "ne,unlt,unle"))
 
 ;; Return 1 if OP is a comparison operation suitable for integer vector/scalar
 ;; comparisons that generate a -1/0 mask.

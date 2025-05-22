@@ -1810,17 +1810,10 @@ extern scalar_int_mode rs6000_pmode;
    : (((OP) == EQ || (OP) == NE) && COMPARISON_P (X)			  \
       ? CCEQmode : CCmode))
 
-/* Can the condition code MODE be safely reversed?  Don't allow floating point
-   comparisons to be reversed unless NaNs are not allowed.
-
-   In the past, we used to allow reversing FP operations because we only
-   generated FCMPU comparisons and not FCMPO.  However, starting with power9,
-   the XSCMPEQDP, XSCMPGTDP, and XSCMPGEDP instructions will trap if a
-   signalling NaN is used.  If we allow reversing FP operations, we could wind
-   up converting a LT operation into UNGE and the instruction will trap.  The
-   machine independent parts of the compiler will handle reversing the
-   arguments if the FP comparison cannot be reversed.  */
-#define REVERSIBLE_CC_MODE(MODE) ((MODE) != CCFPmode || flag_finite_math_only)
+/* Can the condition code MODE be safely reversed?  This is safe in
+   all cases on this port, because at present it doesn't use the
+   trapping FP comparisons (fcmpo).  */
+#define REVERSIBLE_CC_MODE(MODE) 1
 
 /* Given a condition code and a mode, return the inverse condition.  */
 #define REVERSE_CONDITION(CODE, MODE) rs6000_reverse_condition (MODE, CODE)

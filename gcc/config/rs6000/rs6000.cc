@@ -15379,30 +15379,6 @@ rs6000_reverse_condition (machine_mode mode, enum rtx_code code)
     return reverse_condition (code);
 }
 
-/* Like reverse_condition, but return the condition code where the arguments
-   are reversed.  I.e. do not convert an unordered compare into an ordered
-   compare.  This is used for the fpmask operations in power9 to implement
-   floating point conditional moves.  */
-
-enum rtx_code
-rs6000_fpmask_reverse_args (enum rtx_code code)
-{
-  switch (code)
-    {
-    case NE:
-      return EQ;
-
-    case LE:
-      return GT;
-
-    case LT:
-      return GE;
-
-    default:
-      gcc_unreachable ();
-    }
-}
-
 /* Check if C (as 64bit integer) can be rotated to a constant which constains
    nonzero bits at the LOWBITS low bits only.
 
