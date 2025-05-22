@@ -1,3 +1,15 @@
+==================== Branch work206-bugs, patch #114 ====================
+
+Disable fp cmove on power9
+
+2025-05-22  Michael Meissner  <meissner@linux.ibm.com>
+
+gcc/
+
+	PR target/118541
+	* config/rs6000/rs6000.cc (have_compare_and_set_mask): Disable unless
+	NaNs are disabled.
+
 ==================== Branch work206-bugs, patch #113 ====================
 
 Fix PR 118541, do not generate unordered fp cmoves for IEEE compares.
