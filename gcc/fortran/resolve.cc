@@ -1968,7 +1968,7 @@ resolve_procedure_expression (gfc_expr* expr)
   if (is_illegal_recursion (sym, gfc_current_ns))
     {
       if (sym->attr.use_assoc && expr->symtree->name[0] == '@')
-	gfc_warning (0, "Non-RECURSIVE procedure %qs from module %qs is "
+	gfc_warning (0, "Non-RECURSIVE procedure %qs from module %qs is"
 		     " possibly calling itself recursively in procedure %qs. "
 		     " Declare it RECURSIVE or use %<-frecursive%>",
 		     sym->name, sym->module, gfc_current_ns->proc_name->name);
@@ -2409,7 +2409,9 @@ resolve_elemental_actual (gfc_expr *expr, gfc_code *c)
 	  for (a = arg0; a; a = a->next)
 	    if (a != arg
 		&& a->expr->rank == arg->expr->rank
-		&& !a->expr->symtree->n.sym->attr.optional)
+		&& (a->expr->expr_type != EXPR_VARIABLE
+		    || (a->expr->expr_type == EXPR_VARIABLE
+			&& !a->expr->symtree->n.sym->attr.optional)))
 	      {
 		t = true;
 		break;
@@ -3152,6 +3154,13 @@ gfc_pure_function (gfc_expr *e, const char **name)
       pure = e->value.function.isym->pure
 	     || e->value.function.isym->elemental;
       *name = e->value.function.isym->name;
+    }
+  else if (e->symtree && e->symtree->n.sym && e->symtree->n.sym->attr.dummy)
+    {
+      /* The function has been resolved, but esym is not yet set.
+	 This can happen with functions as dummy argument.  */
+      pure = e->symtree->n.sym->attr.pure;
+      *name = e->symtree->n.sym->name;
     }
   else
     {
@@ -12155,6 +12164,16 @@ generate_component_assignments (gfc_code **code, gfc_namespace *ns)
     {
       /* Assign the rhs to the temporary.  */
       tmp_expr = get_temp_from_expr ((*code)->expr1, ns);
+      if (tmp_expr->symtree->n.sym->attr.pointer)
+	{
+	  /* Use allocate on assignment for the sake of simplicity. The
+	     temporary must not take on the optional attribute. Assume
+	     that the assignment is guarded by a PRESENT condition if the
+	     lhs is optional.  */
+	  tmp_expr->symtree->n.sym->attr.pointer = 0;
+	  tmp_expr->symtree->n.sym->attr.optional = 0;
+	  tmp_expr->symtree->n.sym->attr.allocatable = 1;
+	}
       this_code = build_assignment (EXEC_ASSIGN,
 				    tmp_expr, (*code)->expr2,
 				    NULL, NULL, (*code)->loc);

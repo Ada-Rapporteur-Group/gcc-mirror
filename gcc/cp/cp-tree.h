@@ -5582,7 +5582,8 @@ enum cp_lvalue_kind_flags {
   clk_class = 4,    /* A prvalue of class or array type.  */
   clk_bitfield = 8, /* An lvalue for a bit-field.  */
   clk_packed = 16,  /* An lvalue for a packed field.  */
-  clk_implicit_rval = 1<<5 /* An lvalue being treated as an xvalue.  */
+  clk_implicit_rval = 1<<5, /* An lvalue being treated as an xvalue.  */
+  clk_mergeable = 1<<6
 };
 
 /* This type is used for parameters and variables which hold
@@ -6947,6 +6948,7 @@ extern tree convert_to_reference		(tree, tree, int, int, tree,
 						 tsubst_flags_t);
 extern tree convert_from_reference		(tree);
 extern tree force_rvalue			(tree, tsubst_flags_t);
+extern tree force_lvalue			(tree, tsubst_flags_t);
 extern tree ocp_convert				(tree, tree, int, int,
 						 tsubst_flags_t);
 extern tree cp_convert				(tree, tree, tsubst_flags_t);
@@ -7452,7 +7454,6 @@ extern bool handle_module_option (unsigned opt, const char *arg, int value);
 /* In optimize.cc */
 extern tree clone_attrs				(tree);
 extern bool maybe_clone_body			(tree);
-extern void maybe_optimize_cdtor		(tree);
 
 /* In parser.cc */
 extern tree cp_convert_range_for (tree, tree, tree, cp_decomp *, bool,
@@ -8035,6 +8036,7 @@ extern bool glvalue_p				(const_tree);
 extern bool obvalue_p				(const_tree);
 extern bool xvalue_p	                        (const_tree);
 extern bool bitfield_p				(const_tree);
+extern bool non_mergeable_glvalue_p		(const_tree);
 extern tree cp_stabilize_reference		(tree);
 extern bool builtin_valid_in_constant_expr_p    (const_tree);
 extern tree build_min				(enum tree_code, tree, ...);
@@ -8680,6 +8682,7 @@ extern bool is_rvalue_constant_expression (tree);
 extern bool is_nondependent_constant_expression (tree);
 extern bool is_nondependent_static_init_expression (tree);
 extern bool is_static_init_expression    (tree);
+extern bool is_std_class (tree, const char *);
 extern bool is_std_allocator (tree);
 extern bool potential_rvalue_constant_expression (tree);
 extern bool require_potential_constant_expression (tree);
@@ -8762,6 +8765,8 @@ extern bool morph_fn_to_coro			(tree, tree *, tree *);
 extern tree coro_get_actor_function		(tree);
 extern tree coro_get_destroy_function		(tree);
 extern tree coro_get_ramp_function		(tree);
+
+extern tree co_await_get_resume_call		(tree await_expr);
 
 /* contracts.cc */
 extern tree make_postcondition_variable		(cp_expr);

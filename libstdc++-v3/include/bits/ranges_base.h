@@ -537,6 +537,12 @@ namespace ranges
     using range_rvalue_reference_t
       = iter_rvalue_reference_t<iterator_t<_Range>>;
 
+  // _GLIBCXX_RESOLVE_LIB_DEFECTS
+  // 3860. range_common_reference_t is missing
+  template<range _Range>
+    using range_common_reference_t
+      = iter_common_reference_t<iterator_t<_Range>>;
+
   /// [range.sized] The sized_range concept.
   template<typename _Tp>
     concept sized_range = range<_Tp>
@@ -625,11 +631,13 @@ namespace ranges
   namespace __access
   {
 #if __glibcxx_ranges_as_const // >= C++23
-    template<typename _Range>
+    template<input_range _Range>
       constexpr auto&
       __possibly_const_range(_Range& __r) noexcept
       {
-	if constexpr (constant_range<const _Range> && !constant_range<_Range>)
+	// _GLIBCXX_RESOLVE_LIB_DEFECTS
+	// 4027. possibly-const-range should prefer returning const R&
+	if constexpr (input_range<const _Range>)
 	  return const_cast<const _Range&>(__r);
 	else
 	  return __r;

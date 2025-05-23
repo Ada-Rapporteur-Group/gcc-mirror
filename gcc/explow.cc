@@ -756,8 +756,26 @@ force_subreg (machine_mode outermode, rtx op,
   if (x)
     return x;
 
+  auto *start = get_last_insn ();
   op = copy_to_mode_reg (innermode, op);
-  return simplify_gen_subreg (outermode, op, innermode, byte);
+  rtx res = simplify_gen_subreg (outermode, op, innermode, byte);
+  if (!res)
+    delete_insns_since (start);
+  return res;
+}
+
+/* Try to return an rvalue expression for the OUTERMODE lowpart of OP,
+   which has mode INNERMODE.  Allow OP to be forced into a new register
+   if necessary.
+
+   Return null on failure.  */
+
+rtx
+force_lowpart_subreg (machine_mode outermode, rtx op,
+		      machine_mode innermode)
+{
+  auto byte = subreg_lowpart_offset (outermode, innermode);
+  return force_subreg (outermode, op, innermode, byte);
 }
 
 /* If X is a memory ref, copy its contents to a new temp reg and return
