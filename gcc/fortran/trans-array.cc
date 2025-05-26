@@ -2780,6 +2780,7 @@ gfc_add_loop_ss_code (gfc_loopinfo * loop, gfc_ss * ss, bool subscript,
 	  gfc_add_block_to_block (&outer_loop->pre, &se.pre);
 	  gfc_add_block_to_block (&outer_loop->post, &se.post);
 	  info->descriptor = se.expr;
+	  gfc_conv_array_lbound_spacing (&outer_loop->pre, ss, 0);
 	  break;
 
 	case GFC_SS_INTRINSIC:
@@ -4308,7 +4309,8 @@ gfc_conv_array_lbound_spacing (stmtblock_t * block, gfc_ss * ss, int dim)
   gfc_array_info *info;
 
   gcc_assert (ss->info->type == GFC_SS_SECTION
-	      || ss->info->type == GFC_SS_COMPONENT);
+	      || ss->info->type == GFC_SS_COMPONENT
+	      || ss->info->type == GFC_SS_VECTOR);
 
   info = &ss->info->data.array;
   tree desc = info->descriptor;
