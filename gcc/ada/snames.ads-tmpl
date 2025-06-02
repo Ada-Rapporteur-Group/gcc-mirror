@@ -1308,6 +1308,7 @@ package Snames is
    Name_Others                           : constant Name_Id := N + $;
    Name_Out                              : constant Name_Id := N + $;
    Name_Package                          : constant Name_Id := N + $;
+   Name_Parallel                         : constant Name_Id := N + $;
    Name_Pragma                           : constant Name_Id := N + $;
    Name_Private                          : constant Name_Id := N + $;
    Name_Procedure                        : constant Name_Id := N + $;
