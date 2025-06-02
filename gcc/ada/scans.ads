@@ -174,6 +174,7 @@ package Scans is
       Tok_Declare,         -- DECLARE      Eterm, Sterm, After_SM, Labeled_Stmt
       Tok_For,             -- FOR          Eterm, Sterm, After_SM, Labeled_Stmt
       Tok_Loop,            -- LOOP         Eterm, Sterm, After_SM, Labeled_Stmt
+      Tok_Parallel,        -- PARALLEL     Eterm, Sterm, After_SM, Labeled_Stmt
       Tok_While,           -- WHILE        Eterm, Sterm, After_SM, Labeled_Stmt
 
       Tok_Entry,           -- ENTRY        Eterm, Sterm, Declk, Deckn, After_SM
