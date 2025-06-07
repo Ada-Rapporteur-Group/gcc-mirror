@@ -1308,7 +1308,6 @@ package Snames is
    Name_Others                           : constant Name_Id := N + $;
    Name_Out                              : constant Name_Id := N + $;
    Name_Package                          : constant Name_Id := N + $;
-   Name_Parallel                         : constant Name_Id := N + $;
    Name_Pragma                           : constant Name_Id := N + $;
    Name_Private                          : constant Name_Id := N + $;
    Name_Procedure                        : constant Name_Id := N + $;
@@ -1435,6 +1434,14 @@ package Snames is
 
    subtype Ada_2012_Reserved_Words is Name_Id
      range First_2012_Reserved_Word .. Last_2012_Reserved_Word;
+
+   --  Ada 2022 reserved words
+   First_2022_Reserved_Word              : constant Name_Id := N + $;
+   Name_Parallel                         : constant Name_Id := N + $;
+   Last_2022_Reserved_Word               : constant Name_Id := N + $;
+
+   subtype Ada_2022_Reserved_Words is Name_Id
+     range First_2022_Reserved_Word .. Last_2022_Reserved_Word;
 
    --  GNAT extensions reserved words
 
