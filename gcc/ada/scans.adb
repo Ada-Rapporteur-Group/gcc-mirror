@@ -98,7 +98,6 @@ package body Scans is
       Set_Reserved (Name_Others,    Tok_Others);
       Set_Reserved (Name_Out,       Tok_Out);
       Set_Reserved (Name_Package,   Tok_Package);
-      Set_Reserved (Name_Parallel,  Tok_Parallel);
       Set_Reserved (Name_Pragma,    Tok_Pragma);
       Set_Reserved (Name_Private,   Tok_Private);
       Set_Reserved (Name_Procedure, Tok_Procedure);
@@ -135,6 +134,10 @@ package body Scans is
       --  Ada 2012 reserved words
 
       Set_Reserved (Name_Some, Tok_Some);
+
+      --  Ada 2022 reserved words
+
+      Set_Reserved (Name_Parallel,  Tok_Parallel);
 
       --  GNAT extensions reserved words
       Set_Reserved (Name_Finally, Tok_Finally);
