@@ -913,6 +913,12 @@ begin -- Gen_IL.Gen.Gen_Nodes
         Sm (Is_Initialization_Block, Flag),
         Sm (Is_Task_Master, Flag)));
 
+   Cc (N_Parallel_Branch, Node_Kind,
+       (Sy (Statements, List_Id, Default_Empty_List)));
+
+   Cc (N_Parallel_Block_Statement, N_Statement_Other_Than_Procedure_Call,
+       (Sy (Parallel_Branches, List_Id, Default_No_List)));
+
    Cc (N_Case_Statement, N_Statement_Other_Than_Procedure_Call,
        (Sy (Expression, Node_Id, Default_Empty),
         Sy (Alternatives, List_Id, Default_No_List),

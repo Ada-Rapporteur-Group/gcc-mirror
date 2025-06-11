@@ -36,6 +36,8 @@ package body Ch5 is
    function P_Goto_Statement                     return Node_Id;
    function P_If_Statement                       return Node_Id;
    function P_Label                              return Node_Id;
+   function P_Parallel_Construct                 return Node_Id;
+   function P_Parallel_Do_Statement              return Node_Id;
    function P_Null_Statement                     return Node_Id;
 
    function P_Assignment_Statement (LHS : Node_Id) return Node_Id;
@@ -445,6 +447,27 @@ package body Ch5 is
                   else
                      Error_Msg_SC ("OR not allowed here");
                      Scan; -- past or
+                     Statement_Required := False;
+                  end if;
+
+               --  Case of AND
+
+               when Tok_And =>
+
+                  --  Terminate if Antm set or if the or is to the left of the
+                  --  expected column of the end for this sequence.
+
+                  if SS_Flags.Antm
+                     or else Start_Column < Scopes (Scope.Last).Ecol
+                  then
+                     Test_Statement_Required;
+                     exit;
+
+                  --  Otherwise complain and skip past and
+
+                  else
+                     Error_Msg_SC ("AND not allowed here");
+                     Scan; -- past and
                      Statement_Required := False;
                   end if;
 
@@ -864,6 +887,12 @@ package body Ch5 is
                when Tok_Declare =>
                   Check_Bad_Layout;
                   Append_To (Statement_List, P_Declare_Statement);
+                  Statement_Required := False;
+
+               --  Parallel construct
+               when Tok_Parallel =>
+                  Check_Bad_Layout;
+                  Append_To (Statement_List, P_Parallel_Construct);
                   Statement_Required := False;
 
                --  Delay_Statement
@@ -1976,6 +2005,61 @@ package body Ch5 is
       End_Statements (Handled_Statement_Sequence (Block));
       return Block;
    end P_Begin_Statement;
+
+   -------------------------------------
+   -- 5.6.1  Parallel Block Statement --
+   ------------------------------------
+
+   function P_Parallel_Construct return Node_Id is
+   begin
+      T_Parallel;
+
+      case Token is
+         when Tok_Do =>
+            return P_Parallel_Do_Statement;
+         when Tok_For =>
+            Error_Msg_Ada_2022_Feature
+              ("access definition in loop parameter", Token_Ptr);
+            return 0;
+         when others =>
+            Error_Msg_BC ("Invalid token following parallel");
+            return 0;
+      end case;
+   end P_Parallel_Construct;
+
+   function P_Parallel_Do_Statement return Node_Id is
+      Parallel_Do_Node : Node_Id;
+      Branch_List      : List_Id;
+   begin
+      Parallel_Do_Node := New_Node (N_Parallel_Block_Statement, Token_Ptr);
+
+      Push_Scope_Stack;
+      Scopes (Scope.Last).Etyp := E_Do;
+      Scopes (Scope.Last).Ecol := Start_Column;
+      Scopes (Scope.Last).Sloc := Token_Ptr;
+      Scopes (Scope.Last).Labl := Error;
+
+      T_Do;
+
+      Branch_List := New_List;
+      loop
+         declare
+            Parallel_Branch : Node_Id;
+         begin
+            Parallel_Branch := Make_Parallel_Branch
+              (Token_Ptr, P_Sequence_Of_Statements (SS_Antm_Sreq));
+            Append (Parallel_Branch, Branch_List);
+         end;
+
+         exit when Token /= Tok_And;
+         Scan;
+      end loop;
+
+      End_Statements;
+      Set_Parallel_Branches (Parallel_Do_Node, Branch_List);
+
+      return Parallel_Do_Node;
+   end P_Parallel_Do_Statement;
 
    -------------------------
    -- 5.7  Exit Statement --

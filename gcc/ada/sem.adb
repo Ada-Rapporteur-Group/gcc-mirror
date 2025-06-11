@@ -60,6 +60,7 @@ with Stylesw;        use Stylesw;
 with Uintp;          use Uintp;
 with Uname;          use Uname;
 
+with Ada.Exceptions;
 with Ada.Unchecked_Deallocation;
 
 pragma Warnings (Off, Sem_Util);
@@ -164,6 +165,16 @@ package body Sem is
 
          when N_Attribute_Definition_Clause   =>
             Analyze_Attribute_Definition_Clause (N);
+
+         when N_Parallel_Branch =>
+            Ada.Exceptions.Raise_Exception
+              (Program_Error'Identity,
+               "N_Parallel_Branch unimplemented");
+
+         when N_Parallel_Block_Statement =>
+            Ada.Exceptions.Raise_Exception
+              (Program_Error'Identity,
+               "N_Parallel_Block_Statement unimplemented");
 
          when N_Block_Statement =>
             Analyze_Block_Statement (N);

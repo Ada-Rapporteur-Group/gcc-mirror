@@ -339,6 +339,7 @@ package Gen_IL.Fields is
       Original_Entity,
       Others_Discrete_Choices,
       Out_Present,
+      Parallel_Branches,
       Parameter_Associations,
       Parameter_Specifications,
       Parameter_Type,

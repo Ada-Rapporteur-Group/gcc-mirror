@@ -1249,6 +1249,28 @@ package body Sprint is
             Write_Char (';');
             Sprint_At_End_Proc (Node);
 
+         when N_Parallel_Branch =>
+            Sprint_Indented_List (Statements (Node));
+
+         when N_Parallel_Block_Statement =>
+            Write_Indent_Str_Sloc ("parallel do");
+
+            declare
+               Branch_Node : Node_Id;
+            begin
+               Branch_Node := First (Parallel_Branches (Node));
+               loop
+                  Indent_Begin;
+                  Sprint_Node (Branch_Node);
+                  Indent_End;
+                  Next (Branch_Node);
+                  exit when No (Branch_Node);
+                  Write_Indent_Str ("and");
+               end loop;
+            end;
+
+            Write_Indent_Str ("end do;");
+
          when N_Call_Marker =>
             null;
 
