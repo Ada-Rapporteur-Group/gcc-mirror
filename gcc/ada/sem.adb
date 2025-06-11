@@ -166,6 +166,11 @@ package body Sem is
          when N_Attribute_Definition_Clause   =>
             Analyze_Attribute_Definition_Clause (N);
 
+         when N_Chunk_Specifier =>
+            Ada.Exceptions.Raise_Exception
+              (Program_Error'Identity,
+               "N_Chunk_Specifier unimplemented");
+
          when N_Parallel_Branch =>
             Ada.Exceptions.Raise_Exception
               (Program_Error'Identity,

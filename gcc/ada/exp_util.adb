@@ -8123,6 +8123,7 @@ package body Exp_Util is
                --  Declarations
 
                | N_Abstract_Subprogram_Declaration
+               | N_Chunk_Specifier
                | N_Entry_Body
                | N_Exception_Declaration
                | N_Exception_Renaming_Declaration

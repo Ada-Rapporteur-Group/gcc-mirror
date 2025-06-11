@@ -1253,7 +1253,15 @@ package body Sprint is
             Sprint_Indented_List (Statements (Node));
 
          when N_Parallel_Block_Statement =>
-            Write_Indent_Str_Sloc ("parallel do");
+            Write_Indent_Str_Sloc ("parallel ");
+
+            if Present (Chunk_Specifier (Node)) then
+               Write_Char ('(');
+               Sprint_Node (Chunk_Specifier (Node));
+               Write_Str (") ");
+            end if;
+
+            Write_Str_Sloc ("do");
 
             declare
                Branch_Node : Node_Id;
@@ -1338,6 +1346,11 @@ package body Sprint is
             Write_Char_Sloc (''');
             Write_Char_Code (UI_To_CC (Char_Literal_Value (Node)));
             Write_Char (''');
+
+         when N_Chunk_Specifier =>
+            Write_Id (Identifier (Node));
+            Write_Str (" in ");
+            Sprint_Node (Range_Constraint (Node));
 
          when N_Code_Statement =>
             Write_Indent;

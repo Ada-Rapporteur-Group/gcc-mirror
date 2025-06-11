@@ -92,6 +92,7 @@ package Gen_IL.Fields is
       Check_Address_Alignment,
       Choice_Parameter,
       Choices,
+      Chunk_Specifier,
       Class_Present,
       Classifications,
       Cleanup_Actions,

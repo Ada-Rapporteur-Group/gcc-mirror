@@ -36,8 +36,8 @@ package body Ch5 is
    function P_Goto_Statement                     return Node_Id;
    function P_If_Statement                       return Node_Id;
    function P_Label                              return Node_Id;
+   function P_Chunk_Specifier                    return Node_Id;
    function P_Parallel_Construct                 return Node_Id;
-   function P_Parallel_Do_Statement              return Node_Id;
    function P_Null_Statement                     return Node_Id;
 
    function P_Assignment_Statement (LHS : Node_Id) return Node_Id;
@@ -64,6 +64,8 @@ package body Ch5 is
    --  Parse loop statement. If Loop_Name is non-Empty on entry, it is
    --  the N_Identifier node for the label on the loop. If Loop_Name is
    --  Empty on entry (the default), then the loop statement is unlabeled.
+
+   function P_Parallel_Do_Statement (Chunk : Node_Id) return Node_Id;
 
    function P_While_Statement (Loop_Name : Node_Id := Empty) return Node_Id;
    --  Parse while statement. If Loop_Name is non-Empty on entry, it is
@@ -2010,24 +2012,52 @@ package body Ch5 is
    -- 5.6.1  Parallel Block Statement --
    ------------------------------------
 
+   function P_Chunk_Specifier return Node_Id is
+      Chunk : Node_Id := Empty;
+   begin
+      T_Left_Paren;
+      case Token is
+         when Tok_Identifier =>
+            Chunk := New_Node (N_Chunk_Specifier, Token_Ptr);
+            Set_Identifier (Chunk, Token_Node);
+            Scan; --  Scan past chunk index
+            T_In;
+            Set_Range_Constraint (Chunk, P_Signed_Integer_Type_Definition);
+         when Tok_Integer_Literal =>
+            Chunk := Token_Node;
+            Scan; --  Scan past number
+         when others =>
+            Error_Msg_SC ("Invalid chunk specifier. Expected " &
+               "identifier or natural number");
+      end case;
+      T_Right_Paren;
+
+      return Chunk;
+   end P_Chunk_Specifier;
+
    function P_Parallel_Construct return Node_Id is
+      Chunk_Spec : Node_Id := Empty;
    begin
       T_Parallel;
 
+      if Token = Tok_Left_Paren then
+         Chunk_Spec := P_Chunk_Specifier;
+      end if;
+
       case Token is
          when Tok_Do =>
-            return P_Parallel_Do_Statement;
+            return P_Parallel_Do_Statement (Chunk_Spec);
          when Tok_For =>
             Error_Msg_Ada_2022_Feature
-              ("access definition in loop parameter", Token_Ptr);
-            return 0;
+              ("Parallel loops not yet implemented", Token_Ptr);
+            return Empty;
          when others =>
-            Error_Msg_BC ("Invalid token following parallel");
-            return 0;
+            Error_Msg_SC ("Invalid token following parallel");
+            return Empty;
       end case;
    end P_Parallel_Construct;
 
-   function P_Parallel_Do_Statement return Node_Id is
+   function P_Parallel_Do_Statement (Chunk : Node_Id) return Node_Id is
       Parallel_Do_Node : Node_Id;
       Branch_List      : List_Id;
    begin
@@ -2054,8 +2084,9 @@ package body Ch5 is
          exit when Token /= Tok_And;
          Scan;
       end loop;
-
       End_Statements;
+
+      Set_Chunk_Specifier (Parallel_Do_Node, Chunk);
       Set_Parallel_Branches (Parallel_Do_Node, Branch_List);
 
       return Parallel_Do_Node;
