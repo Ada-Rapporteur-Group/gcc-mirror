@@ -211,6 +211,7 @@ package Gen_IL.Types is
       N_Identifier,
       N_Operator_Symbol,
       N_Character_Literal,
+      N_Chunk_Specifier,
       N_Op_Add,
       N_Op_Concat,
       N_Op_Expon,
