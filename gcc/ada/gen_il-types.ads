@@ -324,6 +324,8 @@ package Gen_IL.Types is
       N_Assignment_Statement,
       N_Asynchronous_Select,
       N_Block_Statement,
+      N_Parallel_Branch,
+      N_Parallel_Block_Statement,
       N_Case_Statement,
       N_Code_Statement,
       N_Compound_Statement,

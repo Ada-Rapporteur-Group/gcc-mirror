@@ -231,6 +231,10 @@ package body Endh is
             End_Type := E_Select;
             Scan; -- past SELECT
 
+         elsif Token = Tok_Do then
+            End_Type := E_Do;
+            Scan; -- past DO
+
          --  Cases which do allow labels
 
          else
@@ -885,6 +889,9 @@ package body Endh is
       elsif End_Type = E_Select then
          Error_Msg_SC ("no SELECT for this `END SELECT`!");
 
+      elsif End_Type = E_Do then
+         Error_Msg_SC ("no DO for this `END DO`!");
+
       else
          Error_Msg_SC ("no BEGIN for this END!");
       end if;
@@ -978,6 +985,10 @@ package body Endh is
          Error_Msg_SC -- CODEFIX
            ("`END SELECT;` expected@ for SELECT#!");
 
+      elsif End_Type = E_Do then
+         Error_Msg_SC -- CODEFIX
+           ("`END DO;` expected@ for DO#!");
+
       --  All remaining cases are cases with a name (we do not treat the
       --  suspicious is cases specially for a replaced end, only for an
       --  inserted end).
@@ -1048,6 +1059,10 @@ package body Endh is
       elsif End_Type = E_Select then
          Error_Msg_BC
            ("missing `END SELECT;` for SELECT#!");
+
+      elsif End_Type = E_Do then
+         Error_Msg_BC
+           ("missing `END DO;` for DO#!");
 
       elsif End_Type = E_Name then
          if Error_Msg_Node_1 = Empty then
