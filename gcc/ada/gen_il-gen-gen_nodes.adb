@@ -1063,6 +1063,8 @@ begin -- Gen_IL.Gen.Gen_Nodes
        (Sy (Condition, Node_Id, Default_Empty),
         Sy (Iterator_Specification, Node_Id, Default_Empty),
         Sy (Loop_Parameter_Specification, Node_Id, Default_Empty),
+        Sy (Chunk_Specifier, Node_Id, Default_Empty),
+        Sy (Is_Parallel, Flag),
         Sm (Condition_Actions, List_Id)));
 
    Cc (N_Terminate_Alternative, Node_Kind,

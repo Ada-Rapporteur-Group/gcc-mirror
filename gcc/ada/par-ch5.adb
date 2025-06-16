@@ -37,7 +37,6 @@ package body Ch5 is
    function P_If_Statement                       return Node_Id;
    function P_Label                              return Node_Id;
    function P_Chunk_Specifier                    return Node_Id;
-   function P_Parallel_Construct                 return Node_Id;
    function P_Null_Statement                     return Node_Id;
 
    function P_Assignment_Statement (LHS : Node_Id) return Node_Id;
@@ -65,7 +64,20 @@ package body Ch5 is
    --  the N_Identifier node for the label on the loop. If Loop_Name is
    --  Empty on entry (the default), then the loop statement is unlabeled.
 
+   function P_Parallel_Construct (Loop_Name : Node_Id := Empty) return Node_Id;
+   --  Parse the construct following a "parallel" keyword. This function is
+   --  responsible for parsing the chunk specifier and calls P_Loop_Statement
+   --  or P_Parallel_Do_Statement depending on which keyword follows the
+   --  parallel part. If Loop_Name is non-Empty on entry, it is passed on
+   --  to a P_Loop_Statement if the construct is a parallel for loop. If
+   --  Loop_Name is present but the construct is a parallel do, this function
+   --  will raise an error.
+
    function P_Parallel_Do_Statement (Chunk : Node_Id) return Node_Id;
+   --  Parse parallel do. If Chunk is non-Empty on entry, the specified
+   --  parallel chunk specifier will be used for the parallel do. If
+   --  Chunk is Empty on entry (the default), the parallel do will have
+   --  no chunk specifier.
 
    function P_While_Statement (Loop_Name : Node_Id := Empty) return Node_Id;
    --  Parse while statement. If Loop_Name is non-Empty on entry, it is
@@ -310,7 +322,7 @@ package body Ch5 is
                     (Token = Tok_Left_Paren
                       and then Prev_Token not in
                        Tok_Case | Tok_Delay | Tok_If | Tok_Elsif | Tok_Return |
-                       Tok_When | Tok_While | Tok_Separate)
+                       Tok_When | Tok_While | Tok_Separate | Tok_Parallel)
                then
                   --  Here we have an apparent reserved identifier and the
                   --  token past it is appropriate to this usage (and would
@@ -654,6 +666,12 @@ package body Ch5 is
                      elsif Token = Tok_For then
                         Append_To (Statement_List,
                           P_For_Statement (Id_Node));
+
+                     --  Parallel for statement
+
+                     elsif Token = Tok_Parallel then
+                        Append_To (Statement_List,
+                          P_Parallel_Construct (Id_Node));
 
                      --  Otherwise complain we have inappropriate statement
 
@@ -2035,7 +2053,10 @@ package body Ch5 is
       return Chunk;
    end P_Chunk_Specifier;
 
-   function P_Parallel_Construct return Node_Id is
+   function P_Parallel_Construct
+     (Loop_Name : Node_Id := Empty)
+      return Node_Id
+   is
       Chunk_Spec : Node_Id := Empty;
    begin
       T_Parallel;
@@ -2046,14 +2067,35 @@ package body Ch5 is
 
       case Token is
          when Tok_Do =>
+            if Present (Loop_Name) then
+               Error_Msg_F ("Loop label not allowed on " &
+                 "parallel do", Loop_Name);
+            end if;
+
+            if Present (Chunk_Spec) and then
+              Nkind (Chunk_Spec) = N_Chunk_Specifier
+            then
+               Error_Msg_F ("Range chunk specifier not " &
+                 "allowed for parallel do", Chunk_Spec);
+            end if;
+
             return P_Parallel_Do_Statement (Chunk_Spec);
          when Tok_For =>
-            Error_Msg_Ada_2022_Feature
-              ("Parallel loops not yet implemented", Token_Ptr);
-            return Empty;
+            declare
+               Loop_Node   : Node_Id;
+               Iter_Scheme : Node_Id;
+            begin
+               Loop_Node := P_For_Statement (Loop_Name);
+               Iter_Scheme := Iteration_Scheme (Loop_Node);
+
+               Set_Is_Parallel (Iter_Scheme);
+               Set_Chunk_Specifier (Iter_Scheme, Chunk_Spec);
+
+               return Loop_Node;
+            end;
          when others =>
             Error_Msg_SC ("Invalid token following parallel");
-            return Empty;
+            return Error;
       end case;
    end P_Parallel_Construct;
 

@@ -2333,7 +2333,17 @@ package body Sprint is
                Write_Str_With_Col_Check_Sloc ("while ");
                Sprint_Node (Condition (Node));
             else
-               Write_Str_With_Col_Check_Sloc ("for ");
+               if Is_Parallel (Node) then
+                  Write_Str_With_Col_Check_Sloc ("parallel ");
+                  if Present (Chunk_Specifier (Node)) then
+                     Write_Char ('(');
+                     Sprint_Node (Chunk_Specifier (Node));
+                     Write_Str (") ");
+                  end if;
+                  Write_Str ("for ");
+               else
+                  Write_Str_With_Col_Check_Sloc ("for ");
+               end if;
 
                if Present (Iterator_Specification (Node)) then
                   Sprint_Node (Iterator_Specification (Node));

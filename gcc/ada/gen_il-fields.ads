@@ -271,6 +271,7 @@ package Gen_IL.Fields is
       Is_Machine_Number,
       Is_Null_Loop,
       Is_Overloaded,
+      Is_Parallel,
       Is_Power_Of_2_For_Shift,
       Is_Preelaborable_Call,
       Is_Prefixed_Call,
