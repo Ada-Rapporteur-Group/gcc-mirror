@@ -477,7 +477,7 @@ package body Ch5 is
                      Test_Statement_Required;
                      exit;
 
-                  --  Otherwise complain and skip past and
+                  --  Otherwise complain and skip past AND
 
                   else
                      Error_Msg_SC ("AND not allowed here");
@@ -2069,15 +2069,15 @@ package body Ch5 is
       case Token is
          when Tok_Do =>
             if Present (Loop_Name) then
-               Error_Msg_F ("Loop label not allowed on " &
-                 "parallel do", Loop_Name);
+               Error_Msg_F ("Identifiers cannot be used for " &
+                 "parallel block statements", Loop_Name);
             end if;
 
             if Present (Chunk_Spec) and then
               Nkind (Chunk_Spec) = N_Chunk_Specifier
             then
-               Error_Msg_F ("Range chunk specifier not " &
-                 "allowed for parallel do", Chunk_Spec);
+               Error_Msg_F ("Range chunk specifier not permitted" &
+                 " in parallel block statements", Chunk_Spec);
             end if;
 
             return P_Parallel_Do_Statement (Chunk_Spec);
@@ -2095,7 +2095,8 @@ package body Ch5 is
                return Loop_Node;
             end;
          when others =>
-            Error_Msg_SC ("Invalid token following parallel");
+            Error_Msg_SC ("Invalid token following parallel. " &
+              "Expected AND or FOR.");
             return Error;
       end case;
    end P_Parallel_Construct;
