@@ -2060,6 +2060,7 @@ package body Ch5 is
       Chunk_Spec : Node_Id := Empty;
    begin
       T_Parallel;
+      Error_Msg_Ada_2022_Feature ("Parallel construct", Token_Ptr);
 
       if Token = Tok_Left_Paren then
          Chunk_Spec := P_Chunk_Specifier;
