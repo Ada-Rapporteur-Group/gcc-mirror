@@ -913,6 +913,17 @@ begin -- Gen_IL.Gen.Gen_Nodes
         Sm (Is_Initialization_Block, Flag),
         Sm (Is_Task_Master, Flag)));
 
+   Cc (N_Chunk_Specifier, Node_Kind,
+       (Sy (Identifier, Node_Id, Default_Empty),
+        Sy (Range_Constraint, Node_Id, Default_Empty)));
+
+   Cc (N_Parallel_Branch, Node_Kind,
+       (Sy (Statements, List_Id, Default_Empty_List)));
+
+   Cc (N_Parallel_Block_Statement, N_Statement_Other_Than_Procedure_Call,
+       (Sy (Chunk_Specifier, Node_Id, Default_Empty),
+        Sy (Parallel_Branches, List_Id, Default_No_List)));
+
    Cc (N_Case_Statement, N_Statement_Other_Than_Procedure_Call,
        (Sy (Expression, Node_Id, Default_Empty),
         Sy (Alternatives, List_Id, Default_No_List),
@@ -1052,6 +1063,8 @@ begin -- Gen_IL.Gen.Gen_Nodes
        (Sy (Condition, Node_Id, Default_Empty),
         Sy (Iterator_Specification, Node_Id, Default_Empty),
         Sy (Loop_Parameter_Specification, Node_Id, Default_Empty),
+        Sy (Chunk_Specifier, Node_Id, Default_Empty),
+        Sy (Is_Parallel, Flag),
         Sm (Condition_Actions, List_Id)));
 
    Cc (N_Terminate_Alternative, Node_Kind,

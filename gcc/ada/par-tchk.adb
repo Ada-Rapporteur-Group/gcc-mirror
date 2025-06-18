@@ -201,6 +201,15 @@ package body Tchk is
       end if;
    end T_Comma;
 
+   ----------
+   -- T_Do --
+   ----------
+
+   procedure T_Do is
+   begin
+      Check_Token (Tok_Do, AP);
+   end T_Do;
+
    ---------------
    -- T_Dot_Dot --
    ---------------
@@ -374,6 +383,15 @@ package body Tchk is
    begin
       Check_Token (Tok_Or, AP);
    end T_Or;
+
+   ----------------
+   -- T_Parallel --
+   ----------------
+
+   procedure T_Parallel is
+   begin
+      Check_Token (Tok_Parallel, AP);
+   end T_Parallel;
 
    ---------------
    -- T_Private --

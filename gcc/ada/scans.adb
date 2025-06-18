@@ -135,6 +135,10 @@ package body Scans is
 
       Set_Reserved (Name_Some, Tok_Some);
 
+      --  Ada 2022 reserved words
+
+      Set_Reserved (Name_Parallel,  Tok_Parallel);
+
       --  GNAT extensions reserved words
       Set_Reserved (Name_Finally, Tok_Finally);
    end Initialize_Ada_Keywords;
