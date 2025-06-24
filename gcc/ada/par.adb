@@ -407,6 +407,7 @@ function Par (Configuration_Pragmas : Boolean) return List_Id is
       Extm : Boolean;      -- EXCEPTION can terminate sequence
       Fitm : Boolean;      -- FINALLY can terminate sequence
       Ortm : Boolean;      -- OR can terminate sequence
+      Antm : Boolean;      -- AND can terminate sequence
       Sreq : Boolean;      -- at least one statement required
       Tatm : Boolean;      -- THEN ABORT can terminate sequence
       Whtm : Boolean;      -- WHEN can terminate sequence
@@ -414,16 +415,17 @@ function Par (Configuration_Pragmas : Boolean) return List_Id is
    end record;
    pragma Pack (SS_Rec);
 
-   SS_Eftm_Eltm_Sreq : constant SS_Rec := (T, T, F, F, F, T, F, F, F);
-   SS_Eltm_Ortm_Tatm : constant SS_Rec := (F, T, F, F, T, F, T, F, F);
-   SS_Extm_Fitm_Sreq : constant SS_Rec := (F, F, T, T, F, T, F, F, F);
-   SS_None           : constant SS_Rec := (F, F, F, F, F, F, F, F, F);
-   SS_Ortm_Sreq      : constant SS_Rec := (F, F, F, F, T, T, F, F, F);
-   SS_Sreq           : constant SS_Rec := (F, F, F, F, F, T, F, F, F);
-   SS_Sreq_Whtm      : constant SS_Rec := (F, F, F, F, F, T, F, T, F);
-   SS_Sreq_Fitm_Whtm : constant SS_Rec := (F, F, F, T, F, T, F, T, F);
-   SS_Whtm           : constant SS_Rec := (F, F, F, F, F, F, F, T, F);
-   SS_Unco           : constant SS_Rec := (F, F, F, F, F, F, F, F, T);
+   SS_Eftm_Eltm_Sreq : constant SS_Rec := (T, T, F, F, F, F, T, F, F, F);
+   SS_Eltm_Ortm_Tatm : constant SS_Rec := (F, T, F, F, T, F, F, T, F, F);
+   SS_Extm_Fitm_Sreq : constant SS_Rec := (F, F, T, T, F, F, T, F, F, F);
+   SS_None           : constant SS_Rec := (F, F, F, F, F, F, F, F, F, F);
+   SS_Ortm_Sreq      : constant SS_Rec := (F, F, F, F, T, F, T, F, F, F);
+   SS_Antm_Sreq      : constant SS_Rec := (F, F, F, F, F, T, T, F, F, F);
+   SS_Sreq           : constant SS_Rec := (F, F, F, F, F, F, T, F, F, F);
+   SS_Sreq_Whtm      : constant SS_Rec := (F, F, F, F, F, F, T, F, T, F);
+   SS_Sreq_Fitm_Whtm : constant SS_Rec := (F, F, F, T, F, F, T, F, T, F);
+   SS_Whtm           : constant SS_Rec := (F, F, F, F, F, F, F, F, T, F);
+   SS_Unco           : constant SS_Rec := (F, F, F, F, F, F, F, F, F, T);
 
    Goto_List : Elist_Id;
    --  List of goto nodes appearing in the current compilation. Used to
@@ -463,6 +465,7 @@ function Par (Configuration_Pragmas : Boolean) return List_Id is
        E_Record,          -- END RECORD;
        E_Return,          -- END RETURN;
        E_Select,          -- END SELECT;
+       E_Do,              -- END DO;
        E_Name,            -- END [name];
        E_Suspicious_Is,   -- END [name]; (case of suspicious IS)
        E_Bad_Is);         -- END [name]; (case of bad IS)
@@ -1240,6 +1243,7 @@ function Par (Configuration_Pragmas : Boolean) return List_Id is
       procedure T_Colon;
       procedure T_Colon_Equal;
       procedure T_Comma;
+      procedure T_Do;
       procedure T_Dot_Dot;
       procedure T_For;
       procedure T_Greater_Greater;
@@ -1252,6 +1256,7 @@ function Par (Configuration_Pragmas : Boolean) return List_Id is
       procedure T_New;
       procedure T_Of;
       procedure T_Or;
+      procedure T_Parallel;
       procedure T_Private;
       procedure T_Range;
       procedure T_Record;

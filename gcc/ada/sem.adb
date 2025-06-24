@@ -55,6 +55,7 @@ with Sem_Util;       use Sem_Util;
 with Sinfo;          use Sinfo;
 with Sinfo.Nodes;    use Sinfo.Nodes;
 with Sinfo.Utils;    use Sinfo.Utils;
+with Errout;         use Errout;
 with Stand;          use Stand;
 with Stylesw;        use Stylesw;
 with Uintp;          use Uintp;
@@ -164,6 +165,18 @@ package body Sem is
 
          when N_Attribute_Definition_Clause   =>
             Analyze_Attribute_Definition_Clause (N);
+
+         when N_Chunk_Specifier =>
+            Error_Msg ("N_Chunk_Specifier" &
+               " unimplemented", Sloc (N));
+
+         when N_Parallel_Branch =>
+            Error_Msg ("N_Parallel_Branch" &
+               " unimplemented", Sloc (N));
+
+         when N_Parallel_Block_Statement =>
+            Error_Msg ("N_Parallel_Block_Statement" &
+               " unimplemented", Sloc (N));
 
          when N_Block_Statement =>
             Analyze_Block_Statement (N);

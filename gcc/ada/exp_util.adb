@@ -8238,6 +8238,7 @@ package body Exp_Util is
                --  Declarations
 
                | N_Abstract_Subprogram_Declaration
+               | N_Chunk_Specifier
                | N_Entry_Body
                | N_Exception_Declaration
                | N_Exception_Renaming_Declaration
@@ -8263,6 +8264,7 @@ package body Exp_Util is
                | N_Package_Declaration
                | N_Package_Instantiation
                | N_Package_Renaming_Declaration
+               | N_Parallel_Branch
                | N_Private_Extension_Declaration
                | N_Private_Type_Declaration
                | N_Procedure_Instantiation

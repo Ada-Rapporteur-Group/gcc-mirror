@@ -1249,6 +1249,36 @@ package body Sprint is
             Write_Char (';');
             Sprint_At_End_Proc (Node);
 
+         when N_Parallel_Branch =>
+            Sprint_Indented_List (Statements (Node));
+
+         when N_Parallel_Block_Statement =>
+            Write_Indent_Str_Sloc ("parallel ");
+
+            if Present (Chunk_Specifier (Node)) then
+               Write_Char ('(');
+               Sprint_Node (Chunk_Specifier (Node));
+               Write_Str (") ");
+            end if;
+
+            Write_Str_Sloc ("do");
+
+            declare
+               Branch_Node : Node_Id;
+            begin
+               Branch_Node := First (Parallel_Branches (Node));
+               loop
+                  Indent_Begin;
+                  Sprint_Node (Branch_Node);
+                  Indent_End;
+                  Next (Branch_Node);
+                  exit when No (Branch_Node);
+                  Write_Indent_Str ("and");
+               end loop;
+            end;
+
+            Write_Indent_Str ("end do;");
+
          when N_Call_Marker =>
             null;
 
@@ -1316,6 +1346,11 @@ package body Sprint is
             Write_Char_Sloc (''');
             Write_Char_Code (UI_To_CC (Char_Literal_Value (Node)));
             Write_Char (''');
+
+         when N_Chunk_Specifier =>
+            Write_Id (Identifier (Node));
+            Write_Str (" in ");
+            Sprint_Node (Range_Constraint (Node));
 
          when N_Code_Statement =>
             Write_Indent;
@@ -2298,7 +2333,17 @@ package body Sprint is
                Write_Str_With_Col_Check_Sloc ("while ");
                Sprint_Node (Condition (Node));
             else
-               Write_Str_With_Col_Check_Sloc ("for ");
+               if Is_Parallel (Node) then
+                  Write_Str_With_Col_Check_Sloc ("parallel ");
+                  if Present (Chunk_Specifier (Node)) then
+                     Write_Char ('(');
+                     Sprint_Node (Chunk_Specifier (Node));
+                     Write_Str (") ");
+                  end if;
+                  Write_Str ("for ");
+               else
+                  Write_Str_With_Col_Check_Sloc ("for ");
+               end if;
 
                if Present (Iterator_Specification (Node)) then
                   Sprint_Node (Iterator_Specification (Node));
