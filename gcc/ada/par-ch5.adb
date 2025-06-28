@@ -2042,23 +2042,32 @@ package body Ch5 is
    ------------------------------------
 
    function P_Chunk_Specifier return Node_Id is
-      Chunk : Node_Id := Empty;
+      Chunk           : Node_Id := Empty;
+      Has_Chunk_Index : Boolean := False;
    begin
       T_Left_Paren;
-      case Token is
-         when Tok_Identifier =>
-            Chunk := New_Node (N_Chunk_Specifier, Token_Ptr);
-            Set_Identifier (Chunk, Token_Node);
-            Scan; --  Scan past chunk index
-            T_In;
-            Set_Range_Constraint (Chunk, P_Signed_Integer_Type_Definition);
-         when Tok_Integer_Literal =>
-            Chunk := Token_Node;
-            Scan; --  Scan past number
-         when others =>
-            Error_Msg_SC ("Invalid chunk specifier. Expected " &
-               "identifier or natural number");
-      end case;
+
+      --  Check for identifier followed by IS
+      if Token = Tok_Identifier then
+         declare
+            SS : Saved_Scan_State;
+         begin
+            Save_Scan_State (SS);
+            Scan; --  Past identifier
+            Has_Chunk_Index := (Token = Tok_In);
+            Restore_Scan_State (SS);
+         end;
+      end if;
+
+      if Has_Chunk_Index then
+         Chunk := New_Node (N_Chunk_Specifier, Token_Ptr);
+         Set_Identifier (Chunk, P_Defining_Identifier (C_In));
+         T_In;
+         Set_Range_Constraint (Chunk, P_Discrete_Subtype_Definition);
+      else
+         Chunk := P_Simple_Expression;
+      end if;
+
       T_Right_Paren;
 
       return Chunk;
@@ -2107,7 +2116,7 @@ package body Ch5 is
             end;
          when others =>
             Error_Msg_SC ("Invalid token following parallel. " &
-              "Expected AND or FOR.");
+              "Expected DO or FOR.");
             return Error;
       end case;
    end P_Parallel_Construct;
