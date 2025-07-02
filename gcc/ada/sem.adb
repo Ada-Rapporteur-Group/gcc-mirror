@@ -61,7 +61,6 @@ with Stylesw;        use Stylesw;
 with Uintp;          use Uintp;
 with Uname;          use Uname;
 
-with Ada.Exceptions;
 with Ada.Unchecked_Deallocation;
 
 pragma Warnings (Off, Sem_Util);

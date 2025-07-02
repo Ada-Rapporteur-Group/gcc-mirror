@@ -472,7 +472,7 @@ package body Ch5 is
 
                when Tok_And =>
 
-                  --  Terminate if Antm set or if the or is to the left of the
+                  --  Terminate if Antm set or if the AND is to the left of the
                   --  expected column of the end for this sequence.
 
                   if SS_Flags.Antm
@@ -2047,7 +2047,7 @@ package body Ch5 is
    begin
       T_Left_Paren;
 
-      --  Check for identifier followed by IS
+      --  Check for identifier followed by IN
       if Token = Tok_Identifier then
          declare
             SS : Saved_Scan_State;
