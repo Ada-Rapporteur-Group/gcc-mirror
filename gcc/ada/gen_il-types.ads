@@ -452,6 +452,7 @@ package Gen_IL.Types is
       E_Constant,
       E_Discriminant,
       E_Loop_Parameter,
+      E_Chunk_Index,
       E_Variable,
       E_Out_Parameter,
       E_In_Out_Parameter,

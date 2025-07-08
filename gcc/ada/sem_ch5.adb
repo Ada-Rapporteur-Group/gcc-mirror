@@ -115,6 +115,17 @@ package body Sem_Ch5 is
    --  contain calls to functions returning controlled arrays or when the
    --  domain of iteration is a container.
 
+   procedure Get_Range_Bounds (N : Node_Id; L : out Node_Id; H : out Node_Id);
+   --  Gets low and high values for a range-like node N. L and H are the
+   --  lower and upper range value nodes respectively.
+
+   procedure Check_Subrange_Bounds (DS : Node_Id; Loop_Nod : Node_Id);
+   --  Check if either bound of a loop or chunk index subrange is
+   --  known to be outside the range of the parameter type, this is
+   --  e.g. the case of a loop from 20..X where the type is 1..19.
+   --  Such a range is dubious since either it raises CE or it executes
+   --  zero times, and that cannot be useful!
+
    ------------------------
    -- Analyze_Assignment --
    ------------------------
@@ -2111,9 +2122,10 @@ package body Sem_Ch5 is
    ------------------------------
 
    procedure Analyze_Iteration_Scheme (N : Node_Id) is
-      Cond      : Node_Id;
-      Iter_Spec : Node_Id;
-      Loop_Spec : Node_Id;
+      Cond       : Node_Id;
+      Iter_Spec  : Node_Id;
+      Loop_Spec  : Node_Id;
+      Chunk_Spec : Node_Id;
 
    begin
       --  For an infinite loop, there is no iteration scheme
@@ -2122,9 +2134,14 @@ package body Sem_Ch5 is
          return;
       end if;
 
-      Cond      := Condition (N);
-      Iter_Spec := Iterator_Specification (N);
-      Loop_Spec := Loop_Parameter_Specification (N);
+      Cond       := Condition (N);
+      Iter_Spec  := Iterator_Specification (N);
+      Loop_Spec  := Loop_Parameter_Specification (N);
+      Chunk_Spec := Chunk_Specifier (N);
+
+      if Present (Chunk_Spec) then
+         Analyze_Chunk_Specifier (Chunk_Spec);
+      end if;
 
       if Present (Cond) then
          Analyze_And_Resolve (Cond, Any_Boolean);
@@ -3382,15 +3399,7 @@ package body Sem_Ch5 is
             Null_Range : Boolean := False;
 
          begin
-            if Nkind (DS) = N_Range then
-               L := Low_Bound  (DS);
-               H := High_Bound (DS);
-            else
-               L :=
-                 Type_Low_Bound  (Underlying_Type (Etype (Subtype_Mark (DS))));
-               H :=
-                 Type_High_Bound (Underlying_Type (Etype (Subtype_Mark (DS))));
-            end if;
+            Get_Range_Bounds (DS, L, H);
 
             --  Check for null or possibly null range and issue warning. We
             --  suppress such messages in generic templates and instances,
@@ -3482,82 +3491,7 @@ package body Sem_Ch5 is
                end if;
             end if;
 
-            --  Check if either bound is known to be outside the range of the
-            --  loop parameter type, this is e.g. the case of a loop from
-            --  20..X where the type is 1..19.
-
-            --  Such a loop is dubious since either it raises CE or it executes
-            --  zero times, and that cannot be useful!
-
-            if Etype (DS) /= Any_Type
-              and then not Error_Posted (DS)
-              and then Nkind (DS) = N_Subtype_Indication
-              and then Nkind (Constraint (DS)) = N_Range_Constraint
-            then
-               declare
-                  LLo : constant Node_Id :=
-                          Low_Bound  (Range_Expression (Constraint (DS)));
-                  LHi : constant Node_Id :=
-                          High_Bound (Range_Expression (Constraint (DS)));
-
-                  Bad_Bound : Node_Id := Empty;
-                  --  Suspicious loop bound
-
-               begin
-                  --  At this stage L, H are the bounds of the type, and LLo
-                  --  Lhi are the low bound and high bound of the loop.
-
-                  if Compile_Time_Compare (LLo, L, Assume_Valid => True) = LT
-                       or else
-                     Compile_Time_Compare (LLo, H, Assume_Valid => True) = GT
-                  then
-                     Bad_Bound := LLo;
-                  end if;
-
-                  if Compile_Time_Compare (LHi, L, Assume_Valid => True) = LT
-                       or else
-                     Compile_Time_Compare (LHi, H, Assume_Valid => True) = GT
-                  then
-                     Bad_Bound := LHi;
-                  end if;
-
-                  if Present (Bad_Bound) then
-                     Error_Msg_N
-                       ("suspicious loop bound out of range of "
-                        & "loop subtype??", Bad_Bound);
-                     Error_Msg_N
-                       ("\loop executes zero times or raises "
-                        & "Constraint_Error??", Bad_Bound);
-                  end if;
-
-                  if Compile_Time_Compare (LLo, LHi, Assume_Valid => False)
-                    = GT
-                  then
-                     Error_Msg_N ("??constrained range is null",
-                       Constraint (DS));
-
-                     --  Additional constraints on modular types can be
-                     --  confusing, add more information.
-
-                     if Ekind (Etype (DS)) = E_Modular_Integer_Subtype then
-                        Error_Msg_Uint_1 := Intval (LLo);
-                        Error_Msg_Uint_2 := Intval (LHi);
-                        Error_Msg_NE ("\iterator has modular type &, " &
-                          "so the loop has bounds ^ ..^",
-                          Constraint (DS),
-                          Subtype_Mark (DS));
-                     end if;
-
-                     if Nkind (Loop_Nod) = N_Loop_Statement then
-                        Set_Is_Null_Loop (Loop_Nod);
-
-                        --  Suppress other warnings about the body of the loop,
-                        --  as it will never execute.
-                        Set_Suppress_Loop_Warnings (Loop_Nod);
-                     end if;
-                  end if;
-               end;
-            end if;
+            Check_Subrange_Bounds (DS, Loop_Nod);
 
          --  This declare block is about warnings, if we get an exception while
          --  testing for warnings, we simply abandon the attempt silently. This
@@ -4359,6 +4293,78 @@ package body Sem_Ch5 is
       null;
    end Analyze_Null_Statement;
 
+   -----------------------------
+   -- Analyze_Chunk_Specifier --
+   -----------------------------
+
+   procedure Analyze_Chunk_Specifier (N : Node_Id) is
+   begin
+      case Nkind (N) is
+         when N_Chunk_Specifier =>
+            declare
+               Chunk_Index : Entity_Id := Identifier (N);
+               Chunk_Range : Node_Id := Range_Constraint (N);
+            begin
+               --  Resolve range constraint and add chunk index to scope
+               Analyze_And_Resolve (Chunk_Range, Any_Discrete);
+               Set_Etype (Chunk_Index, Etype (Chunk_Range));
+               Mutate_Ekind (Chunk_Index, E_Chunk_Index);
+               Set_Is_Not_Self_Hidden (Chunk_Index);
+               Enter_Name (Chunk_Index);
+
+               --  Check for null range in chunk index range. A known max chunk
+               --  count of zero will result in a runtime error
+               if Nkind (Chunk_Range) in N_Range | N_Subtype_Indication then
+                  declare
+                     L : Node_Id;
+                     H : Node_Id;
+                  begin
+                     Get_Range_Bounds (Chunk_Range, L, H);
+                     if Compile_Time_Compare (L, H, Assume_Valid => False) = GT
+                       and then Comes_From_Source (N)
+                       and then not Inside_A_Generic
+                       and then not In_Instance
+                     then
+                        Error_Msg_N ("??chunk specifier range is null, " &
+                          "maximum number of chunks is zero", Chunk_Range);
+                     end if;
+                  end;
+
+                  Check_Subrange_Bounds (Chunk_Range, N);
+               end if;
+            end;
+         when others =>
+            --  Resolve chunk specifier as integer expression
+            Analyze_And_Resolve (N, Any_Integer);
+            Check_Unset_Reference (N);
+
+            if Compile_Time_Known_Value (N) and then Expr_Value (N) <= 0 then
+               Error_Msg_N ("??maximum number of chunks must be" &
+                 " greater than zero", N);
+            end if;
+      end case;
+   end Analyze_Chunk_Specifier;
+
+   -------------------------
+   -- Analyze_Parallel_Do --
+   -------------------------
+
+   procedure Analyze_Parallel_Do (N : Node_Id) is
+      Chunk_Spec  : constant Node_Id := Chunk_Specifier (N);
+      Branch_Node : Node_Id;
+   begin
+      Branch_Node := First (Parallel_Branches (N));
+
+      if Present (Chunk_Spec) then
+         Analyze_Chunk_Specifier (Chunk_Spec);
+      end if;
+
+      while Present (Branch_Node) loop
+         Analyze_Statements (Statements (Branch_Node));
+         Next (Branch_Node);
+      end loop;
+   end Analyze_Parallel_Do;
+
    -------------------------
    -- Analyze_Target_Name --
    -------------------------
@@ -4893,4 +4899,113 @@ package body Sem_Ch5 is
       Full_Analysis := Save_Analysis;
    end Preanalyze_Range;
 
+   ----------------------
+   -- Get_Range_Bounds --
+   ----------------------
+
+   procedure Get_Range_Bounds (N : Node_Id;
+     L : out Node_Id; H : out Node_Id) is
+   begin
+      case Nkind (N) is
+         when N_Range =>
+            L := Low_Bound  (N);
+            H := High_Bound (N);
+         when N_Subtype_Indication =>
+            L := Type_Low_Bound  (Underlying_Type (
+              Etype (Subtype_Mark (N))));
+            H := Type_High_Bound (Underlying_Type (
+              Etype (Subtype_Mark (N))));
+         when N_Range_Constraint =>
+            L := Low_Bound  (Range_Expression (N));
+            H := High_Bound (Range_Expression (N));
+         when others =>
+            pragma Assert (False);
+      end case;
+   end Get_Range_Bounds;
+
+   ---------------------------
+   -- Check_Subrange_Bounds --
+   ---------------------------
+
+   procedure Check_Subrange_Bounds (DS : Node_Id; Loop_Nod : Node_Id) is
+   begin
+      if Etype (DS) /= Any_Type
+        and then not Error_Posted (DS)
+        and then Nkind (DS) = N_Subtype_Indication
+        and then Nkind (Constraint (DS)) = N_Range_Constraint
+      then
+         declare
+            L   : Node_Id;
+            H   : Node_Id;
+            LLo : Node_Id;
+            LHi : Node_Id;
+
+            Bad_Bound : Node_Id := Empty;
+            --  Suspicious loop bound
+
+         begin
+            Get_Range_Bounds (DS, L, H);
+            Get_Range_Bounds (Constraint (DS), LLo, LHi);
+
+            --  At this stage L, H are the bounds of the type, and LLo
+            --  Lhi are the low bound and high bound of the loop.
+
+            if Compile_Time_Compare (LLo, L, Assume_Valid => True) = LT
+                 or else
+               Compile_Time_Compare (LLo, H, Assume_Valid => True) = GT
+            then
+               Bad_Bound := LLo;
+            end if;
+
+            if Compile_Time_Compare (LHi, L, Assume_Valid => True) = LT
+                 or else
+               Compile_Time_Compare (LHi, H, Assume_Valid => True) = GT
+            then
+               Bad_Bound := LHi;
+            end if;
+
+            if Present (Bad_Bound) then
+               if Nkind (Loop_Nod) = N_Loop_Statement then
+                  Error_Msg_N
+                    ("suspicious loop bound out of range of "
+                     & "loop subtype??", Bad_Bound);
+                  Error_Msg_N
+                    ("\loop executes zero times or raises "
+                     & "Constraint_Error??", Bad_Bound);
+               else
+                  Error_Msg_N
+                    ("suspicious subrange bound out of range of "
+                     & "chunk index subtype??", Bad_Bound);
+               end if;
+            end if;
+
+            if Compile_Time_Compare (LLo, LHi, Assume_Valid => False)
+              = GT
+            then
+               Error_Msg_N ("??constrained range is null",
+                 Constraint (DS));
+
+               --  Additional constraints on modular types can be
+               --  confusing, add more information.
+
+               if Ekind (Etype (DS)) = E_Modular_Integer_Subtype then
+                  Error_Msg_Uint_1 := Intval (LLo);
+                  Error_Msg_Uint_2 := Intval (LHi);
+                  Error_Msg_NE ("\iterator has modular type &, " &
+                    "so the loop has bounds ^ ..^",
+                    Constraint (DS),
+                    Subtype_Mark (DS));
+               end if;
+
+               if Nkind (Loop_Nod) = N_Loop_Statement then
+                  Set_Is_Null_Loop (Loop_Nod);
+
+                  --  Suppress other warnings about the body of the loop,
+                  --  as it will never execute.
+                  Set_Suppress_Loop_Warnings (Loop_Nod);
+               end if;
+            end if;
+         end;
+      end if;
+   end Check_Subrange_Bounds;
 end Sem_Ch5;

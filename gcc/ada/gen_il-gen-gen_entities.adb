@@ -375,6 +375,9 @@ begin -- Gen_IL.Gen.Gen_Entities
    Cc (E_Loop_Parameter, Allocatable_Kind);
    --  A loop parameter created by a for loop
 
+   Cc (E_Chunk_Index, Allocatable_Kind);
+   --  A chunk index created by a parallel chunk specifier
+
    Cc (E_Variable, Constant_Or_Variable_Kind,
        --  Variables created by an object declaration with no constant keyword
        (Sm (Anonymous_Designated_Type, Node_Id),

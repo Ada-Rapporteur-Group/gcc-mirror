@@ -475,6 +475,7 @@ package Lib.Xref is
       E_Limited_Private_Type                       => '+',
       E_Loop                                       => 'l',
       E_Loop_Parameter                             => '*',
+      E_Chunk_Index                                => '*',
       E_In_Out_Parameter                           => '*',
       E_In_Parameter                               => '*',
       E_Incomplete_Subtype                         => '+',
