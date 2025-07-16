@@ -6458,6 +6458,85 @@ package body Exp_Ch5 is
       end if;
    end Expand_Predicated_Loop;
 
+   ----------------------------------------
+   -- Expand_N_Parallel_Do_Statement_Seq --
+   ----------------------------------------
+
+   procedure Expand_N_Parallel_Do_Statement_Seq (N : Node_Id) is
+      Branches   : List_Id := New_List;
+      Decls      : List_Id := New_List;
+      Loc        : constant Source_Ptr := Sloc (N);
+      Chunk_Spec : Node_Id := Chunk_Specifier (N);
+   begin
+      --  Rewrites a parllel do statement as a series of sequential
+      --  blocks. This function transforms the following:
+
+      --     parallel (CHUNK) do
+      --        BRANCH 1
+      --     and
+      --        BRANCH 2
+      --     and
+      --        ...
+      --     end do;
+
+      --  into
+
+      --     declare
+      --        par_chunks : integer := CHUNK;
+      --     begin
+      --        begin
+      --          BRANCH 1
+      --        end;
+      --        begin
+      --          BRANCH 2
+      --        end;
+      --        ...
+      --     end;
+
+      --  Prepend numeric chunk specifier expression to rewritten block
+      if Present (Chunk_Spec) then
+         declare
+            Chunk_Id   : Node_Id := Make_Temporary (Loc, 'C', N);
+            Chunk_Decl : Node_Id;
+            Chunk_Type : Entity_Id := Etype (Chunk_Spec);
+         begin
+            Chunk_Decl := Make_Object_Declaration (Loc,
+              Defining_Identifier => Chunk_Id,
+              Expression          => Chunk_Spec,
+              Object_Definition   => New_Occurrence_Of (Chunk_Type, Loc));
+            Append_To (Decls, Chunk_Decl);
+         end;
+      end if;
+
+      --  Rewrite parallel branches as blocks
+      declare
+         Current_Branch : Node_Id := First (Parallel_Branches (N));
+      begin
+         while Present (Current_Branch) loop
+            declare
+               Handled_Seq     : Node_Id;
+               Rewritten_Block : Node_Id;
+            begin
+               Handled_Seq := Make_Handled_Sequence_Of_Statements (Loc,
+                 Statements => Statements (Current_Branch));
+               Rewritten_Block := Make_Block_Statement (Loc,
+                 Declarations               => Empty_List,
+                 Handled_Statement_Sequence => Handled_Seq);
+               Append_To (Branches, Rewritten_Block);
+            end;
+            Current_Branch := Next (Current_Branch);
+         end loop;
+
+         Rewrite (N,
+           Make_Block_Statement (Loc,
+             Declarations               => Decls,
+             Handled_Statement_Sequence =>
+               Make_Handled_Sequence_Of_Statements (Loc,
+                 Statements => Branches)));
+         Analyze (N);
+      end;
+   end Expand_N_Parallel_Do_Statement_Seq;
+
    ------------------------------
    -- Make_Tag_Ctrl_Assignment --
    ------------------------------
