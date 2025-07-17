@@ -4911,10 +4911,10 @@ package body Sem_Ch5 is
             L := Low_Bound  (N);
             H := High_Bound (N);
          when N_Subtype_Indication =>
-            L := Type_Low_Bound  (Underlying_Type (
-              Etype (Subtype_Mark (N))));
-            H := Type_High_Bound (Underlying_Type (
-              Etype (Subtype_Mark (N))));
+            L := Type_Low_Bound  (Underlying_Type
+              (Etype (Subtype_Mark (N))));
+            H := Type_High_Bound (Underlying_Type
+              (Etype (Subtype_Mark (N))));
          when N_Range_Constraint =>
             L := Low_Bound  (Range_Expression (N));
             H := High_Bound (Range_Expression (N));
@@ -4974,8 +4974,9 @@ package body Sem_Ch5 is
                      & "Constraint_Error??", Bad_Bound);
                else
                   Error_Msg_N
-                    ("suspicious subrange bound out of range of "
-                     & "chunk index subtype??", Bad_Bound);
+                    ("Suspicious chunk_index range: out of range " &
+                     "of chunk_index subtype. ""Constraint_Error"" " &
+                     "will be raised at run-time.??", Bad_Bound);
                end if;
             end if;
 
