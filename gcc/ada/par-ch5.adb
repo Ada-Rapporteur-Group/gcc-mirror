@@ -2060,12 +2060,14 @@ package body Ch5 is
       end if;
 
       if Has_Chunk_Index then
-         Chunk := New_Node (N_Chunk_Specifier, Token_Ptr);
-         Set_Identifier (Chunk, P_Defining_Identifier (C_In));
+         Chunk := New_Node (N_Chunk_Specifier_Range, Token_Ptr);
+         Set_Defining_Identifier (Chunk, P_Defining_Identifier (C_In));
          T_In;
-         Set_Range_Constraint (Chunk, P_Discrete_Subtype_Definition);
+         Set_Discrete_Subtype_Definition
+           (Chunk, P_Discrete_Subtype_Definition);
       else
-         Chunk := P_Simple_Expression;
+         Chunk := New_Node (N_Chunk_Specifier_Int, Token_Ptr);
+         Set_Expression (Chunk, P_Simple_Expression);
       end if;
 
       T_Right_Paren;
@@ -2094,7 +2096,7 @@ package body Ch5 is
             end if;
 
             if Present (Chunk_Spec) and then
-              Nkind (Chunk_Spec) = N_Chunk_Specifier
+              Nkind (Chunk_Spec) = N_Chunk_Specifier_Range
             then
                Error_Msg_F ("Range chunk specifier not permitted" &
                  " in parallel block statements", Chunk_Spec);

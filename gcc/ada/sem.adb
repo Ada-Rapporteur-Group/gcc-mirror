@@ -166,8 +166,12 @@ package body Sem is
          when N_Attribute_Definition_Clause   =>
             Analyze_Attribute_Definition_Clause (N);
 
-         when N_Chunk_Specifier =>
-            Error_Msg ("N_Chunk_Specifier" &
+         when N_Chunk_Specifier_Int =>
+            Error_Msg ("N_Chunk_Specifier_Int" &
+               " unimplemented", Sloc (N));
+
+         when N_Chunk_Specifier_Range =>
+            Error_Msg ("N_Chunk_Specifier_Range" &
                " unimplemented", Sloc (N));
 
          when N_Parallel_Branch =>
