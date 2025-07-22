@@ -166,21 +166,8 @@ package body Sem is
          when N_Attribute_Definition_Clause   =>
             Analyze_Attribute_Definition_Clause (N);
 
-         when N_Chunk_Specifier_Int =>
-            Error_Msg ("N_Chunk_Specifier_Int" &
-               " unimplemented", Sloc (N));
-
-         when N_Chunk_Specifier_Range =>
-            Error_Msg ("N_Chunk_Specifier_Range" &
-               " unimplemented", Sloc (N));
-
-         when N_Parallel_Branch =>
-            Error_Msg ("N_Parallel_Branch" &
-               " unimplemented", Sloc (N));
-
          when N_Parallel_Block_Statement =>
-            Error_Msg ("N_Parallel_Block_Statement" &
-               " unimplemented", Sloc (N));
+            Analyze_Parallel_Do (N);
 
          when N_Block_Statement =>
             Analyze_Block_Statement (N);
@@ -718,6 +705,8 @@ package body Sem is
             | N_Aspect_Specification
             | N_Case_Expression_Alternative
             | N_Case_Statement_Alternative
+            | N_Chunk_Specifier_Int
+            | N_Chunk_Specifier_Range
             | N_Compilation_Unit_Aux
             | N_Component_Association
             | N_Component_Clause
@@ -758,6 +747,7 @@ package body Sem is
             | N_Mod_Clause
             | N_Modular_Type_Definition
             | N_Ordinary_Fixed_Point_Definition
+            | N_Parallel_Branch
             | N_Parameter_Specification
             | N_Pragma_Argument_Association
             | N_Procedure_Specification

@@ -67,7 +67,7 @@ package body Ch5 is
 
    function P_Parallel_Construct (Loop_Name : Node_Id := Empty) return Node_Id;
    --  Parse the construct following a "parallel" keyword. This function is
-   --  responsible for parsing the chunk specifier and calls P_Loop_Statement
+   --  responsible for parsing the chunk specification and calls P_Loop_Statement
    --  or P_Parallel_Do_Statement depending on which keyword follows the
    --  parallel part. If Loop_Name is non-Empty on entry, it is passed on
    --  to a P_Loop_Statement if the construct is a parallel for loop. If
@@ -76,9 +76,9 @@ package body Ch5 is
 
    function P_Parallel_Do_Statement (Chunk : Node_Id) return Node_Id;
    --  Parse parallel do. If Chunk is non-Empty on entry, the specified
-   --  parallel chunk specifier will be used for the parallel do. If
+   --  parallel chunk specification will be used for the parallel do. If
    --  Chunk is Empty on entry (the default), the parallel do will have
-   --  no chunk specifier.
+   --  no chunk specification.
 
    function P_While_Statement (Loop_Name : Node_Id := Empty) return Node_Id;
    --  Parse while statement. If Loop_Name is non-Empty on entry, it is
@@ -2098,7 +2098,7 @@ package body Ch5 is
             if Present (Chunk_Spec) and then
               Nkind (Chunk_Spec) = N_Chunk_Specifier_Range
             then
-               Error_Msg_F ("Range chunk specifier not permitted" &
+               Error_Msg_F ("Range chunk specification not permitted" &
                  " in parallel block statements", Chunk_Spec);
             end if;
 

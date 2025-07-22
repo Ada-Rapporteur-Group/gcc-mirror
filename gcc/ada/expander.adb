@@ -416,6 +416,9 @@ package body Expander is
                when N_Package_Renaming_Declaration =>
                   Expand_N_Package_Renaming_Declaration (N);
 
+               when N_Parallel_Block_Statement =>
+                  Expand_N_Parallel_Do_Statement_Seq (N);
+
                when N_Subprogram_Renaming_Declaration =>
                   Expand_N_Subprogram_Renaming_Declaration (N);
 

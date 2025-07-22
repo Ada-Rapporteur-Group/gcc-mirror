@@ -1622,6 +1622,7 @@ begin -- Gen_IL.Gen.Gen_Nodes
           Children =>
             (N_Aggregate,
              N_Block_Statement,
+             N_Chunk_Specifier_Range,
              N_Declaration,
              N_Discriminant_Specification,
              N_Entry_Index_Specification,

@@ -2111,9 +2111,10 @@ package body Sem_Ch5 is
    ------------------------------
 
    procedure Analyze_Iteration_Scheme (N : Node_Id) is
-      Cond      : Node_Id;
-      Iter_Spec : Node_Id;
-      Loop_Spec : Node_Id;
+      Cond       : Node_Id;
+      Iter_Spec  : Node_Id;
+      Loop_Spec  : Node_Id;
+      Chunk_Spec : Node_Id;
 
    begin
       --  For an infinite loop, there is no iteration scheme
@@ -2122,9 +2123,14 @@ package body Sem_Ch5 is
          return;
       end if;
 
-      Cond      := Condition (N);
-      Iter_Spec := Iterator_Specification (N);
-      Loop_Spec := Loop_Parameter_Specification (N);
+      Cond       := Condition (N);
+      Iter_Spec  := Iterator_Specification (N);
+      Loop_Spec  := Loop_Parameter_Specification (N);
+      Chunk_Spec := Chunk_Specifier (N);
+
+      if Present (Chunk_Spec) then
+         Analyze_Chunk_Specifier (Chunk_Spec);
+      end if;
 
       if Present (Cond) then
          Analyze_And_Resolve (Cond, Any_Boolean);
@@ -3237,7 +3243,8 @@ package body Sem_Ch5 is
          --  an unchecked conversion when needed. The expression of the
          --  conversion is always an object.
 
-         if Nkind (DS_Copy) = N_Function_Call
+         if Nkind (N) /= N_Chunk_Specifier_Range
+           and then (Nkind (DS_Copy) = N_Function_Call
 
            or else (Is_Entity_Name (DS_Copy)
                      and then not Is_Type (Entity (DS_Copy)))
@@ -3250,7 +3257,7 @@ package body Sem_Ch5 is
 
            or else Nkind (DS_Copy) = N_Unchecked_Type_Conversion
            or else (Nkind (DS_Copy) = N_Qualified_Expression
-                     and then Is_Iterator (Etype (DS_Copy)))
+                     and then Is_Iterator (Etype (DS_Copy))))
          then
             --  This is an iterator specification. Rewrite it as such and
             --  analyze it to capture function calls that may require
@@ -3424,19 +3431,30 @@ package body Sem_Ch5 is
                   --  non-null after all.
 
                   if Null_Range then
-                     Error_Msg_N
-                       ("??loop range is null, loop will not execute", DS);
-
+                     if Nkind (N) = N_Chunk_Specifier_Range then
+                        Error_Msg_N
+                          ("??chunk specification range is null, Program_Error" &
+                           " will be raised at runtime", DS);
+                     else
+                        Error_Msg_N
+                          ("??loop range is null, loop will not execute", DS);
+                     end if;
+ 
                   --  Here is where the loop could execute because of
                   --  invalid values, so issue appropriate message.
 
                   else
-                     Error_Msg_N
-                       ("??loop range may be null, loop may not execute", DS);
-
-                     Error_Msg_N
-                       ("??can only execute if invalid values are present",
-                        DS);
+                     if Nkind (N) = N_Chunk_Specifier_Range then
+                        Error_Msg_N
+                          ("??chunk specification range may be null, Program_Error" &
+                           " could be raised at runtime", DS);
+                     else
+                        Error_Msg_N
+                          ("??loop range may be null, loop may not execute", DS);
+                        Error_Msg_N
+                          ("??can only execute if invalid values are present",
+                           DS);
+                     end if;
                   end if;
                end if;
 
@@ -3459,7 +3477,8 @@ package body Sem_Ch5 is
                --  In practice, this is very likely to be a case of reversing
                --  the bounds incorrectly in the range.
 
-            elsif Reverse_Present (N)
+            elsif Nkind (N) /= N_Chunk_Specifier_Range
+              and then Reverse_Present (N)
               and then Nkind (Original_Node (H)) = N_Integer_Literal
               and then
                 (Intval (Original_Node (H)) = Uint_0
@@ -3522,12 +3541,19 @@ package body Sem_Ch5 is
                   end if;
 
                   if Present (Bad_Bound) then
-                     Error_Msg_N
-                       ("suspicious loop bound out of range of "
-                        & "loop subtype??", Bad_Bound);
-                     Error_Msg_N
-                       ("\loop executes zero times or raises "
-                        & "Constraint_Error??", Bad_Bound);
+                     if Nkind (N) = N_Chunk_Specifier_Range then
+                        Error_Msg_N
+                          ("Suspicious chunk_index range: out of range " &
+                           "of chunk_index subtype. ""Constraint_Error"" " &
+                           "will be raised at run-time.??", Bad_Bound);
+                     else
+                        Error_Msg_N
+                          ("suspicious loop bound out of range of "
+                           & "loop subtype??", Bad_Bound);
+                        Error_Msg_N
+                          ("\loop executes zero times or raises "
+                           & "Constraint_Error??", Bad_Bound);
+                     end if;
                   end if;
 
                   if Compile_Time_Compare (LLo, LHi, Assume_Valid => False)
@@ -3579,7 +3605,9 @@ package body Sem_Ch5 is
       --  Preanalyze the filter. Expansion will take place when enclosing
       --  loop is expanded.
 
-      if Present (Iterator_Filter (N)) then
+      if Nkind (N) /= N_Chunk_Specifier_Range
+        and then Present (Iterator_Filter (N))
+      then
          Preanalyze_And_Resolve (Iterator_Filter (N), Standard_Boolean);
       end if;
    end Analyze_Loop_Parameter_Specification;
@@ -4358,6 +4386,55 @@ package body Sem_Ch5 is
    begin
       null;
    end Analyze_Null_Statement;
+
+   -----------------------------
+   -- Analyze_Chunk_Specifier --
+   -----------------------------
+
+   procedure Analyze_Chunk_Specifier (N : Node_Id) is
+      pragma Assert (Nkind (N) in N_Chunk_Specifier_Range |
+        N_Chunk_Specifier_Int);
+   begin
+      case Nkind (N) is
+         when N_Chunk_Specifier_Range =>
+            Analyze_Loop_Parameter_Specification (N);
+
+         when N_Chunk_Specifier_Int =>
+            --  Resolve chunk specification as integer expression
+            declare
+               Expr : Node_Id := Expression (N);
+            begin
+               Analyze_And_Resolve (Expr, Any_Integer);
+               Check_Unset_Reference (Expr);
+
+               if Compile_Time_Known_Value (Expr) and then Expr_Value (Expr) <= 0 then
+                  Error_Msg_N ("??maximum number of chunks must be" &
+                    " greater than zero", N);
+               end if;
+            end;
+
+         when others =>
+            pragma Assert (False);
+      end case;
+   end Analyze_Chunk_Specifier;
+
+   -------------------------
+   -- Analyze_Parallel_Do --
+   -------------------------
+
+   procedure Analyze_Parallel_Do (N : Node_Id) is
+      Chunk_Spec  : constant Node_Id := Chunk_Specifier (N);
+      Branch_Node : Node_Id := First (Parallel_Branches (N));
+   begin
+      if Present (Chunk_Spec) then
+         Analyze_Chunk_Specifier (Chunk_Spec);
+      end if;
+
+      while Present (Branch_Node) loop
+         Analyze_Statements (Statements (Branch_Node));
+         Next (Branch_Node);
+      end loop;
+   end Analyze_Parallel_Do;
 
    -------------------------
    -- Analyze_Target_Name --
