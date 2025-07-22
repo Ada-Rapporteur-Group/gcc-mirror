@@ -70,9 +70,6 @@ with Uintp;          use Uintp;
 with Validsw;        use Validsw;
 with Warnsw;         use Warnsw;
 
-with Output;
-with Sprint;
-
 package body Exp_Ch5 is
 
    procedure Build_Formal_Container_Iteration
