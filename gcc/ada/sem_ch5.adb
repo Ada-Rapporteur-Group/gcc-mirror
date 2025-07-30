@@ -3433,24 +3433,25 @@ package body Sem_Ch5 is
                   if Null_Range then
                      if Nkind (N) = N_Chunk_Specifier_Range then
                         Error_Msg_N
-                          ("??chunk specification range is null, Program_Error" &
-                           " will be raised at runtime", DS);
+                          ("??chunk specification range is null, " &
+                           "Program_Error will be raised at runtime", DS);
                      else
                         Error_Msg_N
                           ("??loop range is null, loop will not execute", DS);
                      end if;
- 
+
                   --  Here is where the loop could execute because of
                   --  invalid values, so issue appropriate message.
 
                   else
                      if Nkind (N) = N_Chunk_Specifier_Range then
                         Error_Msg_N
-                          ("??chunk specification range may be null, Program_Error" &
-                           " could be raised at runtime", DS);
+                          ("??chunk specification range may be null," &
+                           " Program_Error could be raised at runtime", DS);
                      else
                         Error_Msg_N
-                          ("??loop range may be null, loop may not execute", DS);
+                          ("??loop range may be null, loop may" &
+                           " not execute", DS);
                         Error_Msg_N
                           ("??can only execute if invalid values are present",
                            DS);
@@ -4407,7 +4408,9 @@ package body Sem_Ch5 is
                Analyze_And_Resolve (Expr, Any_Integer);
                Check_Unset_Reference (Expr);
 
-               if Compile_Time_Known_Value (Expr) and then Expr_Value (Expr) <= 0 then
+               if Compile_Time_Known_Value (Expr) and then
+                 Expr_Value (Expr) <= 0
+               then
                   Error_Msg_N ("??maximum number of chunks must be" &
                     " greater than zero", N);
                end if;
