@@ -2128,6 +2128,19 @@ package body Sem_Ch5 is
       Loop_Spec  := Loop_Parameter_Specification (N);
       Chunk_Spec := Chunk_Specifier (N);
 
+      if Is_Parallel (N) then
+         if Present (Iter_Spec) then
+            Error_Msg_N ("Parallel iteration over " &
+              "containers not yet supported", N);
+         elsif Present (Loop_Spec) and then
+           Reverse_Present (Loop_Spec)
+         then
+            Error_Msg_N
+              ("Parallel loops cannot use reverse " &
+               "in their loop parameter specification", N);
+         end if;
+      end if;
+
       if Present (Chunk_Spec) then
          Analyze_Chunk_Specifier (Chunk_Spec);
       end if;

@@ -66,9 +66,9 @@ package body Ch5 is
    --  Empty on entry (the default), then the loop statement is unlabeled.
 
    function P_Parallel_Construct (Loop_Name : Node_Id := Empty) return Node_Id;
-   --  Parse the construct following a "parallel" keyword. This function is
-   --  responsible for parsing the chunk specification and calls P_Loop_Statement
-   --  or P_Parallel_Do_Statement depending on which keyword follows the
+   --  Parse the construct following a "parallel" keyword. This function
+   --  parses the chunk specification and calls P_Loop_Statement or
+   --  P_Parallel_Do_Statement depending on which keyword follows the
    --  parallel part. If Loop_Name is non-Empty on entry, it is passed on
    --  to a P_Loop_Statement if the construct is a parallel for loop. If
    --  Loop_Name is present but the construct is a parallel do, this function
