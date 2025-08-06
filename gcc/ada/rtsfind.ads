@@ -508,7 +508,15 @@ package Rtsfind is
       System_Tasking_Protected_Objects_Single_Entry,
       System_Tasking_Restricted_Stages,
       System_Tasking_Rendezvous,
-      System_Tasking_Stages);
+      System_Tasking_Stages,
+
+      --  Package LWT
+
+      LWT,
+
+      -- Children of LWT
+
+      LWT_Parallelism);
 
    --------------------------
    -- Runtime Entity Table --
@@ -2182,7 +2190,13 @@ package Rtsfind is
      RE_Free_Task,                       -- System.Tasking.Stages
      RE_Expunge_Unactivated_Tasks,       -- System.Tasking.Stages
      RE_Move_Activation_Chain,           -- System.Tasking_Stages
-     RE_Terminated);                     -- System.Tasking.Stages
+     RE_Terminated,                      -- System.Tasking.Stages
+
+     RE_Longest_Integer,                 -- LWT.Parallelism
+     RE_Par_Range_Loop,                  -- LWT.Parallelism
+     RE_Par_Range_Loop_With_Early_Exit,  -- LWT.Parallelism
+     RE_Early_Exit,                      -- LWT.Parallelism
+     RE_Par_Loop_Id);                    -- LWT.Parallelism
 
    --  The following declarations build a table that is indexed by the RTE
    --  function to determine the unit containing the given entity. This table
@@ -3879,7 +3893,13 @@ package Rtsfind is
      RE_Free_Task                        => System_Tasking_Stages,
      RE_Expunge_Unactivated_Tasks        => System_Tasking_Stages,
      RE_Move_Activation_Chain            => System_Tasking_Stages,
-     RE_Terminated                       => System_Tasking_Stages);
+     RE_Terminated                       => System_Tasking_Stages,
+
+     RE_Longest_Integer                  => LWT_Parallelism,
+     RE_Par_Range_Loop                   => LWT_Parallelism,
+     RE_Par_Range_Loop_With_Early_Exit   => LWT_Parallelism,
+     RE_Early_Exit                       => LWT_Parallelism,
+     RE_Par_Loop_Id                      => LWT_Parallelism);
 
    --------------------------------
    -- Configurable Run-Time Mode --

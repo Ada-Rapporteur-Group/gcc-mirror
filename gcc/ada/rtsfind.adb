@@ -643,6 +643,9 @@ package body Rtsfind is
      range System_Tasking_Async_Delays_Enqueue_Calendar ..
        System_Tasking_Async_Delays_Enqueue_RT;
 
+   subtype LWT_Descendant is RTU_Id
+     range LWT_Parallelism .. LWT_Parallelism;
+
    function Get_Unit_Name (U_Id : RTU_Id) return Unit_Name_Type is
       Uname_Chars : constant String := RTU_Id'Image (U_Id);
    begin
@@ -743,6 +746,9 @@ package body Rtsfind is
          if U_Id in System_Tasking_Async_Delays_Descendant then
             Name_Buffer (28) := '.';
          end if;
+
+      elsif U_Id in LWT_Descendant then
+         Name_Buffer (4) := '.';
       end if;
 
       --  Add %s at end for spec
