@@ -5844,27 +5844,11 @@ package body Exp_Ch5 is
       Scheme : constant Node_Id    := Iteration_Scheme (N);
       Stmt   : Node_Id;
 
-      --  function Prepare_P_Loop_Signature (Early_Exit : Boolean) return Node_Id;
-
-      --  function Prepare_P_Loop_Signature (Early_Exit : Boolean)
-      --    return Node_Id
-      --  is
-
-      --  begin
-
-      --  end Prepare_P_Loop_Signature;
-
       procedure Expand_Parallel_Loop;
 
       procedure Expand_Parallel_Loop is
-         function Contains_Early_Exit (S : List_Id) return Boolean;
-
          procedure Expand_Chunk_Spec_Seq (C : Node_Id);
-
-         function Contains_Early_Exit (S : List_Id) return Boolean is
-         begin
-            return False; --  Unimpl
-         end Contains_Early_Exit;
+         procedure Expand_Parallel;
 
          procedure Expand_Chunk_Spec_Seq (C : Node_Id) is
             pragma Assert (Nkind (C) in N_Chunk_Specifier_Range |
@@ -5947,6 +5931,326 @@ package body Exp_Ch5 is
                   Statements => New_List (Relocate_Node (N)))));
             Analyze (N);
          end Expand_Chunk_Spec_Seq;
+
+         procedure Expand_Parallel is
+            procedure Replace_Returns (N : Node_Id);
+
+            function Get_Return_Val (Typ : Entity_Id) return Entity_Id;
+            function Get_Return_Ind return Entity_Id;
+            function New_Early_Exit_Case (Replacement : Node_Id)
+              return Node_Id;
+
+            Loop_Param : Entity_Id := Loop_Parameter_Specification (Scheme);
+
+            Chunk_Cnt : Node_Id;
+            Chunk_Spec : Node_Id := Chunk_Specifier (Scheme);
+
+            Outlined_Spec, Outlined_Body : Node_Id;
+
+            Proc_Formals : List_Id := Empty_List;
+            Proc_Body    : List_Id := Empty_List;
+
+            Block_Stmt   : Node_Id;
+            Block_Decls  : List_Id := Empty_List;
+
+            Proc_Id       : Entity_Id := Make_Temporary (Loc, 'P');
+            Low_Param     : Entity_Id := Make_Temporary (Loc, 'P');
+            Hi_Param      : Entity_Id := Make_Temporary (Loc, 'P');
+            Chunk_Param   : Entity_Id;
+            Loop_Id_Param : Entity_Id := Make_Temporary (Loc, 'P');
+
+            Return_Val : Entity_Id := Empty;
+            Return_Ind : Entity_Id := Empty;
+            Ret_Is_Void : Boolean := False;
+            Exit_Alt_Count : Positive := 1;
+            Exit_Alts : List_Id := New_List;
+
+            Range_Typ  : Entity_Id := Etype (Defining_Identifier
+              (Loop_Param));
+
+            New_Loop_Spec : Node_Id;
+            New_Loop_Sub  : Node_Id;
+            New_Loop : Node_Id;
+
+            --  RTE types
+            Long_Int_Typ : Entity_Id := RTE (RE_Longest_Integer);
+            Loop_Id_Typ  : Entity_Id := RTE (RE_Par_Loop_Id);
+
+            function Get_Return_Val (Typ : Entity_Id) return Entity_Id
+            is
+               pragma Assert (Present (Return_Val) or else not Ret_Is_Void);
+            begin
+               if Present (Return_Val) then
+                  pragma Assert (Typ = Etype (Return_Val));
+                  return Return_Val;
+               end if;
+
+               Return_Val := Make_Temporary (Loc, 'P');
+               Set_Etype (Return_Val, Typ);
+               Mutate_Ekind (Return_Val, E_Variable);
+               Append_To (Block_Decls, Make_Object_Declaration (Loc,
+                 Defining_Identifier => Return_Val,
+                 Object_Definition   => New_Occurrence_Of (Typ, Loc)));
+               return Return_Val;
+            end Get_Return_Val;
+
+            function Get_Return_Ind return Entity_Id is
+            begin
+               if Present (Return_Ind) then
+                  return Return_Ind;
+               end if;
+
+               Return_Ind := Make_Temporary (Loc, 'P');
+               Set_Etype (Return_Ind, Standard_Positive);
+               Mutate_Ekind (Return_Ind, E_Variable);
+               Append_To (Block_Decls, Make_Object_Declaration (Loc,
+                 Defining_Identifier => Return_Ind,
+                 Expression          =>
+                   Make_Integer_Literal (Loc, Uint_0),
+                 Object_Definition   =>
+                   New_Occurrence_Of (Standard_Natural, Loc)));
+               return Return_Ind;
+            end Get_Return_Ind;
+
+            --  Adds new "exit" clause to exit case at the end of the
+            --  parallel call
+            function New_Early_Exit_Case (Replacement : Node_Id)
+              return Node_Id
+            is
+               Alt : Node_Id;
+               Ind : Node_Id := Make_Integer_Literal
+                 (Loc, Nat'Val (Exit_Alt_Count));
+            begin
+               Alt := Make_Case_Statement_Alternative (Loc,
+                 Discrete_Choices => New_List (Copy_Separate_Tree (Ind)),
+                 Statements       => New_List (Replacement));
+               Append_To (Exit_Alts, Alt);
+               Exit_Alt_Count := Exit_Alt_Count + 1;
+               return Ind;
+            end New_Early_Exit_Case;
+
+            function Make_Early_Exit (Replacement : Node_Id := Empty;
+              Ret_Val : Node_Id := Empty) return Node_Id;
+
+            function Make_Early_Exit (Replacement : Node_Id := Empty;
+              Ret_Val : Node_Id := Empty) return Node_Id
+            is
+               If_Body : List_Id := New_List;
+               EE_Call : Node_Id;
+            begin
+               EE_Call := Make_Function_Call (Loc,
+                 Name => New_Occurrence_Of (RTE (RE_Early_Exit), Loc),
+                 Parameter_Associations => New_List
+                   (New_Occurrence_Of (Loop_Id_Param, Loc)));
+
+               if Present (Replacement) then
+                  Append_To (If_Body, Make_Assignment_Statement (Loc,
+                    Name => New_Occurrence_Of (Get_Return_Ind, Loc),
+                    Expression => New_Early_Exit_Case (Replacement)));
+               end if;
+
+               if Present (Return_Val) then
+                  Append_To (If_Body, Make_Assignment_Statement (Loc,
+                    Name => New_Occurrence_Of (Get_Return_Val
+                      (Etype (Ret_Val)), Loc),
+                    Expression => Ret_Val));
+               end if;
+
+               Append_To (If_Body, Make_Simple_Return_Statement (Loc));
+
+               return Make_If_Statement (Loc,
+                 Condition => EE_Call,
+                 Then_Statements => If_Body);
+            end Make_Early_Exit;
+
+            procedure Replace_Returns (N : Node_Id) is
+               function Visit_Node (I : Node_Id) return Traverse_Result;
+
+               function Visit_Node (I : Node_Id) return Traverse_Result is
+               begin
+                  --  Don't traverse nested functions
+                  if Nkind (I) = N_Subprogram_Body then
+                     return Skip;
+                  end if;
+
+                  if Nkind (I) = N_Simple_Return_Statement then
+                     if Present (Expression (I)) then
+                        Rewrite (I, Make_Early_Exit (
+                           Ret_Val => Expression (I),
+                           Replacement => Make_Simple_Return_Statement
+                             (Loc, New_Occurrence_Of (Get_Return_Val
+                               (Etype (Expression (I))), Loc))));
+                     else
+                        pragma Assert (No (Return_Val));
+                        Ret_Is_Void := True;
+                        Rewrite (I, Make_Early_Exit);
+                     end if;
+                     --  Analyze (I);
+
+                     return Skip;
+                  end if;
+
+                  return OK;
+               end Visit_Node;
+
+               procedure Visit_All_Nodes is
+                 new Traverse_Proc (Visit_Node);
+            begin
+               Visit_All_Nodes (N);
+            end Replace_Returns;
+         begin
+            Mutate_Ekind (Proc_Id, E_Procedure);
+            Set_Etype (Proc_Id, Standard_Void_Type);
+            Set_Scope (Proc_Id, Current_Scope);
+            Set_Is_Internal (Proc_Id);
+
+            --  Get Chunk_Index parameter
+            if Present (Chunk_Spec) and then
+               Nkind (Chunk_Spec) = N_Chunk_Specifier_Range
+            then
+               Chunk_Param := Defining_Identifier (Chunk_Spec);
+               Remove_Homonym (Chunk_Param);
+               Mutate_Ekind (Chunk_Param, E_In_Parameter);
+
+               --  Chunk_Cnt :=
+
+               --  TODO: Calculate chunk size
+               --  I think this case just fails for now
+            else
+               if Present (Chunk_Spec) and then
+                  Nkind (Chunk_Spec) = N_Chunk_Specifier_Int
+               then
+                  Chunk_Cnt := Expression (Chunk_Spec);
+               else
+                  Chunk_Cnt := Make_Integer_Literal (Loc, Uint_0);
+               end if;
+               Chunk_Param := Make_Temporary (Loc, 'P');
+            end if;
+
+            Set_Etype (Chunk_Param, Standard_Positive);
+
+            --  Create outlined function params
+            --  (Low : Longest_Integer; High : Longest_Integer;
+            --   Chunk_Id : Positive)
+            Append_To (Proc_Formals,
+              Make_Parameter_Specification (Loc,
+                Defining_Identifier => Low_Param,
+                Parameter_Type      =>
+                  New_Occurrence_Of (Long_Int_Typ, Loc)));
+
+            Append_To (Proc_Formals,
+              Make_Parameter_Specification (Loc,
+                Defining_Identifier => Hi_Param,
+                Parameter_Type      =>
+                  New_Occurrence_Of (Long_Int_Typ, Loc)));
+
+            Append_To (Proc_Formals,
+              Make_Parameter_Specification (Loc,
+                Defining_Identifier => Chunk_Param,
+                Parameter_Type      =>
+                  New_Occurrence_Of (Standard_Positive, Loc)));
+
+            Append_To (Proc_Formals,
+              Make_Parameter_Specification (Loc,
+                Defining_Identifier => Loop_Id_Param,
+                Parameter_Type      =>
+                  New_Occurrence_Of (Loop_Id_Typ, Loc)));
+
+            Outlined_Spec := Make_Procedure_Specification (Loc,
+              Defining_Unit_Name       => Proc_Id,
+              Parameter_Specifications => Proc_Formals);
+
+            --  Create new loop
+            New_Loop_Sub := Make_Subtype_Indication (Loc,
+              Subtype_Mark => New_Occurrence_Of (Range_Typ, Loc),
+              Constraint => Make_Range_Constraint (Loc,
+                Range_Expression => Make_Range (Loc,
+                  Low_Bound => Make_Attribute_Reference (Loc,
+                    Prefix => New_Occurrence_Of (Range_Typ, Loc),
+                    Attribute_Name => Name_Val,
+                    Expressions => New_List
+                      (New_Occurrence_Of (Low_Param, Loc))),
+                  High_Bound => Make_Attribute_Reference (Loc,
+                    Prefix => New_Occurrence_Of (Range_Typ, Loc),
+                    Attribute_Name => Name_Val,
+                    Expressions => New_List
+                      (New_Occurrence_Of (Hi_Param, Loc))))));
+
+            New_Loop_Spec := Make_Loop_Parameter_Specification (Loc,
+              Defining_Identifier => Defining_Identifier (Loop_Param),
+              Discrete_Subtype_Definition => New_Loop_Sub);
+
+            New_Loop := Make_Loop_Statement (Loc,
+              Statements => New_Copy_List_Tree (Statements (N)),
+              Iteration_Scheme => Make_Iteration_Scheme (Loc,
+                Loop_Parameter_Specification => New_Loop_Spec));
+
+            Append_To (Proc_Body, New_Loop);
+            --  New_Loop := Empty; -- co
+
+            Outlined_Body := Make_Subprogram_Body (Loc,
+              Declarations => Empty_List,
+              Specification => Outlined_Spec,
+              Handled_Statement_Sequence =>
+                Make_Handled_Sequence_Of_Statements
+                  (Loc, Statements => Proc_Body));
+
+            Replace_Returns (New_Loop);
+            Append_To (Block_Decls, Outlined_Body);
+
+            declare
+               DS : Node_Id := Discrete_Subtype_Definition (Loop_Param);
+               Lower_Arg, Upper_Arg, Call : Node_Id;
+               Call_Params : List_Id := New_List;
+            begin
+               if Nkind (DS) = N_Subtype_Indication
+                  and then Present (Constraint (DS))
+                  and then Nkind (Constraint (DS)) = N_Range_Constraint
+               then
+                  Lower_Arg := Low_Bound (Range_Expression (Constraint (DS)));
+                  Upper_Arg := High_Bound (Range_Expression (Constraint (DS)));
+               else
+                  Lower_Arg := Low_Bound (DS);
+                  Upper_Arg := High_Bound (DS);
+               end if;
+
+               Append_To (Call_Params, Make_Attribute_Reference (Loc,
+                 Prefix => New_Occurrence_Of (Long_Int_Typ, Loc),
+                 Attribute_Name => Name_Val,
+                 Expressions => New_List
+                   (Make_Attribute_Reference (Loc,
+                     Prefix => New_Occurrence_Of (Range_Typ, Loc),
+                     Attribute_Name => Name_Pos,
+                     Expressions => New_List (Lower_Arg)))));
+               Append_To (Call_Params, Make_Attribute_Reference (Loc,
+                 Prefix => New_Occurrence_Of (Long_Int_Typ, Loc),
+                 Attribute_Name => Name_Val,
+                 Expressions => New_List
+                   (Make_Attribute_Reference (Loc,
+                     Prefix => New_Occurrence_Of (Range_Typ, Loc),
+                     Attribute_Name => Name_Pos,
+                     Expressions => New_List (Upper_Arg)))));
+               Append_To (Call_Params, Chunk_Cnt);
+               Append_To (Call_Params, Make_Null (Loc));
+               Append_To (Call_Params, Make_Attribute_Reference (Loc,
+                  Prefix => New_Occurrence_Of (Proc_Id, Loc),
+                  Attribute_Name => Name_Access));
+
+               Call := Make_Procedure_Call_Statement (Loc,
+                 Name => New_Occurrence_Of (RTE
+                   (RE_Par_Range_Loop_With_Early_Exit), Loc),
+                 Parameter_Associations => Call_Params);
+
+               Block_Stmt := Make_Block_Statement (Loc,
+                 Declarations => Block_Decls,
+                 Handled_Statement_Sequence =>
+                   Make_Handled_Sequence_Of_Statements (Loc,
+                     Statements => New_List (Call)));
+
+               Rewrite (N, Block_Stmt);
+               Analyze (N);
+            end;
+         end Expand_Parallel;
       begin
          if No (Scheme) or else not Is_Parallel (Scheme) then
             return;
@@ -5956,195 +6260,7 @@ package body Exp_Ch5 is
             --  TODO: mandate this during semantic analysis
             pragma Assert (Present (Scheme) and then
                Present (Loop_Parameter_Specification (Scheme)));
-
-            --  Handle parallel expansion
-            declare
-               Loop_Param : Node_Id := Loop_Parameter_Specification (Scheme);
-               Chunk_Spec : Node_Id := Chunk_Specifier (Scheme);
-               Formals    : List_Id := New_List;
-               Call_Args  : List_Id := New_List;
-               Loop_Stmts : List_Id := New_List;
-               Outlined_Spec, Outlined_Body, Loop_Body : Node_Id;
-
-               Low_Id     : Entity_Id := Make_Temporary (Loc, 'P');
-               Hi_Id      : Entity_Id := Make_Temporary (Loc, 'P');
-               Proc_Id    : Entity_Id := Make_Temporary (Loc, 'P');
-               Old_Id     : Entity_Id := Defining_Identifier (Loop_Param);
-               Chunk_Id   : Entity_Id;
-               New_LP     : Entity_Id;
-               Bound_Typ  : Entity_Id := RTE (RE_Longest_Integer);
-               Range_Typ  : Entity_Id := Etype (Old_Id);
-               Par_Call   : Node_Id;
-               Chunk_Cnt  : Node_Id;
-            begin
-               Mutate_Ekind (Proc_Id, E_Procedure);
-               Set_Is_Internal (Proc_Id);
-
-               --  Get Chunk_Index parameter
-               if Present (Chunk_Spec) and then
-                 Nkind (Chunk_Spec) = N_Chunk_Specifier_Range
-               then
-                  Chunk_Id := Defining_Identifier (Chunk_Spec);
-                  Remove_Homonym (Chunk_Id);
-                  Mutate_Ekind (Chunk_Id, E_In_Parameter);
-
-                  --  TODO: Calculate chunk size
-                  --  I think this case just fails for now
-               else
-                  if Present (Chunk_Spec) and then
-                    Nkind (Chunk_Spec) = N_Chunk_Specifier_Int
-                  then
-                     Chunk_Cnt := Expression (Chunk_Spec);
-                  else
-                     Chunk_Cnt := Make_Integer_Literal (Loc, Uint_0);
-                  end if;
-                  Chunk_Id := Make_Temporary (Loc, 'P');
-               end if;
-
-               Set_Etype (Chunk_Id, Standard_Positive);
-
-               --  Create outlined function params
-               --  (Low : Longest_Integer; High : Longest_Integer;
-               --   Chunk_Id : Positive)
-               Append_To (Formals,
-                 Make_Parameter_Specification (Loc,
-                   Defining_Identifier => Low_Id,
-                   Parameter_Type      =>
-                     New_Occurrence_Of (Bound_Typ, Loc)));
-
-               Append_To (Formals,
-                 Make_Parameter_Specification (Loc,
-                   Defining_Identifier => Hi_Id,
-                   Parameter_Type      =>
-                     New_Occurrence_Of (Bound_Typ, Loc)));
-
-               Append_To (Formals,
-                 Make_Parameter_Specification (Loc,
-                   Defining_Identifier => Chunk_Id,
-                   Parameter_Type      =>
-                     New_Occurrence_Of (Standard_Positive, Loc)));
-
-               Outlined_Spec := Make_Procedure_Specification (Loc,
-                 Defining_Unit_Name       => Proc_Id,
-                 Parameter_Specifications => Formals);
-
-               Mutate_Ekind (Proc_Id, E_Procedure);
-               Set_Etype (Proc_Id, Standard_Void_Type);
-
-               --  Construct loop in outlined function
-               --  Loop_Body := New_Copy_Tree (N, New_Scope => Proc_Id);
-               --  Range_Typ := Etype (Defining_Identifier
-               --    (Loop_Parameter_Specification (Iteration_Scheme (Loop_Body))));
-               --  Set_Discrete_Subtype_Definition
-               --    (Loop_Parameter_Specification (Iteration_Scheme (Loop_Body)),
-               --     Make_Subtype_Indication (Loc,
-               --       Subtype_Mark => New_Occurrence_Of (Range_Typ, Loc),
-               --       Constraint => Make_Range_Constraint (Loc,
-               --         Range_Expression => Make_Range (Loc,
-               --           Low_Bound => Make_Attribute_Reference (Loc,
-               --             Prefix => New_Occurrence_Of (Range_Typ, Loc),
-               --             Attribute_Name => Name_Val,
-               --             Expressions => New_List (New_Occurrence_Of (Low_Id, Loc))),
-               --           High_Bound => Make_Attribute_Reference (Loc,
-               --             Prefix => New_Occurrence_Of (Range_Typ, Loc),
-               --             Attribute_Name => Name_Val,
-               --             Expressions => New_List (New_Occurrence_Of (Hi_Id, Loc)))))));
-
-               --  declare
-               --     E, C : Node_Id;
-               --  begin
-               --     E := First (Statements (N));
-
-               --     while Present (E) loop
-               --        C := New_Copy_Tree (E, New_Scope => Proc_Id);
-               --        Set_Analyzed (C, False);
-               --        Append (C, Loop_Stmts);
-               --        Next (E);
-               --     end loop;
-               --  end;
-
-               Loop_Body := Make_Loop_Statement (Loc, -- New_Copy_List_Tree (Statements (N))
-                 Statements => Copy_Separate_List (Statements (N)),
-                 Iteration_Scheme =>
-                   Make_Iteration_Scheme (Loc,
-                     Loop_Parameter_Specification =>
-                       Make_Loop_Parameter_Specification (Loc,
-                         Defining_Identifier => Copy_Separate_Tree (Old_Id),
-                         Discrete_Subtype_Definition =>
-                           Make_Subtype_Indication (Loc,
-                               Subtype_Mark =>
-                                 New_Occurrence_Of (Range_Typ, Loc),
-                               Constraint => Make_Range_Constraint (Loc,
-                                 Range_Expression =>
-                                   Make_Range (Loc,
-                                     Low_Bound =>
-                               Make_Attribute_Reference (Loc,
-                                 Prefix => New_Occurrence_Of (Range_Typ, Loc),
-                                 Attribute_Name => Name_Val,
-                                 Expressions => New_List (New_Occurrence_Of (Low_Id, Loc))),
-                             High_Bound =>
-                               Make_Attribute_Reference (Loc,
-                                 Prefix => New_Occurrence_Of (Range_Typ, Loc),
-                                 Attribute_Name => Name_Val,
-                                 Expressions => New_List (New_Occurrence_Of (Hi_Id, Loc)))))))));
-
-               Outlined_Body := Make_Subprogram_Body (Loc,
-                 Declarations => New_List,
-                 Specification => Outlined_Spec,
-                 Handled_Statement_Sequence =>
-                   Make_Handled_Sequence_Of_Statements
-                     (Loc, Statements => New_List (Loop_Body)));
-
-               Insert_Before (N, Outlined_Body);
-
-               declare
-                  DS : Node_Id := Discrete_Subtype_Definition (Loop_Param);
-                  Lower_Arg, Upper_Arg, Call : Node_Id;
-                  Call_Params : List_Id := New_List;
-               begin
-                  if Nkind (DS) = N_Subtype_Indication
-                    and then Present (Constraint (DS))
-                    and then Nkind (Constraint (DS)) = N_Range_Constraint
-                  then
-                     Lower_Arg := Low_Bound (Range_Expression (Constraint (DS)));
-                     Upper_Arg := High_Bound (Range_Expression (Constraint (DS)));
-                  else
-                     Lower_Arg := Low_Bound (DS);
-                     Upper_Arg := High_Bound (DS);
-                  end if;
-
-                  Append_To (Call_Params, Make_Attribute_Reference (Loc,
-                      Prefix => New_Occurrence_Of (Bound_Typ, Loc),
-                      Attribute_Name => Name_Val,
-                      Expressions => New_List
-                        (Make_Attribute_Reference (Loc,
-                          Prefix => New_Occurrence_Of (Range_Typ, Loc),
-                          Attribute_Name => Name_Pos,
-                          Expressions => New_List (Lower_Arg)))));
-                  Append_To (Call_Params, Make_Attribute_Reference (Loc,
-                      Prefix => New_Occurrence_Of (Bound_Typ, Loc),
-                      Attribute_Name => Name_Val,
-                      Expressions => New_List
-                        (Make_Attribute_Reference (Loc,
-                          Prefix => New_Occurrence_Of (Range_Typ, Loc),
-                          Attribute_Name => Name_Pos,
-                          Expressions => New_List (Upper_Arg)))));
-                  Append_To (Call_Params, Chunk_Cnt);
-                  --  TODO: Replace ordering with named arguments
-                  Append_To (Call_Params, Make_Null (Loc));
-                  Append_To (Call_Params, Make_Attribute_Reference (Loc,
-                    Prefix => New_Occurrence_Of (Proc_Id, Loc),
-                    Attribute_Name => Name_Access));
-
-                  Call := Make_Procedure_Call_Statement (Loc,
-                    Name => New_Occurrence_Of (RTE (RE_Par_Range_Loop), Loc),
-                    Parameter_Associations => Call_Params);
-
-                  Rewrite (N, Call);
-                  Analyze (Outlined_Body);
-                  Analyze (N);
-               end;
-            end;
+            Expand_Parallel;
          else
             --  Handle sequential fallback expansion
             Set_Is_Parallel (Scheme, False);
@@ -6776,20 +6892,20 @@ package body Exp_Ch5 is
       end if;
    end Expand_Predicated_Loop;
 
-   ----------------------------------------
-   -- Expand_N_Parallel_Do_Statement_Seq --
-   ----------------------------------------
+   ------------------------------------
+   -- Expand_N_Parallel_Do_Statement --
+   ------------------------------------
 
-   procedure Expand_N_Parallel_Do_Statement_Seq (N : Node_Id) is
+   procedure Expand_N_Parallel_Do_Statement (N : Node_Id) is
       Branches   : List_Id := New_List;
       Decls      : List_Id := New_List;
       Loc        : constant Source_Ptr := Sloc (N);
       Chunk_Spec : Node_Id := Chunk_Specifier (N);
 
-      procedure Sequential;
-      procedure Parallel;
+      procedure Exp_Sequential;
+      procedure Exp_Parallel;
 
-      procedure Sequential is
+      procedure Exp_Sequential is
          --  Rewrites a parllel do statement as a series of sequential
          --  blocks. This function transforms the following:
 
@@ -6857,9 +6973,9 @@ package body Exp_Ch5 is
                   Statements => Branches)));
             Analyze (N);
          end;
-      end Sequential;
+      end Exp_Sequential;
 
-      procedure Parallel is
+      procedure Exp_Parallel is
          Chunk_Spec : Node_Id := Chunk_Specifier (N);
          Formals    : List_Id := New_List;
          Call_Args  : List_Id := New_List;
@@ -6913,8 +7029,6 @@ package body Exp_Ch5 is
          Outlined_Spec := Make_Procedure_Specification (Loc,
             Defining_Unit_Name       => Proc_Id,
             Parameter_Specifications => Formals);
-
-         Mutate_Ekind (Proc_Id, E_Procedure);
          Set_Etype (Proc_Id, Standard_Void_Type);
 
          declare
@@ -6943,23 +7057,25 @@ package body Exp_Ch5 is
              Constraint => Make_Range_Constraint (Loc,
                Range_Expression => Make_Range (Loc,
                  Low_Bound => Make_Integer_Literal (Loc, Uint_1),
-                 High_Bound => Make_Integer_Literal (Loc, Int'Val (Branch_Count))))));
+                 High_Bound => Make_Integer_Literal (Loc,
+                   Int'Val (Branch_Count))))));
          Insert_Before (N, Sub_Def);
          Analyze (Sub_Def);
 
          Loop_Body := Make_Loop_Statement (Loc,
            Iteration_Scheme => Make_Iteration_Scheme (Loc,
-             Loop_Parameter_Specification => Make_Loop_Parameter_Specification (Loc,
-               Defining_Identifier => Loop_Param,
-               Discrete_Subtype_Definition => Make_Subtype_Indication (Loc,
-                 Subtype_Mark => New_Occurrence_Of (Sub_Id, Loc),
-                 Constraint => Make_Range_Constraint (Loc,
-                   Range_Expression => Make_Range (Loc,
-                     Low_Bound => New_Occurrence_Of (Low_Id, Loc),
-                     High_Bound => New_Occurrence_Of (Hi_Id, Loc)))))),
-           Statements => New_List (Make_Case_Statement (Loc, 
-             Expression => New_Occurrence_Of (Loop_Param, Loc),
-             Alternatives => Case_Alts)));
+             Loop_Parameter_Specification =>
+               Make_Loop_Parameter_Specification (Loc,
+                 Defining_Identifier => Loop_Param,
+                 Discrete_Subtype_Definition => Make_Subtype_Indication (Loc,
+                   Subtype_Mark => New_Occurrence_Of (Sub_Id, Loc),
+                   Constraint => Make_Range_Constraint (Loc,
+                     Range_Expression => Make_Range (Loc,
+                       Low_Bound => New_Occurrence_Of (Low_Id, Loc),
+                       High_Bound => New_Occurrence_Of (Hi_Id, Loc)))))),
+            Statements => New_List (Make_Case_Statement (Loc,
+              Expression => New_Occurrence_Of (Loop_Param, Loc),
+              Alternatives => Case_Alts)));
 
          Outlined_Body := Make_Subprogram_Body (Loc,
            Declarations => New_List,
@@ -6968,11 +7084,12 @@ package body Exp_Ch5 is
              Make_Handled_Sequence_Of_Statements
                (Loc, Statements => New_List (Loop_Body)));
 
-         Insert_Before (N, Outlined_Body);
+         Insert_Action (N, Outlined_Body);
          Analyze (Outlined_Body);
 
          Append_To (Call_Args, Make_Integer_Literal (Loc, 1));
-         Append_To (Call_Args, Make_Integer_Literal (Loc, Int'Val (Branch_Count)));
+         Append_To (Call_Args, Make_Integer_Literal
+           (Loc, Int'Val (Branch_Count)));
          Append_To (Call_Args, Chunk_Cnt);
          --  TODO: Replace ordering with named arguments
          Append_To (Call_Args, Make_Null (Loc));
@@ -6983,19 +7100,17 @@ package body Exp_Ch5 is
          Par_Call := Make_Procedure_Call_Statement (Loc,
            Name => New_Occurrence_Of (RTE (RE_Par_Range_Loop), Loc),
            Parameter_Associations => Call_Args);
-         
+
          Rewrite (N, Par_Call);
          Analyze (N);
-      end Parallel;
+      end Exp_Parallel;
    begin
-      
       if RTE_Available (RE_Longest_Integer) then
-         Parallel;
+         Exp_Parallel;
       else
-         Sequential;
+         Exp_Sequential;
       end if;
-      
-   end Expand_N_Parallel_Do_Statement_Seq;
+   end Expand_N_Parallel_Do_Statement;
 
    ------------------------------
    -- Make_Tag_Ctrl_Assignment --

@@ -514,7 +514,7 @@ package Rtsfind is
 
       LWT,
 
-      -- Children of LWT
+      --  Children of LWT
 
       LWT_Parallelism);
 

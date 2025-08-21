@@ -1486,6 +1486,11 @@ package body Atree is
 
          Set_Analyzed (New_Id, False);
 
+         --  TODO: investigate this
+         if Nkind (New_Id) in N_Block_Statement | N_Loop_Statement then
+            Set_Identifier (New_Id, Empty);
+         end if;
+
          --  Rather special case, if we have an expanded name, then change
          --  it back into a selected component, so that the tree looks the
          --  way it did coming out of the parser. This will change back
