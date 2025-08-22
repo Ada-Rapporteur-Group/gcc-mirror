@@ -2132,8 +2132,8 @@ package body Sem_Ch5 is
          if Present (Iter_Spec) then
             Error_Msg_N ("Parallel iteration over " &
               "containers not yet supported", N);
-         elsif Present (Loop_Spec) and then
-           Reverse_Present (Loop_Spec)
+         elsif Present (Loop_Spec)
+           and then Reverse_Present (Loop_Spec)
          then
             Error_Msg_N
               ("Parallel loops cannot use reverse " &
@@ -4421,8 +4421,8 @@ package body Sem_Ch5 is
                Analyze_And_Resolve (Expr, Any_Integer);
                Check_Unset_Reference (Expr);
 
-               if Compile_Time_Known_Value (Expr) and then
-                 Expr_Value (Expr) <= 0
+               if Compile_Time_Known_Value (Expr)
+                 and then Expr_Value (Expr) <= 0
                then
                   Error_Msg_N ("??maximum number of chunks must be" &
                     " greater than zero", N);
