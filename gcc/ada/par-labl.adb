@@ -143,6 +143,7 @@ procedure Labl is
         and then Nkind (Result) /= N_Package_Body
         and then Nkind (Result) /= N_Subprogram_Body
         and then Nkind (Result) /= N_Block_Statement
+        and then Nkind (Result) /= N_Parallel_Block_Statement
       loop
          Result := Parent (Result);
       end loop;

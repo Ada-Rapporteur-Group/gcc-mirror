@@ -7105,11 +7105,12 @@ package body Exp_Ch5 is
          Analyze (N);
       end Exp_Parallel;
    begin
-      if RTE_Available (RE_Longest_Integer) then
-         Exp_Parallel;
-      else
-         Exp_Sequential;
-      end if;
+      Exp_Sequential;
+      --  if RTE_Available (RE_Longest_Integer) then
+      --     Exp_Parallel;
+      --  else
+      --     Exp_Sequential;
+      --  end if;
    end Expand_N_Parallel_Do_Statement;
 
    ------------------------------

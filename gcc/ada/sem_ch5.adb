@@ -44,6 +44,7 @@ with Namet;          use Namet;
 with Nlists;         use Nlists;
 with Nmake;          use Nmake;
 with Opt;            use Opt;
+with Rtsfind;        use Rtsfind;
 with Sem;            use Sem;
 with Sem_Aux;        use Sem_Aux;
 with Sem_Case;       use Sem_Case;
@@ -4434,23 +4435,146 @@ package body Sem_Ch5 is
       end case;
    end Analyze_Chunk_Specifier;
 
-   -------------------------
-   -- Analyze_Parallel_Do --
-   -------------------------
+   function Build_Parallel_Loop_Spec (Loc : Source_Ptr;
+     Chunk_Param : Entity_Id) return Node_Id;
 
-   procedure Analyze_Parallel_Do (N : Node_Id) is
+   function Build_Parallel_Loop_Spec
+     (Loc : Source_Ptr; Chunk_Param : Entity_Id) return Node_Id
+   is
+      Long_Int_Typ  : Entity_Id := RTE (RE_Longest_Integer);
+      Loop_Id_Typ   : Entity_Id := RTE (RE_Par_Loop_Id);
+      Proc_Id       : Entity_Id := Make_Temporary (Loc, 'P');
+      Low_Param     : Entity_Id := Make_Temporary (Loc, 'P');
+      Hi_Param      : Entity_Id := Make_Temporary (Loc, 'P');
+      Loop_Id_Param : Entity_Id := Make_Temporary (Loc, 'P');
+   begin
+      return Make_Procedure_Specification (Loc,
+        Defining_Unit_Name       => Proc_Id,
+        Parameter_Specifications => New_List (
+          Make_Parameter_Specification (Loc,
+            Defining_Identifier => Low_Param,
+            Parameter_Type      =>
+              New_Occurrence_Of (Long_Int_Typ, Loc)),
+          Make_Parameter_Specification (Loc,
+            Defining_Identifier => Hi_Param,
+            Parameter_Type      =>
+              New_Occurrence_Of (Long_Int_Typ, Loc)),
+          Make_Parameter_Specification (Loc,
+            Defining_Identifier => Chunk_Param,
+            Parameter_Type      =>
+              New_Occurrence_Of (Standard_Positive, Loc)),
+          Make_Parameter_Specification (Loc,
+            Defining_Identifier => Loop_Id_Param,
+            Parameter_Type      =>
+              New_Occurrence_Of (Loop_Id_Typ, Loc))));
+   end Build_Parallel_Loop_Spec;
+
+   --------------------------------------
+   -- Analyze_Parallel_Block_Statement --
+   --------------------------------------
+
+   procedure Analyze_Parallel_Block_Statement (N : Node_Id) is
       Chunk_Spec  : constant Node_Id := Chunk_Specifier (N);
       Branch_Node : Node_Id := First (Parallel_Branches (N));
+      Loc         : Source_Ptr := Sloc (N);
+      --  Par      : Node_Id := Parent (N);
+      --  Outlined : Boolean := Present (Par)
+      --    and then Nkind (Par) = N_Subprogram_Body
+      --    and then Is_Outlined_Parallel_Function (Par);
    begin
       if Present (Chunk_Spec) then
          Analyze_Chunk_Specifier (Chunk_Spec);
       end if;
 
-      while Present (Branch_Node) loop
-         Analyze_Statements (Statements (Branch_Node));
-         Next (Branch_Node);
-      end loop;
-   end Analyze_Parallel_Do;
+      if not In_Outlined_Parallel (N)
+        and then RTE_Available (RE_Par_Range_Loop_With_Early_Exit)
+      then
+         --  Rewrite 
+         declare
+            Outlined_Body, Outlined_Spec, Chunk_Arg,
+              Parallel_Call, Parallel_Block : Node_Id;
+            Branch_Count : Nat := 0;
+            Old_Decls    : List_Id := Declarations (N);
+         begin
+            Set_Declarations (N, No_List);
+            Set_Chunk_Specifier (N, Empty);
+            Set_In_Outlined_Parallel (N);
+
+            --  TODO: Any better way to do this?
+            while Present (Branch_Node) loop
+               Branch_Count := Branch_Count + 1;
+               Next (Branch_Node);
+            end loop;
+
+            if Present (Chunk_Spec) then
+               Chunk_Arg := Relocate_Node (Expression (Chunk_Spec));
+            else
+               Chunk_Arg := Make_Integer_Literal (Loc, 0);
+            end if;
+
+            Outlined_Spec := Build_Parallel_Loop_Spec (Loc,
+              Chunk_Param => Make_Temporary (Loc, 'P'));
+
+            Outlined_Body := Make_Subprogram_Body (Loc,
+              Specification => Outlined_Spec,
+              Declarations => Old_Decls,
+              Handled_Statement_Sequence =>
+                Make_Handled_Sequence_Of_Statements (Loc,
+                  Statements => New_List (Relocate_Node (N))));
+            Set_Is_Outlined_Parallel_Function (Outlined_Body);
+
+            Parallel_Call := Make_Procedure_Call_Statement (Loc,
+              Name => New_Occurrence_Of (RTE
+                (RE_Par_Range_Loop_With_Early_Exit), Loc),
+              Parameter_Associations => New_List (
+                Make_Integer_Literal (Loc, 1),
+                Make_Integer_Literal (Loc, Branch_Count),
+                Chunk_Arg,
+                Make_Null (Loc),
+                Make_Attribute_Reference (Loc,
+                  Prefix => New_Occurrence_Of
+                    (Defining_Unit_Name (Outlined_Spec), Loc),
+                  Attribute_Name => Name_Access)));
+
+            Parallel_Block := Make_Block_Statement (Loc,
+               Declarations => New_List (Outlined_Body),
+               Handled_Statement_Sequence =>
+                 Make_Handled_Sequence_Of_Statements (Loc,
+                   Statements => New_List (Parallel_Call)));
+
+            Rewrite (N, Parallel_Block);
+            Analyze (N);
+         end;
+      elsif Present (Declarations (N))
+        and then not Is_Empty_List (Declarations (N))
+      then
+         pragma Assert (not In_Outlined_Parallel (N));
+         --  Move 
+         declare
+            New_Block : Node_Id;
+            Old_Decls : List_Id := Declarations (N);
+         begin
+            Set_Declarations (N, No_List);
+            New_Block := Make_Block_Statement (Loc,
+              Declarations => Declarations (N),
+              Handled_Statement_Sequence =>
+                Make_Handled_Sequence_Of_Statements (Loc,
+                  Statements => New_List (Relocate_Node (N))));
+            Rewrite (N, New_Block);
+            Analyze (N);
+         end;
+      else
+         --  Analyze statements in current scope
+         while Present (Branch_Node) loop
+            Analyze_Statements (Statements (Branch_Node));
+            Next (Branch_Node);
+         end loop;
+
+         if not In_Outlined_Parallel (N) then
+            null;
+         end if;
+      end if;
+   end Analyze_Parallel_Block_Statement;
 
    -------------------------
    -- Analyze_Target_Name --

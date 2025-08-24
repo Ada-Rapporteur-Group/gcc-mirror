@@ -728,6 +728,7 @@ begin -- Gen_IL.Gen.Gen_Nodes
         Sm (Do_Storage_Check, Flag),
         Sm (Has_Relative_Deadline_Pragma, Flag),
         Sm (Is_Entry_Barrier_Function, Flag),
+        Sm (Is_Outlined_Parallel_Function, Flag),
         Sm (Is_Protected_Subprogram_Body, Flag),
         Sm (Is_Task_Body_Procedure, Flag),
         Sm (Is_Task_Master, Flag),
@@ -920,7 +921,13 @@ begin -- Gen_IL.Gen.Gen_Nodes
 
    Cc (N_Parallel_Block_Statement, N_Statement_Other_Than_Procedure_Call,
        (Sy (Chunk_Specifier, Node_Id, Default_Empty),
-        Sy (Parallel_Branches, List_Id, Default_No_List)));
+        Sy (Parallel_Branches, List_Id, Default_No_List),
+        --  List of declaration associated with the parallel block.
+        --  The parallel block doesn't actaully have any syntax to support this,
+        --  but we need to collect these decls so that we can move them to the
+        --  appropriate spot during analysis
+        Sy (Declarations, List_Id, Default_No_List),
+        Sm (In_Outlined_Parallel, Flag)));
 
    Cc (N_Case_Statement, N_Statement_Other_Than_Procedure_Call,
        (Sy (Expression, Node_Id, Default_Empty),

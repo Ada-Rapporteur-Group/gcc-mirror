@@ -44,7 +44,7 @@ package Sem_Ch5 is
    procedure Analyze_Loop_Parameter_Specification (N : Node_Id);
    procedure Analyze_Loop_Statement               (N : Node_Id);
    procedure Analyze_Null_Statement               (N : Node_Id);
-   procedure Analyze_Parallel_Do                  (N : Node_Id);
+   procedure Analyze_Parallel_Block_Statement     (N : Node_Id);
    procedure Analyze_Statements                   (L : List_Id);
    procedure Analyze_Target_Name                  (N : Node_Id);
 
