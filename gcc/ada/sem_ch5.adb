@@ -4435,18 +4435,19 @@ package body Sem_Ch5 is
       end case;
    end Analyze_Chunk_Specifier;
 
-   function Build_Parallel_Loop_Spec (Loc : Source_Ptr;
-     Chunk_Param : Entity_Id) return Node_Id;
+   function Build_Parallel_Loop_Spec
+     (Loc : Source_Ptr; Low_Param : Entity_Id;
+      Hi_Param : Entity_Id; Chunk_Param : Entity_Id;
+      Loop_Id_Param : Entity_Id) return Node_Id;
 
    function Build_Parallel_Loop_Spec
-     (Loc : Source_Ptr; Chunk_Param : Entity_Id) return Node_Id
+     (Loc : Source_Ptr; Low_Param : Entity_Id;
+      Hi_Param : Entity_Id; Chunk_Param : Entity_Id;
+      Loop_Id_Param : Entity_Id) return Node_Id
    is
       Long_Int_Typ  : Entity_Id := RTE (RE_Longest_Integer);
       Loop_Id_Typ   : Entity_Id := RTE (RE_Par_Loop_Id);
       Proc_Id       : Entity_Id := Make_Temporary (Loc, 'P');
-      Low_Param     : Entity_Id := Make_Temporary (Loc, 'P');
-      Hi_Param      : Entity_Id := Make_Temporary (Loc, 'P');
-      Loop_Id_Param : Entity_Id := Make_Temporary (Loc, 'P');
    begin
       return Make_Procedure_Specification (Loc,
         Defining_Unit_Name       => Proc_Id,
@@ -4493,8 +4494,11 @@ package body Sem_Ch5 is
          declare
             Outlined_Body, Outlined_Spec, Chunk_Arg,
               Parallel_Call, Parallel_Block : Node_Id;
-            Branch_Count : Nat := 0;
-            Old_Decls    : List_Id := Declarations (N);
+            Branch_Count  : Nat := 0;
+            Old_Decls     : List_Id := Declarations (N);
+            Low_Param     : Entity_Id := Make_Temporary (Loc, 'P');
+            Hi_Param      : Entity_Id := Make_Temporary (Loc, 'P');
+            Loop_Id_Param : Entity_Id := Make_Temporary (Loc, 'P');
          begin
             Set_Declarations (N, No_List);
             Set_Chunk_Specifier (N, Empty);
@@ -4511,9 +4515,17 @@ package body Sem_Ch5 is
             else
                Chunk_Arg := Make_Integer_Literal (Loc, 0);
             end if;
+            Set_Etype (Chunk_Arg, Standard_Positive);
 
             Outlined_Spec := Build_Parallel_Loop_Spec (Loc,
-              Chunk_Param => Make_Temporary (Loc, 'P'));
+              Low_Param     => Low_Param,
+              Hi_Param      => Hi_Param,
+              Chunk_Param   => Make_Temporary (Loc, 'P'),
+              Loop_Id_Param => Loop_Id_Param);
+
+            Set_Parallel_Low_Bound (N, Low_Param);
+            Set_Parallel_Hi_Bound (N, Hi_Param);
+            Set_Parallel_Loop_Id (N, Loop_Id_Param);
 
             Outlined_Body := Make_Subprogram_Body (Loc,
               Specification => Outlined_Spec,
@@ -4549,7 +4561,7 @@ package body Sem_Ch5 is
         and then not Is_Empty_List (Declarations (N))
       then
          pragma Assert (not In_Outlined_Parallel (N));
-         --  Move 
+         --  Move
          declare
             New_Block : Node_Id;
             Old_Decls : List_Id := Declarations (N);

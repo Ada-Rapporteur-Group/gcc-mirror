@@ -6939,9 +6939,9 @@ package body Exp_Ch5 is
                Chunk_Type : Entity_Id := Etype (Expression (Chunk_Spec));
             begin
                Chunk_Decl := Make_Object_Declaration (Loc,
-               Defining_Identifier => Chunk_Id,
-               Expression          => Expression (Chunk_Spec),
-               Object_Definition   => New_Occurrence_Of (Chunk_Type, Loc));
+                 Defining_Identifier => Chunk_Id,
+                 Expression          => Expression (Chunk_Spec),
+                 Object_Definition   => New_Occurrence_Of (Chunk_Type, Loc));
                Append_To (Decls, Chunk_Decl);
             end;
          end if;
@@ -6956,81 +6956,33 @@ package body Exp_Ch5 is
                   Rewritten_Block : Node_Id;
                begin
                   Handled_Seq := Make_Handled_Sequence_Of_Statements
-                  (Loc, Statements => Statements (Current_Branch));
+                    (Loc, Statements => Statements (Current_Branch));
                   Rewritten_Block := Make_Block_Statement (Loc,
-                  Declarations               => Empty_List,
-                  Handled_Statement_Sequence => Handled_Seq);
+                    Declarations               => Empty_List,
+                    Handled_Statement_Sequence => Handled_Seq);
                   Append_To (Branches, Rewritten_Block);
                end;
                Current_Branch := Next (Current_Branch);
             end loop;
 
             Rewrite (N,
-            Make_Block_Statement (Loc,
-               Declarations               => Decls,
-               Handled_Statement_Sequence =>
+              Make_Block_Statement (Loc,
+                Declarations               => Decls,
+                Handled_Statement_Sequence =>
                   Make_Handled_Sequence_Of_Statements (Loc,
-                  Statements => Branches)));
+                    Statements => Branches)));
             Analyze (N);
          end;
       end Exp_Sequential;
 
       procedure Exp_Parallel is
-         Chunk_Spec : Node_Id := Chunk_Specifier (N);
-         Formals    : List_Id := New_List;
-         Call_Args  : List_Id := New_List;
-         Case_Alts  : List_Id := New_List;
-         Outlined_Spec, Outlined_Body : Node_Id;
-         Branch_Count : Natural := 0;
-         Index_Typ  : Entity_Id := RTE (RE_Longest_Integer);
-
-         Low_Id     : Entity_Id := Make_Temporary (Loc, 'P');
-         Hi_Id      : Entity_Id := Make_Temporary (Loc, 'P');
-         Proc_Id    : Entity_Id := Make_Temporary (Loc, 'P');
-         Chunk_Id   : Entity_Id := Make_Temporary (Loc, 'P');
-         Loop_Param : Entity_Id := Make_Temporary (Loc, 'P');
-         Sub_Id   : Entity_Id := Make_Temporary (Loc, 'P');
-         Par_Call, Loop_Body, Chunk_Cnt, Case_Stmt, Sub_Def : Node_Id;
+         Case_Alts     : List_Id := New_List;
+         Branch_Count  : Nat := 0;
+         Low_Id        : Entity_Id := Parallel_Low_Bound (N);
+         Hi_Id         : Entity_Id := Parallel_Hi_Bound (N);
+         Loop_Param_Id : Entity_Id := Make_Temporary (Loc, 'P');
+         Loop_Body, Loop_Case, Loop_Param, Loop_Range : Node_Id;
       begin
-         Mutate_Ekind (Proc_Id, E_Procedure);
-         Set_Is_Internal (Proc_Id);
-
-         --  Get Chunk_Index parameter
-         if Present (Chunk_Spec)
-           and then Nkind (Chunk_Spec) = N_Chunk_Specifier_Int
-         then
-            Chunk_Cnt := Expression (Chunk_Spec);
-         else
-            Chunk_Cnt := Make_Integer_Literal (Loc, Uint_0);
-         end if;
-         Set_Etype (Chunk_Id, Standard_Positive);
-
-         --  Create outlined function params
-         --  (Low : Longest_Integer; High : Longest_Integer;
-         --   Chunk_Id : Positive)
-         Append_To (Formals,
-           Make_Parameter_Specification (Loc,
-             Defining_Identifier => Low_Id,
-             Parameter_Type      =>
-               New_Occurrence_Of (Index_Typ, Loc)));
-
-         Append_To (Formals,
-           Make_Parameter_Specification (Loc,
-             Defining_Identifier => Hi_Id,
-             Parameter_Type      =>
-             New_Occurrence_Of (Index_Typ, Loc)));
-
-         Append_To (Formals,
-           Make_Parameter_Specification (Loc,
-             Defining_Identifier => Chunk_Id,
-             Parameter_Type      =>
-             New_Occurrence_Of (Standard_Positive, Loc)));
-
-         Outlined_Spec := Make_Procedure_Specification (Loc,
-            Defining_Unit_Name       => Proc_Id,
-            Parameter_Specifications => Formals);
-         Set_Etype (Proc_Id, Standard_Void_Type);
-
          declare
             Branch : Node_Id := First (Parallel_Branches (N));
          begin
@@ -7038,10 +6990,9 @@ package body Exp_Ch5 is
                Branch_Count := Branch_Count + 1;
                Append_To (Case_Alts,
                  Make_Case_Statement_Alternative (Loc,
-                   Discrete_Choices => New_List (Make_Integer_Literal
-                     (Loc, Int'Val (Branch_Count))),
-                   Statements => Copy_Separate_List
-                     (Statements (Branch))));
+                   Discrete_Choices => New_List (
+                     Make_Integer_Literal (Loc, Branch_Count)),
+                   Statements => Statements (Branch)));
                Next (Branch);
             end loop;
          end;
@@ -7050,67 +7001,36 @@ package body Exp_Ch5 is
            Discrete_Choices => New_List (Make_Others_Choice (Loc)),
            Statements => New_List (Make_Null_Statement (Loc))));
 
-         Sub_Def := Make_Subtype_Declaration (Loc,
-           Defining_Identifier => Sub_Id,
-           Subtype_Indication => Make_Subtype_Indication (Loc,
-             Subtype_Mark => New_Occurrence_Of (Index_Typ, Loc),
+         Loop_Case := Make_Case_Statement (Loc,
+           Expression => New_Occurrence_Of (Loop_Param_Id, Loc),
+           Alternatives => Case_Alts);
+
+         Loop_Range := Make_Range (Loc,
+           Low_Bound => New_Occurrence_Of (Low_Id, Loc),
+           High_Bound => New_Occurrence_Of (Hi_Id, Loc));
+
+         Loop_Param := Make_Loop_Parameter_Specification (Loc,
+           Defining_Identifier => Loop_Param_Id,
+           Discrete_Subtype_Definition => Make_Subtype_Indication (Loc,
+             Subtype_Mark => New_Occurrence_Of (
+               RTE (RE_Longest_Integer), Loc),
              Constraint => Make_Range_Constraint (Loc,
-               Range_Expression => Make_Range (Loc,
-                 Low_Bound => Make_Integer_Literal (Loc, Uint_1),
-                 High_Bound => Make_Integer_Literal (Loc,
-                   Int'Val (Branch_Count))))));
-         Insert_Before (N, Sub_Def);
-         Analyze (Sub_Def);
+               Range_Expression => Loop_Range)));
 
          Loop_Body := Make_Loop_Statement (Loc,
            Iteration_Scheme => Make_Iteration_Scheme (Loc,
-             Loop_Parameter_Specification =>
-               Make_Loop_Parameter_Specification (Loc,
-                 Defining_Identifier => Loop_Param,
-                 Discrete_Subtype_Definition => Make_Subtype_Indication (Loc,
-                   Subtype_Mark => New_Occurrence_Of (Sub_Id, Loc),
-                   Constraint => Make_Range_Constraint (Loc,
-                     Range_Expression => Make_Range (Loc,
-                       Low_Bound => New_Occurrence_Of (Low_Id, Loc),
-                       High_Bound => New_Occurrence_Of (Hi_Id, Loc)))))),
-            Statements => New_List (Make_Case_Statement (Loc,
-              Expression => New_Occurrence_Of (Loop_Param, Loc),
-              Alternatives => Case_Alts)));
+             Loop_Parameter_Specification => Loop_Param),
+           Statements => New_List (Loop_Case));
 
-         Outlined_Body := Make_Subprogram_Body (Loc,
-           Declarations => New_List,
-           Specification => Outlined_Spec,
-           Handled_Statement_Sequence =>
-             Make_Handled_Sequence_Of_Statements
-               (Loc, Statements => New_List (Loop_Body)));
-
-         Insert_Action (N, Outlined_Body);
-         Analyze (Outlined_Body);
-
-         Append_To (Call_Args, Make_Integer_Literal (Loc, 1));
-         Append_To (Call_Args, Make_Integer_Literal
-           (Loc, Int'Val (Branch_Count)));
-         Append_To (Call_Args, Chunk_Cnt);
-         --  TODO: Replace ordering with named arguments
-         Append_To (Call_Args, Make_Null (Loc));
-         Append_To (Call_Args, Make_Attribute_Reference (Loc,
-           Prefix => New_Occurrence_Of (Proc_Id, Loc),
-           Attribute_Name => Name_Access));
-
-         Par_Call := Make_Procedure_Call_Statement (Loc,
-           Name => New_Occurrence_Of (RTE (RE_Par_Range_Loop), Loc),
-           Parameter_Associations => Call_Args);
-
-         Rewrite (N, Par_Call);
+         Rewrite (N, Loop_Body);
          Analyze (N);
       end Exp_Parallel;
    begin
-      Exp_Sequential;
-      --  if RTE_Available (RE_Longest_Integer) then
-      --     Exp_Parallel;
-      --  else
-      --     Exp_Sequential;
-      --  end if;
+      if In_Outlined_Parallel (N) then
+         Exp_Parallel;
+      else
+         Exp_Sequential;
+      end if;
    end Expand_N_Parallel_Do_Statement;
 
    ------------------------------

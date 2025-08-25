@@ -927,6 +927,9 @@ begin -- Gen_IL.Gen.Gen_Nodes
         --  but we need to collect these decls so that we can move them to the
         --  appropriate spot during analysis
         Sy (Declarations, List_Id, Default_No_List),
+        Sm (Parallel_Low_Bound, Node_Id),
+        Sm (Parallel_Hi_Bound, Node_Id),
+        Sm (Parallel_Loop_Id, Node_Id),
         Sm (In_Outlined_Parallel, Flag)));
 
    Cc (N_Case_Statement, N_Statement_Other_Than_Procedure_Call,
