@@ -344,6 +344,8 @@ package Gen_IL.Fields is
       Others_Discrete_Choices,
       Out_Present,
       Parallel_Branches,
+      Parallel_Chunk_Id,
+      Parallel_Declarations,
       Parallel_Hi_Bound,
       Parallel_Loop_Id,
       Parallel_Low_Bound,

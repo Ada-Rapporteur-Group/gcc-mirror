@@ -55,6 +55,9 @@ procedure Labl is
    --  corresponding statements into a proper loop, for optimization
    --  purposes (for example, to control reclaiming local storage).
 
+   function Is_Parallel_Loop (N : Node_Id) return Boolean;
+   --  Checks if the given node is a parallel loop
+
    ---------------------------
    -- Check_Distinct_Labels --
    ---------------------------
@@ -134,6 +137,14 @@ procedure Labl is
       Result : Node_Id := Parent (N);
 
    begin
+      --  In the case of parallel loops, the captured labels will
+      --  include the enclosing loop itself. It sounds counterintuitive,
+      --  but these label definitions are going to be moved to a seperate
+      --  block or procedure body later on.
+      --  if Is_Parallel_Loop (N) then
+      --     return N;
+      --  end if;
+
       --  Climb up the parent chain until we find a body or block
 
       while Present (Result)
@@ -144,6 +155,7 @@ procedure Labl is
         and then Nkind (Result) /= N_Subprogram_Body
         and then Nkind (Result) /= N_Block_Statement
         and then Nkind (Result) /= N_Parallel_Block_Statement
+        and then not Is_Parallel_Loop (Result)
       loop
          Result := Parent (Result);
       end loop;
@@ -478,6 +490,17 @@ procedure Labl is
       end loop;
    end Find_Natural_Loops;
 
+   ----------------------
+   -- Is_Parallel_Loop --
+   ----------------------
+
+   function Is_Parallel_Loop (N : Node_Id) return Boolean is
+      Scheme : Node_Id := Iteration_Scheme (N);
+   begin
+      return Nkind (N) = N_Loop_Statement
+        and then Present (Scheme) and then Is_Parallel (Scheme);
+   end Is_Parallel_Loop;
+
 --  Start of processing for Par.Labl
 
 begin
@@ -525,11 +548,23 @@ begin
          --  Now attach the implicit label declaration to the appropriate
          --  declarative region, creating a declaration list if none exists
 
-         if No (Declarations (Enclosing_Body_Or_Block)) then
-            Set_Declarations (Enclosing_Body_Or_Block, New_List);
-         end if;
+         if Nkind (Enclosing_Body_Or_Block) in
+           N_Loop_Statement | N_Parallel_Block_Statement
+         then
+            if No (Parallel_Declarations (Enclosing_Body_Or_Block)) then
+               Set_Parallel_Declarations
+                 (Enclosing_Body_Or_Block, New_List);
+            end if;
 
-         Append (Label_Decl_Node, Declarations (Enclosing_Body_Or_Block));
+            Append (Label_Decl_Node, Parallel_Declarations
+              (Enclosing_Body_Or_Block));
+         else
+            if No (Declarations (Enclosing_Body_Or_Block)) then
+               Set_Declarations (Enclosing_Body_Or_Block, New_List);
+            end if;
+
+            Append (Label_Decl_Node, Declarations (Enclosing_Body_Or_Block));
+         end if;
       end if;
 
       <<Next_Label>>

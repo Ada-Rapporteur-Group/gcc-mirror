@@ -926,7 +926,7 @@ begin -- Gen_IL.Gen.Gen_Nodes
         --  The parallel block doesn't actaully have any syntax to support this,
         --  but we need to collect these decls so that we can move them to the
         --  appropriate spot during analysis
-        Sy (Declarations, List_Id, Default_No_List),
+        Sy (Parallel_Declarations, List_Id, Default_No_List),
         Sm (Parallel_Low_Bound, Node_Id),
         Sm (Parallel_Hi_Bound, Node_Id),
         Sm (Parallel_Loop_Id, Node_Id),
@@ -984,7 +984,13 @@ begin -- Gen_IL.Gen.Gen_Nodes
         Sy (End_Label, Node_Id, Default_Empty),
         Sy (Has_Created_Identifier, Flag),
         Sy (Is_Null_Loop, Flag),
-        Sy (Suppress_Loop_Warnings, Flag)));
+        Sy (Suppress_Loop_Warnings, Flag),
+        Sy (Parallel_Declarations, List_Id, Default_No_List),
+        Sm (Parallel_Low_Bound, Node_Id),
+        Sm (Parallel_Hi_Bound, Node_Id),
+        Sm (Parallel_Loop_Id, Node_Id),
+        Sm (Parallel_Chunk_Id, Node_Id),
+        Sm (In_Outlined_Parallel, Flag)));
 
    Ab (N_Loop_Flow_Statement, N_Statement_Other_Than_Procedure_Call,
        (Sy (Name, Node_Id, Default_Empty),
