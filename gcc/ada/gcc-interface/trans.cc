@@ -1186,9 +1186,12 @@ Identifier_to_gnu (Node_Id gnat_node, tree *gnu_result_type_p)
      something went wrong, probably in generic instantiation.  However, this
      does not apply to types.  Since we sometime have strange Ekind's, just
      do this test for objects, except for discriminants because their type
-     may have been changed to a subtype by Exp_Ch3.Adjust_Discriminants.  */
+     may have been changed to a subtype by Exp_Ch3.Adjust_Discriminants. This
+	 can also occur when re-analyzing a loop parameter.  */
+  // TODO: Investigate this?
   gcc_assert (!Is_Object (gnat_entity)
 	      || Ekind (gnat_entity) == E_Discriminant
+		  || Ekind (gnat_entity) == E_Loop_Parameter
 	      || Etype (gnat_node) == Etype (gnat_entity)
 	      || Gigi_Types_Compatible (Etype (gnat_node),
 					Etype (gnat_entity)));

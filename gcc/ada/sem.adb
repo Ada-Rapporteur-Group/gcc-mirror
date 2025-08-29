@@ -167,7 +167,7 @@ package body Sem is
             Analyze_Attribute_Definition_Clause (N);
 
          when N_Parallel_Block_Statement =>
-            Analyze_Parallel_Do (N);
+            Analyze_Parallel_Block_Statement (N);
 
          when N_Block_Statement =>
             Analyze_Block_Statement (N);
