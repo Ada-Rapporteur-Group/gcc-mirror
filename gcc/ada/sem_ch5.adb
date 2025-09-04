@@ -3871,6 +3871,10 @@ package body Sem_Ch5 is
                end if;
             end Read_Bounds;
 
+            ----------------------
+            -- Create_Bound_Arg --
+            ----------------------
+
             function Create_Bound_Arg (Arg : Node_Id)
               return Node_Id
             is
@@ -4012,29 +4016,24 @@ package body Sem_Ch5 is
             Expr_Copy     : Node_Id;
 
          begin
+            --  Nothing to do; either already in block or already in parallel
+            --  procedure
+
             if Is_Wrapped_In_Block (N)
               or else In_Outlined_Parallel (N)
             then
                null;
 
-            else
-               case Nkind (Chunk_Spec) is
-                  when N_Chunk_Specifier_Int =>
-                     Expr_Copy := New_Copy_Tree (Expression (Chunk_Spec));
-                     Set_Parent (Expr_Copy, Chunk_Spec);
-                     Preanalyze (Expr_Copy);
-                     Wrap_In_Block := Has_Sec_Stack_Call (Expr_Copy);
-                  when N_Chunk_Specifier_Range =>
-                     Wrap_In_Block := Range_Has_Sec_Stack
-                       (Discrete_Subtype_Definition (Chunk_Spec));
-                  when others =>
-                     null;
-               end case;
+            --  Wrap loop in block if the parallel chunk specification
+            --  uses the second stack
 
-               if Wrap_In_Block then
-                  Wrap_Loop_Statement (Manage_Sec_Stack => True);
-                  Stop_Processing := True;
-               end if;
+            elsif Present (Chunk_Spec)
+              and then Nkind (Chunk_Spec) = N_Chunk_Specifier_Range
+              and then Range_Has_Sec_Stack
+                         (Discrete_Subtype_Definition (Chunk_Spec))
+            then
+               Wrap_Loop_Statement (Manage_Sec_Stack => True);
+               Stop_Processing := True;
             end if;
          end Prepare_Parallel_Chunk;
 
@@ -4056,6 +4055,11 @@ package body Sem_Ch5 is
             if Lwt_Availible then
                Outline_Loop;
                Stop_Processing := True;
+
+            --  For sequetial expansion, wrap the loop in a block if it hasn't
+            --  been wrapped already. The declarations we've collected need to be
+            --  moved somewhere.
+
             elsif Present (Parallel_Declarations (N)) and then
               not Is_Empty_List (Parallel_Declarations (N))
             then
@@ -4115,11 +4119,11 @@ package body Sem_Ch5 is
             Prepare_Param_Spec_Loop (Param_Spec, Stop_Processing);
          end if;
 
-         if Is_Parallel (Iter) then
+         --  Process parallel loops
+
+         if Is_Parallel (Iter) and then not Stop_Processing then
             --  Preanalyze parallel chunk specification
-            if not Stop_Processing then
-               Prepare_Parallel_Chunk (Stop_Processing);
-            end if;
+            Prepare_Parallel_Chunk (Stop_Processing);
 
             --  Outline parallel loop
             if not Stop_Processing then

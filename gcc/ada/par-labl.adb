@@ -137,13 +137,6 @@ procedure Labl is
       Result : Node_Id := Parent (N);
 
    begin
-      --  In the case of parallel loops, the captured labels will
-      --  include the enclosing loop itself. It sounds counterintuitive,
-      --  but these label definitions are going to be moved to a seperate
-      --  block or procedure body later on.
-      --  if Is_Parallel_Loop (N) then
-      --     return N;
-      --  end if;
 
       --  Climb up the parent chain until we find a body or block
 
