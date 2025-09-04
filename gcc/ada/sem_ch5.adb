@@ -3516,6 +3516,11 @@ package body Sem_Ch5 is
          --  Determine whether arbitrary statement Stmt is the sole statement
          --  wrapped within some block, excluding pragmas.
 
+         function Range_Has_Sec_Stack (R : Node_Id) return Boolean;
+         pragma Inline (Range_Has_Sec_Stack);
+         --  Check if loop parameter/chunk specification has calls to second
+         --  stack
+
          procedure Prepare_Iterator_Loop
            (Iter_Spec       : Node_Id;
             Stop_Processing : out Boolean);
@@ -3532,12 +3537,21 @@ package body Sem_Ch5 is
          --  for transformation if needed.
          --  If Stop_Processing is set to True, should stop further processing.
 
-         procedure Prepare_Parallel_Loop
+         procedure Prepare_Parallel_Chunk
            (Stop_Processing : out Boolean);
-         pragma Inline (Prepare_Parallel_Loop);
+         pragma Inline (Prepare_Parallel_Chunk);
+         --  Check parallel chunk specifier for secondary stack usage.
+         --  If Stop_Processing is set to True, should stop further processing.
+
+         procedure Prepare_Outlined_Loop
+           (Stop_Processing : out Boolean);
+         pragma Inline (Prepare_Outlined_Loop);
+         --  Wrap parallel loop inside outlined procedure
+         --  If Stop_Processing is set to True, should stop further processing.
 
          procedure Outline_Loop;
          pragma Inline (Outline_Loop);
+         --  Wrap parallel loop inside an outlined procedure
 
          procedure Wrap_Loop_Statement (Manage_Sec_Stack : Boolean);
          pragma Inline (Wrap_Loop_Statement);
@@ -3707,37 +3721,23 @@ package body Sem_Ch5 is
             end if;
          end Prepare_Iterator_Loop;
 
-         -----------------------------
-         -- Prepare_Param_Spec_Loop --
-         -----------------------------
+         -------------------------
+         -- Range_Has_Sec_Stack --
+         -------------------------
 
-         procedure Prepare_Param_Spec_Loop
-           (Param_Spec      : Node_Id;
-            Stop_Processing : out Boolean)
-         is
-            High     : Node_Id;
-            Low      : Node_Id;
-            Rng      : Node_Id;
-            Rng_Copy : Node_Id;
-            Rng_Typ  : Entity_Id;
+         function Range_Has_Sec_Stack (R : Node_Id) return Boolean is
+            Rng, Rng_Copy, Low, High : Node_Id;
+            Rng_Typ : Entity_Id;
 
          begin
-            Stop_Processing := False;
-            Rng := Discrete_Subtype_Definition (Param_Spec);
-
-            --  Nothing to do when the loop is already wrapped in a block
-
-            if Is_Wrapped_In_Block (N) then
-               null;
-
             --  The parameter specification appears in the form
             --
             --    for Def_Id in Subtype_Mark Constraint loop
 
-            elsif Nkind (Rng) = N_Subtype_Indication
-              and then Nkind (Range_Expression (Constraint (Rng))) = N_Range
+            if Nkind (R) = N_Subtype_Indication
+              and then Nkind (Range_Expression (Constraint (R))) = N_Range
             then
-               Rng := Range_Expression (Constraint (Rng));
+               Rng := Range_Expression (Constraint (R));
 
                --  Preanalyze the bounds of the range constraint, setting
                --  parent fields to associate the copied bounds with the range,
@@ -3756,11 +3756,8 @@ package body Sem_Ch5 is
                --  on the secondary stack. Note that the loop must be wrapped
                --  only when such a call exists.
 
-               if Has_Sec_Stack_Call (Low) or else Has_Sec_Stack_Call (High)
-               then
-                  Wrap_Loop_Statement (Manage_Sec_Stack => True);
-                  Stop_Processing := True;
-               end if;
+               return Has_Sec_Stack_Call (Low)
+                 or else Has_Sec_Stack_Call (High);
 
             --  Otherwise the parameter specification appears in the form
             --
@@ -3771,8 +3768,8 @@ package body Sem_Ch5 is
                --  copy is semi inserted into the tree by setting its Parent
                --  pointer.
 
-               Rng_Copy := New_Copy_Tree (Rng);
-               Set_Parent (Rng_Copy, Parent (Rng));
+               Rng_Copy := New_Copy_Tree (R);
+               Set_Parent (Rng_Copy, Parent (R));
 
                --  Determine what the loop is iterating on
 
@@ -3788,14 +3785,43 @@ package body Sem_Ch5 is
                --    * contains a function call that returns on the secondary
                --      stack.
 
-               if Is_Iterator (Rng_Typ)
-                 or else Has_Sec_Stack_Call (Rng_Copy)
-               then
-                  Wrap_Loop_Statement (Manage_Sec_Stack => True);
-                  Stop_Processing := True;
-               end if;
+               return Is_Iterator (Rng_Typ)
+                 or else Has_Sec_Stack_Call (Rng_Copy);
+            end if;
+         end Range_Has_Sec_Stack;
+
+         -----------------------------
+         -- Prepare_Param_Spec_Loop --
+         -----------------------------
+
+         procedure Prepare_Param_Spec_Loop
+           (Param_Spec      : Node_Id;
+            Stop_Processing : out Boolean)
+         is
+            Rng        : Node_Id;
+            Chunk_Spec : Node_Id := Chunk_Specifier (Iter);
+
+         begin
+            Stop_Processing := False;
+            Rng := Discrete_Subtype_Definition (Param_Spec);
+
+            --  Nothing to do when the loop is already wrapped in a block
+
+            if Is_Wrapped_In_Block (N) then
+               null;
+
+            --  Wrap the loop in a block if either the loop parameter
+            --  or the chunk specification use the second stack
+
+            elsif Range_Has_Sec_Stack (Rng) then
+               Wrap_Loop_Statement (Manage_Sec_Stack => True);
+               Stop_Processing := True;
             end if;
          end Prepare_Param_Spec_Loop;
+
+         ------------------
+         -- Outline_Loop --
+         ------------------
 
          procedure Outline_Loop is
             Loc        : constant Source_Ptr := Sloc (N);
@@ -3814,12 +3840,20 @@ package body Sem_Ch5 is
 
             procedure Read_Bounds
               (DS : Node_Id; L : out Node_Id; H : out Node_Id);
+            --  Reads range or subtype indication's lower and upper bounds
 
             function Create_Bound_Arg (Arg : Node_Id) return Node_Id;
+            --  Creates a lower or upper bound argument for the LWT call
 
             procedure Prepare_Loop_Param
               (P : Node_Id; L : out Node_Id;
                H : out Node_Id; Typ : out Entity_Id);
+            --  Prepares loop parameter by moving any calls into the enclosing
+            --  block
+
+            -----------------
+            -- Read_Bounds --
+            -----------------
 
             procedure Read_Bounds
               (DS : Node_Id; L : out Node_Id; H : out Node_Id)
@@ -3852,6 +3886,10 @@ package body Sem_Ch5 is
                  Expressions => New_List (To_Pos));
                return To_Long_Int;
             end Create_Bound_Arg;
+
+            ------------------------
+            -- Prepare_Loop_Param --
+            ------------------------
 
             procedure Prepare_Loop_Param
               (P : Node_Id; L : out Node_Id;
@@ -3898,11 +3936,6 @@ package body Sem_Ch5 is
                          Attribute_Name => Name_Pos,
                          Expressions => New_List
                            (Copy_Separate_Tree (Low))));
-                     --  Chunk_Arg := Unchecked_Convert_To (
-                     --    Typ => New_Occurrence_Of (Standard_Positive, Loc),
-                     --    Expr => Make_Op_Add (Loc,
-                     --      Left_Opnd => Diff,
-                     --      Right_Opnd => Make_Integer_Literal (Loc, 1)));
                      Chunk_Arg := Make_Op_Add (Loc,
                        Left_Opnd => Diff,
                        Right_Opnd => Make_Integer_Literal (Loc, 1));
@@ -3918,10 +3951,6 @@ package body Sem_Ch5 is
               Hi_Param      => Hi_Param,
               Chunk_Param   => Chunk_Param,
               Loop_Id_Param => Loop_Id_Param);
-
-            Set_Parallel_Low_Bound (N, Low_Param);
-            Set_Parallel_Hi_Bound (N, Hi_Param);
-            Set_Parallel_Loop_Id (N, Loop_Id_Param);
             Set_Parallel_Chunk_Id (N, Chunk_Param);
 
             Outlined_Body := Make_Subprogram_Body (Loc,
@@ -3931,10 +3960,8 @@ package body Sem_Ch5 is
                 Make_Handled_Sequence_Of_Statements (Loc,
                   Statements => New_List (Relocate_Node (N))));
 
-            Set_Is_Outlined_Parallel_Function (Outlined_Body);
-
             declare
-               Low, Hi, New_DS : Node_Id;
+               Low, Hi, New_DS, New_RC : Node_Id;
                Typ : Entity_Id;
             begin
                Prepare_Loop_Param
@@ -3946,8 +3973,9 @@ package body Sem_Ch5 is
                  Hi_Arg => Create_Bound_Arg (Hi),
                  Chunk_Arg => Chunk_Arg,
                  Outlined_Proc => New_Occurrence_Of
-                  (Defining_Unit_Name (Outlined_Spec), Loc));
+                   (Defining_Unit_Name (Outlined_Spec), Loc));
 
+               --  Rewrite loop range as Low_Param .. High_Param
                New_DS := Make_Range (Loc,
                  Low_Bound => Make_Attribute_Reference (Loc,
                  Prefix => New_Occurrence_Of (Typ, Loc),
@@ -3964,13 +3992,9 @@ package body Sem_Ch5 is
                  (Loop_Parameter_Specification (Iter), New_DS);
             end;
 
-            Parallel_Block := Make_Block_Statement (Loc,
-              Declarations => New_List (Outlined_Body),
-              Handled_Statement_Sequence =>
-              Make_Handled_Sequence_Of_Statements (Loc,
-              Statements => New_List (Parallel_Call)));
+            Insert_Before_And_Analyze (N, Outlined_Body);
 
-            Rewrite (N, Parallel_Block);
+            Rewrite (N, Parallel_Call);
             Analyze (N);
 
             Remove_Entity (Loop_Id);
@@ -3978,11 +4002,55 @@ package body Sem_Ch5 is
               Defining_Unit_Name (Outlined_Spec));
          end Outline_Loop;
 
-         procedure Prepare_Parallel_Loop (Stop_Processing : out Boolean) is
+         ----------------------------
+         -- Prepare_Parallel_Chunk --
+         ----------------------------
+
+         procedure Prepare_Parallel_Chunk (Stop_Processing : out Boolean) is
+            Chunk_Spec    : constant Node_Id := Chunk_Specifier (Iter);
+            Wrap_In_Block : Boolean := False;
+            Expr_Copy     : Node_Id;
+
          begin
-            if Present (Iterator_Specification (Iter)) then
+            if Is_Wrapped_In_Block (N)
+              or else In_Outlined_Parallel (N)
+            then
+               null;
+
+            else
+               case Nkind (Chunk_Spec) is
+                  when N_Chunk_Specifier_Int =>
+                     Expr_Copy := New_Copy_Tree (Expression (Chunk_Spec));
+                     Set_Parent (Expr_Copy, Chunk_Spec);
+                     Preanalyze (Expr_Copy);
+                     Wrap_In_Block := Has_Sec_Stack_Call (Expr_Copy);
+                  when N_Chunk_Specifier_Range =>
+                     Wrap_In_Block := Range_Has_Sec_Stack
+                       (Discrete_Subtype_Definition (Chunk_Spec));
+                  when others =>
+                     null;
+               end case;
+
+               if Wrap_In_Block then
+                  Wrap_Loop_Statement (Manage_Sec_Stack => True);
+                  Stop_Processing := True;
+               end if;
+            end if;
+         end Prepare_Parallel_Chunk;
+
+         ---------------------------
+         -- Prepare_Outlined_Loop --
+         ---------------------------
+
+         procedure Prepare_Outlined_Loop (Stop_Processing : out Boolean) is
+         begin
+            if Present (Iter_Spec) then
                Error_Msg_N ("Parallel iteration over " &
                  "containers not yet supported", N);
+            end if;
+
+            if In_Outlined_Parallel (N) then
+               return;
             end if;
 
             if Lwt_Availible then
@@ -3994,7 +4062,7 @@ package body Sem_Ch5 is
                Wrap_Loop_Statement (Manage_Sec_Stack => False);
                Stop_Processing := True;
             end if;
-         end Prepare_Parallel_Loop;
+         end Prepare_Outlined_Loop;
 
          -------------------------
          -- Wrap_Loop_Statement --
@@ -4047,12 +4115,16 @@ package body Sem_Ch5 is
             Prepare_Param_Spec_Loop (Param_Spec, Stop_Processing);
          end if;
 
-         --  Process parallel loops
-         if not Stop_Processing and then Present (Iter)
-           and then Is_Parallel (Iter)
-           and then not In_Outlined_Parallel (N)
-         then
-            Prepare_Parallel_Loop (Stop_Processing);
+         if Is_Parallel (Iter) then
+            --  Preanalyze parallel chunk specification
+            if not Stop_Processing then
+               Prepare_Parallel_Chunk (Stop_Processing);
+            end if;
+
+            --  Outline parallel loop
+            if not Stop_Processing then
+               Prepare_Outlined_Loop (Stop_Processing);
+            end if;
          end if;
       end Prepare_Loop_Statement;
 
@@ -4501,6 +4573,10 @@ package body Sem_Ch5 is
       end case;
    end Analyze_Chunk_Specifier;
 
+   ------------------------------
+   -- Build_Parallel_Loop_Spec --
+   ------------------------------
+
    function Build_Parallel_Loop_Spec
      (Loc : Source_Ptr; Low_Param : Entity_Id;
       Hi_Param : Entity_Id; Chunk_Param : Entity_Id;
@@ -4530,6 +4606,10 @@ package body Sem_Ch5 is
             Parameter_Type      =>
               New_Occurrence_Of (Loop_Id_Typ, Loc))));
    end Build_Parallel_Loop_Spec;
+
+   -------------------------
+   -- Build_Parallel_Call --
+   -------------------------
 
    function Build_Parallel_Call
      (Loc : Source_Ptr; Low_Arg : Node_Id;
@@ -4567,7 +4647,7 @@ package body Sem_Ch5 is
       then
          declare
             Outlined_Body, Outlined_Spec, Chunk_Arg,
-              Parallel_Call, Parallel_Block : Node_Id;
+              Parallel_Call : Node_Id;
             Branch_Count  : Nat := 0;
             Old_Decls     : List_Id := Parallel_Declarations (N);
             Low_Param     : Entity_Id := Make_Temporary (Loc, 'P');
@@ -4607,8 +4687,10 @@ package body Sem_Ch5 is
               Handled_Statement_Sequence =>
                 Make_Handled_Sequence_Of_Statements (Loc,
                   Statements => New_List (Relocate_Node (N))));
-            Set_Is_Outlined_Parallel_Function (Outlined_Body);
+            Insert_Before_And_Analyze (N, Outlined_Body);
 
+            --  Build a call to Par_Range_Loop_With_Early_Exit that
+            --  iterates over 1 .. NUM_BRANCHES
             Parallel_Call := Build_Parallel_Call (Loc,
               Low_Arg => Make_Integer_Literal (Loc, 1),
               Hi_Arg => Make_Integer_Literal (Loc, Branch_Count),
@@ -4616,13 +4698,7 @@ package body Sem_Ch5 is
               Outlined_Proc => New_Occurrence_Of
                 (Defining_Unit_Name (Outlined_Spec), Loc));
 
-            Parallel_Block := Make_Block_Statement (Loc,
-              Declarations => New_List (Outlined_Body),
-              Handled_Statement_Sequence =>
-                Make_Handled_Sequence_Of_Statements (Loc,
-                  Statements => New_List (Parallel_Call)));
-
-            Rewrite (N, Parallel_Block);
+            Rewrite (N, Parallel_Call);
             Analyze (N);
          end;
       elsif Present (Parallel_Declarations (N))

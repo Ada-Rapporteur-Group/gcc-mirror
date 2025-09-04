@@ -271,7 +271,6 @@ package Gen_IL.Fields is
       Is_Known_Guaranteed_ABE,
       Is_Machine_Number,
       Is_Null_Loop,
-      Is_Outlined_Parallel_Function,
       Is_Overloaded,
       Is_Parallel,
       Is_Power_Of_2_For_Shift,

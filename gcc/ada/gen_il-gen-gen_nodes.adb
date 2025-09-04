@@ -728,7 +728,6 @@ begin -- Gen_IL.Gen.Gen_Nodes
         Sm (Do_Storage_Check, Flag),
         Sm (Has_Relative_Deadline_Pragma, Flag),
         Sm (Is_Entry_Barrier_Function, Flag),
-        Sm (Is_Outlined_Parallel_Function, Flag),
         Sm (Is_Protected_Subprogram_Body, Flag),
         Sm (Is_Task_Body_Procedure, Flag),
         Sm (Is_Task_Master, Flag),
@@ -986,9 +985,6 @@ begin -- Gen_IL.Gen.Gen_Nodes
         Sy (Is_Null_Loop, Flag),
         Sy (Suppress_Loop_Warnings, Flag),
         Sy (Parallel_Declarations, List_Id, Default_No_List),
-        Sm (Parallel_Low_Bound, Node_Id),
-        Sm (Parallel_Hi_Bound, Node_Id),
-        Sm (Parallel_Loop_Id, Node_Id),
         Sm (Parallel_Chunk_Id, Node_Id),
         Sm (In_Outlined_Parallel, Flag)));
 

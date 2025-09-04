@@ -5845,6 +5845,14 @@ package body Exp_Ch5 is
       Stmt   : Node_Id;
 
       function Get_DS_Lower (DS : Node_Id) return Node_Id;
+      --  Gets lower bound on range or subtype indication
+
+      procedure Expand_Parallel_Loop;
+      --  Expand parallel loop chunk index
+
+      ------------------
+      -- Get_DS_Lower --
+      ------------------
 
       function Get_DS_Lower (DS : Node_Id) return Node_Id is
       begin
@@ -5866,7 +5874,9 @@ package body Exp_Ch5 is
          end case;
       end Get_DS_Lower;
 
-      procedure Expand_Parallel_Loop;
+      --------------------------
+      -- Expand_Parallel_Loop --
+      --------------------------
 
       procedure Expand_Parallel_Loop is
          procedure Expand_Chunk_Spec_Seq (C : Node_Id);
@@ -5878,6 +5888,7 @@ package body Exp_Ch5 is
 
             Block_Decl : Node_Id;
          begin
+            --  Insert chunk specification declartion before loop node
             if Nkind (C) = N_Chunk_Specifier_Range then
                --  Range chunk specification
                declare
@@ -5885,12 +5896,13 @@ package body Exp_Ch5 is
                   Ident : Node_Id := Defining_Identifier (C);
                   Lower : Node_Id := Get_DS_Lower (DS);
                begin
-                  Block_Decl := Make_Object_Declaration (Loc,
-                    Defining_Identifier => Ident,
-                    Constant_Present    => True,
-                    Expression          => Lower,
-                    Object_Definition   => New_Occurrence_Of
-                      (Etype (Ident), Loc));
+                  Insert_Before_And_Analyze (N,
+                    Make_Object_Declaration (Loc,
+                      Defining_Identifier => Ident,
+                      Constant_Present    => True,
+                      Expression          => Lower,
+                      Object_Definition   => New_Occurrence_Of
+                        (Etype (Ident), Loc)));
                   Remove_Homonym (Ident);
                   Mutate_Ekind (Ident, E_Constant);
                end;
@@ -5900,42 +5912,23 @@ package body Exp_Ch5 is
                   Expr     : Node_Id := Expression (C);
                   Expr_Typ : Entity_Id := Etype (Expr);
                begin
-                  Block_Decl := Make_Object_Declaration (Loc,
-                    Defining_Identifier => Make_Temporary (Loc, 'C', N),
-                    Constant_Present    => True,
-                    Object_Definition   => New_Occurrence_Of (Expr_Typ, Loc),
-                    Expression          => Expr);
+                  Insert_Before_And_Analyze (N,
+                    Make_Object_Declaration (Loc,
+                      Defining_Identifier => Make_Temporary (Loc, 'C', N),
+                      Constant_Present    => True,
+                      Object_Definition   => New_Occurrence_Of (Expr_Typ, Loc),
+                      Expression          => Expr));
                end;
             end if;
 
             --  Remove chunk specification
 
             Set_Chunk_Specifier (Scheme, Empty);
-
-            --  Rewrites
-
-            --     parallel (Chunk_Index a .. b)
-            --        for x in y .. z loop
-            --           ...
-            --        end loop;
-
-            --  as
-
-            --     block
-            --        Chunk_Index : Chunk_Ind_Type := Lower_Bound;
-            --     begin
-            --        for x in y .. z loop
-            --           ...
-            --        end loop;
-            --     end;
-
-            Rewrite (N, Make_Block_Statement (Loc,
-              Declarations => New_List (Block_Decl),
-              Handled_Statement_Sequence =>
-                Make_Handled_Sequence_Of_Statements (Loc,
-                  Statements => New_List (Relocate_Node (N)))));
-            Analyze (N);
          end Expand_Chunk_Spec_Seq;
+
+         ---------------------
+         -- Expand_Parallel --
+         ---------------------
 
          procedure Expand_Parallel is
             --  Definitions for WIP parallel return handling
@@ -6096,20 +6089,25 @@ package body Exp_Ch5 is
                   Ident : Node_Id := Defining_Identifier (Chunk_Spec);
                   Low   : Node_Id := Get_DS_Lower (DS);
                   Chunk : Node_Id := Parallel_Chunk_Id (N);
+                  Expr, Low_Int, Expr_Val : Node_Id;
                begin
+                  Low_Int := Make_Attribute_Reference (Loc,
+                    Prefix         => New_Occurrence_Of (Etype (Ident), Loc),
+                    Attribute_Name => Name_Pos,
+                    Expressions    => New_List (Low));
+                  Expr := Make_Op_Subtract (Loc,
+                    Left_Opnd    => Make_Op_Add (Loc,
+                      Left_Opnd  => Low_Int,
+                      Right_Opnd => New_Occurrence_Of (Chunk, Loc)),
+                    Right_Opnd   => Make_Integer_Literal (Loc, 1));
+                  Expr_Val := Make_Attribute_Reference (Loc,
+                    Prefix         => New_Occurrence_Of (Etype (Ident), Loc),
+                    Attribute_Name => Name_Val,
+                    Expressions    => New_List (Expr));
                   Insert_Before_And_Analyze (N, Make_Object_Declaration (Loc,
                     Defining_Identifier => Ident,
                     Constant_Present    => True,
-                    Expression          => Make_Op_Add (Loc,
-                      Left_Opnd         => Make_Attribute_Reference (Loc,
-                        Prefix          => New_Occurrence_Of
-                          (Etype (Ident), Loc),
-                        Attribute_Name  => Name_Val,
-                        Expressions     => New_List
-                          (Make_Op_Subtract (Loc,
-                           Left_Opnd     => New_Occurrence_Of (Chunk, Loc),
-                           Right_Opnd    => Make_Integer_Literal (Loc, 1)))),
-                      Right_Opnd        => Low),
+                    Expression          => Expr_Val,
                     Object_Definition   => New_Occurrence_Of
                       (Etype (Ident), Loc)));
                   Remove_Homonym (Ident);
