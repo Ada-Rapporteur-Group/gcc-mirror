@@ -1,5 +1,5 @@
 -- { dg-do compile }
--- { dg-options "-gnat2022" }
+-- { dg-options "-gnat2022 -Werror" }
 
 procedure parallel_do_err4 is
 begin
@@ -14,3 +14,5 @@ begin
          null;
    end do;
 end parallel_do_err4;
+
+-- { dg-error "\"lwt\" library not found. Parallel block will execute sequentially" "" { target *-*-* } 6 }

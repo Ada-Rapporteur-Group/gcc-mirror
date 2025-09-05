@@ -9,3 +9,5 @@ begin
       null;
    end do;
 end parallel_do_err6;
+
+-- { dg-error "\"lwt\" library not found. Parallel block will execute sequentially" "" { target *-*-* } 6 }

@@ -13,3 +13,4 @@ end parallel_for_err2;
 -- { dg-error "static value out of range" "" { target *-*-* } 7 }
 -- { dg-error "Constraint_Error will be raised at run time" "" { target *-*-* } 7 }
 -- { dg-error "Suspicious chunk_index range: out of range of chunk_index subtype" "" { target *-*-* } 7 }
+-- { dg-error "\"lwt\" library not found. Parallel loop will execute sequentially" "" { target *-*-* } 8 }

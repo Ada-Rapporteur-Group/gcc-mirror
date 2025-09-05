@@ -4119,15 +4119,20 @@ package body Sem_Ch5 is
                Outline_Loop;
                Stop_Processing := True;
 
-            --  For sequetial expansion, wrap the loop in a block if it
-            --  hasn't been wrapped already. The declarations we've collected
-            --  need to be moved somewhere.
+            else
+               Error_Msg_N ("LWT library not found. Parallel loop " &
+                 "will execute sequentially??", N);
 
-            elsif Present (Parallel_Declarations (N)) and then
-              not Is_Empty_List (Parallel_Declarations (N))
-            then
-               Wrap_Loop_Statement (Manage_Sec_Stack => False);
-               Stop_Processing := True;
+               --  For sequential expansion, wrap the loop in a block if
+               --  it hasn't been wrapped already. The declarations we've
+               --  collected need to be moved somewhere.
+
+               if Present (Parallel_Declarations (N)) and then
+                 not Is_Empty_List (Parallel_Declarations (N))
+               then
+                  Wrap_Loop_Statement (Manage_Sec_Stack => False);
+                  Stop_Processing := True;
+               end if;
             end if;
          end Prepare_Outlined_Loop;
 
@@ -4842,7 +4847,8 @@ package body Sem_Ch5 is
 
          --  Warn the user if sequential expansion is used
          if not In_Outlined_Parallel (N) then
-            null;
+            Error_Msg_N ("LWT library not found. Parallel block " &
+              "will execute sequentially??", N);
          end if;
       end if;
    end Analyze_Parallel_Block_Statement;
