@@ -128,7 +128,8 @@ package body Sem_Ch5 is
      (Loc : Source_Ptr; Low_Param : Entity_Id;
       Hi_Param : Entity_Id; Chunk_Param : Entity_Id;
       Loop_Id_Param : Entity_Id) return Node_Id;
-   --  Build procedure specification for the outlined body of
+   --  Build procedure specification for the parallel construct's
+   --  outlined procedure
 
    function Build_Parallel_Call
      (Loc : Source_Ptr; Low_Arg : Node_Id;
@@ -3099,7 +3100,7 @@ package body Sem_Ch5 is
          --  an unchecked conversion when needed. The expression of the
          --  conversion is always an object.
 
-         if Nkind (N) /= N_Chunk_Specifier_Range
+         if Nkind (N) /= N_Chunk_Specification_Range
            and then (Nkind (DS_Copy) = N_Function_Call
 
            or else (Is_Entity_Name (DS_Copy)
@@ -3287,7 +3288,7 @@ package body Sem_Ch5 is
                   --  non-null after all.
 
                   if Null_Range then
-                     if Nkind (N) = N_Chunk_Specifier_Range then
+                     if Nkind (N) = N_Chunk_Specification_Range then
                         Error_Msg_N
                           ("??chunk specification range is null, " &
                            "Program_Error will be raised at runtime", DS);
@@ -3300,7 +3301,7 @@ package body Sem_Ch5 is
                   --  invalid values, so issue appropriate message.
 
                   else
-                     if Nkind (N) = N_Chunk_Specifier_Range then
+                     if Nkind (N) = N_Chunk_Specification_Range then
                         Error_Msg_N
                           ("??chunk specification range may be null," &
                            " Program_Error could be raised at runtime", DS);
@@ -3334,7 +3335,7 @@ package body Sem_Ch5 is
                --  In practice, this is very likely to be a case of reversing
                --  the bounds incorrectly in the range.
 
-            elsif Nkind (N) /= N_Chunk_Specifier_Range
+            elsif Nkind (N) /= N_Chunk_Specification_Range
               and then Reverse_Present (N)
               and then Nkind (Original_Node (H)) = N_Integer_Literal
               and then
@@ -3398,7 +3399,7 @@ package body Sem_Ch5 is
                   end if;
 
                   if Present (Bad_Bound) then
-                     if Nkind (N) = N_Chunk_Specifier_Range then
+                     if Nkind (N) = N_Chunk_Specification_Range then
                         Error_Msg_N
                           ("Suspicious chunk_index range: out of range " &
                            "of chunk_index subtype. ""Constraint_Error"" " &
@@ -3462,7 +3463,7 @@ package body Sem_Ch5 is
       --  Preanalyze the filter. Expansion will take place when enclosing
       --  loop is expanded.
 
-      if Nkind (N) /= N_Chunk_Specifier_Range
+      if Nkind (N) /= N_Chunk_Specification_Range
         and then Present (Iterator_Filter (N))
       then
          Preanalyze_And_Resolve (Iterator_Filter (N), Standard_Boolean);
@@ -3811,7 +3812,7 @@ package body Sem_Ch5 is
                null;
 
             --  Wrap the loop in a block if either the loop parameter
-            --  or the chunk specification use the second stack
+            --  or the chunk specification use the secondary stack
 
             elsif Range_Has_Sec_Stack (Rng) then
                Wrap_Loop_Statement (Manage_Sec_Stack => True);
@@ -3831,12 +3832,11 @@ package body Sem_Ch5 is
 
             Outlined_Body, Outlined_Spec, Chunk_Arg,
               Parallel_Call, Parallel_Block : Node_Id;
-            Low_Param     : Entity_Id := Make_Temporary (Loc, 'P');
-            Hi_Param      : Entity_Id := Make_Temporary (Loc, 'P');
-            Chunk_Param   : Entity_Id := Make_Temporary (Loc, 'P');
-            Loop_Id_Param : Entity_Id := Make_Temporary (Loc, 'P');
-
-            Long_Int_Typ : Entity_Id := RTE (RE_Longest_Integer);
+            Low_Param     : constant Entity_Id := Make_Temporary (Loc, 'P');
+            Hi_Param      : constant Entity_Id := Make_Temporary (Loc, 'P');
+            Chunk_Param   : constant Entity_Id := Make_Temporary (Loc, 'P');
+            Loop_Id_Param : constant Entity_Id := Make_Temporary (Loc, 'P');
+            Long_Int_Typ  : constant Entity_Id := RTE (RE_Longest_Integer);
 
             procedure Read_Bounds
               (DS : Node_Id; L : out Node_Id; H : out Node_Id);
@@ -3915,20 +3915,79 @@ package body Sem_Ch5 is
                   Read_Bounds (R_Copy, L, H);
                end if;
             end Prepare_Loop_Param;
+
          begin
+            --  Relocates the parallel loop inside an outlined procedure and
+            --  adds a call to LWT in its place.
+
+            --  Transforms
+
+            --     parallel (CHUNK) for I in Low .. Hi loop
+            --        ...
+            --     end loop;
+
+            --  into
+
+            --     procedure Proc_Name (Low_Arg : Longest_Integer;
+            --       Hi_Arg : Longest_Integer; Chunk : Positive;
+            --       Loop_Id : Par_Loop_Id)
+            --     is
+            --        parallel (CHUNK)
+            --           for I in Low_Arg .. Hi_Arg loop
+            --              ...
+            --           end loop;
+            --     end Proc_Name;
+
+            --     Par_Range_Loop_With_Early_Exit (
+            --       Low => Low, High => Hi,
+            --       Num_Chunks => CHUNK_EXPR,
+            --       Loop_Body => Proc_Name'Access);
+
             Set_Parallel_Declarations (N, No_List);
             Set_In_Outlined_Parallel (N);
 
             if Present (Chunk_Spec) then
-               if Nkind (Chunk_Spec) = N_Chunk_Specifier_Int then
+               if Nkind (Chunk_Spec) = N_Chunk_Specification_Int then
+                  --  Set CHUNK_EXPR to the chunk specification's integer
+                  --  expression
                   Analyze_Chunk_Specifier (Chunk_Spec);
                   Chunk_Arg := Relocate_Node (Expression (Chunk_Spec));
                else
+                  --  Process chunk specification range
+
+                  --  Transforms
+
+                  --     parallel (Chunk in Chunk_Low_Expr .. Chunk_Hi_Expr)
+                  --        for ... loop
+                  --           ...
+                  --        end loop;
+
+                  --  into
+
+                  --     Lo : Chunk_Type := Chunk_Low_Expr;
+                  --     Hi : Chunk_Type := Chunk_Hi_Expr;
+                  --     parallel (Chunk in Lo .. Hi)
+                  --        for ... loop
+                  --           ...
+                  --        end loop;
+                  --    ...
+
+                  --   These values are later used in the parallel call:
+
+                  --    Par_Range_Loop_With_Early_Exit (
+                  --      Num_Chunks => Chunk_Type'Pos (Hi) -
+                  --                      Chunk_Type'Pos (Lo) + 1
+                  --      ...);
+
                   declare
                      Low, Hi, Diff : Node_Id;
                      Typ : Entity_Id;
                   begin
+                     --  Move chunk specification values with side effects
+                     --  outside of loop before we wrap it in a procedure
                      Prepare_Loop_Param (Chunk_Spec, Low, Hi, Typ);
+
+                     --  Chunk_Type'Pos (Hi) - Chunk_Type'Pos (Lo)
                      Diff := Make_Op_Subtract (Loc,
                        Left_Opnd => Make_Attribute_Reference (Loc,
                          Prefix => New_Occurrence_Of (Typ, Loc),
@@ -3940,6 +3999,8 @@ package body Sem_Ch5 is
                          Attribute_Name => Name_Pos,
                          Expressions => New_List
                            (Copy_Separate_Tree (Low))));
+
+                     --  Chunk_Type'Pos (Hi) - Chunk_Type'Pos (Lo) + 1
                      Chunk_Arg := Make_Op_Add (Loc,
                        Left_Opnd => Diff,
                        Right_Opnd => Make_Integer_Literal (Loc, 1));
@@ -3968,9 +4029,11 @@ package body Sem_Ch5 is
                Low, Hi, New_DS, New_RC : Node_Id;
                Typ : Entity_Id;
             begin
+               --  Move loop parameter values with side effects
+               --  outside of loop before we wrap it in a procedure
                Prepare_Loop_Param
                  (Loop_Parameter_Specification (Iter),
-                  Low, Hi, Typ);
+                   Low, Hi, Typ);
 
                Parallel_Call := Build_Parallel_Call (Loc,
                  Low_Arg => Create_Bound_Arg (Low),
@@ -4028,7 +4091,7 @@ package body Sem_Ch5 is
             --  uses the second stack
 
             elsif Present (Chunk_Spec)
-              and then Nkind (Chunk_Spec) = N_Chunk_Specifier_Range
+              and then Nkind (Chunk_Spec) = N_Chunk_Specification_Range
               and then Range_Has_Sec_Stack
                          (Discrete_Subtype_Definition (Chunk_Spec))
             then
@@ -4056,9 +4119,9 @@ package body Sem_Ch5 is
                Outline_Loop;
                Stop_Processing := True;
 
-            --  For sequetial expansion, wrap the loop in a block if it hasn't
-            --  been wrapped already. The declarations we've collected need to be
-            --  moved somewhere.
+            --  For sequetial expansion, wrap the loop in a block if it
+            --  hasn't been wrapped already. The declarations we've collected
+            --  need to be moved somewhere.
 
             elsif Present (Parallel_Declarations (N)) and then
               not Is_Empty_List (Parallel_Declarations (N))
@@ -4077,11 +4140,15 @@ package body Sem_Ch5 is
 
             Blk     : Node_Id;
             Blk_Id  : Entity_Id;
-            Blk_Dcl : List_Id := Empty_List;
-            P_Decls : List_Id := Parallel_Declarations (N);
+            Blk_Dcl : List_Id            := Empty_List;
+            P_Decls : constant List_Id   := Parallel_Declarations (N);
             Loop_Id : constant Entity_Id := Entity (Identifier (N));
 
          begin
+            --  If we have any collected parallel declarations and we know
+            --  we aren't going to create an outlined procedure, then add
+            --  the collected decls to the wrapper block.
+
             if not Lwt_Availible
               and then Present (P_Decls)
               and then not Is_Empty_List (P_Decls)
@@ -4549,14 +4616,15 @@ package body Sem_Ch5 is
    -----------------------------
 
    procedure Analyze_Chunk_Specifier (N : Node_Id) is
-      pragma Assert (Nkind (N) in N_Chunk_Specifier_Range |
-        N_Chunk_Specifier_Int);
+      pragma Assert (Nkind (N) in N_Chunk_Specification_Range |
+        N_Chunk_Specification_Int);
    begin
       case Nkind (N) is
-         when N_Chunk_Specifier_Range =>
+         when N_Chunk_Specification_Range =>
+            --  Analyze range chunk specification
             Analyze_Loop_Parameter_Specification (N);
 
-         when N_Chunk_Specifier_Int =>
+         when N_Chunk_Specification_Int =>
             --  Resolve chunk specification as integer expression
             declare
                Expr : Node_Id := Expression (N);
@@ -4586,10 +4654,16 @@ package body Sem_Ch5 is
       Hi_Param : Entity_Id; Chunk_Param : Entity_Id;
       Loop_Id_Param : Entity_Id) return Node_Id
    is
-      Long_Int_Typ  : Entity_Id := RTE (RE_Longest_Integer);
-      Loop_Id_Typ   : Entity_Id := RTE (RE_Par_Loop_Id);
-      Proc_Id       : Entity_Id := Make_Temporary (Loc, 'P');
+      Long_Int_Typ  : constant Entity_Id := RTE (RE_Longest_Integer);
+      Loop_Id_Typ   : constant Entity_Id := RTE (RE_Par_Loop_Id);
+      Proc_Id       : constant Entity_Id := Make_Temporary (Loc, 'P');
    begin
+      --  Builds out the following procedure specification:
+
+      --     procedure Proc_Name (Low : Longest_Integer;
+      --       Hi : Longest_Integer; Chunk : Positive;
+      --       Loop_Id : Par_Loop_Id);
+
       return Make_Procedure_Specification (Loc,
         Defining_Unit_Name       => Proc_Id,
         Parameter_Specifications => New_List (
@@ -4623,6 +4697,13 @@ package body Sem_Ch5 is
       Par_Range : Entity_Id := RTE
         (RE_Par_Range_Loop_With_Early_Exit);
    begin
+
+      --  Builds the following call:
+
+      --     Par_Range_Loop_With_Early_Exit (
+      --       Low_Arg, Hi_Arg, Chunk_Arg, null,
+      --       Outlined_Proc'Access)
+
       return Make_Procedure_Call_Statement (Loc,
         Name => New_Occurrence_Of (Par_Range, Loc),
         Parameter_Associations => New_List (
@@ -4638,9 +4719,9 @@ package body Sem_Ch5 is
    --------------------------------------
 
    procedure Analyze_Parallel_Block_Statement (N : Node_Id) is
-      Chunk_Spec  : constant Node_Id := Chunk_Specifier (N);
-      Branch_Node : Node_Id := First (Parallel_Branches (N));
-      Loc         : Source_Ptr := Sloc (N);
+      Chunk_Spec  : constant Node_Id    := Chunk_Specifier (N);
+      Loc         : constant Source_Ptr := Sloc (N);
+      Branch_Node : Node_Id             := First (Parallel_Branches (N));
    begin
       if Present (Chunk_Spec) then
          Analyze_Chunk_Specifier (Chunk_Spec);
@@ -4649,24 +4730,47 @@ package body Sem_Ch5 is
       if not In_Outlined_Parallel (N)
         and then RTE_Available (RE_Par_Range_Loop_With_Early_Exit)
       then
+         --  Wrap the parallel block inside an outlined procedure
+
+         --  Transforms
+
+         --     parallel (Chunk_Expr) do
+         --        ...
+         --     and
+         --        ...
+         --     end do;
+
+         --  into
+
+         --     procedure Proc_Name (Low : Longest_Integer;
+         --       Hi : Longest_Integer; Chunk : Positive;
+         --       Loop_Id : Par_Loop_Id)
+         --     is
+         --        parallel do
+         --           ...
+         --        and
+         --           ...
+         --        end do;
+         --     end Proc_Name;
+
+         --     Par_Range_Loop_With_Early_Exit (
+         --       Low => 1, High => NUM_BRANCHES_LITERAL,
+         --       Num_Chunks => Chunk_Expr,
+         --       Loop_Body => Proc_Name'Access);
+
          declare
             Outlined_Body, Outlined_Spec, Chunk_Arg,
               Parallel_Call : Node_Id;
-            Branch_Count  : Nat := 0;
-            Old_Decls     : List_Id := Parallel_Declarations (N);
-            Low_Param     : Entity_Id := Make_Temporary (Loc, 'P');
-            Hi_Param      : Entity_Id := Make_Temporary (Loc, 'P');
-            Loop_Id_Param : Entity_Id := Make_Temporary (Loc, 'P');
+            Branch_Count  : constant Nat       := List_Length
+                                                    (Parallel_Branches (N));
+            Old_Decls     : constant List_Id   := Parallel_Declarations (N);
+            Low_Param     : constant Entity_Id := Make_Temporary (Loc, 'P');
+            Hi_Param      : constant Entity_Id := Make_Temporary (Loc, 'P');
+            Loop_Id_Param : constant Entity_Id := Make_Temporary (Loc, 'P');
          begin
             Set_Parallel_Declarations (N, No_List);
             Set_Chunk_Specifier (N, Empty);
             Set_In_Outlined_Parallel (N);
-
-            --  TODO: Any better way to do this?
-            while Present (Branch_Node) loop
-               Branch_Count := Branch_Count + 1;
-               Next (Branch_Node);
-            end loop;
 
             if Present (Chunk_Spec) then
                Chunk_Arg := Relocate_Node (Expression (Chunk_Spec));
@@ -4681,6 +4785,8 @@ package body Sem_Ch5 is
               Chunk_Param   => Make_Temporary (Loc, 'P'),
               Loop_Id_Param => Loop_Id_Param);
 
+            --  Pass loop parameters to N so that they can be accessed
+            --  during expansion.
             Set_Parallel_Low_Bound (N, Low_Param);
             Set_Parallel_Hi_Bound (N, Hi_Param);
             Set_Parallel_Loop_Id (N, Loop_Id_Param);
@@ -4709,10 +4815,14 @@ package body Sem_Ch5 is
         and then not Is_Empty_List (Parallel_Declarations (N))
       then
          pragma Assert (not In_Outlined_Parallel (N));
-         --  Move
+
+         --  If we're here, that means we're using the sequential fallback.
+         --  Move the parallel block and its associated declarations inside
+         --  an enclosing block statement.
+
          declare
             New_Block : Node_Id;
-            Old_Decls : List_Id := Parallel_Declarations (N);
+            Old_Decls : constant List_Id := Parallel_Declarations (N);
          begin
             Set_Parallel_Declarations (N, No_List);
             New_Block := Make_Block_Statement (Loc,
@@ -4729,6 +4839,11 @@ package body Sem_Ch5 is
             Analyze_Statements (Statements (Branch_Node));
             Next (Branch_Node);
          end loop;
+
+         --  Warn the user if sequential expansion is used
+         if not In_Outlined_Parallel (N) then
+            null;
+         end if;
       end if;
    end Analyze_Parallel_Block_Statement;
 

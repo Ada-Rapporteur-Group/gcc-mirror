@@ -908,11 +908,11 @@ begin -- Gen_IL.Gen.Gen_Nodes
         Sm (Is_Initialization_Block, Flag),
         Sm (Is_Task_Master, Flag)));
 
-   Cc (N_Chunk_Specifier_Range, Node_Kind,
+   Cc (N_Chunk_Specification_Range, Node_Kind,
        (Sy (Defining_Identifier, Node_Id),
         Sy (Discrete_Subtype_Definition, Node_Id, Default_Empty)));
 
-   Cc (N_Chunk_Specifier_Int, Node_Kind,
+   Cc (N_Chunk_Specification_Int, Node_Kind,
        (Sy (Expression, Node_Id, Default_Empty)));
 
    Cc (N_Parallel_Branch, Node_Kind,
@@ -1634,7 +1634,7 @@ begin -- Gen_IL.Gen.Gen_Nodes
           Children =>
             (N_Aggregate,
              N_Block_Statement,
-             N_Chunk_Specifier_Range,
+             N_Chunk_Specification_Range,
              N_Declaration,
              N_Discriminant_Specification,
              N_Entry_Index_Specification,

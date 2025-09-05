@@ -36,8 +36,7 @@ package Exp_Ch5 is
    procedure Expand_N_Goto_When_Statement       (N : Node_Id);
    procedure Expand_N_If_Statement              (N : Node_Id);
    procedure Expand_N_Loop_Statement            (N : Node_Id);
-
-   procedure Expand_N_Parallel_Do_Statement (N : Node_Id);
+   procedure Expand_N_Parallel_Block_Statement  (N : Node_Id);
 
    procedure Expand_Iterator_Loop_Over_Array (N : Node_Id);
    --  Expand loop over arrays that uses the form "for X of C"

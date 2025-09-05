@@ -705,8 +705,8 @@ package body Sem is
             | N_Aspect_Specification
             | N_Case_Expression_Alternative
             | N_Case_Statement_Alternative
-            | N_Chunk_Specifier_Int
-            | N_Chunk_Specifier_Range
+            | N_Chunk_Specification_Int
+            | N_Chunk_Specification_Range
             | N_Compilation_Unit_Aux
             | N_Component_Association
             | N_Component_Clause

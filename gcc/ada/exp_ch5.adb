@@ -154,8 +154,6 @@ package body Exp_Ch5 is
    --  Calls either Expand_Assign_Array_Loop, Expand_Assign_Array_Bitfield, or
    --  Expand_Assign_Array_Bitfield_Fast as appropriate.
 
-   --  function Build_Parallel_Proc (N : Node_Id) return Node_Id;
-
    procedure Expand_Assign_Record (N : Node_Id);
    --  N is an assignment of an untagged record value. This routine handles
    --  the case where the assignment must be made component by component,
@@ -5845,7 +5843,7 @@ package body Exp_Ch5 is
       Stmt   : Node_Id;
 
       function Get_DS_Lower (DS : Node_Id) return Node_Id;
-      --  Gets lower bound on range or subtype indication
+      --  Gets lower bound on DS, which is a discrete subtype definition
 
       procedure Expand_Parallel_Loop;
       --  Expand parallel loop chunk index
@@ -5883,13 +5881,13 @@ package body Exp_Ch5 is
          procedure Expand_Parallel;
 
          procedure Expand_Chunk_Spec_Seq (C : Node_Id) is
-            pragma Assert (Nkind (C) in N_Chunk_Specifier_Range |
-              N_Chunk_Specifier_Int);
+            pragma Assert (Nkind (C) in N_Chunk_Specification_Range |
+              N_Chunk_Specification_Int);
 
             Block_Decl : Node_Id;
          begin
-            --  Insert chunk specification declartion before loop node
-            if Nkind (C) = N_Chunk_Specifier_Range then
+            --  Insert chunk specification declaration before loop node
+            if Nkind (C) = N_Chunk_Specification_Range then
                --  Range chunk specification
                declare
                   DS    : Node_Id := Discrete_Subtype_Definition (C);
@@ -6082,36 +6080,62 @@ package body Exp_Ch5 is
 
          begin
             if Present (Chunk_Spec)
-              and then Nkind (Chunk_Spec) = N_Chunk_Specifier_Range
+              and then Nkind (Chunk_Spec) = N_Chunk_Specification_Range
             then
+               --  Inserts constant chunk index declaration in the outlined
+               --  procedure's declaration. This constant replaces the chunk
+               --  specification loop parameter in scope.
+
+               --  Transforms
+               --     parallel (Chunk in Ch_Low .. Ch_Hi) for I in ... loop
+               --        ...
+               --     end loop;
+
+               --  into
+               --     Chunk : constant Rng_Type := Rng_Type'Value
+               --       (Rng_Type'Pos (Ch_Low) + Chunk_Index - 1)
+               --     for I in ... loop
+               --        ...
+               --     end loop;
+
                declare
-                  DS    : Node_Id := Discrete_Subtype_Definition (Chunk_Spec);
-                  Ident : Node_Id := Defining_Identifier (Chunk_Spec);
-                  Low   : Node_Id := Get_DS_Lower (DS);
-                  Chunk : Node_Id := Parallel_Chunk_Id (N);
+                  DS    : constant Node_Id := Discrete_Subtype_Definition
+                                                (Chunk_Spec);
+                  Ident : constant Node_Id := Defining_Identifier (Chunk_Spec);
+                  Low   : constant Node_Id := Get_DS_Lower (DS);
+                  Chunk : constant Node_Id := Parallel_Chunk_Id (N);
                   Expr, Low_Int, Expr_Val : Node_Id;
                begin
+                  --  Rng_Type'Pos (Ch_Low)
                   Low_Int := Make_Attribute_Reference (Loc,
                     Prefix         => New_Occurrence_Of (Etype (Ident), Loc),
                     Attribute_Name => Name_Pos,
                     Expressions    => New_List (Low));
+
+                  --  Rng_Type'Pos (Ch_Low) + Chunk_Index - 1
                   Expr := Make_Op_Subtract (Loc,
                     Left_Opnd    => Make_Op_Add (Loc,
                       Left_Opnd  => Low_Int,
                       Right_Opnd => New_Occurrence_Of (Chunk, Loc)),
                     Right_Opnd   => Make_Integer_Literal (Loc, 1));
+
+                  --  Rng_Type'Value (Rng_Type'Pos (Ch_Low) + Chunk_Index - 1)
                   Expr_Val := Make_Attribute_Reference (Loc,
                     Prefix         => New_Occurrence_Of (Etype (Ident), Loc),
                     Attribute_Name => Name_Val,
                     Expressions    => New_List (Expr));
+
                   Insert_Before_And_Analyze (N, Make_Object_Declaration (Loc,
                     Defining_Identifier => Ident,
                     Constant_Present    => True,
                     Expression          => Expr_Val,
                     Object_Definition   => New_Occurrence_Of
                       (Etype (Ident), Loc)));
+
                   Remove_Homonym (Ident);
                   Mutate_Ekind (Ident, E_Constant);
+
+                  --  Remove parallel elements
                   Set_Chunk_Specifier (Scheme, Empty);
                   Set_Is_Parallel (Scheme, False);
                end;
@@ -6123,9 +6147,6 @@ package body Exp_Ch5 is
          end if;
 
          if RTE_Available (RE_Longest_Integer) then
-            --  TODO: mandate this during semantic analysis
-            pragma Assert (Present (Scheme) and then
-              Present (Loop_Parameter_Specification (Scheme)));
             Expand_Parallel;
          else
             --  Handle sequential fallback expansion
@@ -6759,20 +6780,23 @@ package body Exp_Ch5 is
    end Expand_Predicated_Loop;
 
    ------------------------------------
-   -- Expand_N_Parallel_Do_Statement --
+   -- Expand_N_Parallel_Block_Statement --
    ------------------------------------
 
-   procedure Expand_N_Parallel_Do_Statement (N : Node_Id) is
+   procedure Expand_N_Parallel_Block_Statement (N : Node_Id) is
       Branches   : List_Id := New_List;
       Decls      : List_Id := New_List;
       Loc        : constant Source_Ptr := Sloc (N);
       Chunk_Spec : Node_Id := Chunk_Specifier (N);
 
       procedure Exp_Sequential;
+      --  Transforms parallel block statement into sequential fallback
+
       procedure Exp_Parallel;
+      --  Expand parallel block statement
 
       procedure Exp_Sequential is
-         --  Rewrites a parllel do statement as a series of sequential
+         --  Rewrites a parallel do statement as a series of sequential
          --  blocks. This function transforms the following:
 
          --     parallel (CHUNK) do
@@ -6812,7 +6836,6 @@ package body Exp_Ch5 is
             end;
          end if;
 
-         --  Rewrite parallel branches as blocks
          declare
             Current_Branch : Node_Id := First (Parallel_Branches (N));
          begin
@@ -6849,6 +6872,32 @@ package body Exp_Ch5 is
          Loop_Param_Id : Entity_Id := Make_Temporary (Loc, 'P');
          Loop_Body, Loop_Case, Loop_Param, Loop_Range : Node_Id;
       begin
+
+         --  Rewrite parallel branches as case alternatives inside a
+         --  loop that iterates over Low_Outlined_Param .. Hi_Outlined_Param.
+
+         --  Transforms
+
+         --     parallel do
+         --        BRANCH 1
+         --     and
+         --        BRANCH 2
+         --     and
+         --        ...
+         --     end do;
+
+         --  into
+
+         --     for I in Low_Outlined_Param .. Hi_Outlined_Param loop
+         --        case I is
+         --           when 1 =>
+         --              BRANCH 1
+         --           when 2 =>
+         --              BRANCH 2
+         --           ...
+         --        end case;
+         --     end loop;
+
          declare
             Branch : Node_Id := First (Parallel_Branches (N));
          begin
@@ -6897,7 +6946,7 @@ package body Exp_Ch5 is
       else
          Exp_Sequential;
       end if;
-   end Expand_N_Parallel_Do_Statement;
+   end Expand_N_Parallel_Block_Statement;
 
    ------------------------------
    -- Make_Tag_Ctrl_Assignment --
