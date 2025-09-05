@@ -46,7 +46,6 @@ with Namet;          use Namet;
 with Nlists;         use Nlists;
 with Nmake;          use Nmake;
 with Opt;            use Opt;
-with Output;
 with Restrict;       use Restrict;
 with Rident;         use Rident;
 with Rtsfind;        use Rtsfind;
@@ -63,7 +62,6 @@ with Sem_Res;        use Sem_Res;
 with Sem_Util;       use Sem_Util;
                      use Sem_Util.Storage_Model_Support;
 with Snames;         use Snames;
-with Sprint;
 with Stand;          use Stand;
 with Stringt;        use Stringt;
 with Tbuild;         use Tbuild;
@@ -6636,9 +6634,9 @@ package body Exp_Ch5 is
       end if;
    end Expand_Predicated_Loop;
 
-   ------------------------------------
+   ---------------------------------------
    -- Expand_N_Parallel_Block_Statement --
-   ------------------------------------
+   ---------------------------------------
 
    procedure Expand_N_Parallel_Block_Statement (N : Node_Id) is
       Branches   : List_Id := New_List;
