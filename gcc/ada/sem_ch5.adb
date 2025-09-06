@@ -3839,36 +3839,37 @@ package body Sem_Ch5 is
             Long_Int_Typ  : constant Entity_Id := RTE (RE_Longest_Integer);
 
             procedure Read_Bounds
-              (DS : Node_Id; L : out Node_Id; H : out Node_Id);
+              (DS : Node_Id; Lo : out Node_Id; Hi : out Node_Id);
             --  Reads range or subtype indication's lower and upper bounds
 
             function Create_Bound_Arg (Arg : Node_Id) return Node_Id;
             --  Creates a lower or upper bound argument for the LWT call
 
             procedure Prepare_Loop_Param
-              (P : Node_Id; L : out Node_Id;
-               H : out Node_Id; Typ : out Entity_Id);
-            --  Prepares loop parameter P by moving any calls into the enclosing
-            --  block. Low and high values are written to L and H respectively,
-            --  and Typ is set to the loop parameter type.
+              (P : Node_Id; Lo : out Node_Id;
+               Hi : out Node_Id; Typ : out Entity_Id);
+            --  Prepares loop parameter P by moving any calls into the
+            --  enclosing block. Low and high values are written to Lo
+            --  and Hi respectively, and Typ is set to the loop parameter
+            --  type.
 
             -----------------
             -- Read_Bounds --
             -----------------
 
             procedure Read_Bounds
-              (DS : Node_Id; L : out Node_Id; H : out Node_Id)
+              (DS : Node_Id; Lo : out Node_Id; Hi : out Node_Id)
             is
             begin
                if Nkind (DS) = N_Subtype_Indication
                   and then Present (Constraint (DS))
                   and then Nkind (Constraint (DS)) = N_Range_Constraint
                then
-                  L := Low_Bound (Range_Expression (Constraint (DS)));
-                  H := High_Bound (Range_Expression (Constraint (DS)));
+                  Lo := Low_Bound (Range_Expression (Constraint (DS)));
+                  Hi := High_Bound (Range_Expression (Constraint (DS)));
                else
-                  L := Low_Bound (DS);
-                  H := High_Bound (DS);
+                  Lo := Low_Bound (DS);
+                  Hi := High_Bound (DS);
                end if;
             end Read_Bounds;
 
@@ -3881,6 +3882,8 @@ package body Sem_Ch5 is
             is
                To_Pos, To_Long_Int : Node_Id;
             begin
+               --  Creates the expression
+               --    Longest_Integer'Value (Range_Typ'Pos (Arg))
                To_Pos := Make_Attribute_Reference (Loc,
                  Prefix => New_Occurrence_Of (Etype (Arg), Loc),
                  Attribute_Name => Name_Pos,
@@ -3897,8 +3900,8 @@ package body Sem_Ch5 is
             ------------------------
 
             procedure Prepare_Loop_Param
-              (P : Node_Id; L : out Node_Id;
-               H : out Node_Id; Typ : out Entity_Id)
+              (P : Node_Id; Lo : out Node_Id;
+               Hi : out Node_Id; Typ : out Entity_Id)
             is
                DS     : Node_Id := Discrete_Subtype_Definition (P);
                R_Copy : Node_Id := New_Copy_Tree (DS);
@@ -3911,9 +3914,9 @@ package body Sem_Ch5 is
                  and then Expander_Active
                then
                   Process_Bounds (DS, N, Sloc (P));
-                  Read_Bounds (DS, L, H);
+                  Read_Bounds (DS, Lo, Hi);
                else
-                  Read_Bounds (R_Copy, L, H);
+                  Read_Bounds (R_Copy, Lo, Hi);
                end if;
             end Prepare_Loop_Param;
 
