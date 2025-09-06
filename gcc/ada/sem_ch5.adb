@@ -3519,7 +3519,7 @@ package body Sem_Ch5 is
 
          function Range_Has_Sec_Stack (R : Node_Id) return Boolean;
          pragma Inline (Range_Has_Sec_Stack);
-         --  Check if loop parameter/chunk specification has calls to second
+         --  Check if loop parameter/chunk specification has calls to secondary
          --  stack
 
          procedure Prepare_Iterator_Loop
@@ -3828,7 +3828,7 @@ package body Sem_Ch5 is
             Loc        : constant Source_Ptr := Sloc (N);
             Decls      : constant List_Id    := Parallel_Declarations (N);
             Chunk_Spec : constant Node_Id    := Chunk_Specifier (Iter);
-            Loop_Id    : constant Entity_Id := Entity (Identifier (N));
+            Loop_Id    : constant Entity_Id  := Entity (Identifier (N));
 
             Outlined_Body, Outlined_Spec, Chunk_Arg,
               Parallel_Call, Parallel_Block : Node_Id;
@@ -3848,8 +3848,9 @@ package body Sem_Ch5 is
             procedure Prepare_Loop_Param
               (P : Node_Id; L : out Node_Id;
                H : out Node_Id; Typ : out Entity_Id);
-            --  Prepares loop parameter by moving any calls into the enclosing
-            --  block
+            --  Prepares loop parameter P by moving any calls into the enclosing
+            --  block. Low and high values are written to L and H respectively,
+            --  and Typ is set to the loop parameter type.
 
             -----------------
             -- Read_Bounds --
@@ -4088,7 +4089,7 @@ package body Sem_Ch5 is
                null;
 
             --  Wrap loop in block if the parallel chunk specification
-            --  uses the second stack
+            --  uses the secondary stack
 
             elsif Present (Chunk_Spec)
               and then Nkind (Chunk_Spec) = N_Chunk_Specification_Range
@@ -4109,13 +4110,11 @@ package body Sem_Ch5 is
             if Present (Iter_Spec) then
                Error_Msg_N ("Parallel iteration over " &
                  "containers not yet supported", N);
-            end if;
 
-            if In_Outlined_Parallel (N) then
-               return;
-            end if;
+            elsif In_Outlined_Parallel (N) then
+               null;
 
-            if Lwt_Availible then
+            elsif Lwt_Availible then
                Outline_Loop;
                Stop_Processing := True;
 
@@ -4193,7 +4192,7 @@ package body Sem_Ch5 is
 
          --  Process parallel loops
 
-         if Is_Parallel (Iter) and then not Stop_Processing then
+         if not Stop_Processing and then Is_Parallel (Iter) then
             --  Preanalyze parallel chunk specification
             Prepare_Parallel_Chunk (Stop_Processing);
 
@@ -4711,12 +4710,11 @@ package body Sem_Ch5 is
 
       return Make_Procedure_Call_Statement (Loc,
         Name => New_Occurrence_Of (Par_Range, Loc),
-        Parameter_Associations => New_List (
-          Low_Arg, Hi_Arg, Chunk_Arg,
-          Make_Null (Loc),
-          Make_Attribute_Reference (Loc,
-            Prefix => Outlined_Proc,
-            Attribute_Name => Name_Access)));
+        Parameter_Associations => New_List
+          (Low_Arg, Hi_Arg, Chunk_Arg, Make_Null (Loc),
+            Make_Attribute_Reference (Loc,
+              Prefix => Outlined_Proc,
+              Attribute_Name => Name_Access)));
    end Build_Parallel_Call;
 
    --------------------------------------

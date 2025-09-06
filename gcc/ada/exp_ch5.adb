@@ -5823,6 +5823,17 @@ package body Exp_Ch5 is
       Analyze (N);
    end Expand_Iterator_Loop_Over_Container;
 
+   ---------------------------
+   -- Expand_Parallel_Exits --
+   ---------------------------
+
+   procedure Expand_Parallel_Exits
+     (Outlined : Node_Id; Lwt_Call : Node_Id)
+   is
+   begin
+      null;
+   end Expand_Parallel_Exits;
+
    -----------------------------
    -- Expand_N_Loop_Statement --
    -----------------------------
