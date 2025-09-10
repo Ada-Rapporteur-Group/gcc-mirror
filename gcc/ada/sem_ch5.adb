@@ -3799,8 +3799,7 @@ package body Sem_Ch5 is
            (Param_Spec      : Node_Id;
             Stop_Processing : out Boolean)
          is
-            Rng        : Node_Id;
-            Chunk_Spec : Node_Id := Chunk_Specifier (Iter);
+            Rng : Node_Id;
 
          begin
             Stop_Processing := False;
@@ -3831,7 +3830,7 @@ package body Sem_Ch5 is
             Loop_Id    : constant Entity_Id  := Entity (Identifier (N));
 
             Outlined_Body, Outlined_Spec, Chunk_Arg,
-              Parallel_Call, Parallel_Block : Node_Id;
+              Parallel_Call : Node_Id;
             Low_Param     : constant Entity_Id := Make_Temporary (Loc, 'P');
             Hi_Param      : constant Entity_Id := Make_Temporary (Loc, 'P');
             Chunk_Param   : constant Entity_Id := Make_Temporary (Loc, 'P');
@@ -3903,8 +3902,8 @@ package body Sem_Ch5 is
               (P : Node_Id; Lo : out Node_Id;
                Hi : out Node_Id; Typ : out Entity_Id)
             is
-               DS     : Node_Id := Discrete_Subtype_Definition (P);
-               R_Copy : Node_Id := New_Copy_Tree (DS);
+               DS     : constant Node_Id := Discrete_Subtype_Definition (P);
+               R_Copy : constant Node_Id := New_Copy_Tree (DS);
             begin
                Set_Parent (R_Copy, Parent (DS));
                Preanalyze_Range (R_Copy);
@@ -4030,7 +4029,7 @@ package body Sem_Ch5 is
                   Statements => New_List (Relocate_Node (N))));
 
             declare
-               Low, Hi, New_DS, New_RC : Node_Id;
+               Low, Hi, New_DS : Node_Id;
                Typ : Entity_Id;
             begin
                --  Move loop parameter values with side effects
@@ -4079,8 +4078,6 @@ package body Sem_Ch5 is
 
          procedure Prepare_Parallel_Chunk (Stop_Processing : out Boolean) is
             Chunk_Spec    : constant Node_Id := Chunk_Specifier (Iter);
-            Wrap_In_Block : Boolean := False;
-            Expr_Copy     : Node_Id;
 
          begin
             --  Nothing to do; either already in block or already in parallel
@@ -4634,7 +4631,7 @@ package body Sem_Ch5 is
          when N_Chunk_Specification_Int =>
             --  Resolve chunk specification as integer expression
             declare
-               Expr : Node_Id := Expression (N);
+               Expr : constant Node_Id := Expression (N);
             begin
                Analyze_And_Resolve (Expr, Any_Integer);
                Check_Unset_Reference (Expr);
@@ -4701,7 +4698,7 @@ package body Sem_Ch5 is
       Hi_Arg : Node_Id; Chunk_Arg : Node_Id;
       Outlined_Proc : Entity_Id) return Node_Id
    is
-      Par_Range : Entity_Id := RTE
+      Par_Range : constant Entity_Id := RTE
         (RE_Par_Range_Loop_With_Early_Exit);
    begin
 

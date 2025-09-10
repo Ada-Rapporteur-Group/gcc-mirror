@@ -5823,17 +5823,6 @@ package body Exp_Ch5 is
       Analyze (N);
    end Expand_Iterator_Loop_Over_Container;
 
-   ---------------------------
-   -- Expand_Parallel_Exits --
-   ---------------------------
-
-   procedure Expand_Parallel_Exits
-     (Outlined : Node_Id; Lwt_Call : Node_Id)
-   is
-   begin
-      null;
-   end Expand_Parallel_Exits;
-
    -----------------------------
    -- Expand_N_Loop_Statement --
    -----------------------------
@@ -5892,16 +5881,14 @@ package body Exp_Ch5 is
          procedure Expand_Chunk_Spec_Seq (C : Node_Id) is
             pragma Assert (Nkind (C) in N_Chunk_Specification_Range |
               N_Chunk_Specification_Int);
-
-            Block_Decl : Node_Id;
          begin
             --  Insert chunk specification declaration before loop node
             if Nkind (C) = N_Chunk_Specification_Range then
                --  Range chunk specification
                declare
-                  DS    : Node_Id := Discrete_Subtype_Definition (C);
-                  Ident : Node_Id := Defining_Identifier (C);
-                  Lower : Node_Id := Get_DS_Lower (DS);
+                  DS    : constant Node_Id := Discrete_Subtype_Definition (C);
+                  Ident : constant Node_Id := Defining_Identifier (C);
+                  Lower : constant Node_Id := Get_DS_Lower (DS);
                begin
                   Insert_Before_And_Analyze (N,
                     Make_Object_Declaration (Loc,
@@ -5916,8 +5903,8 @@ package body Exp_Ch5 is
             else
                --  Integer specifier
                declare
-                  Expr     : Node_Id := Expression (C);
-                  Expr_Typ : Entity_Id := Etype (Expr);
+                  Expr     : constant Node_Id := Expression (C);
+                  Expr_Typ : constant Entity_Id := Etype (Expr);
                begin
                   Insert_Before_And_Analyze (N,
                     Make_Object_Declaration (Loc,
@@ -5938,11 +5925,7 @@ package body Exp_Ch5 is
          ---------------------
 
          procedure Expand_Parallel is
-            Loop_Param : Entity_Id := Loop_Parameter_Specification (Scheme);
-            Chunk_Spec : Node_Id := Chunk_Specifier (Scheme);
-
-            --  RTE types
-            Long_Int_Typ : Entity_Id := RTE (RE_Longest_Integer);
+            Chunk_Spec : constant Node_Id := Chunk_Specifier (Scheme);
 
          begin
             if Present (Chunk_Spec)
@@ -6650,10 +6633,10 @@ package body Exp_Ch5 is
    ---------------------------------------
 
    procedure Expand_N_Parallel_Block_Statement (N : Node_Id) is
-      Branches   : List_Id := New_List;
-      Decls      : List_Id := New_List;
+      Branches   : constant List_Id := New_List;
+      Decls      : constant List_Id := New_List;
       Loc        : constant Source_Ptr := Sloc (N);
-      Chunk_Spec : Node_Id := Chunk_Specifier (N);
+      Chunk_Spec : constant Node_Id := Chunk_Specifier (N);
 
       procedure Exp_Sequential;
       --  Transforms parallel block statement into sequential fallback
@@ -6690,9 +6673,10 @@ package body Exp_Ch5 is
          --  Prepend numeric chunk specification expression to rewritten block
          if Present (Chunk_Spec) then
             declare
-               Chunk_Id   : Node_Id := Make_Temporary (Loc, 'C', N);
+               Chunk_Id   : constant Node_Id := Make_Temporary (Loc, 'C', N);
                Chunk_Decl : Node_Id;
-               Chunk_Type : Entity_Id := Etype (Expression (Chunk_Spec));
+               Chunk_Type : constant Entity_Id := Etype
+                 (Expression (Chunk_Spec));
             begin
                Chunk_Decl := Make_Object_Declaration (Loc,
                  Defining_Identifier => Chunk_Id,
@@ -6731,11 +6715,11 @@ package body Exp_Ch5 is
       end Exp_Sequential;
 
       procedure Exp_Parallel is
-         Case_Alts     : List_Id := New_List;
+         Case_Alts     : constant List_Id := New_List;
          Branch_Count  : Nat := 0;
-         Low_Id        : Entity_Id := Parallel_Low_Bound (N);
-         Hi_Id         : Entity_Id := Parallel_Hi_Bound (N);
-         Loop_Param_Id : Entity_Id := Make_Temporary (Loc, 'P');
+         Low_Id        : constant Entity_Id := Parallel_Low_Bound (N);
+         Hi_Id         : constant Entity_Id := Parallel_Hi_Bound (N);
+         Loop_Param_Id : constant Entity_Id := Make_Temporary (Loc, 'P');
          Loop_Body, Loop_Case, Loop_Param, Loop_Range : Node_Id;
       begin
 

@@ -488,10 +488,10 @@ procedure Labl is
    ----------------------
 
    function Is_Parallel_Loop (N : Node_Id) return Boolean is
-      Scheme : Node_Id := Iteration_Scheme (N);
    begin
       return Nkind (N) = N_Loop_Statement
-        and then Present (Scheme) and then Is_Parallel (Scheme);
+        and then Present (Iteration_Scheme (N))
+        and then Is_Parallel (Iteration_Scheme (N));
    end Is_Parallel_Loop;
 
 --  Start of processing for Par.Labl
