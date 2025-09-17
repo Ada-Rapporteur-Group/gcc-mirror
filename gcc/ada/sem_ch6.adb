@@ -1931,7 +1931,11 @@ package body Sem_Ch6 is
 
          for J in reverse 0 .. Scope_Stack.Last loop
             Result := Scope_Stack.Table (J).Entity;
-            exit when Ekind (Result) not in E_Block | E_Loop;
+            if Ekind (Result) = E_Procedure then
+               exit when not Is_Outlined_Parallel (Result);
+            else
+               exit when Ekind (Result) not in E_Block | E_Loop;
+            end if;
          end loop;
 
          pragma Assert (Present (Result));
@@ -2481,6 +2485,9 @@ package body Sem_Ch6 is
 
       procedure Restore_Limited_Views (Restore_List : Elist_Id);
       --  Undo the transformation done by Exchange_Limited_Views.
+
+      procedure Rewrite_Parallel_Exits (Scope_Id : Entity_Id);
+      --
 
       procedure Set_Trivial_Subprogram (N : Node_Id);
       --  Sets the Is_Trivial_Subprogram flag in both spec and body of the
@@ -3474,6 +3481,198 @@ package body Sem_Ch6 is
             Next_Elmt (Elmt);
          end loop;
       end Restore_Limited_Views;
+
+      ----------------------------
+      -- Rewrite_Parallel_Exits --
+      ----------------------------
+
+      procedure Rewrite_Parallel_Exits (Scope_Id : Entity_Id) is
+
+         function Get_Return_Val (Typ : Entity_Id) return Entity_Id;
+         function Get_Return_Ind return Entity_Id;
+         function New_Early_Exit_Case (Post_Call_Action : Node_Id)
+           return Node_Id;
+         function Make_Early_Exit
+           (Post_Call_Action : Node_Id := Empty;
+            Ret_Val : Node_Id := Empty) return Node_Id;
+         function Visit_Node (I : Node_Id) return Traverse_Result;
+
+         Return_Val     : Entity_Id := Empty;
+         Return_Ind     : Entity_Id := Empty;
+         Ret_Is_Void    : Boolean := False;
+         Exit_Alt_Count : Nat := 1;
+         Exit_Alts      : constant List_Id := New_List;
+
+         function Get_Return_Val (Typ : Entity_Id) return Entity_Id
+         is
+            pragma Assert (Present (Return_Val) or else
+              not Ret_Is_Void);
+         begin
+            if Present (Return_Val) then
+               pragma Assert (Typ = Etype (Return_Val));
+               return Return_Val;
+            end if;
+
+            Return_Val := Make_Temporary (Loc, 'P');
+
+            Set_Etype (Return_Val, Typ);
+            Mutate_Ekind (Return_Val, E_Variable);
+
+            Insert_Before_And_Analyze (N,
+              Make_Object_Declaration (Loc,
+                Defining_Identifier => Return_Val,
+                Object_Definition   => New_Occurrence_Of (Typ, Loc)));
+
+            return Return_Val;
+         end Get_Return_Val;
+
+         function Get_Return_Ind return Entity_Id is
+         begin
+            if Present (Return_Ind) then
+               return Return_Ind;
+            end if;
+
+            Return_Ind := Make_Temporary (Loc, 'P');
+
+            Set_Etype (Return_Ind, Standard_Natural);
+            Mutate_Ekind (Return_Ind, E_Variable);
+
+            Insert_Before_And_Analyze (N,
+              Make_Object_Declaration (Loc,
+                Defining_Identifier => Return_Ind,
+                Expression          => Make_Integer_Literal (Loc, Uint_0),
+                Object_Definition   =>
+                  New_Occurrence_Of (Standard_Natural, Loc)));
+
+            return Return_Ind;
+         end Get_Return_Ind;
+
+         --  Adds new "exit" clause to exit case at the end of the
+         --  parallel call
+         function New_Early_Exit_Case (Post_Call_Action : Node_Id)
+           return Node_Id
+         is
+            Alt : Node_Id;
+            Ind : constant Node_Id := Make_Integer_Literal
+              (Loc, Exit_Alt_Count);
+         begin
+            Alt := Make_Case_Statement_Alternative (Loc,
+              Discrete_Choices => New_List (Copy_Separate_Tree (Ind)),
+              Statements       => New_List (Post_Call_Action));
+            Append_To (Exit_Alts, Alt);
+            Exit_Alt_Count := Exit_Alt_Count + 1;
+            return Ind;
+         end New_Early_Exit_Case;
+
+         function Make_Early_Exit
+           (Post_Call_Action : Node_Id := Empty;
+            Ret_Val : Node_Id := Empty) return Node_Id
+         is
+            If_Body    : constant List_Id := New_List;
+            Exit_Stmts : constant List_Id := New_List;
+            EE_Call, Exit_Block : Node_Id;
+         begin
+            --  Create call to LWT Early Exit function
+            EE_Call := Make_Function_Call (Loc,
+              Name => New_Occurrence_Of (RTE (RE_Early_Exit), Loc),
+              Parameter_Associations => New_List (New_Occurrence_Of (
+                Parallel_Loop_Id_Param (Scope_Id), Loc)));
+
+            --  Create a new post call action index and assign this
+            --  value to Return_Ind
+            if Present (Post_Call_Action) then
+               Append_To (If_Body, Make_Assignment_Statement (Loc,
+                 Name => New_Occurrence_Of (Get_Return_Ind, Loc),
+                 Expression => New_Early_Exit_Case (Post_Call_Action)));
+            end if;
+
+            --  If this is a return statement, then assign the value
+            --  to Return_Val
+            if Present (Ret_Val) then
+               Append_To (If_Body, Make_Assignment_Statement (Loc,
+                 Name => New_Occurrence_Of (Get_Return_Val
+                   (Etype (Ret_Val)), Loc),
+                 Expression => Ret_Val));
+            end if;
+
+            --  Create early exit if statement and return
+
+            --     if Early_Exit (Loop_Id) then
+            --        Return_Val := ___;
+            --        Return_Ind := ___;
+            --     end if;
+            --     return;
+
+            Append_To (Exit_Stmts, Make_If_Statement (Loc,
+              Condition => EE_Call,
+              Then_Statements => If_Body));
+            Append_To (Exit_Stmts,
+              Make_Simple_Return_Statement (Loc));
+
+            --  Wrap the early exit inside a block and mark it as an
+            --  early exit so that we don't re-traverse it later
+            Exit_Block := Make_Block_Statement (Loc,
+              Handled_Statement_Sequence =>
+                Make_Handled_Sequence_Of_Statements (Loc,
+                  Statements => Exit_Stmts));
+            Set_Is_Parallel_Exit (Exit_Block);
+
+            return Exit_Block;
+         end Make_Early_Exit;
+
+         function Visit_Node (I : Node_Id) return Traverse_Result is
+         begin
+            --  Don't traverse nested functions or exit blocks
+            if Nkind (I) = N_Subprogram_Body
+              or else (Nkind (I) = N_Block_Statement
+                and then Is_Parallel_Exit (I))
+            then
+               return Skip;
+            end if;
+
+            if Nkind (I) = N_Simple_Return_Statement then
+               if Present (Expression (I)) then
+                  Rewrite (I, Make_Early_Exit (
+                    Ret_Val          => Expression (I),
+                    Post_Call_Action => Make_Simple_Return_Statement
+                      (Loc, New_Occurrence_Of (Get_Return_Val (
+                        Etype (Expression (I))), Loc))));
+               else
+                  pragma Assert (No (Return_Val));
+                  Ret_Is_Void := True;
+                  Rewrite (I, Make_Early_Exit (Post_Call_Action =>
+                    Make_Simple_Return_Statement (Loc)));
+               end if;
+
+               Analyze (I);
+               return Skip;
+            end if;
+
+            return OK;
+         end Visit_Node;
+
+         procedure Replace_Exits is
+           new Traverse_Proc (Visit_Node);
+
+      begin
+         if Present (Scope_Id)
+           and then Ekind (Scope_Id) = E_Procedure
+           and then Is_Outlined_Parallel (Scope_Id)
+         then
+            Set_Is_Outlined_Parallel (Scope_Id, False);
+            Replace_Exits (Handled_Statement_Sequence (N));
+            if Present (Return_Ind) then
+               Append_To (Exit_Alts,
+                 Make_Case_Statement_Alternative (Loc,
+                   Discrete_Choices => New_List (Make_Others_Choice (Loc)),
+                   Statements => New_List (Make_Null_Statement (Loc))));
+               Set_Parallel_Exit_Actions (Scope_Id,
+                 Make_Case_Statement (Loc,
+                   Expression   => New_Occurrence_Of (Return_Ind, Loc),
+                   Alternatives => Exit_Alts));
+            end if;
+         end if;
+      end Rewrite_Parallel_Exits;
 
       ----------------------------
       -- Set_Trivial_Subprogram --
@@ -4721,6 +4920,8 @@ package body Sem_Ch6 is
       Check_Completion;
       Inspect_Deferred_Constant_Completion (Declarations (N));
       Analyze (Handled_Statement_Sequence (N));
+
+      Rewrite_Parallel_Exits (Body_Id);
 
       --  Add the generated minimum accessibility objects to the subprogram
       --  body's list of declarations after analysis of the statements and
