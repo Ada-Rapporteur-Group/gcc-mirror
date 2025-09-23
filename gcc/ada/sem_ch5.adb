@@ -1898,8 +1898,10 @@ package body Sem_Ch5 is
          Scope_Id := Scope_Stack.Table (J).Entity;
 
          if Label_Scope = Scope_Id
-           or else Ekind (Scope_Id) not in
+           or else (Ekind (Scope_Id) not in
                      E_Block | E_Loop | E_Return_Statement
+                    and then (Ekind (Scope_Id) /= E_Procedure
+                     or else not Is_Outlined_Parallel (Scope_Id)))
          then
             if Scope_Id /= Label_Scope then
                Error_Msg_N

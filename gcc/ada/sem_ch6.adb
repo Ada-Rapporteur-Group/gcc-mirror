@@ -3489,13 +3489,31 @@ package body Sem_Ch6 is
       procedure Rewrite_Parallel_Exits (Scope_Id : Entity_Id) is
 
          function Get_Return_Val (Typ : Entity_Id) return Entity_Id;
+         --  Retrieves or creates a variable that stores the parallel
+         --  construct's return value.
+
          function Get_Return_Ind return Entity_Id;
+         --  Retrieves or creates a variable that stores which exit
+         --  action should be run after the call to LWT. Default is
+         --  zero.
+
          function New_Early_Exit_Case (Post_Call_Action : Node_Id)
            return Node_Id;
+         --  Adds new post call action to exit case at the end of the
+         --  parallel call
+
          function Make_Early_Exit
            (Post_Call_Action : Node_Id := Empty;
             Ret_Val : Node_Id := Empty) return Node_Id;
+         --  Creates the parallel exit node
+
          function Visit_Node (I : Node_Id) return Traverse_Result;
+         --  Visitor function that rewrites control flow statements
+         --  as parallel exits
+
+         function Scope_Is_Inside_Parallel (S : Entity_Id)
+           return Boolean;
+         --  Checks if a given scope is inside the parallel construct
 
          Return_Val     : Entity_Id := Empty;
          Return_Ind     : Entity_Id := Empty;
@@ -3547,8 +3565,6 @@ package body Sem_Ch6 is
             return Return_Ind;
          end Get_Return_Ind;
 
-         --  Adds new "exit" clause to exit case at the end of the
-         --  parallel call
          function New_Early_Exit_Case (Post_Call_Action : Node_Id)
            return Node_Id
          is
@@ -3620,6 +3636,29 @@ package body Sem_Ch6 is
             return Exit_Block;
          end Make_Early_Exit;
 
+         function Scope_Is_Inside_Parallel (S : Entity_Id)
+           return Boolean
+         is
+            Inside_Outlined : Boolean := True;
+            Scop            : Entity_Id;
+         begin
+            --  At this point, the outlined function scope should
+            --  be the top value on the scope stack. If we can't find
+            --  the target scope above the outlined function scope,
+            --  we can assume it is inside the outlined function and
+            --  was already popped off the scope stack
+            for J in reverse 0 .. Scope_Stack.Last loop
+               Scop := Scope_Stack.Table (J).Entity;
+               if Scope (S) = Scop then
+                  return Inside_Outlined;
+               elsif Scop = Scope_Id then
+                  Inside_Outlined := False;
+               end if;
+            end loop;
+
+            return True;
+         end Scope_Is_Inside_Parallel;
+
          function Visit_Node (I : Node_Id) return Traverse_Result is
          begin
             --  Don't traverse nested functions or exit blocks
@@ -3630,6 +3669,7 @@ package body Sem_Ch6 is
                return Skip;
             end if;
 
+            --  Rewrite return statements
             if Nkind (I) = N_Simple_Return_Statement then
                if Present (Expression (I)) then
                   Rewrite (I, Make_Early_Exit (
@@ -3644,6 +3684,17 @@ package body Sem_Ch6 is
                     Make_Simple_Return_Statement (Loc)));
                end if;
 
+               Analyze (I);
+               return Skip;
+            end if;
+
+            --  Rewrite goto statements
+            if Nkind (I) = N_Goto_Statement
+              and then not Scope_Is_Inside_Parallel (
+                Entity (Name (I)))
+            then
+               Rewrite (I, Make_Early_Exit (
+                 Post_Call_Action => Copy_Separate_Tree (I)));
                Analyze (I);
                return Skip;
             end if;
