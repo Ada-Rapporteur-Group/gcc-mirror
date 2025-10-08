@@ -3833,11 +3833,11 @@ package body Sem_Ch5 is
 
             Outlined_Body, Outlined_Spec, Chunk_Arg,
               Parallel_Call : Node_Id;
-            Spec_Id       : constant Entity_Id := Make_Temporary (Loc, 'P');
-            Low_Param     : constant Entity_Id := Make_Temporary (Loc, 'P');
-            Hi_Param      : constant Entity_Id := Make_Temporary (Loc, 'P');
-            Chunk_Param   : constant Entity_Id := Make_Temporary (Loc, 'P');
-            Long_Int_Typ  : constant Entity_Id := RTE (RE_Longest_Integer);
+            Spec_Id      : constant Entity_Id := Make_Temporary (Loc, 'P');
+            Low_Param    : constant Entity_Id := Make_Temporary (Loc, 'P');
+            Hi_Param     : constant Entity_Id := Make_Temporary (Loc, 'P');
+            Chunk_Param  : constant Entity_Id := Make_Temporary (Loc, 'P');
+            Long_Int_Typ : constant Entity_Id := RTE (RE_Longest_Integer);
 
             procedure Read_Bounds
               (DS : Node_Id; Lo : out Node_Id; Hi : out Node_Id);
@@ -4347,6 +4347,10 @@ package body Sem_Ch5 is
       Push_Scope (Ent);
       Analyze_Iteration_Scheme (Iter);
 
+      if Is_Parallel (Iter) then
+         Set_Is_Parallel_Loop_Scope (Ent);
+      end if;
+
       --  Check for following case which merits a warning if the type of E is
       --  a multi-dimensional array (and no explicit subscript ranges present).
 
@@ -4549,11 +4553,14 @@ package body Sem_Ch5 is
          Kind := Ekind (Scope_Id);
 
          if Kind = E_Loop and then (No (Target) or else Scope_Id = U_Name) then
+            Set_Exits_From (N, Scope_Id);
             exit;
 
          elsif Kind = E_Block
            or else Kind = E_Loop
            or else Kind = E_Return_Statement
+           or else (Kind = E_Procedure
+                    and then Is_Outlined_Parallel (Scope_Id))
          then
             null;
 

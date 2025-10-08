@@ -3600,6 +3600,9 @@ package body Sem_Ch6 is
                Append_To (If_Body, Make_Assignment_Statement (Loc,
                  Name => New_Occurrence_Of (Get_Return_Ind, Loc),
                  Expression => New_Early_Exit_Case (Post_Call_Action)));
+            else
+               pragma Assert (No (Return_Val));
+               Append_To (If_Body, Make_Null_Statement (Loc));
             end if;
 
             --  If this is a return statement, then assign the value
@@ -3689,7 +3692,7 @@ package body Sem_Ch6 is
             end if;
 
             --  Rewrite goto statements
-            if Nkind (I) = N_Goto_Statement
+            if Nkind (I) in N_Goto_Statement
               and then not Scope_Is_Inside_Parallel (
                 Entity (Name (I)))
             then
@@ -3697,6 +3700,31 @@ package body Sem_Ch6 is
                  Post_Call_Action => Copy_Separate_Tree (I)));
                Analyze (I);
                return Skip;
+            end if;
+
+            --  Rewrite exit statements
+            if Nkind (I) = N_Exit_Statement then
+               --  Rewrite exits that exit the current parallel loop
+               if (No (Name (I))
+                 and then Ekind (Exits_From (I)) = E_Loop
+                 and then Is_Parallel_Loop_Scope (Exits_From (I)))
+                 or else (Present (Name (I))
+                   and then Is_Parallel_Loop_Scope (Entity (Name (I))))
+               then
+                  Rewrite (I, Make_Early_Exit);
+                  Analyze (I);
+                  return Skip;
+
+               --  Rewrite exits that exit a loop outside the current
+               --  parallel loop
+               elsif Present (Name (I))
+                 and then not Scope_Is_Inside_Parallel (Entity (Name (I)))
+               then
+                  Rewrite (I, Make_Early_Exit (
+                    Post_Call_Action => Copy_Separate_Tree (I)));
+                  Analyze (I);
+                  return Skip;
+               end if;
             end if;
 
             return OK;

@@ -1231,6 +1231,7 @@ begin -- Gen_IL.Gen.Gen_Entities
         Sm (First_Exit_Statement, Node_Id),
         Sm (Has_Exit, Flag),
         Sm (Has_Loop_Entry_Attributes, Flag),
+        Sm (Is_Parallel_Loop_Scope, Flag),
         Sm (Last_Entity, Node_Id),
         Sm (Renamed_Or_Alias, Node_Id),
         Sm (Scope_Depth_Value, Unat)));
