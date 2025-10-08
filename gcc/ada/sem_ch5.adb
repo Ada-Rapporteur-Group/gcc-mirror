@@ -4077,11 +4077,13 @@ package body Sem_Ch5 is
          ----------------------------
 
          procedure Prepare_Parallel_Chunk (Stop_Processing : out Boolean) is
-            Chunk_Spec    : constant Node_Id := Chunk_Specifier (Iter);
+            Chunk_Spec : constant Node_Id := Chunk_Specifier (Iter);
 
          begin
-            --  Nothing to do; either already in block or already in parallel
-            --  procedure
+            Stop_Processing := False;
+
+            --  Nothing to do; either already in block or already in
+            --  parallel procedure
 
             if Is_Wrapped_In_Block (N)
               or else In_Outlined_Parallel (N)
@@ -4107,6 +4109,8 @@ package body Sem_Ch5 is
 
          procedure Prepare_Outlined_Loop (Stop_Processing : out Boolean) is
          begin
+            Stop_Processing := False;
+
             if Present (Iter_Spec) then
                Error_Msg_N ("Parallel iteration over " &
                  "containers not yet supported", N);
@@ -4126,8 +4130,8 @@ package body Sem_Ch5 is
                --  it hasn't been wrapped already. The declarations we've
                --  collected need to be moved somewhere.
 
-               if Present (Parallel_Declarations (N)) and then
-                 not Is_Empty_List (Parallel_Declarations (N))
+               if Present (Parallel_Declarations (N))
+                 and then not Is_Empty_List (Parallel_Declarations (N))
                then
                   Wrap_Loop_Statement (Manage_Sec_Stack => False);
                   Stop_Processing := True;
@@ -4153,9 +4157,9 @@ package body Sem_Ch5 is
             --  we aren't going to create an outlined procedure, then add
             --  the collected decls to the wrapper block.
 
-            if not Lwt_Availible
-              and then Present (P_Decls)
+            if Present (P_Decls)
               and then not Is_Empty_List (P_Decls)
+              and then not Lwt_Availible
             then
                Blk_Dcl := P_Decls;
                Set_Parallel_Declarations (N, No_List);
