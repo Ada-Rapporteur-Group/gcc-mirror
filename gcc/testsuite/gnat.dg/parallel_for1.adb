@@ -1,4 +1,4 @@
--- { dg-options "-gnat2022" }
+-- { dg-options "-gnat2022 -Werror" }
 
 procedure parallel_for1 is
    subtype Chunk_Number is Natural range 1 .. 8;
@@ -28,3 +28,5 @@ begin
       raise Program_Error;
    end if;
 end parallel_for1;
+
+-- { dg-error "\"lwt\" library not found. Parallel loop will execute sequentially" "" { target *-*-* } 23 }

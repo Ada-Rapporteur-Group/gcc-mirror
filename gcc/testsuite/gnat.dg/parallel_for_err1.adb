@@ -8,3 +8,5 @@ begin
          null;
       end loop;
 end parallel_for_err1;
+
+-- { dg-error "\"lwt\" library not found. Parallel loop will execute sequentially" "" { target *-*-* } 7 }

@@ -68,13 +68,13 @@ package body Ch5 is
    function P_Parallel_Construct (Loop_Name : Node_Id := Empty) return Node_Id;
    --  Parse the construct following a "parallel" keyword. This function
    --  parses the chunk specification and calls P_Loop_Statement or
-   --  P_Parallel_Do_Statement depending on which keyword follows the
-   --  parallel part. If Loop_Name is non-Empty on entry, it is passed on
+   --  P_Parallel_Block_Statement depending on which reserved word follows
+   --  'parallel'. If Loop_Name is non-Empty on entry, it is passed on
    --  to a P_Loop_Statement if the construct is a parallel for loop. If
    --  Loop_Name is present but the construct is a parallel do, this function
    --  will raise an error.
 
-   function P_Parallel_Do_Statement (Chunk : Node_Id) return Node_Id;
+   function P_Parallel_Block_Statement (Chunk : Node_Id) return Node_Id;
    --  Parse parallel do. If Chunk is non-Empty on entry, the specified
    --  parallel chunk specification will be used for the parallel do. If
    --  Chunk is Empty on entry (the default), the parallel do will have
@@ -2060,13 +2060,13 @@ package body Ch5 is
       end if;
 
       if Has_Chunk_Index then
-         Chunk := New_Node (N_Chunk_Specifier_Range, Token_Ptr);
+         Chunk := New_Node (N_Chunk_Specification_Range, Token_Ptr);
          Set_Defining_Identifier (Chunk, P_Defining_Identifier (C_In));
          T_In;
          Set_Discrete_Subtype_Definition
            (Chunk, P_Discrete_Subtype_Definition);
       else
-         Chunk := New_Node (N_Chunk_Specifier_Int, Token_Ptr);
+         Chunk := New_Node (N_Chunk_Specification_Int, Token_Ptr);
          Set_Expression (Chunk, P_Simple_Expression);
       end if;
 
@@ -2096,13 +2096,13 @@ package body Ch5 is
             end if;
 
             if Present (Chunk_Spec) and then
-              Nkind (Chunk_Spec) = N_Chunk_Specifier_Range
+              Nkind (Chunk_Spec) = N_Chunk_Specification_Range
             then
                Error_Msg_F ("Range chunk specification not permitted" &
                  " in parallel block statements", Chunk_Spec);
             end if;
 
-            return P_Parallel_Do_Statement (Chunk_Spec);
+            return P_Parallel_Block_Statement (Chunk_Spec);
          when Tok_For =>
             declare
                Loop_Node   : Node_Id;
@@ -2123,11 +2123,11 @@ package body Ch5 is
       end case;
    end P_Parallel_Construct;
 
-   function P_Parallel_Do_Statement (Chunk : Node_Id) return Node_Id is
-      Parallel_Do_Node : Node_Id;
+   function P_Parallel_Block_Statement (Chunk : Node_Id) return Node_Id is
+      Parallel_Block_Node : Node_Id;
       Branch_List      : List_Id;
    begin
-      Parallel_Do_Node := New_Node (N_Parallel_Block_Statement, Token_Ptr);
+      Parallel_Block_Node := New_Node (N_Parallel_Block_Statement, Token_Ptr);
 
       Push_Scope_Stack;
       Scopes (Scope.Last).Etyp := E_Do;
@@ -2152,11 +2152,11 @@ package body Ch5 is
       end loop;
       End_Statements;
 
-      Set_Chunk_Specifier (Parallel_Do_Node, Chunk);
-      Set_Parallel_Branches (Parallel_Do_Node, Branch_List);
+      Set_Chunk_Specifier (Parallel_Block_Node, Chunk);
+      Set_Parallel_Branches (Parallel_Block_Node, Branch_List);
 
-      return Parallel_Do_Node;
-   end P_Parallel_Do_Statement;
+      return Parallel_Block_Node;
+   end P_Parallel_Block_Statement;
 
    -------------------------
    -- 5.7  Exit Statement --

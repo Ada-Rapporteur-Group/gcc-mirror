@@ -1,4 +1,4 @@
--- { dg-options "-gnat2022" }
+-- { dg-options "-gnat2022 -Werror" }
 
 procedure parallel_do1 is
    Ran_Chunk_Gen : Boolean := False;
@@ -27,3 +27,5 @@ begin
       raise Program_Error;
    end if;
 end parallel_do1;
+
+-- { dg-error "\"lwt\" library not found. Parallel block will execute sequentially" "" { target *-*-* } 16 }

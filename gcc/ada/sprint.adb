@@ -1347,10 +1347,10 @@ package body Sprint is
             Write_Char_Code (UI_To_CC (Char_Literal_Value (Node)));
             Write_Char (''');
 
-         when N_Chunk_Specifier_Int =>
+         when N_Chunk_Specification_Int =>
             Sprint_Node (Expression (Node));
 
-         when N_Chunk_Specifier_Range =>
+         when N_Chunk_Specification_Range =>
             Write_Id (Defining_Identifier (Node));
             Write_Str (" in ");
             Sprint_Node (Discrete_Subtype_Definition (Node));

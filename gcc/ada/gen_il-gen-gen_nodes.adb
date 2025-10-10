@@ -908,11 +908,11 @@ begin -- Gen_IL.Gen.Gen_Nodes
         Sm (Is_Initialization_Block, Flag),
         Sm (Is_Task_Master, Flag)));
 
-   Cc (N_Chunk_Specifier_Range, Node_Kind,
+   Cc (N_Chunk_Specification_Range, Node_Kind,
        (Sy (Defining_Identifier, Node_Id),
         Sy (Discrete_Subtype_Definition, Node_Id, Default_Empty)));
 
-   Cc (N_Chunk_Specifier_Int, Node_Kind,
+   Cc (N_Chunk_Specification_Int, Node_Kind,
        (Sy (Expression, Node_Id, Default_Empty)));
 
    Cc (N_Parallel_Branch, Node_Kind,
@@ -920,7 +920,18 @@ begin -- Gen_IL.Gen.Gen_Nodes
 
    Cc (N_Parallel_Block_Statement, N_Statement_Other_Than_Procedure_Call,
        (Sy (Chunk_Specifier, Node_Id, Default_Empty),
-        Sy (Parallel_Branches, List_Id, Default_No_List)));
+        Sy (Parallel_Branches, List_Id, Default_No_List),
+        --  While the parallel block syntax itself does not have anywhere for
+        --  declarations, it is later moved inside an outlined procedure before
+        --  analysis. This list is used to collect block and loop labels that
+        --  are created inside Par.Labl so that they can be moved inside the
+        --  outlined procedure's declarations. In the case of sequential
+        --  expansion, these declarations are moved inside an enclosing block.
+        Sy (Parallel_Declarations, List_Id, Default_No_List),
+        Sm (Parallel_Low_Bound, Node_Id),
+        Sm (Parallel_Hi_Bound, Node_Id),
+        Sm (Parallel_Loop_Id, Node_Id),
+        Sm (In_Outlined_Parallel, Flag)));
 
    Cc (N_Case_Statement, N_Statement_Other_Than_Procedure_Call,
        (Sy (Expression, Node_Id, Default_Empty),
@@ -974,7 +985,12 @@ begin -- Gen_IL.Gen.Gen_Nodes
         Sy (End_Label, Node_Id, Default_Empty),
         Sy (Has_Created_Identifier, Flag),
         Sy (Is_Null_Loop, Flag),
-        Sy (Suppress_Loop_Warnings, Flag)));
+        Sy (Suppress_Loop_Warnings, Flag),
+        --  See comment for Parallel_Declarations in
+        --  N_Parallel_Block_Statement declaration
+        Sy (Parallel_Declarations, List_Id, Default_No_List),
+        Sm (Parallel_Chunk_Id, Node_Id),
+        Sm (In_Outlined_Parallel, Flag)));
 
    Ab (N_Loop_Flow_Statement, N_Statement_Other_Than_Procedure_Call,
        (Sy (Name, Node_Id, Default_Empty),
@@ -1622,7 +1638,7 @@ begin -- Gen_IL.Gen.Gen_Nodes
           Children =>
             (N_Aggregate,
              N_Block_Statement,
-             N_Chunk_Specifier_Range,
+             N_Chunk_Specification_Range,
              N_Declaration,
              N_Discriminant_Specification,
              N_Entry_Index_Specification,
