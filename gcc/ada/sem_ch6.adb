@@ -3504,7 +3504,8 @@ package body Sem_Ch6 is
 
          function Make_Early_Exit
            (Post_Call_Action : Node_Id := Empty;
-            Ret_Val : Node_Id := Empty) return Node_Id;
+            Ret_Val          : Node_Id := Empty;
+            Predicate        : Node_Id := Empty) return Node_Id;
          --  Creates the parallel exit node
 
          function Visit_Node (I : Node_Id) return Traverse_Result;
@@ -3582,10 +3583,11 @@ package body Sem_Ch6 is
 
          function Make_Early_Exit
            (Post_Call_Action : Node_Id := Empty;
-            Ret_Val : Node_Id := Empty) return Node_Id
+            Ret_Val          : Node_Id := Empty;
+            Predicate        : Node_Id := Empty) return Node_Id
          is
             If_Body    : constant List_Id := New_List;
-            Exit_Stmts : constant List_Id := New_List;
+            Exit_Stmts : List_Id := New_List;
             EE_Call, Exit_Block : Node_Id;
          begin
             --  Create call to LWT Early Exit function
@@ -3627,6 +3629,14 @@ package body Sem_Ch6 is
               Then_Statements => If_Body));
             Append_To (Exit_Stmts,
               Make_Simple_Return_Statement (Loc));
+
+            --  Wrap contents of block inside an if statement if a
+            --  predicate is supplied. This is used for `exit when`
+            if Present (Predicate) then
+               Exit_Stmts := New_List (Make_If_Statement (Loc,
+                 Condition       => Predicate,
+                 Then_Statements => Exit_Stmts));
+            end if;
 
             --  Wrap the early exit inside a block and mark it as an
             --  early exit so that we don't re-traverse it later
@@ -3711,7 +3721,8 @@ package body Sem_Ch6 is
                  or else (Present (Name (I))
                    and then Is_Parallel_Loop_Scope (Entity (Name (I))))
                then
-                  Rewrite (I, Make_Early_Exit);
+                  Rewrite (I, Make_Early_Exit (
+                     Predicate => Copy_Separate_Tree (Condition (I))));
                   Analyze (I);
                   return Skip;
 
