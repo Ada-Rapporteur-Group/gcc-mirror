@@ -4048,12 +4048,12 @@ package body Sem_Ch5 is
                --  Rewrite loop range as Low_Param .. High_Param
                New_DS := Make_Range (Loc,
                  Low_Bound => Make_Attribute_Reference (Loc,
-                 Prefix => New_Occurrence_Of (Typ, Loc),
+                 Prefix => New_Occurrence_Of (Etype (Low), Loc),
                    Attribute_Name => Name_Val,
                    Expressions => New_List
                      (New_Occurrence_Of (Low_Param, Loc))),
                  High_Bound => Make_Attribute_Reference (Loc,
-                   Prefix => New_Occurrence_Of (Typ, Loc),
+                   Prefix => New_Occurrence_Of (Etype (Hi), Loc),
                    Attribute_Name => Name_Val,
                    Expressions => New_List
                      (New_Occurrence_Of (Hi_Param, Loc))));
