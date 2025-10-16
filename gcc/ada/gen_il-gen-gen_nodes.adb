@@ -906,6 +906,7 @@ begin -- Gen_IL.Gen.Gen_Nodes
         Sm (Exception_Junk, Flag),
         Sm (Is_Abort_Block, Flag),
         Sm (Is_Initialization_Block, Flag),
+        Sm (Is_Parallel_Exit, Flag),
         Sm (Is_Task_Master, Flag)));
 
    Cc (N_Chunk_Specification_Range, Node_Kind,
@@ -930,7 +931,6 @@ begin -- Gen_IL.Gen.Gen_Nodes
         Sy (Parallel_Declarations, List_Id, Default_No_List),
         Sm (Parallel_Low_Bound, Node_Id),
         Sm (Parallel_Hi_Bound, Node_Id),
-        Sm (Parallel_Loop_Id, Node_Id),
         Sm (In_Outlined_Parallel, Flag)));
 
    Cc (N_Case_Statement, N_Statement_Other_Than_Procedure_Call,
@@ -994,7 +994,8 @@ begin -- Gen_IL.Gen.Gen_Nodes
 
    Ab (N_Loop_Flow_Statement, N_Statement_Other_Than_Procedure_Call,
        (Sy (Name, Node_Id, Default_Empty),
-        Sy (Condition, Node_Id, Default_Empty)));
+        Sy (Condition, Node_Id, Default_Empty),
+        Sm (Exits_From, Node_Id)));
 
    Cc (N_Continue_Statement, N_Loop_Flow_Statement,
        (Sm (Call_Or_Target_Loop, Node_Id)));

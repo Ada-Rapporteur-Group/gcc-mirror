@@ -125,9 +125,9 @@ package body Sem_Ch5 is
    --  resolve the original bounds.
 
    function Build_Parallel_Loop_Spec
-     (Loc : Source_Ptr; Low_Param : Entity_Id;
-      Hi_Param : Entity_Id; Chunk_Param : Entity_Id;
-      Loop_Id_Param : Entity_Id) return Node_Id;
+     (Loc : Source_Ptr; Spec_Id : Entity_Id;
+      Low_Param : Entity_Id; Hi_Param : Entity_Id;
+      Chunk_Param : Entity_Id) return Node_Id;
    --  Build procedure specification for the parallel construct's
    --  outlined procedure
 
@@ -1898,8 +1898,10 @@ package body Sem_Ch5 is
          Scope_Id := Scope_Stack.Table (J).Entity;
 
          if Label_Scope = Scope_Id
-           or else Ekind (Scope_Id) not in
+           or else (Ekind (Scope_Id) not in
                      E_Block | E_Loop | E_Return_Statement
+                    and then (Ekind (Scope_Id) /= E_Procedure
+                     or else not Is_Outlined_Parallel (Scope_Id)))
          then
             if Scope_Id /= Label_Scope then
                Error_Msg_N
@@ -3831,11 +3833,11 @@ package body Sem_Ch5 is
 
             Outlined_Body, Outlined_Spec, Chunk_Arg,
               Parallel_Call : Node_Id;
-            Low_Param     : constant Entity_Id := Make_Temporary (Loc, 'P');
-            Hi_Param      : constant Entity_Id := Make_Temporary (Loc, 'P');
-            Chunk_Param   : constant Entity_Id := Make_Temporary (Loc, 'P');
-            Loop_Id_Param : constant Entity_Id := Make_Temporary (Loc, 'P');
-            Long_Int_Typ  : constant Entity_Id := RTE (RE_Longest_Integer);
+            Spec_Id      : constant Entity_Id := Make_Temporary (Loc, 'P');
+            Low_Param    : constant Entity_Id := Make_Temporary (Loc, 'P');
+            Hi_Param     : constant Entity_Id := Make_Temporary (Loc, 'P');
+            Chunk_Param  : constant Entity_Id := Make_Temporary (Loc, 'P');
+            Long_Int_Typ : constant Entity_Id := RTE (RE_Longest_Integer);
 
             procedure Read_Bounds
               (DS : Node_Id; Lo : out Node_Id; Hi : out Node_Id);
@@ -4015,10 +4017,10 @@ package body Sem_Ch5 is
             Set_Etype (Chunk_Arg, Standard_Positive);
 
             Outlined_Spec := Build_Parallel_Loop_Spec (Loc,
+              Spec_Id       => Spec_Id,
               Low_Param     => Low_Param,
               Hi_Param      => Hi_Param,
-              Chunk_Param   => Chunk_Param,
-              Loop_Id_Param => Loop_Id_Param);
+              Chunk_Param   => Chunk_Param);
             Set_Parallel_Chunk_Id (N, Chunk_Param);
 
             Outlined_Body := Make_Subprogram_Body (Loc,
@@ -4042,8 +4044,7 @@ package body Sem_Ch5 is
                  Low_Arg => Create_Bound_Arg (Low),
                  Hi_Arg => Create_Bound_Arg (Hi),
                  Chunk_Arg => Chunk_Arg,
-                 Outlined_Proc => New_Occurrence_Of
-                   (Defining_Unit_Name (Outlined_Spec), Loc));
+                 Outlined_Proc => New_Occurrence_Of (Spec_Id, Loc));
 
                --  Rewrite loop range as Low_Param .. High_Param
                New_DS := Make_Range (Loc,
@@ -4067,9 +4068,13 @@ package body Sem_Ch5 is
             Rewrite (N, Parallel_Call);
             Analyze (N);
 
+            if Present (Parallel_Exit_Actions (Spec_Id)) then
+               Insert_After_And_Analyze (N,
+                 Parallel_Exit_Actions (Spec_Id));
+            end if;
+
             Remove_Entity (Loop_Id);
-            Append_Entity (Loop_Id,
-              Defining_Unit_Name (Outlined_Spec));
+            Append_Entity (Loop_Id, Spec_Id);
          end Outline_Loop;
 
          ----------------------------
@@ -4342,6 +4347,10 @@ package body Sem_Ch5 is
       Push_Scope (Ent);
       Analyze_Iteration_Scheme (Iter);
 
+      if Is_Parallel (Iter) then
+         Set_Is_Parallel_Loop_Scope (Ent);
+      end if;
+
       --  Check for following case which merits a warning if the type of E is
       --  a multi-dimensional array (and no explicit subscript ranges present).
 
@@ -4544,11 +4553,14 @@ package body Sem_Ch5 is
          Kind := Ekind (Scope_Id);
 
          if Kind = E_Loop and then (No (Target) or else Scope_Id = U_Name) then
+            Set_Exits_From (N, Scope_Id);
             exit;
 
          elsif Kind = E_Block
            or else Kind = E_Loop
            or else Kind = E_Return_Statement
+           or else (Kind = E_Procedure
+                    and then Is_Outlined_Parallel (Scope_Id))
          then
             null;
 
@@ -4658,13 +4670,13 @@ package body Sem_Ch5 is
    ------------------------------
 
    function Build_Parallel_Loop_Spec
-     (Loc : Source_Ptr; Low_Param : Entity_Id;
-      Hi_Param : Entity_Id; Chunk_Param : Entity_Id;
-      Loop_Id_Param : Entity_Id) return Node_Id
+     (Loc : Source_Ptr; Spec_Id : Entity_Id;
+      Low_Param : Entity_Id; Hi_Param : Entity_Id;
+      Chunk_Param : Entity_Id) return Node_Id
    is
       Long_Int_Typ  : constant Entity_Id := RTE (RE_Longest_Integer);
       Loop_Id_Typ   : constant Entity_Id := RTE (RE_Par_Loop_Id);
-      Proc_Id       : constant Entity_Id := Make_Temporary (Loc, 'P');
+      Loop_Id_Param : constant Entity_Id := Make_Temporary (Loc, 'P');
    begin
       --  Builds out the following procedure specification:
 
@@ -4672,24 +4684,28 @@ package body Sem_Ch5 is
       --       Hi : Longest_Integer; Chunk : Positive;
       --       Loop_Id : Par_Loop_Id);
 
+      Mutate_Ekind (Spec_Id, E_Procedure);
+      Set_Is_Outlined_Parallel (Spec_Id);
+      Set_Parallel_Loop_Id_Param (Spec_Id, Loop_Id_Param);
+
       return Make_Procedure_Specification (Loc,
-        Defining_Unit_Name       => Proc_Id,
+        Defining_Unit_Name       => Spec_Id,
         Parameter_Specifications => New_List (
           Make_Parameter_Specification (Loc,
-            Defining_Identifier => Low_Param,
-            Parameter_Type      =>
+            Defining_Identifier  => Low_Param,
+            Parameter_Type       =>
               New_Occurrence_Of (Long_Int_Typ, Loc)),
           Make_Parameter_Specification (Loc,
-            Defining_Identifier => Hi_Param,
-            Parameter_Type      =>
+            Defining_Identifier  => Hi_Param,
+            Parameter_Type       =>
               New_Occurrence_Of (Long_Int_Typ, Loc)),
           Make_Parameter_Specification (Loc,
-            Defining_Identifier => Chunk_Param,
-            Parameter_Type      =>
+            Defining_Identifier  => Chunk_Param,
+            Parameter_Type       =>
               New_Occurrence_Of (Standard_Positive, Loc)),
           Make_Parameter_Specification (Loc,
-            Defining_Identifier => Loop_Id_Param,
-            Parameter_Type      =>
+            Defining_Identifier  => Loop_Id_Param,
+            Parameter_Type       =>
               New_Occurrence_Of (Loop_Id_Typ, Loc))));
    end Build_Parallel_Loop_Spec;
 
@@ -4771,9 +4787,9 @@ package body Sem_Ch5 is
             Branch_Count  : constant Nat       := List_Length
                                                     (Parallel_Branches (N));
             Old_Decls     : constant List_Id   := Parallel_Declarations (N);
+            Spec_Id       : constant Entity_Id := Make_Temporary (Loc, 'P');
             Low_Param     : constant Entity_Id := Make_Temporary (Loc, 'P');
             Hi_Param      : constant Entity_Id := Make_Temporary (Loc, 'P');
-            Loop_Id_Param : constant Entity_Id := Make_Temporary (Loc, 'P');
          begin
             Set_Parallel_Declarations (N, No_List);
             Set_Chunk_Specifier (N, Empty);
@@ -4787,16 +4803,15 @@ package body Sem_Ch5 is
             Set_Etype (Chunk_Arg, Standard_Positive);
 
             Outlined_Spec := Build_Parallel_Loop_Spec (Loc,
-              Low_Param     => Low_Param,
-              Hi_Param      => Hi_Param,
-              Chunk_Param   => Make_Temporary (Loc, 'P'),
-              Loop_Id_Param => Loop_Id_Param);
+              Spec_Id     => Spec_Id,
+              Low_Param   => Low_Param,
+              Hi_Param    => Hi_Param,
+              Chunk_Param => Make_Temporary (Loc, 'P'));
 
             --  Pass loop parameters to N so that they can be accessed
             --  during expansion.
             Set_Parallel_Low_Bound (N, Low_Param);
             Set_Parallel_Hi_Bound (N, Hi_Param);
-            Set_Parallel_Loop_Id (N, Loop_Id_Param);
 
             Outlined_Body := Make_Subprogram_Body (Loc,
               Specification => Outlined_Spec,
@@ -4817,6 +4832,12 @@ package body Sem_Ch5 is
 
             Rewrite (N, Parallel_Call);
             Analyze (N);
+
+            --  Insert exit actions case statement after the LWT call
+            if Present (Parallel_Exit_Actions (Spec_Id)) then
+               Insert_After_And_Analyze (N,
+                 Parallel_Exit_Actions (Spec_Id));
+            end if;
          end;
       elsif Present (Parallel_Declarations (N))
         and then not Is_Empty_List (Parallel_Declarations (N))
