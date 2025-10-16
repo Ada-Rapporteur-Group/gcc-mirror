@@ -11,14 +11,14 @@ package body LWT.Parallelism is
    begin
       Loop_Body (Low, High, 1, PID);
       if Mock_Check_Loop (PID) = ACTIVE then
-         Loop_Statuses.Replace (Next_PID, ENDED);
+         Loop_Statuses.Replace (PID, ENDED);
       end if;
    end Par_Range_Loop_With_Early_Exit;
 
    function Early_Exit (PID : Par_Loop_Id) return Boolean is
       pragma Assert (Loop_Statuses.Contains (PID));
    begin
-      Loop_Statuses.Replace (Next_PID, TERMINATED);
+      Loop_Statuses.Replace (PID, TERMINATED);
       return True;
    end Early_Exit;
 
