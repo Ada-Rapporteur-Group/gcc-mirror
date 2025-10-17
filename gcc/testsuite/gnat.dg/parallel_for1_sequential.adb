@@ -1,6 +1,7 @@
--- { dg-options "-gnat2022 -Werror" }
+-- { dg-do run }
+-- { dg-options "-gnat2022" }
 
-procedure parallel_for1 is
+procedure parallel_for1_sequential is
    subtype Chunk_Number is Natural range 1 .. 8;
 
    Ran_A : Boolean := False;
@@ -27,6 +28,6 @@ begin
    if not (Ran_A and then Ran_B and then Chunk_Lower = 2) then
       raise Program_Error;
    end if;
-end parallel_for1;
+end parallel_for1_sequential;
 
--- { dg-error "\"lwt\" library not found. Parallel loop will execute sequentially" "" { target *-*-* } 23 }
+-- { dg-warning "\"lwt\" library not found. Parallel loop will execute sequentially" "" { target *-*-* } 24 }
