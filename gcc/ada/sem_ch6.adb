@@ -3658,12 +3658,14 @@ package body Sem_Ch6 is
             for J in reverse 0 .. Scope_Stack.Last loop
                Scop := Scope_Stack.Table (J).Entity;
 
-               --  The current scope (Scop) is the target scope (Scope (S))
+               --  The current scope (Scop) is the target scope
+               --  (Scope (S))
                if Scope (S) = Scop then
                   return Inside_Outlined;
 
-               --  If the current scope is the outlined function scope (Scope_Id),
-               --  then we know we're exiting the outlined function scope
+               --  If the current scope is the outlined function scope
+               --  (Scope_Id), then we know we're exiting the outlined
+               --  function scope
                elsif Scop = Scope_Id then
                   Inside_Outlined := False;
                end if;
@@ -3671,7 +3673,7 @@ package body Sem_Ch6 is
 
             --  If we can't find the target scope above the outlined
             --  function scope, we can assume it was inside the outlined
-            --  function and was already popped off the scope stack. 
+            --  function and was already popped off the scope stack.
             return True;
          end Scope_Is_Inside_Parallel;
 
@@ -3725,7 +3727,7 @@ package body Sem_Ch6 is
                    and then Is_Parallel_Loop_Scope (Entity (Name (I))))
                then
                   Rewrite (I, Make_Early_Exit (
-                     Predicate => Copy_Separate_Tree (Condition (I))));
+                    Predicate => Condition (I)));
                   Analyze (I);
                   return Skip;
 
@@ -3735,7 +3737,10 @@ package body Sem_Ch6 is
                  and then not Scope_Is_Inside_Parallel (Entity (Name (I)))
                then
                   Rewrite (I, Make_Early_Exit (
-                    Post_Call_Action => Copy_Separate_Tree (I)));
+                    Predicate        => Condition (I),
+                    Post_Call_Action => Make_Exit_Statement (Loc,
+                      Name           => New_Occurrence_Of (Entity (Name (I)),
+                                          Loc))));
                   Analyze (I);
                   return Skip;
                end if;
