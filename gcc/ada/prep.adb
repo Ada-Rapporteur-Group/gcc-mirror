@@ -82,6 +82,7 @@ package body Prep is
       Tok_Others    => Name_Others,
       Tok_Out       => Name_Out,
       Tok_Package   => Name_Package,
+      Tok_Parallel  => Name_Parallel,
       Tok_Pragma    => Name_Pragma,
       Tok_Private   => Name_Private,
       Tok_Procedure => Name_Procedure,

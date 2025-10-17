@@ -1140,6 +1140,8 @@ package body VAST is
          when N_Abortable_Part
             | N_Abort_Statement
             | N_Asynchronous_Select
+            | N_Chunk_Specification_Int
+            | N_Chunk_Specification_Range
             | N_Compound_Statement
             | N_Conditional_Entry_Call
             | N_Continue_Statement
@@ -1156,6 +1158,8 @@ package body VAST is
             | N_Interpolated_String_Literal
             | N_Iterated_Element_Association
             | N_Mod_Clause
+            | N_Parallel_Block_Statement
+            | N_Parallel_Branch
             | N_Raise_When_Statement
             | N_Return_When_Statement
             | N_SCIL_Dispatching_Call
