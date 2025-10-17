@@ -44,6 +44,7 @@ with Namet;          use Namet;
 with Nlists;         use Nlists;
 with Nmake;          use Nmake;
 with Opt;            use Opt;
+with Rtsfind;        use Rtsfind;
 with Sem;            use Sem;
 with Sem_Aux;        use Sem_Aux;
 with Sem_Case;       use Sem_Case;
@@ -114,6 +115,26 @@ package body Sem_Ch5 is
    --  of finalization actions. This prevents memory leaks when the bounds
    --  contain calls to functions returning controlled arrays or when the
    --  domain of iteration is a container.
+
+   procedure Process_Bounds (R : Node_Id; N : Node_Id; Loc : Source_Ptr);
+   --  If the iteration is given by a range, create temporaries and
+   --  assignment statements block to capture the bounds and perform
+   --  required finalization actions in case a bound includes a function
+   --  call that uses the temporary stack. We first preanalyze a copy of
+   --  the range in order to determine the expected type, and analyze and
+   --  resolve the original bounds.
+
+   function Build_Parallel_Loop_Spec
+     (Loc : Source_Ptr; Spec_Id : Entity_Id;
+      Low_Param : Entity_Id; Hi_Param : Entity_Id;
+      Chunk_Param : Entity_Id) return Node_Id;
+   --  Build procedure specification for the parallel construct's
+   --  outlined procedure
+
+   function Build_Parallel_Call
+     (Loc : Source_Ptr; Low_Arg : Node_Id;
+      Hi_Arg : Node_Id; Chunk_Arg : Node_Id;
+      Outlined_Proc : Entity_Id) return Node_Id;
 
    ------------------------
    -- Analyze_Assignment --
@@ -1888,8 +1909,10 @@ package body Sem_Ch5 is
          Scope_Id := Scope_Stack.Table (J).Entity;
 
          if Label_Scope = Scope_Id
-           or else Ekind (Scope_Id) not in
+           or else (Ekind (Scope_Id) not in
                      E_Block | E_Loop | E_Return_Statement
+                    and then (Ekind (Scope_Id) /= E_Procedure
+                     or else not Is_Outlined_Parallel (Scope_Id)))
          then
             if Scope_Id /= Label_Scope then
                Error_Msg_N
@@ -2122,9 +2145,10 @@ package body Sem_Ch5 is
    ------------------------------
 
    procedure Analyze_Iteration_Scheme (N : Node_Id) is
-      Cond      : Node_Id;
-      Iter_Spec : Node_Id;
-      Loop_Spec : Node_Id;
+      Cond       : Node_Id;
+      Iter_Spec  : Node_Id;
+      Loop_Spec  : Node_Id;
+      Chunk_Spec : Node_Id;
 
    begin
       --  For an infinite loop, there is no iteration scheme
@@ -2133,9 +2157,23 @@ package body Sem_Ch5 is
          return;
       end if;
 
-      Cond      := Condition (N);
-      Iter_Spec := Iterator_Specification (N);
-      Loop_Spec := Loop_Parameter_Specification (N);
+      Cond       := Condition (N);
+      Iter_Spec  := Iterator_Specification (N);
+      Loop_Spec  := Loop_Parameter_Specification (N);
+      Chunk_Spec := Chunk_Specifier (N);
+
+      if Is_Parallel (N)
+        and then Present (Loop_Spec)
+        and then Reverse_Present (Loop_Spec)
+      then
+         Error_Msg_N
+           ("Parallel loops cannot use reverse " &
+            "in their loop parameter specification", N);
+      end if;
+
+      if Present (Chunk_Spec) then
+         Analyze_Chunk_Specifier (Chunk_Spec);
+      end if;
 
       if Present (Cond) then
          Analyze_And_Resolve (Cond, Any_Boolean);
@@ -2947,14 +2985,6 @@ package body Sem_Ch5 is
       --  forms. In this case it is not sufficient to check the static
       --  predicate function only, look for a dynamic predicate aspect as well.
 
-      procedure Process_Bounds (R : Node_Id);
-      --  If the iteration is given by a range, create temporaries and
-      --  assignment statements block to capture the bounds and perform
-      --  required finalization actions in case a bound includes a function
-      --  call that uses the temporary stack. We first preanalyze a copy of
-      --  the range in order to determine the expected type, and analyze and
-      --  resolve the original bounds.
-
       --------------------------------------
       -- Check_Controlled_Array_Attribute --
       --------------------------------------
@@ -3032,172 +3062,6 @@ package body Sem_Ch5 is
          end if;
       end Check_Predicate_Use;
 
-      --------------------
-      -- Process_Bounds --
-      --------------------
-
-      procedure Process_Bounds (R : Node_Id) is
-         Loc : constant Source_Ptr := Sloc (N);
-
-         function One_Bound
-           (Original_Bound : Node_Id;
-            Analyzed_Bound : Node_Id;
-            Typ            : Entity_Id) return Node_Id;
-         --  Capture value of bound and return captured value
-
-         ---------------
-         -- One_Bound --
-         ---------------
-
-         function One_Bound
-           (Original_Bound : Node_Id;
-            Analyzed_Bound : Node_Id;
-            Typ            : Entity_Id) return Node_Id
-         is
-            Assign : Node_Id;
-            Decl   : Node_Id;
-            Id     : Entity_Id;
-
-         begin
-            --  If the bound is a constant or an object, no need for a separate
-            --  declaration. If the bound is the result of previous expansion
-            --  it is already analyzed and should not be modified. Note that
-            --  the Bound will be resolved later, if needed, as part of the
-            --  call to Make_Index (literal bounds may need to be resolved to
-            --  type Integer).
-
-            if Analyzed (Original_Bound) then
-               return Original_Bound;
-
-            elsif Nkind (Analyzed_Bound) in
-                    N_Integer_Literal | N_Character_Literal
-              or else Is_Entity_Name (Analyzed_Bound)
-            then
-               Analyze_And_Resolve (Original_Bound, Typ);
-               return Original_Bound;
-
-            elsif Inside_Class_Condition_Preanalysis then
-               Analyze_And_Resolve (Original_Bound, Typ);
-               return Original_Bound;
-            end if;
-
-            --  Normally, the best approach is simply to generate a constant
-            --  declaration that captures the bound. However, there is a nasty
-            --  case where this is wrong. If the bound is complex, and has a
-            --  possible use of the secondary stack, we need to generate a
-            --  separate assignment statement to ensure the creation of a block
-            --  which will release the secondary stack.
-
-            --  We prefer the constant declaration, since it leaves us with a
-            --  proper trace of the value, useful in optimizations that get rid
-            --  of junk range checks.
-
-            if not Has_Sec_Stack_Call (Analyzed_Bound) then
-               Analyze_And_Resolve (Original_Bound, Typ);
-
-               --  Ensure that the bound is valid. This check should not be
-               --  generated when the range belongs to a quantified expression
-               --  as the construct is still not expanded into its final form.
-
-               if Nkind (Parent (R)) /= N_Loop_Parameter_Specification
-                 or else Nkind (Parent (Parent (R))) /= N_Quantified_Expression
-               then
-                  Ensure_Valid (Original_Bound);
-               end if;
-
-               Force_Evaluation (Original_Bound);
-               return Original_Bound;
-            end if;
-
-            Id := Make_Temporary (Loc, 'R', Original_Bound);
-
-            --  Here we make a declaration with a separate assignment
-            --  statement, and insert before loop header.
-
-            Decl :=
-              Make_Object_Declaration (Loc,
-                Defining_Identifier => Id,
-                Object_Definition   => New_Occurrence_Of (Typ, Loc));
-
-            Assign :=
-              Make_Assignment_Statement (Loc,
-                Name        => New_Occurrence_Of (Id, Loc),
-                Expression  => Relocate_Node (Original_Bound));
-
-            Insert_Actions (Loop_Nod, New_List (Decl, Assign));
-
-            --  Now that this temporary variable is initialized we decorate it
-            --  as safe-to-reevaluate to inform to the backend that no further
-            --  asignment will be issued and hence it can be handled as side
-            --  effect free. Note that this decoration must be done when the
-            --  assignment has been analyzed because otherwise it will be
-            --  rejected (see Analyze_Assignment).
-
-            Set_Is_Safe_To_Reevaluate (Id);
-
-            Rewrite (Original_Bound, New_Occurrence_Of (Id, Loc));
-
-            if Nkind (Assign) = N_Assignment_Statement then
-               return Expression (Assign);
-            else
-               return Original_Bound;
-            end if;
-         end One_Bound;
-
-         Hi     : constant Node_Id := High_Bound (R);
-         Lo     : constant Node_Id := Low_Bound  (R);
-         R_Copy : constant Node_Id := New_Copy_Tree (R);
-         New_Hi : Node_Id;
-         New_Lo : Node_Id;
-         Typ    : Entity_Id;
-
-      --  Start of processing for Process_Bounds
-
-      begin
-         Set_Parent (R_Copy, Parent (R));
-         Preanalyze_Range (R_Copy);
-         Typ := Etype (R_Copy);
-
-         --  If the type of the discrete range is Universal_Integer, then the
-         --  bound's type must be resolved to Integer, and any object used to
-         --  hold the bound must also have type Integer, unless the literal
-         --  bounds are constant-folded expressions with a user-defined type.
-
-         if Typ = Universal_Integer then
-            if Nkind (Lo) = N_Integer_Literal
-              and then Present (Etype (Lo))
-              and then Scope (Etype (Lo)) /= Standard_Standard
-            then
-               Typ := Etype (Lo);
-
-            elsif Nkind (Hi) = N_Integer_Literal
-              and then Present (Etype (Hi))
-              and then Scope (Etype (Hi)) /= Standard_Standard
-            then
-               Typ := Etype (Hi);
-
-            else
-               Typ := Standard_Integer;
-            end if;
-         end if;
-
-         Set_Etype (R, Typ);
-
-         New_Lo := One_Bound (Lo, Low_Bound  (R_Copy), Typ);
-         New_Hi := One_Bound (Hi, High_Bound (R_Copy), Typ);
-
-         --  Propagate staticness to loop range itself, in case the
-         --  corresponding subtype is static.
-
-         if New_Lo /= Lo and then Is_OK_Static_Expression (New_Lo) then
-            Rewrite (Low_Bound (R), New_Copy (New_Lo));
-         end if;
-
-         if New_Hi /= Hi and then Is_OK_Static_Expression (New_Hi) then
-            Rewrite (High_Bound (R), New_Copy (New_Hi));
-         end if;
-      end Process_Bounds;
-
       --  Local variables
 
       DS : constant Node_Id   := Discrete_Subtype_Definition (N);
@@ -3208,6 +3072,7 @@ package body Sem_Ch5 is
    --  Start of processing for Analyze_Loop_Parameter_Specification
 
    begin
+
       Mutate_Ekind (Id, E_Loop_Parameter);
       Enter_Name (Id);
 
@@ -3241,7 +3106,7 @@ package body Sem_Ch5 is
         and then Expander_Active
         and then Nkind (Parent (N)) /= N_Quantified_Expression
       then
-         Process_Bounds (DS);
+         Process_Bounds (DS, Loop_Nod, Sloc (N));
 
       --  Either the expander not active or the range of iteration is a subtype
       --  indication, an entity, or a function call that yields an aggregate or
@@ -3267,7 +3132,8 @@ package body Sem_Ch5 is
          --  an unchecked conversion when needed. The expression of the
          --  conversion is always an object.
 
-         if Nkind (DS_Copy) = N_Function_Call
+         if Nkind (N) /= N_Chunk_Specification_Range
+           and then (Nkind (DS_Copy) = N_Function_Call
 
            or else (Is_Entity_Name (DS_Copy)
                      and then not Is_Type (Entity (DS_Copy)))
@@ -3280,7 +3146,7 @@ package body Sem_Ch5 is
 
            or else Nkind (DS_Copy) = N_Unchecked_Type_Conversion
            or else (Nkind (DS_Copy) = N_Qualified_Expression
-                     and then Is_Iterator (Etype (DS_Copy)))
+                     and then Is_Iterator (Etype (DS_Copy))))
          then
             --  This is an iterator specification. Rewrite it as such and
             --  analyze it to capture function calls that may require
@@ -3454,19 +3320,31 @@ package body Sem_Ch5 is
                   --  non-null after all.
 
                   if Null_Range then
-                     Error_Msg_N
-                       ("??loop range is null, loop will not execute", DS);
+                     if Nkind (N) = N_Chunk_Specification_Range then
+                        Error_Msg_N
+                          ("??chunk specification range is null, " &
+                           "Program_Error will be raised at runtime", DS);
+                     else
+                        Error_Msg_N
+                          ("??loop range is null, loop will not execute", DS);
+                     end if;
 
                   --  Here is where the loop could execute because of
                   --  invalid values, so issue appropriate message.
 
                   else
-                     Error_Msg_N
-                       ("??loop range may be null, loop may not execute", DS);
-
-                     Error_Msg_N
-                       ("??can only execute if invalid values are present",
-                        DS);
+                     if Nkind (N) = N_Chunk_Specification_Range then
+                        Error_Msg_N
+                          ("??chunk specification range may be null," &
+                           " Program_Error could be raised at runtime", DS);
+                     else
+                        Error_Msg_N
+                          ("??loop range may be null, loop may" &
+                           " not execute", DS);
+                        Error_Msg_N
+                          ("??can only execute if invalid values are present",
+                           DS);
+                     end if;
                   end if;
                end if;
 
@@ -3489,7 +3367,8 @@ package body Sem_Ch5 is
                --  In practice, this is very likely to be a case of reversing
                --  the bounds incorrectly in the range.
 
-            elsif Reverse_Present (N)
+            elsif Nkind (N) /= N_Chunk_Specification_Range
+              and then Reverse_Present (N)
               and then Nkind (Original_Node (H)) = N_Integer_Literal
               and then
                 (Intval (Original_Node (H)) = Uint_0
@@ -3552,12 +3431,19 @@ package body Sem_Ch5 is
                   end if;
 
                   if Present (Bad_Bound) then
-                     Error_Msg_N
-                       ("suspicious loop bound out of range of "
-                        & "loop subtype??", Bad_Bound);
-                     Error_Msg_N
-                       ("\loop executes zero times or raises "
-                        & "Constraint_Error??", Bad_Bound);
+                     if Nkind (N) = N_Chunk_Specification_Range then
+                        Error_Msg_N
+                          ("Suspicious chunk_index range: out of range " &
+                           "of chunk_index subtype. ""Constraint_Error"" " &
+                           "will be raised at run-time.??", Bad_Bound);
+                     else
+                        Error_Msg_N
+                          ("suspicious loop bound out of range of "
+                           & "loop subtype??", Bad_Bound);
+                        Error_Msg_N
+                          ("\loop executes zero times or raises "
+                           & "Constraint_Error??", Bad_Bound);
+                     end if;
                   end if;
 
                   if Compile_Time_Compare (LLo, LHi, Assume_Valid => False)
@@ -3609,7 +3495,9 @@ package body Sem_Ch5 is
       --  Preanalyze the filter. Expansion will take place when enclosing
       --  loop is expanded.
 
-      if Present (Iterator_Filter (N)) then
+      if Nkind (N) /= N_Chunk_Specification_Range
+        and then Present (Iterator_Filter (N))
+      then
          Preanalyze_And_Resolve (Iterator_Filter (N), Standard_Boolean);
       end if;
    end Analyze_Loop_Parameter_Specification;
@@ -3634,6 +3522,14 @@ package body Sem_Ch5 is
         (Iter            : Node_Id;
          Stop_Processing : out Boolean)
       is
+         --  Local variables
+         Iter_Spec  : constant Node_Id := Iterator_Specification (Iter);
+         Param_Spec : constant Node_Id := Loop_Parameter_Specification (Iter);
+
+         Lwt_Availible : constant Boolean :=
+           Present (Iter) and then Is_Parallel (Iter)
+           and then RTE_Available (RE_Par_Range_Loop_With_Early_Exit);
+
          function Has_Sec_Stack_Default_Iterator
            (Cont_Typ : Entity_Id) return Boolean;
          pragma Inline (Has_Sec_Stack_Default_Iterator);
@@ -3653,6 +3549,11 @@ package body Sem_Ch5 is
          --  Determine whether arbitrary statement Stmt is the sole statement
          --  wrapped within some block, excluding pragmas.
 
+         function Range_Has_Sec_Stack (R : Node_Id) return Boolean;
+         pragma Inline (Range_Has_Sec_Stack);
+         --  Check if loop parameter/chunk specification has calls to secondary
+         --  stack
+
          procedure Prepare_Iterator_Loop
            (Iter_Spec       : Node_Id;
             Stop_Processing : out Boolean);
@@ -3668,6 +3569,22 @@ package body Sem_Ch5 is
          --  Prepare a discrete loop with parameter specification Param_Spec
          --  for transformation if needed.
          --  If Stop_Processing is set to True, should stop further processing.
+
+         procedure Prepare_Parallel_Chunk
+           (Stop_Processing : out Boolean);
+         pragma Inline (Prepare_Parallel_Chunk);
+         --  Check parallel chunk specifier for secondary stack usage.
+         --  If Stop_Processing is set to True, should stop further processing.
+
+         procedure Prepare_Outlined_Loop
+           (Stop_Processing : out Boolean);
+         pragma Inline (Prepare_Outlined_Loop);
+         --  Wrap parallel loop inside outlined procedure
+         --  If Stop_Processing is set to True, should stop further processing.
+
+         procedure Outline_Loop;
+         pragma Inline (Outline_Loop);
+         --  Wrap parallel loop inside an outlined procedure
 
          procedure Wrap_Loop_Statement (Manage_Sec_Stack : Boolean);
          pragma Inline (Wrap_Loop_Statement);
@@ -3837,37 +3754,23 @@ package body Sem_Ch5 is
             end if;
          end Prepare_Iterator_Loop;
 
-         -----------------------------
-         -- Prepare_Param_Spec_Loop --
-         -----------------------------
+         -------------------------
+         -- Range_Has_Sec_Stack --
+         -------------------------
 
-         procedure Prepare_Param_Spec_Loop
-           (Param_Spec      : Node_Id;
-            Stop_Processing : out Boolean)
-         is
-            High     : Node_Id;
-            Low      : Node_Id;
-            Rng      : Node_Id;
-            Rng_Copy : Node_Id;
-            Rng_Typ  : Entity_Id;
+         function Range_Has_Sec_Stack (R : Node_Id) return Boolean is
+            Rng, Rng_Copy, Low, High : Node_Id;
+            Rng_Typ : Entity_Id;
 
          begin
-            Stop_Processing := False;
-            Rng := Discrete_Subtype_Definition (Param_Spec);
-
-            --  Nothing to do when the loop is already wrapped in a block
-
-            if Is_Wrapped_In_Block (N) then
-               null;
-
             --  The parameter specification appears in the form
             --
             --    for Def_Id in Subtype_Mark Constraint loop
 
-            elsif Nkind (Rng) = N_Subtype_Indication
-              and then Nkind (Range_Expression (Constraint (Rng))) = N_Range
+            if Nkind (R) = N_Subtype_Indication
+              and then Nkind (Range_Expression (Constraint (R))) = N_Range
             then
-               Rng := Range_Expression (Constraint (Rng));
+               Rng := Range_Expression (Constraint (R));
 
                --  Preanalyze the bounds of the range constraint, setting
                --  parent fields to associate the copied bounds with the range,
@@ -3886,11 +3789,8 @@ package body Sem_Ch5 is
                --  on the secondary stack. Note that the loop must be wrapped
                --  only when such a call exists.
 
-               if Has_Sec_Stack_Call (Low) or else Has_Sec_Stack_Call (High)
-               then
-                  Wrap_Loop_Statement (Manage_Sec_Stack => True);
-                  Stop_Processing := True;
-               end if;
+               return Has_Sec_Stack_Call (Low)
+                 or else Has_Sec_Stack_Call (High);
 
             --  Otherwise the parameter specification appears in the form
             --
@@ -3901,8 +3801,8 @@ package body Sem_Ch5 is
                --  copy is semi inserted into the tree by setting its Parent
                --  pointer.
 
-               Rng_Copy := New_Copy_Tree (Rng);
-               Set_Parent (Rng_Copy, Parent (Rng));
+               Rng_Copy := New_Copy_Tree (R);
+               Set_Parent (Rng_Copy, Parent (R));
 
                --  Determine what the loop is iterating on
 
@@ -3918,14 +3818,361 @@ package body Sem_Ch5 is
                --    * contains a function call that returns on the secondary
                --      stack.
 
-               if Is_Iterator (Rng_Typ)
-                 or else Has_Sec_Stack_Call (Rng_Copy)
+               return Is_Iterator (Rng_Typ)
+                 or else Has_Sec_Stack_Call (Rng_Copy);
+            end if;
+         end Range_Has_Sec_Stack;
+
+         -----------------------------
+         -- Prepare_Param_Spec_Loop --
+         -----------------------------
+
+         procedure Prepare_Param_Spec_Loop
+           (Param_Spec      : Node_Id;
+            Stop_Processing : out Boolean)
+         is
+            Rng : Node_Id;
+
+         begin
+            Stop_Processing := False;
+            Rng := Discrete_Subtype_Definition (Param_Spec);
+
+            --  Nothing to do when the loop is already wrapped in a block
+
+            if Is_Wrapped_In_Block (N) then
+               null;
+
+            --  Wrap the loop in a block if either the loop parameter
+            --  or the chunk specification use the secondary stack
+
+            elsif Range_Has_Sec_Stack (Rng) then
+               Wrap_Loop_Statement (Manage_Sec_Stack => True);
+               Stop_Processing := True;
+            end if;
+         end Prepare_Param_Spec_Loop;
+
+         ------------------
+         -- Outline_Loop --
+         ------------------
+
+         procedure Outline_Loop is
+            Loc        : constant Source_Ptr := Sloc (N);
+            Decls      : constant List_Id    := Parallel_Declarations (N);
+            Chunk_Spec : constant Node_Id    := Chunk_Specifier (Iter);
+            Loop_Id    : constant Entity_Id  := Entity (Identifier (N));
+
+            Outlined_Body, Outlined_Spec, Chunk_Arg,
+              Parallel_Call : Node_Id;
+            Spec_Id      : constant Entity_Id := Make_Temporary (Loc, 'P');
+            Low_Param    : constant Entity_Id := Make_Temporary (Loc, 'P');
+            Hi_Param     : constant Entity_Id := Make_Temporary (Loc, 'P');
+            Chunk_Param  : constant Entity_Id := Make_Temporary (Loc, 'P');
+            Long_Int_Typ : constant Entity_Id := RTE (RE_Longest_Integer);
+
+            procedure Read_Bounds
+              (DS : Node_Id; Lo : out Node_Id; Hi : out Node_Id);
+            --  Reads range or subtype indication's lower and upper bounds
+
+            function Create_Bound_Arg (Arg : Node_Id) return Node_Id;
+            --  Creates a lower or upper bound argument for the LWT call
+
+            procedure Prepare_Loop_Param
+              (P : Node_Id; Lo : out Node_Id;
+               Hi : out Node_Id; Typ : out Entity_Id);
+            --  Prepares loop parameter P by moving any calls into the
+            --  enclosing block. Low and high values are written to Lo
+            --  and Hi respectively, and Typ is set to the loop parameter
+            --  type.
+
+            -----------------
+            -- Read_Bounds --
+            -----------------
+
+            procedure Read_Bounds
+              (DS : Node_Id; Lo : out Node_Id; Hi : out Node_Id)
+            is
+            begin
+               if Nkind (DS) = N_Subtype_Indication
+                  and then Present (Constraint (DS))
+                  and then Nkind (Constraint (DS)) = N_Range_Constraint
                then
-                  Wrap_Loop_Statement (Manage_Sec_Stack => True);
+                  Lo := Low_Bound (Range_Expression (Constraint (DS)));
+                  Hi := High_Bound (Range_Expression (Constraint (DS)));
+               else
+                  Lo := Low_Bound (DS);
+                  Hi := High_Bound (DS);
+               end if;
+            end Read_Bounds;
+
+            ----------------------
+            -- Create_Bound_Arg --
+            ----------------------
+
+            function Create_Bound_Arg (Arg : Node_Id)
+              return Node_Id
+            is
+               To_Pos, To_Long_Int : Node_Id;
+            begin
+               --  Creates the expression
+               --    Longest_Integer'Value (Range_Typ'Pos (Arg))
+               To_Pos := Make_Attribute_Reference (Loc,
+                 Prefix => New_Occurrence_Of (Etype (Arg), Loc),
+                 Attribute_Name => Name_Pos,
+                 Expressions => New_List (Copy_Separate_Tree (Arg)));
+               To_Long_Int := Make_Attribute_Reference (Loc,
+                 Prefix => New_Occurrence_Of (Long_Int_Typ, Loc),
+                 Attribute_Name => Name_Val,
+                 Expressions => New_List (To_Pos));
+               return To_Long_Int;
+            end Create_Bound_Arg;
+
+            ------------------------
+            -- Prepare_Loop_Param --
+            ------------------------
+
+            procedure Prepare_Loop_Param
+              (P : Node_Id; Lo : out Node_Id;
+               Hi : out Node_Id; Typ : out Entity_Id)
+            is
+               DS     : constant Node_Id := Discrete_Subtype_Definition (P);
+               R_Copy : constant Node_Id := New_Copy_Tree (DS);
+            begin
+               Set_Parent (R_Copy, Parent (DS));
+               Preanalyze_Range (R_Copy);
+               Typ := Etype (R_Copy);
+
+               if Nkind (DS) = N_Range
+                 and then Expander_Active
+               then
+                  Process_Bounds (DS, N, Sloc (P));
+                  Read_Bounds (DS, Lo, Hi);
+               else
+                  Read_Bounds (R_Copy, Lo, Hi);
+               end if;
+            end Prepare_Loop_Param;
+
+         begin
+            --  Relocates the parallel loop inside an outlined procedure and
+            --  adds a call to LWT in its place.
+
+            --  Transforms
+
+            --     parallel (CHUNK) for I in Low .. Hi loop
+            --        ...
+            --     end loop;
+
+            --  into
+
+            --     procedure Proc_Name (Low_Arg : Longest_Integer;
+            --       Hi_Arg : Longest_Integer; Chunk : Positive;
+            --       Loop_Id : Par_Loop_Id)
+            --     is
+            --        parallel (CHUNK)
+            --           for I in Low_Arg .. Hi_Arg loop
+            --              ...
+            --           end loop;
+            --     end Proc_Name;
+
+            --     Par_Range_Loop_With_Early_Exit (
+            --       Low => Low, High => Hi,
+            --       Num_Chunks => CHUNK_EXPR,
+            --       Loop_Body => Proc_Name'Access);
+
+            Set_Parallel_Declarations (N, No_List);
+            Set_In_Outlined_Parallel (N);
+
+            if Present (Chunk_Spec) then
+               if Nkind (Chunk_Spec) = N_Chunk_Specification_Int then
+                  --  Set CHUNK_EXPR to the chunk specification's integer
+                  --  expression
+                  Analyze_Chunk_Specifier (Chunk_Spec);
+                  Chunk_Arg := Relocate_Node (Expression (Chunk_Spec));
+               else
+                  --  Process chunk specification range
+
+                  --  Transforms
+
+                  --     parallel (Chunk in Chunk_Low_Expr .. Chunk_Hi_Expr)
+                  --        for ... loop
+                  --           ...
+                  --        end loop;
+
+                  --  into
+
+                  --     Lo : Chunk_Type := Chunk_Low_Expr;
+                  --     Hi : Chunk_Type := Chunk_Hi_Expr;
+                  --     parallel (Chunk in Lo .. Hi)
+                  --        for ... loop
+                  --           ...
+                  --        end loop;
+                  --    ...
+
+                  --   These values are later used in the parallel call:
+
+                  --    Par_Range_Loop_With_Early_Exit (
+                  --      Num_Chunks => Chunk_Type'Pos (Hi) -
+                  --                      Chunk_Type'Pos (Lo) + 1
+                  --      ...);
+
+                  declare
+                     Low, Hi, Diff : Node_Id;
+                     Typ : Entity_Id;
+                  begin
+                     --  Move chunk specification values with side effects
+                     --  outside of loop before we wrap it in a procedure
+                     Prepare_Loop_Param (Chunk_Spec, Low, Hi, Typ);
+
+                     --  Chunk_Type'Pos (Hi) - Chunk_Type'Pos (Lo)
+                     Diff := Make_Op_Subtract (Loc,
+                       Left_Opnd => Make_Attribute_Reference (Loc,
+                         Prefix => New_Occurrence_Of (Typ, Loc),
+                         Attribute_Name => Name_Pos,
+                         Expressions => New_List
+                           (Copy_Separate_Tree (Hi))),
+                       Right_Opnd => Make_Attribute_Reference (Loc,
+                         Prefix => New_Occurrence_Of (Typ, Loc),
+                         Attribute_Name => Name_Pos,
+                         Expressions => New_List
+                           (Copy_Separate_Tree (Low))));
+
+                     --  Chunk_Type'Pos (Hi) - Chunk_Type'Pos (Lo) + 1
+                     Chunk_Arg := Make_Op_Add (Loc,
+                       Left_Opnd => Diff,
+                       Right_Opnd => Make_Integer_Literal (Loc, 1));
+                  end;
+               end if;
+            else
+               Chunk_Arg := Make_Integer_Literal (Loc, 0);
+            end if;
+            Set_Etype (Chunk_Arg, Standard_Positive);
+
+            Outlined_Spec := Build_Parallel_Loop_Spec (Loc,
+              Spec_Id       => Spec_Id,
+              Low_Param     => Low_Param,
+              Hi_Param      => Hi_Param,
+              Chunk_Param   => Chunk_Param);
+            Set_Parallel_Chunk_Id (N, Chunk_Param);
+
+            Outlined_Body := Make_Subprogram_Body (Loc,
+              Specification => Outlined_Spec,
+              Declarations => Decls,
+              Handled_Statement_Sequence =>
+                Make_Handled_Sequence_Of_Statements (Loc,
+                  Statements => New_List (Relocate_Node (N))));
+
+            declare
+               Low, Hi, New_DS : Node_Id;
+               Typ : Entity_Id;
+            begin
+               --  Move loop parameter values with side effects
+               --  outside of loop before we wrap it in a procedure
+               Prepare_Loop_Param
+                 (Loop_Parameter_Specification (Iter),
+                   Low, Hi, Typ);
+
+               Parallel_Call := Build_Parallel_Call (Loc,
+                 Low_Arg => Create_Bound_Arg (Low),
+                 Hi_Arg => Create_Bound_Arg (Hi),
+                 Chunk_Arg => Chunk_Arg,
+                 Outlined_Proc => New_Occurrence_Of (Spec_Id, Loc));
+
+               --  Rewrite loop range as Low_Param .. High_Param
+               New_DS := Make_Range (Loc,
+                 Low_Bound => Make_Attribute_Reference (Loc,
+                 Prefix => New_Occurrence_Of (Etype (Low), Loc),
+                   Attribute_Name => Name_Val,
+                   Expressions => New_List
+                     (New_Occurrence_Of (Low_Param, Loc))),
+                 High_Bound => Make_Attribute_Reference (Loc,
+                   Prefix => New_Occurrence_Of (Etype (Hi), Loc),
+                   Attribute_Name => Name_Val,
+                   Expressions => New_List
+                     (New_Occurrence_Of (Hi_Param, Loc))));
+
+               Set_Discrete_Subtype_Definition
+                 (Loop_Parameter_Specification (Iter), New_DS);
+            end;
+
+            Insert_Before_And_Analyze (N, Outlined_Body);
+
+            Rewrite (N, Parallel_Call);
+            Analyze (N);
+
+            if Present (Parallel_Exit_Actions (Spec_Id)) then
+               Insert_After_And_Analyze (N,
+                 Parallel_Exit_Actions (Spec_Id));
+            end if;
+
+            Remove_Entity (Loop_Id);
+            Append_Entity (Loop_Id, Spec_Id);
+         end Outline_Loop;
+
+         ----------------------------
+         -- Prepare_Parallel_Chunk --
+         ----------------------------
+
+         procedure Prepare_Parallel_Chunk (Stop_Processing : out Boolean) is
+            Chunk_Spec : constant Node_Id := Chunk_Specifier (Iter);
+
+         begin
+            Stop_Processing := False;
+
+            --  Nothing to do; either already in block or already in
+            --  parallel procedure
+
+            if Is_Wrapped_In_Block (N)
+              or else In_Outlined_Parallel (N)
+            then
+               null;
+
+            --  Wrap loop in block if the parallel chunk specification
+            --  uses the secondary stack
+
+            elsif Present (Chunk_Spec)
+              and then Nkind (Chunk_Spec) = N_Chunk_Specification_Range
+              and then Range_Has_Sec_Stack
+                         (Discrete_Subtype_Definition (Chunk_Spec))
+            then
+               Wrap_Loop_Statement (Manage_Sec_Stack => True);
+               Stop_Processing := True;
+            end if;
+         end Prepare_Parallel_Chunk;
+
+         ---------------------------
+         -- Prepare_Outlined_Loop --
+         ---------------------------
+
+         procedure Prepare_Outlined_Loop (Stop_Processing : out Boolean) is
+         begin
+            Stop_Processing := False;
+
+            if Present (Iter_Spec) then
+               Error_Msg_N ("Parallel iteration over " &
+                 "containers not yet supported", N);
+
+            elsif In_Outlined_Parallel (N) then
+               null;
+
+            elsif Lwt_Availible then
+               Outline_Loop;
+               Stop_Processing := True;
+
+            else
+               Error_Msg_N ("LWT library not found. Parallel loop " &
+                 "will execute sequentially??", N);
+
+               --  For sequential expansion, wrap the loop in a block if
+               --  it hasn't been wrapped already. The declarations we've
+               --  collected need to be moved somewhere.
+
+               if Present (Parallel_Declarations (N))
+                 and then not Is_Empty_List (Parallel_Declarations (N))
+               then
+                  Wrap_Loop_Statement (Manage_Sec_Stack => False);
                   Stop_Processing := True;
                end if;
             end if;
-         end Prepare_Param_Spec_Loop;
+         end Prepare_Outlined_Loop;
 
          -------------------------
          -- Wrap_Loop_Statement --
@@ -3936,12 +4183,26 @@ package body Sem_Ch5 is
 
             Blk     : Node_Id;
             Blk_Id  : Entity_Id;
+            Blk_Dcl : List_Id            := Empty_List;
+            P_Decls : constant List_Id   := Parallel_Declarations (N);
             Loop_Id : constant Entity_Id := Entity (Identifier (N));
 
          begin
+            --  If we have any collected parallel declarations and we know
+            --  we aren't going to create an outlined procedure, then add
+            --  the collected decls to the wrapper block.
+
+            if Present (P_Decls)
+              and then not Is_Empty_List (P_Decls)
+              and then not Lwt_Availible
+            then
+               Blk_Dcl := P_Decls;
+               Set_Parallel_Declarations (N, No_List);
+            end if;
+
             Blk :=
               Make_Block_Statement (Loc,
-                Declarations               => New_List,
+                Declarations               => Blk_Dcl,
                 Handled_Statement_Sequence =>
                   Make_Handled_Sequence_Of_Statements (Loc,
                     Statements => New_List (Relocate_Node (N))));
@@ -3958,14 +4219,6 @@ package body Sem_Ch5 is
             Remove_Entity (Loop_Id);
             Append_Entity (Loop_Id, Blk_Id);
          end Wrap_Loop_Statement;
-
-         --  Local variables
-
-         Iter_Spec  : constant Node_Id := Iterator_Specification (Iter);
-         Param_Spec : constant Node_Id := Loop_Parameter_Specification (Iter);
-
-      --  Start of processing for Prepare_Loop_Statement
-
       begin
          Stop_Processing := False;
 
@@ -3974,6 +4227,18 @@ package body Sem_Ch5 is
 
          elsif Present (Param_Spec) then
             Prepare_Param_Spec_Loop (Param_Spec, Stop_Processing);
+         end if;
+
+         --  Process parallel loops
+
+         if not Stop_Processing and then Is_Parallel (Iter) then
+            --  Preanalyze parallel chunk specification
+            Prepare_Parallel_Chunk (Stop_Processing);
+
+            --  Outline parallel loop
+            if not Stop_Processing then
+               Prepare_Outlined_Loop (Stop_Processing);
+            end if;
          end if;
       end Prepare_Loop_Statement;
 
@@ -4111,6 +4376,10 @@ package body Sem_Ch5 is
       Kill_Current_Values;
       Push_Scope (Ent);
       Analyze_Iteration_Scheme (Iter);
+
+      if Is_Parallel (Iter) then
+         Set_Is_Parallel_Loop_Scope (Ent);
+      end if;
 
       --  Check for following case which merits a warning if the type of E is
       --  a multi-dimensional array (and no explicit subscript ranges present).
@@ -4314,11 +4583,14 @@ package body Sem_Ch5 is
          Kind := Ekind (Scope_Id);
 
          if Kind = E_Loop and then (No (Target) or else Scope_Id = U_Name) then
+            Set_Exits_From (N, Scope_Id);
             exit;
 
          elsif Kind = E_Block
            or else Kind = E_Loop
            or else Kind = E_Return_Statement
+           or else (Kind = E_Procedure
+                    and then Is_Outlined_Parallel (Scope_Id))
          then
             null;
 
@@ -4388,6 +4660,251 @@ package body Sem_Ch5 is
    begin
       null;
    end Analyze_Null_Statement;
+
+   -----------------------------
+   -- Analyze_Chunk_Specifier --
+   -----------------------------
+
+   procedure Analyze_Chunk_Specifier (N : Node_Id) is
+      pragma Assert (Nkind (N) in N_Chunk_Specification_Range |
+        N_Chunk_Specification_Int);
+   begin
+      case Nkind (N) is
+         when N_Chunk_Specification_Range =>
+            --  Analyze range chunk specification
+            Analyze_Loop_Parameter_Specification (N);
+
+         when N_Chunk_Specification_Int =>
+            --  Resolve chunk specification as integer expression
+            declare
+               Expr : constant Node_Id := Expression (N);
+            begin
+               Analyze_And_Resolve (Expr, Any_Integer);
+               Check_Unset_Reference (Expr);
+
+               if Compile_Time_Known_Value (Expr)
+                 and then Expr_Value (Expr) <= 0
+               then
+                  Error_Msg_N ("??maximum number of chunks must be" &
+                    " greater than zero", N);
+               end if;
+            end;
+
+         when others =>
+            pragma Assert (False);
+      end case;
+   end Analyze_Chunk_Specifier;
+
+   ------------------------------
+   -- Build_Parallel_Loop_Spec --
+   ------------------------------
+
+   function Build_Parallel_Loop_Spec
+     (Loc : Source_Ptr; Spec_Id : Entity_Id;
+      Low_Param : Entity_Id; Hi_Param : Entity_Id;
+      Chunk_Param : Entity_Id) return Node_Id
+   is
+      Long_Int_Typ  : constant Entity_Id := RTE (RE_Longest_Integer);
+      Loop_Id_Typ   : constant Entity_Id := RTE (RE_Par_Loop_Id);
+      Loop_Id_Param : constant Entity_Id := Make_Temporary (Loc, 'P');
+   begin
+      --  Builds out the following procedure specification:
+
+      --     procedure Proc_Name (Low : Longest_Integer;
+      --       Hi : Longest_Integer; Chunk : Positive;
+      --       Loop_Id : Par_Loop_Id);
+
+      Mutate_Ekind (Spec_Id, E_Procedure);
+      Set_Is_Outlined_Parallel (Spec_Id);
+      Set_Parallel_Loop_Id_Param (Spec_Id, Loop_Id_Param);
+
+      return Make_Procedure_Specification (Loc,
+        Defining_Unit_Name       => Spec_Id,
+        Parameter_Specifications => New_List (
+          Make_Parameter_Specification (Loc,
+            Defining_Identifier  => Low_Param,
+            Parameter_Type       =>
+              New_Occurrence_Of (Long_Int_Typ, Loc)),
+          Make_Parameter_Specification (Loc,
+            Defining_Identifier  => Hi_Param,
+            Parameter_Type       =>
+              New_Occurrence_Of (Long_Int_Typ, Loc)),
+          Make_Parameter_Specification (Loc,
+            Defining_Identifier  => Chunk_Param,
+            Parameter_Type       =>
+              New_Occurrence_Of (Standard_Positive, Loc)),
+          Make_Parameter_Specification (Loc,
+            Defining_Identifier  => Loop_Id_Param,
+            Parameter_Type       =>
+              New_Occurrence_Of (Loop_Id_Typ, Loc))));
+   end Build_Parallel_Loop_Spec;
+
+   -------------------------
+   -- Build_Parallel_Call --
+   -------------------------
+
+   function Build_Parallel_Call
+     (Loc : Source_Ptr; Low_Arg : Node_Id;
+      Hi_Arg : Node_Id; Chunk_Arg : Node_Id;
+      Outlined_Proc : Entity_Id) return Node_Id
+   is
+      Par_Range : constant Entity_Id := RTE
+        (RE_Par_Range_Loop_With_Early_Exit);
+   begin
+
+      --  Builds the following call:
+
+      --     Par_Range_Loop_With_Early_Exit (
+      --       Low_Arg, Hi_Arg, Chunk_Arg, null,
+      --       Outlined_Proc'Access)
+
+      return Make_Procedure_Call_Statement (Loc,
+        Name => New_Occurrence_Of (Par_Range, Loc),
+        Parameter_Associations => New_List
+          (Low_Arg, Hi_Arg, Chunk_Arg, Make_Null (Loc),
+            Make_Attribute_Reference (Loc,
+              Prefix => Outlined_Proc,
+              Attribute_Name => Name_Access)));
+   end Build_Parallel_Call;
+
+   --------------------------------------
+   -- Analyze_Parallel_Block_Statement --
+   --------------------------------------
+
+   procedure Analyze_Parallel_Block_Statement (N : Node_Id) is
+      Chunk_Spec  : constant Node_Id    := Chunk_Specifier (N);
+      Loc         : constant Source_Ptr := Sloc (N);
+      Branch_Node : Node_Id             := First (Parallel_Branches (N));
+   begin
+      if Present (Chunk_Spec) then
+         Analyze_Chunk_Specifier (Chunk_Spec);
+      end if;
+
+      if not In_Outlined_Parallel (N)
+        and then RTE_Available (RE_Par_Range_Loop_With_Early_Exit)
+      then
+         --  Wrap the parallel block inside an outlined procedure
+
+         --  Transforms
+
+         --     parallel (Chunk_Expr) do
+         --        ...
+         --     and
+         --        ...
+         --     end do;
+
+         --  into
+
+         --     procedure Proc_Name (Low : Longest_Integer;
+         --       Hi : Longest_Integer; Chunk : Positive;
+         --       Loop_Id : Par_Loop_Id)
+         --     is
+         --        parallel do
+         --           ...
+         --        and
+         --           ...
+         --        end do;
+         --     end Proc_Name;
+
+         --     Par_Range_Loop_With_Early_Exit (
+         --       Low => 1, High => NUM_BRANCHES_LITERAL,
+         --       Num_Chunks => Chunk_Expr,
+         --       Loop_Body => Proc_Name'Access);
+
+         declare
+            Outlined_Body, Outlined_Spec, Chunk_Arg,
+              Parallel_Call : Node_Id;
+            Branch_Count  : constant Nat       := List_Length
+                                                    (Parallel_Branches (N));
+            Old_Decls     : constant List_Id   := Parallel_Declarations (N);
+            Spec_Id       : constant Entity_Id := Make_Temporary (Loc, 'P');
+            Low_Param     : constant Entity_Id := Make_Temporary (Loc, 'P');
+            Hi_Param      : constant Entity_Id := Make_Temporary (Loc, 'P');
+         begin
+            Set_Parallel_Declarations (N, No_List);
+            Set_Chunk_Specifier (N, Empty);
+            Set_In_Outlined_Parallel (N);
+
+            if Present (Chunk_Spec) then
+               Chunk_Arg := Relocate_Node (Expression (Chunk_Spec));
+            else
+               Chunk_Arg := Make_Integer_Literal (Loc, 0);
+            end if;
+            Set_Etype (Chunk_Arg, Standard_Positive);
+
+            Outlined_Spec := Build_Parallel_Loop_Spec (Loc,
+              Spec_Id     => Spec_Id,
+              Low_Param   => Low_Param,
+              Hi_Param    => Hi_Param,
+              Chunk_Param => Make_Temporary (Loc, 'P'));
+
+            --  Pass loop parameters to N so that they can be accessed
+            --  during expansion.
+            Set_Parallel_Low_Bound (N, Low_Param);
+            Set_Parallel_Hi_Bound (N, Hi_Param);
+
+            Outlined_Body := Make_Subprogram_Body (Loc,
+              Specification => Outlined_Spec,
+              Declarations => Old_Decls,
+              Handled_Statement_Sequence =>
+                Make_Handled_Sequence_Of_Statements (Loc,
+                  Statements => New_List (Relocate_Node (N))));
+            Insert_Before_And_Analyze (N, Outlined_Body);
+
+            --  Build a call to Par_Range_Loop_With_Early_Exit that
+            --  iterates over 1 .. NUM_BRANCHES
+            Parallel_Call := Build_Parallel_Call (Loc,
+              Low_Arg => Make_Integer_Literal (Loc, 1),
+              Hi_Arg => Make_Integer_Literal (Loc, Branch_Count),
+              Chunk_Arg => Chunk_Arg,
+              Outlined_Proc => New_Occurrence_Of
+                (Defining_Unit_Name (Outlined_Spec), Loc));
+
+            Rewrite (N, Parallel_Call);
+            Analyze (N);
+
+            --  Insert exit actions case statement after the LWT call
+            if Present (Parallel_Exit_Actions (Spec_Id)) then
+               Insert_After_And_Analyze (N,
+                 Parallel_Exit_Actions (Spec_Id));
+            end if;
+         end;
+      elsif Present (Parallel_Declarations (N))
+        and then not Is_Empty_List (Parallel_Declarations (N))
+      then
+         pragma Assert (not In_Outlined_Parallel (N));
+
+         --  If we're here, that means we're using the sequential fallback.
+         --  Move the parallel block and its associated declarations inside
+         --  an enclosing block statement.
+
+         declare
+            New_Block : Node_Id;
+            Old_Decls : constant List_Id := Parallel_Declarations (N);
+         begin
+            Set_Parallel_Declarations (N, No_List);
+            New_Block := Make_Block_Statement (Loc,
+              Declarations => Old_Decls,
+              Handled_Statement_Sequence =>
+                Make_Handled_Sequence_Of_Statements (Loc,
+                  Statements => New_List (Relocate_Node (N))));
+            Rewrite (N, New_Block);
+            Analyze (N);
+         end;
+      else
+         --  Analyze statements in current scope
+         while Present (Branch_Node) loop
+            Analyze_Statements (Statements (Branch_Node));
+            Next (Branch_Node);
+         end loop;
+
+         --  Warn the user if sequential expansion is used
+         if not In_Outlined_Parallel (N) then
+            Error_Msg_N ("LWT library not found. Parallel block " &
+              "will execute sequentially??", N);
+         end if;
+      end if;
+   end Analyze_Parallel_Block_Statement;
 
    -------------------------
    -- Analyze_Target_Name --
@@ -4922,5 +5439,169 @@ package body Sem_Ch5 is
       Expander_Mode_Restore;
       Full_Analysis := Save_Analysis;
    end Preanalyze_Range;
+
+   --------------------
+   -- Process_Bounds --
+   --------------------
+
+   procedure Process_Bounds (R : Node_Id; N : Node_Id; Loc : Source_Ptr) is
+      function One_Bound
+        (Original_Bound : Node_Id;
+         Analyzed_Bound : Node_Id;
+         Typ            : Entity_Id) return Node_Id;
+      --  Capture value of bound and return captured value
+
+      ---------------
+      -- One_Bound --
+      ---------------
+
+      function One_Bound
+        (Original_Bound : Node_Id;
+         Analyzed_Bound : Node_Id;
+         Typ            : Entity_Id) return Node_Id
+      is
+         Assign : Node_Id;
+         Decl   : Node_Id;
+         Id     : Entity_Id;
+
+      begin
+         --  If the bound is a constant or an object, no need for a separate
+         --  declaration. If the bound is the result of previous expansion
+         --  it is already analyzed and should not be modified. Note that
+         --  the Bound will be resolved later, if needed, as part of the
+         --  call to Make_Index (literal bounds may need to be resolved to
+         --  type Integer).
+
+         if Analyzed (Original_Bound) then
+            return Original_Bound;
+
+         elsif Nkind (Analyzed_Bound) in
+             N_Integer_Literal | N_Character_Literal
+           or else Is_Entity_Name (Analyzed_Bound)
+         then
+            Analyze_And_Resolve (Original_Bound, Typ);
+            return Original_Bound;
+
+         elsif Inside_Class_Condition_Preanalysis then
+            Analyze_And_Resolve (Original_Bound, Typ);
+            return Original_Bound;
+         end if;
+
+         --  Normally, the best approach is simply to generate a constant
+         --  declaration that captures the bound. However, there is a nasty
+         --  case where this is wrong. If the bound is complex, and has a
+         --  possible use of the secondary stack, we need to generate a
+         --  separate assignment statement to ensure the creation of a block
+         --  which will release the secondary stack.
+
+         --  We prefer the constant declaration, since it leaves us with a
+         --  proper trace of the value, useful in optimizations that get rid
+         --  of junk range checks.
+
+         if not Has_Sec_Stack_Call (Analyzed_Bound) then
+            Analyze_And_Resolve (Original_Bound, Typ);
+
+            --  Ensure that the bound is valid. This check should not be
+            --  generated when the range belongs to a quantified expression
+            --  as the construct is still not expanded into its final form.
+
+            if Nkind (Parent (R)) /= N_Loop_Parameter_Specification
+              or else Nkind (Parent (Parent (R))) /= N_Quantified_Expression
+            then
+               Ensure_Valid (Original_Bound);
+            end if;
+
+            Force_Evaluation (Original_Bound);
+            return Original_Bound;
+         end if;
+
+         Id := Make_Temporary (Loc, 'R', Original_Bound);
+
+         --  Here we make a declaration with a separate assignment
+         --  statement, and insert before loop header.
+
+         Decl :=
+           Make_Object_Declaration (Loc,
+             Defining_Identifier => Id,
+             Object_Definition   => New_Occurrence_Of (Typ, Loc));
+
+         Assign :=
+           Make_Assignment_Statement (Loc,
+             Name        => New_Occurrence_Of (Id, Loc),
+             Expression  => Relocate_Node (Original_Bound));
+
+         Insert_Actions (N, New_List (Decl, Assign));
+
+         --  Now that this temporary variable is initialized we decorate it
+         --  as safe-to-reevaluate to inform to the backend that no further
+         --  asignment will be issued and hence it can be handled as side
+         --  effect free. Note that this decoration must be done when the
+         --  assignment has been analyzed because otherwise it will be
+         --  rejected (see Analyze_Assignment).
+
+         Set_Is_Safe_To_Reevaluate (Id);
+
+         Rewrite (Original_Bound, New_Occurrence_Of (Id, Loc));
+
+         if Nkind (Assign) = N_Assignment_Statement then
+            return Expression (Assign);
+         else
+            return Original_Bound;
+         end if;
+      end One_Bound;
+
+      Hi     : constant Node_Id := High_Bound (R);
+      Lo     : constant Node_Id := Low_Bound  (R);
+      R_Copy : constant Node_Id := New_Copy_Tree (R);
+      New_Hi : Node_Id;
+      New_Lo : Node_Id;
+      Typ    : Entity_Id;
+
+   --  Start of processing for Process_Bounds
+
+   begin
+      Set_Parent (R_Copy, Parent (R));
+      Preanalyze_Range (R_Copy);
+      Typ := Etype (R_Copy);
+
+      --  If the type of the discrete range is Universal_Integer, then the
+      --  bound's type must be resolved to Integer, and any object used to
+      --  hold the bound must also have type Integer, unless the literal
+      --  bounds are constant-folded expressions with a user-defined type.
+
+      if Typ = Universal_Integer then
+         if Nkind (Lo) = N_Integer_Literal
+           and then Present (Etype (Lo))
+           and then Scope (Etype (Lo)) /= Standard_Standard
+         then
+            Typ := Etype (Lo);
+
+         elsif Nkind (Hi) = N_Integer_Literal
+           and then Present (Etype (Hi))
+           and then Scope (Etype (Hi)) /= Standard_Standard
+         then
+            Typ := Etype (Hi);
+
+         else
+            Typ := Standard_Integer;
+         end if;
+      end if;
+
+      Set_Etype (R, Typ);
+
+      New_Lo := One_Bound (Lo, Low_Bound  (R_Copy), Typ);
+      New_Hi := One_Bound (Hi, High_Bound (R_Copy), Typ);
+
+      --  Propagate staticness to loop range itself, in case the
+      --  corresponding subtype is static.
+
+      if New_Lo /= Lo and then Is_OK_Static_Expression (New_Lo) then
+         Rewrite (Low_Bound (R), New_Copy (New_Lo));
+      end if;
+
+      if New_Hi /= Hi and then Is_OK_Static_Expression (New_Hi) then
+         Rewrite (High_Bound (R), New_Copy (New_Hi));
+      end if;
+   end Process_Bounds;
 
 end Sem_Ch5;

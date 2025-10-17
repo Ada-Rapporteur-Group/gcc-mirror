@@ -37,6 +37,7 @@ package body Ch5 is
    function P_Goto_Statement                     return Node_Id;
    function P_If_Statement                       return Node_Id;
    function P_Label                              return Node_Id;
+   function P_Chunk_Specifier                    return Node_Id;
    function P_Null_Statement                     return Node_Id;
 
    function P_Assignment_Statement (LHS : Node_Id) return Node_Id;
@@ -63,6 +64,21 @@ package body Ch5 is
    --  Parse loop statement. If Loop_Name is non-Empty on entry, it is
    --  the N_Identifier node for the label on the loop. If Loop_Name is
    --  Empty on entry (the default), then the loop statement is unlabeled.
+
+   function P_Parallel_Construct (Loop_Name : Node_Id := Empty) return Node_Id;
+   --  Parse the construct following a "parallel" keyword. This function
+   --  parses the chunk specification and calls P_Loop_Statement or
+   --  P_Parallel_Block_Statement depending on which reserved word follows
+   --  'parallel'. If Loop_Name is non-Empty on entry, it is passed on
+   --  to a P_Loop_Statement if the construct is a parallel for loop. If
+   --  Loop_Name is present but the construct is a parallel do, this function
+   --  will raise an error.
+
+   function P_Parallel_Block_Statement (Chunk : Node_Id) return Node_Id;
+   --  Parse parallel do. If Chunk is non-Empty on entry, the specified
+   --  parallel chunk specification will be used for the parallel do. If
+   --  Chunk is Empty on entry (the default), the parallel do will have
+   --  no chunk specification.
 
    function P_While_Statement (Loop_Name : Node_Id := Empty) return Node_Id;
    --  Parse while statement. If Loop_Name is non-Empty on entry, it is
@@ -310,7 +326,7 @@ package body Ch5 is
                     (Token = Tok_Left_Paren
                       and then Prev_Token not in
                        Tok_Case | Tok_Delay | Tok_If | Tok_Elsif | Tok_Return |
-                       Tok_When | Tok_While | Tok_Separate)
+                       Tok_When | Tok_While | Tok_Separate | Tok_Parallel)
                then
                   --  Here we have an apparent reserved identifier and the
                   --  token past it is appropriate to this usage (and would
@@ -449,6 +465,27 @@ package body Ch5 is
                   else
                      Error_Msg_SC ("OR not allowed here");
                      Scan; -- past or
+                     Statement_Required := False;
+                  end if;
+
+               --  Case of AND
+
+               when Tok_And =>
+
+                  --  Terminate if Antm set or if the AND is to the left of the
+                  --  expected column of the end for this sequence.
+
+                  if SS_Flags.Antm
+                     or else Start_Column < Scopes (Scope.Last).Ecol
+                  then
+                     Test_Statement_Required;
+                     exit;
+
+                  --  Otherwise complain and skip past AND
+
+                  else
+                     Error_Msg_SC ("AND not allowed here");
+                     Scan; -- past and
                      Statement_Required := False;
                   end if;
 
@@ -640,6 +677,12 @@ package body Ch5 is
                      elsif Token = Tok_For then
                         Append_To (Statement_List,
                           P_For_Statement (Id_Node));
+
+                     --  Parallel for statement
+
+                     elsif Token = Tok_Parallel then
+                        Append_To (Statement_List,
+                          P_Parallel_Construct (Id_Node));
 
                      --  Otherwise complain we have inappropriate statement
 
@@ -875,6 +918,12 @@ package body Ch5 is
                when Tok_Declare =>
                   Check_Bad_Layout;
                   Append_To (Statement_List, P_Declare_Statement);
+                  Statement_Required := False;
+
+               --  Parallel construct
+               when Tok_Parallel =>
+                  Check_Bad_Layout;
+                  Append_To (Statement_List, P_Parallel_Construct);
                   Statement_Required := False;
 
                --  Delay_Statement
@@ -1987,6 +2036,127 @@ package body Ch5 is
       End_Statements (Handled_Statement_Sequence (Block));
       return Block;
    end P_Begin_Statement;
+
+   -------------------------------------
+   -- 5.6.1  Parallel Block Statement --
+   ------------------------------------
+
+   function P_Chunk_Specifier return Node_Id is
+      Chunk           : Node_Id := Empty;
+      Has_Chunk_Index : Boolean := False;
+   begin
+      T_Left_Paren;
+
+      --  Check for identifier followed by IN
+      if Token = Tok_Identifier then
+         declare
+            SS : Saved_Scan_State;
+         begin
+            Save_Scan_State (SS);
+            Scan; --  Past identifier
+            Has_Chunk_Index := (Token = Tok_In);
+            Restore_Scan_State (SS);
+         end;
+      end if;
+
+      if Has_Chunk_Index then
+         Chunk := New_Node (N_Chunk_Specification_Range, Token_Ptr);
+         Set_Defining_Identifier (Chunk, P_Defining_Identifier (C_In));
+         T_In;
+         Set_Discrete_Subtype_Definition
+           (Chunk, P_Discrete_Subtype_Definition);
+      else
+         Chunk := New_Node (N_Chunk_Specification_Int, Token_Ptr);
+         Set_Expression (Chunk, P_Simple_Expression);
+      end if;
+
+      T_Right_Paren;
+
+      return Chunk;
+   end P_Chunk_Specifier;
+
+   function P_Parallel_Construct
+     (Loop_Name : Node_Id := Empty)
+      return Node_Id
+   is
+      Chunk_Spec : Node_Id := Empty;
+   begin
+      T_Parallel;
+      Error_Msg_Ada_2022_Feature ("Parallel construct", Token_Ptr);
+
+      if Token = Tok_Left_Paren then
+         Chunk_Spec := P_Chunk_Specifier;
+      end if;
+
+      case Token is
+         when Tok_Do =>
+            if Present (Loop_Name) then
+               Error_Msg_F ("Identifiers cannot be used for " &
+                 "parallel block statements", Loop_Name);
+            end if;
+
+            if Present (Chunk_Spec) and then
+              Nkind (Chunk_Spec) = N_Chunk_Specification_Range
+            then
+               Error_Msg_F ("Range chunk specification not permitted" &
+                 " in parallel block statements", Chunk_Spec);
+            end if;
+
+            return P_Parallel_Block_Statement (Chunk_Spec);
+         when Tok_For =>
+            declare
+               Loop_Node   : Node_Id;
+               Iter_Scheme : Node_Id;
+            begin
+               Loop_Node := P_For_Statement (Loop_Name);
+               Iter_Scheme := Iteration_Scheme (Loop_Node);
+
+               Set_Is_Parallel (Iter_Scheme);
+               Set_Chunk_Specifier (Iter_Scheme, Chunk_Spec);
+
+               return Loop_Node;
+            end;
+         when others =>
+            Error_Msg_SC ("Invalid token following parallel. " &
+              "Expected DO or FOR.");
+            return Error;
+      end case;
+   end P_Parallel_Construct;
+
+   function P_Parallel_Block_Statement (Chunk : Node_Id) return Node_Id is
+      Parallel_Block_Node : Node_Id;
+      Branch_List      : List_Id;
+   begin
+      Parallel_Block_Node := New_Node (N_Parallel_Block_Statement, Token_Ptr);
+
+      Push_Scope_Stack;
+      Scopes (Scope.Last).Etyp := E_Do;
+      Scopes (Scope.Last).Ecol := Start_Column;
+      Scopes (Scope.Last).Sloc := Token_Ptr;
+      Scopes (Scope.Last).Labl := Error;
+
+      T_Do;
+
+      Branch_List := New_List;
+      loop
+         declare
+            Parallel_Branch : Node_Id;
+         begin
+            Parallel_Branch := Make_Parallel_Branch
+              (Token_Ptr, P_Sequence_Of_Statements (SS_Antm_Sreq));
+            Append (Parallel_Branch, Branch_List);
+         end;
+
+         exit when Token /= Tok_And;
+         Scan;
+      end loop;
+      End_Statements;
+
+      Set_Chunk_Specifier (Parallel_Block_Node, Chunk);
+      Set_Parallel_Branches (Parallel_Block_Node, Branch_List);
+
+      return Parallel_Block_Node;
+   end P_Parallel_Block_Statement;
 
    -------------------------
    -- 5.7  Exit Statement --
