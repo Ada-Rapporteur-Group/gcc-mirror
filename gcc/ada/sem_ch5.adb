@@ -2169,7 +2169,7 @@ package body Sem_Ch5 is
       Cond       := Condition (N);
       Iter_Spec  := Iterator_Specification (N);
       Loop_Spec  := Loop_Parameter_Specification (N);
-      Chunk_Spec := Chunk_Specifier (N);
+      Chunk_Spec := Chunk_Specification (N);
 
       if Is_Parallel (N)
         and then Present (Loop_Spec)
@@ -2181,7 +2181,7 @@ package body Sem_Ch5 is
       end if;
 
       if Present (Chunk_Spec) then
-         Analyze_Chunk_Specifier (Chunk_Spec);
+         Analyze_Chunk_Specification (Chunk_Spec);
       end if;
 
       if Present (Cond) then
@@ -3867,7 +3867,7 @@ package body Sem_Ch5 is
          procedure Outline_Loop is
             Loc        : constant Source_Ptr := Sloc (N);
             Decls      : constant List_Id    := Parallel_Declarations (N);
-            Chunk_Spec : constant Node_Id    := Chunk_Specifier (Iter);
+            Chunk_Spec : constant Node_Id    := Chunk_Specification (Iter);
             Loop_Id    : constant Entity_Id  := Entity (Identifier (N));
 
             Outlined_Body, Outlined_Spec, Chunk_Arg,
@@ -4060,7 +4060,7 @@ package body Sem_Ch5 is
                end;
             else
                if Present (Chunk_Spec) then
-                  Analyze_Chunk_Specifier (Chunk_Spec);
+                  Analyze_Chunk_Specification (Chunk_Spec);
                end if;
                Chunk_Arg := Process_Chunk_Specification_Int (N, Chunk_Spec);
             end if;
@@ -4131,7 +4131,7 @@ package body Sem_Ch5 is
          ----------------------------
 
          procedure Prepare_Parallel_Chunk (Stop_Processing : out Boolean) is
-            Chunk_Spec : constant Node_Id := Chunk_Specifier (Iter);
+            Chunk_Spec : constant Node_Id := Chunk_Specification (Iter);
 
          begin
             Stop_Processing := False;
@@ -4680,11 +4680,11 @@ package body Sem_Ch5 is
       null;
    end Analyze_Null_Statement;
 
-   -----------------------------
-   -- Analyze_Chunk_Specifier --
-   -----------------------------
+   ---------------------------------
+   -- Analyze_Chunk_Specification --
+   ---------------------------------
 
-   procedure Analyze_Chunk_Specifier (N : Node_Id) is
+   procedure Analyze_Chunk_Specification (N : Node_Id) is
       pragma Assert (Nkind (N) in N_Chunk_Specification_Range |
         N_Chunk_Specification_Int);
    begin
@@ -4712,7 +4712,7 @@ package body Sem_Ch5 is
          when others =>
             pragma Assert (False);
       end case;
-   end Analyze_Chunk_Specifier;
+   end Analyze_Chunk_Specification;
 
    ------------------------------
    -- Build_Parallel_Loop_Spec --
@@ -4791,12 +4791,12 @@ package body Sem_Ch5 is
    --------------------------------------
 
    procedure Analyze_Parallel_Block_Statement (N : Node_Id) is
-      Chunk_Spec  : constant Node_Id    := Chunk_Specifier (N);
+      Chunk_Spec  : constant Node_Id    := Chunk_Specification (N);
       Loc         : constant Source_Ptr := Sloc (N);
       Branch_Node : Node_Id             := First (Parallel_Branches (N));
    begin
       if Present (Chunk_Spec) then
-         Analyze_Chunk_Specifier (Chunk_Spec);
+         Analyze_Chunk_Specification (Chunk_Spec);
       end if;
 
       if not In_Outlined_Parallel (N)
@@ -4841,7 +4841,7 @@ package body Sem_Ch5 is
             Hi_Param      : constant Entity_Id := Make_Temporary (Loc, 'P');
          begin
             Set_Parallel_Declarations (N, No_List);
-            Set_Chunk_Specifier (N, Empty);
+            Set_Chunk_Specification (N, Empty);
             Set_In_Outlined_Parallel (N);
 
             Chunk_Arg := Process_Chunk_Specification_Int (N, Chunk_Spec);

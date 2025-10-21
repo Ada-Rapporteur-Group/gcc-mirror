@@ -2112,7 +2112,7 @@ package body Ch5 is
                Iter_Scheme := Iteration_Scheme (Loop_Node);
 
                Set_Is_Parallel (Iter_Scheme);
-               Set_Chunk_Specifier (Iter_Scheme, Chunk_Spec);
+               Set_Chunk_Specification (Iter_Scheme, Chunk_Spec);
 
                return Loop_Node;
             end;
@@ -2152,7 +2152,7 @@ package body Ch5 is
       end loop;
       End_Statements;
 
-      Set_Chunk_Specifier (Parallel_Block_Node, Chunk);
+      Set_Chunk_Specification (Parallel_Block_Node, Chunk);
       Set_Parallel_Branches (Parallel_Block_Node, Branch_List);
 
       return Parallel_Block_Node;

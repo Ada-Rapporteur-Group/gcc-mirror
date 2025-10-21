@@ -5904,7 +5904,7 @@ package body Exp_Ch5 is
 
             --  Remove chunk specification
 
-            Set_Chunk_Specifier (Scheme, Empty);
+            Set_Chunk_Specification (Scheme, Empty);
          end Expand_Chunk_Spec_Seq;
 
          ---------------------
@@ -5912,7 +5912,7 @@ package body Exp_Ch5 is
          ---------------------
 
          procedure Expand_Parallel is
-            Chunk_Spec : constant Node_Id := Chunk_Specifier (Scheme);
+            Chunk_Spec : constant Node_Id := Chunk_Specification (Scheme);
 
          begin
             if Present (Chunk_Spec)
@@ -5972,7 +5972,7 @@ package body Exp_Ch5 is
                   Mutate_Ekind (Ident, E_Constant);
 
                   --  Remove parallel elements
-                  Set_Chunk_Specifier (Scheme, Empty);
+                  Set_Chunk_Specification (Scheme, Empty);
                   Set_Is_Parallel (Scheme, False);
                end;
             end if;
@@ -5987,8 +5987,8 @@ package body Exp_Ch5 is
          else
             --  Handle sequential fallback expansion
             Set_Is_Parallel (Scheme, False);
-            if Present (Chunk_Specifier (Scheme)) then
-               Expand_Chunk_Spec_Seq (Chunk_Specifier (Scheme));
+            if Present (Chunk_Specification (Scheme)) then
+               Expand_Chunk_Spec_Seq (Chunk_Specification (Scheme));
             end if;
          end if;
       end Expand_Parallel_Loop;
@@ -6623,7 +6623,7 @@ package body Exp_Ch5 is
       Branches   : constant List_Id := New_List;
       Decls      : constant List_Id := New_List;
       Loc        : constant Source_Ptr := Sloc (N);
-      Chunk_Spec : constant Node_Id := Chunk_Specifier (N);
+      Chunk_Spec : constant Node_Id := Chunk_Specification (N);
 
       procedure Exp_Sequential;
       --  Transforms parallel block statement into sequential fallback
