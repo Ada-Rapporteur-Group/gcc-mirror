@@ -37,7 +37,7 @@ package body Ch5 is
    function P_Goto_Statement                     return Node_Id;
    function P_If_Statement                       return Node_Id;
    function P_Label                              return Node_Id;
-   function P_Chunk_Specifier                    return Node_Id;
+   function P_Chunk_Specification                return Node_Id;
    function P_Null_Statement                     return Node_Id;
 
    function P_Assignment_Statement (LHS : Node_Id) return Node_Id;
@@ -2041,7 +2041,7 @@ package body Ch5 is
    -- 5.6.1  Parallel Block Statement --
    ------------------------------------
 
-   function P_Chunk_Specifier return Node_Id is
+   function P_Chunk_Specification return Node_Id is
       Chunk           : Node_Id := Empty;
       Has_Chunk_Index : Boolean := False;
    begin
@@ -2073,7 +2073,7 @@ package body Ch5 is
       T_Right_Paren;
 
       return Chunk;
-   end P_Chunk_Specifier;
+   end P_Chunk_Specification;
 
    function P_Parallel_Construct
      (Loop_Name : Node_Id := Empty)
@@ -2085,7 +2085,7 @@ package body Ch5 is
       Error_Msg_Ada_2022_Feature ("Parallel construct", Token_Ptr);
 
       if Token = Tok_Left_Paren then
-         Chunk_Spec := P_Chunk_Specifier;
+         Chunk_Spec := P_Chunk_Specification;
       end if;
 
       case Token is
