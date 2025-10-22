@@ -1917,6 +1917,8 @@ package body Sem_Ch5 is
       for J in reverse 0 .. Scope_Stack.Last loop
          Scope_Id := Scope_Stack.Table (J).Entity;
 
+         --  Skip over blocks, loops, return statement scopes,
+         --  and parallel outlined procedures
          if Label_Scope = Scope_Id
            or else (Ekind (Scope_Id) not in
                      E_Block | E_Loop | E_Return_Statement
@@ -3988,46 +3990,52 @@ package body Sem_Ch5 is
             --       Loop_Body => Proc_Name'Access);
 
             Set_Parallel_Declarations (N, No_List);
+
+            --  Mark the loop as having been moved into an outlined
+            --  scope so we don't reapply the pre-analysis transforms
+
             Set_In_Outlined_Parallel (N);
+
+            --  Process chunk specification range
+
+            --  Transforms
+
+            --     parallel (Chunk in Chunk_Low_Expr .. Chunk_Hi_Expr)
+            --        for ... loop
+            --           ...
+            --        end loop;
+
+            --  into
+
+            --     Lo : Chunk_Type := Chunk_Low_Expr;
+            --     Hi : Chunk_Type := Chunk_Hi_Expr;
+            --     parallel (Chunk in Lo .. Hi)
+            --        for ... loop
+            --           ...
+            --        end loop;
+            --    ...
+
+            --   These values are later used in the parallel call:
+
+            --    Par_Range_Loop_With_Early_Exit (
+            --      Num_Chunks => Chunk_Type'Pos (Hi) -
+            --                      Chunk_Type'Pos (Lo) + 1
+            --      ...);
 
             if Present (Chunk_Spec)
               and then Nkind (Chunk_Spec) = N_Chunk_Specification_Range
             then
-               --  Process chunk specification range
-
-               --  Transforms
-
-               --     parallel (Chunk in Chunk_Low_Expr .. Chunk_Hi_Expr)
-               --        for ... loop
-               --           ...
-               --        end loop;
-
-               --  into
-
-               --     Lo : Chunk_Type := Chunk_Low_Expr;
-               --     Hi : Chunk_Type := Chunk_Hi_Expr;
-               --     parallel (Chunk in Lo .. Hi)
-               --        for ... loop
-               --           ...
-               --        end loop;
-               --    ...
-
-               --   These values are later used in the parallel call:
-
-               --    Par_Range_Loop_With_Early_Exit (
-               --      Num_Chunks => Chunk_Type'Pos (Hi) -
-               --                      Chunk_Type'Pos (Lo) + 1
-               --      ...);
-
                declare
                   Low, Hi, Diff : Node_Id;
                   Typ : Entity_Id;
                begin
                   --  Move chunk specification values with side effects
                   --  outside of loop before we wrap it in a procedure
+
                   Prepare_Loop_Param (Chunk_Spec, Low, Hi, Typ);
 
                   --  Chunk_Type'Pos (Hi) - Chunk_Type'Pos (Lo)
+
                   Diff := Make_Op_Subtract (Loc,
                     Left_Opnd => Make_Attribute_Reference (Loc,
                       Prefix => New_Occurrence_Of (Typ, Loc),
@@ -4046,10 +4054,12 @@ package body Sem_Ch5 is
                   begin
                      --  Move computation into an object definition of the
                      --  positive type to enforce Hi >= Lo
+
+                     --  Chunk_Type'Pos (Hi) - Chunk_Type'Pos (Lo) + 1
+
                      Insert_Before_And_Analyze (N,
                        Make_Object_Declaration (Loc,
                          Defining_Identifier => Chunk_Temp,
-                         --  Chunk_Type'Pos (Hi) - Chunk_Type'Pos (Lo) + 1
                          Expression          => Make_Op_Add (Loc,
                            Left_Opnd         => Diff,
                            Right_Opnd        => Make_Integer_Literal (Loc, 1)),
@@ -4072,6 +4082,8 @@ package body Sem_Ch5 is
               Chunk_Param   => Chunk_Param);
             Set_Parallel_Chunk_Id (N, Chunk_Param);
 
+            --  Move the loop inside the outlined procedure
+
             Outlined_Body := Make_Subprogram_Body (Loc,
               Specification => Outlined_Spec,
               Declarations => Decls,
@@ -4085,9 +4097,12 @@ package body Sem_Ch5 is
             begin
                --  Move loop parameter values with side effects
                --  outside of loop before we wrap it in a procedure
+
                Prepare_Loop_Param
                  (Loop_Parameter_Specification (Iter),
                    Low, Hi, Typ);
+
+               --  Build call to Par_Range_Loop_With_Early_Exit
 
                Parallel_Call := Build_Parallel_Call (Loc,
                  Low_Arg => Create_Bound_Arg (Low),
@@ -4096,6 +4111,7 @@ package body Sem_Ch5 is
                  Outlined_Proc => New_Occurrence_Of (Spec_Id, Loc));
 
                --  Rewrite loop range as Low_Param .. High_Param
+
                New_DS := Make_Range (Loc,
                  Low_Bound => Make_Attribute_Reference (Loc,
                  Prefix => New_Occurrence_Of (Etype (Low), Loc),
@@ -4117,10 +4133,17 @@ package body Sem_Ch5 is
             Rewrite (N, Parallel_Call);
             Analyze (N);
 
+            --  Check our parallel scope for a saved exit actions
+            --  case statement. If we find one, insert it after
+            --  the LWT call
+
             if Present (Parallel_Exit_Actions (Spec_Id)) then
                Insert_After_And_Analyze (N,
                  Parallel_Exit_Actions (Spec_Id));
             end if;
+
+            --  Move the loop label into the outlined procedure
+            --  scope
 
             Remove_Entity (Loop_Id);
             Append_Entity (Loop_Id, Spec_Id);
@@ -4395,6 +4418,9 @@ package body Sem_Ch5 is
       Kill_Current_Values;
       Push_Scope (Ent);
       Analyze_Iteration_Scheme (Iter);
+
+      --  Mark the scope as being parallel so that we can use this information
+      --  later when we transform control flow statements inside parallel scopes.
 
       if Is_Parallel (Iter) then
          Set_Is_Parallel_Loop_Scope (Ent);
@@ -4728,13 +4754,22 @@ package body Sem_Ch5 is
       Loop_Id_Param : constant Entity_Id := Make_Temporary (Loc, 'P');
    begin
       --  Builds out the following procedure specification:
-
       --     procedure Proc_Name (Low : Longest_Integer;
       --       Hi : Longest_Integer; Chunk : Positive;
       --       Loop_Id : Par_Loop_Id);
 
       Mutate_Ekind (Spec_Id, E_Procedure);
+
+      --  Mark the scope as being an outlined parallel procedure
+      --  so that it can be skipped over when analysing goto, return,
+      --  and exit statements
+
       Set_Is_Outlined_Parallel (Spec_Id);
+
+      --  Save the Loop_Id parameter in the scope semantic data so
+      --  we can use it later when we rewrite control flow statements
+      --  using LWT's Early_Exit function
+
       Set_Parallel_Loop_Id_Param (Spec_Id, Loop_Id_Param);
 
       return Make_Procedure_Specification (Loc,
@@ -4772,7 +4807,6 @@ package body Sem_Ch5 is
    begin
 
       --  Builds the following call:
-
       --     Par_Range_Loop_With_Early_Exit (
       --       Low_Arg, Hi_Arg, Chunk_Arg, null,
       --       Outlined_Proc'Access)
@@ -4799,37 +4833,42 @@ package body Sem_Ch5 is
          Analyze_Chunk_Specification (Chunk_Spec);
       end if;
 
+      --  Pre-analysis transformations for parllel expansion.
+      --  This entails wrapping the parallel block inside an
+      --  outlined procedure
+
+      --  Transforms
+
+      --     ... <PARALLEL_DECLS> ...
+      --     parallel (Chunk_Expr) do
+      --        ...
+      --     and
+      --        ...
+      --     end do;
+
+      --  into
+
+      --     procedure Proc_Name (Low : Longest_Integer;
+      --       Hi : Longest_Integer; Chunk : Positive;
+      --       Loop_Id : Par_Loop_Id)
+      --     is
+      --        ... <PARALLEL_DECLS> ...
+      --     begin
+      --        parallel do
+      --           ...
+      --        and
+      --           ...
+      --        end do;
+      --     end Proc_Name;
+
+      --     Par_Range_Loop_With_Early_Exit (
+      --       Low => 1, High => NUM_BRANCHES_LITERAL,
+      --       Num_Chunks => Chunk_Expr,
+      --       Loop_Body => Proc_Name'Access);
+
       if not In_Outlined_Parallel (N)
         and then RTE_Available (RE_Par_Range_Loop_With_Early_Exit)
       then
-         --  Wrap the parallel block inside an outlined procedure
-
-         --  Transforms
-
-         --     parallel (Chunk_Expr) do
-         --        ...
-         --     and
-         --        ...
-         --     end do;
-
-         --  into
-
-         --     procedure Proc_Name (Low : Longest_Integer;
-         --       Hi : Longest_Integer; Chunk : Positive;
-         --       Loop_Id : Par_Loop_Id)
-         --     is
-         --        parallel do
-         --           ...
-         --        and
-         --           ...
-         --        end do;
-         --     end Proc_Name;
-
-         --     Par_Range_Loop_With_Early_Exit (
-         --       Low => 1, High => NUM_BRANCHES_LITERAL,
-         --       Num_Chunks => Chunk_Expr,
-         --       Loop_Body => Proc_Name'Access);
-
          declare
             Outlined_Body, Outlined_Spec, Chunk_Arg,
               Parallel_Call : Node_Id;
@@ -4842,10 +4881,13 @@ package body Sem_Ch5 is
          begin
             Set_Parallel_Declarations (N, No_List);
             Set_Chunk_Specification (N, Empty);
+
+            --  Mark the parallel block as having been moved into
+            --  the outlined scope
+
             Set_In_Outlined_Parallel (N);
 
             Chunk_Arg := Process_Chunk_Specification_Int (N, Chunk_Spec);
-
             Outlined_Spec := Build_Parallel_Loop_Spec (Loc,
               Spec_Id     => Spec_Id,
               Low_Param   => Low_Param,
@@ -4854,8 +4896,11 @@ package body Sem_Ch5 is
 
             --  Pass loop parameters to N so that they can be accessed
             --  during expansion.
+
             Set_Parallel_Low_Bound (N, Low_Param);
             Set_Parallel_Hi_Bound (N, Hi_Param);
+
+            --  Move the parallel block inside the outlined procedure
 
             Outlined_Body := Make_Subprogram_Body (Loc,
               Specification => Outlined_Spec,
@@ -4867,6 +4912,7 @@ package body Sem_Ch5 is
 
             --  Build a call to Par_Range_Loop_With_Early_Exit that
             --  iterates over 1 .. NUM_BRANCHES
+
             Parallel_Call := Build_Parallel_Call (Loc,
               Low_Arg => Make_Integer_Literal (Loc, 1),
               Hi_Arg => Make_Integer_Literal (Loc, Branch_Count),
@@ -4878,19 +4924,42 @@ package body Sem_Ch5 is
             Analyze (N);
 
             --  Insert exit actions case statement after the LWT call
+
             if Present (Parallel_Exit_Actions (Spec_Id)) then
                Insert_After_And_Analyze (N,
                  Parallel_Exit_Actions (Spec_Id));
             end if;
          end;
+
+      --  Pre-analysis expansion for the sequential fallback.
+      --  Move the parallel block and its associated declarations
+      --  inside an enclosing block statement.
+
+      --  Transforms
+
+      --     ... <PARALLEL_DECLS> ...
+      --     parallel (Chunk_Expr) do
+      --        BRANCH 1
+      --     and
+      --        BRANCH 2
+      --     end do;
+
+      --  into
+
+      --     declare
+      --        ... <PARALLEL_DECLS> ...
+      --     begin
+      --        parallel (Chunk_Expr) do
+      --           BRANCH 1
+      --        and
+      --           BRANCH 2
+      --        end do;
+      --     end;
+
       elsif Present (Parallel_Declarations (N))
         and then not Is_Empty_List (Parallel_Declarations (N))
       then
          pragma Assert (not In_Outlined_Parallel (N));
-
-         --  If we're here, that means we're using the sequential fallback.
-         --  Move the parallel block and its associated declarations inside
-         --  an enclosing block statement.
 
          declare
             New_Block : Node_Id;
@@ -4905,14 +4974,18 @@ package body Sem_Ch5 is
             Rewrite (N, New_Block);
             Analyze (N);
          end;
+
+      --  Analyze the parallel block in whatever scope its currently in.
+      --  This part happens after the pre-analysis transformation.
+
       else
-         --  Analyze statements in current scope
          while Present (Branch_Node) loop
             Analyze_Statements (Statements (Branch_Node));
             Next (Branch_Node);
          end loop;
 
          --  Warn the user if sequential expansion is used
+
          if not In_Outlined_Parallel (N) then
             Error_Msg_N ("LWT library not found. Parallel block " &
               "will execute sequentially??", N);
@@ -5636,6 +5709,7 @@ package body Sem_Ch5 is
          --  Move chunk specification into an object declaration
          --  with the positive type so that we can raise a
          --  constraint error if the chunk expression isn't positive
+
          Insert_Before_And_Analyze (N,
            Make_Object_Declaration (Loc,
              Defining_Identifier => Chunk_Temp,

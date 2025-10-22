@@ -921,6 +921,7 @@ package body Ch5 is
                   Statement_Required := False;
 
                --  Parallel construct
+
                when Tok_Parallel =>
                   Check_Bad_Layout;
                   Append_To (Statement_List, P_Parallel_Construct);
@@ -1621,6 +1622,9 @@ package body Ch5 is
    --  P_Loop_Statement, P_For_Statement or P_While_Statement depending
    --  on the initial keyword in the construct (excluding the identifier)
 
+   --  Parallel loop parsing is handled by P_Parallel_Construct but does
+   --  call P_For_Statement internally
+
    --  P_Loop_Statement
 
    --  This function parses the case where no iteration scheme is present
@@ -2039,7 +2043,31 @@ package body Ch5 is
 
    -------------------------------------
    -- 5.6.1  Parallel Block Statement --
-   ------------------------------------
+   -------------------------------------
+
+   --  PARALLEL_BLOCK_STATEMENT ::=
+   --    parallel [(CHUNK_SPECIFICATION)] [ASPECT_SPECIFICATION] do
+   --       SEQUENCE_OF_STATEMENTS
+   --    and
+   --       SEQUENCE_OF_STATEMENTS
+   --    {and
+   --       SEQUENCE_OF_STATEMENTS}
+   --    end do;
+
+   --  The parsing logic for parallel block statements is spread across
+   --  three functions: P_Chunk_Specification, P_Parallel_Construct,
+   --  and P_Parallel_Block_Statement. P_Chunk_Specification and
+   --  P_Parallel_Construct are also used for parsing parallel loops.
+
+   --  P_Chunk_Specification
+
+   --  This function parses a chunk specification
+
+   --  The caller has checked that the previous token is PARALLEL
+
+   --  The first token is expected to be an open parenthesis
+
+   --  Error recovery: can raise Error_Resync
 
    function P_Chunk_Specification return Node_Id is
       Chunk           : Node_Id := Empty;
@@ -2048,6 +2076,7 @@ package body Ch5 is
       T_Left_Paren;
 
       --  Check for identifier followed by IN
+
       if Token = Tok_Identifier then
          declare
             SS : Saved_Scan_State;
@@ -2059,12 +2088,17 @@ package body Ch5 is
          end;
       end if;
 
+      --  Parse range chunk specification
+
       if Has_Chunk_Index then
          Chunk := New_Node (N_Chunk_Specification_Range, Token_Ptr);
          Set_Defining_Identifier (Chunk, P_Defining_Identifier (C_In));
          T_In;
          Set_Discrete_Subtype_Definition
            (Chunk, P_Discrete_Subtype_Definition);
+
+      --  Parse integer expression chunk specification
+
       else
          Chunk := New_Node (N_Chunk_Specification_Int, Token_Ptr);
          Set_Expression (Chunk, P_Simple_Expression);
@@ -2074,6 +2108,17 @@ package body Ch5 is
 
       return Chunk;
    end P_Chunk_Specification;
+
+   --  P_Parallel_Construct
+
+   --  This function handles the parsing of parallel constructs.
+   --  It calls P_Chunk_Specification and then calls either
+   --  P_Parallel_Block_Statement or P_For_Statement depending
+   --  on which keyword follows the chunk specification.
+
+   --  The first token is expected to be PARALLEL
+
+   --  Error recovery: can raise Error_Resync
 
    function P_Parallel_Construct
      (Loop_Name : Node_Id := Empty)
@@ -2122,6 +2167,14 @@ package body Ch5 is
             return Error;
       end case;
    end P_Parallel_Construct;
+
+   --  P_Parallel_Block_Statement
+
+   --  This function parses parallel block statements
+
+   --  The first token is expected to be DO
+
+   --  Error recovery: cannot raise Error_Resync
 
    function P_Parallel_Block_Statement (Chunk : Node_Id) return Node_Id is
       Parallel_Block_Node : Node_Id;

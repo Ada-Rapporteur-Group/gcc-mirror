@@ -41,7 +41,8 @@ procedure Labl is
    --  Next label node to process
 
    function Find_Enclosing_Body_Or_Block (N : Node_Id) return Node_Id;
-   --  Find the innermost body or block that encloses N
+   --  Find the innermost body, block, or parallel construct
+   --  that encloses N
 
    function Find_Enclosing_Body (N : Node_Id) return Node_Id;
    --  Find the innermost body that encloses N
@@ -505,8 +506,11 @@ begin
          goto Next_Label;
       end if;
 
-      --  Find the innermost enclosing body or block, which is where
-      --  we need to implicitly declare this label
+      --  Find the innermost enclosing body, block, or parallel construct
+      --  which is where we need to implicitly declare this label
+
+      --  Find_Enclosing_Body_Or_Block will only ever return N_Loop_Statement
+      --  for parallel loops
 
       Enclosing_Body_Or_Block := Find_Enclosing_Body_Or_Block (Label_Node);
 
@@ -540,6 +544,9 @@ begin
 
          --  Now attach the implicit label declaration to the appropriate
          --  declarative region, creating a declaration list if none exists
+
+         --  For parallel constructs, we add these label declarations to
+         --  Parallel_Declarations instead of Declarations
 
          if Nkind (Enclosing_Body_Or_Block) in
            N_Loop_Statement | N_Parallel_Block_Statement
