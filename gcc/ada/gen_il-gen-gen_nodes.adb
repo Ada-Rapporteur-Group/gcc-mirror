@@ -926,7 +926,7 @@ begin -- Gen_IL.Gen.Gen_Nodes
        (Sy (Statements, List_Id, Default_Empty_List)));
 
    Cc (N_Parallel_Block_Statement, N_Statement_Other_Than_Procedure_Call,
-       (Sy (Chunk_Specifier, Node_Id, Default_Empty),
+       (Sy (Chunk_Specification, Node_Id, Default_Empty),
         Sy (Parallel_Branches, List_Id, Default_No_List),
         --  While the parallel block syntax itself does not have anywhere for
         --  declarations, it is later moved inside an outlined procedure before
@@ -1089,7 +1089,7 @@ begin -- Gen_IL.Gen.Gen_Nodes
        (Sy (Condition, Node_Id, Default_Empty),
         Sy (Iterator_Specification, Node_Id, Default_Empty),
         Sy (Loop_Parameter_Specification, Node_Id, Default_Empty),
-        Sy (Chunk_Specifier, Node_Id, Default_Empty),
+        Sy (Chunk_Specification, Node_Id, Default_Empty),
         Sy (Is_Parallel, Flag),
         Sm (Condition_Actions, List_Id)));
 

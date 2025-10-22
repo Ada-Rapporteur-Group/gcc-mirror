@@ -55,7 +55,6 @@ with Sem_Util;       use Sem_Util;
 with Sinfo;          use Sinfo;
 with Sinfo.Nodes;    use Sinfo.Nodes;
 with Sinfo.Utils;    use Sinfo.Utils;
-with Errout;         use Errout;
 with Stand;          use Stand;
 with Stylesw;        use Stylesw;
 with Uintp;          use Uintp;

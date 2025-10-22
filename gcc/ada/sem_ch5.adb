@@ -135,6 +135,15 @@ package body Sem_Ch5 is
      (Loc : Source_Ptr; Low_Arg : Node_Id;
       Hi_Arg : Node_Id; Chunk_Arg : Node_Id;
       Outlined_Proc : Entity_Id) return Node_Id;
+   --  Builds call to LWT's Par_Range_Loop_With_Early_Exit
+   --  for parallel constructs
+
+   function Process_Chunk_Specification_Int
+     (N : Node_Id; Chunk : Node_Id) return Node_Id;
+   --  Logic for processing integer chunk specifications shared
+   --  between both parallel construct pre-expansions. Returns
+   --  the value of Chunk_Arg (the CHUNK_COUNT value that is passed
+   --  to LWT)
 
    ------------------------
    -- Analyze_Assignment --
@@ -2160,7 +2169,7 @@ package body Sem_Ch5 is
       Cond       := Condition (N);
       Iter_Spec  := Iterator_Specification (N);
       Loop_Spec  := Loop_Parameter_Specification (N);
-      Chunk_Spec := Chunk_Specifier (N);
+      Chunk_Spec := Chunk_Specification (N);
 
       if Is_Parallel (N)
         and then Present (Loop_Spec)
@@ -2172,7 +2181,7 @@ package body Sem_Ch5 is
       end if;
 
       if Present (Chunk_Spec) then
-         Analyze_Chunk_Specifier (Chunk_Spec);
+         Analyze_Chunk_Specification (Chunk_Spec);
       end if;
 
       if Present (Cond) then
@@ -3858,7 +3867,7 @@ package body Sem_Ch5 is
          procedure Outline_Loop is
             Loc        : constant Source_Ptr := Sloc (N);
             Decls      : constant List_Id    := Parallel_Declarations (N);
-            Chunk_Spec : constant Node_Id    := Chunk_Specifier (Iter);
+            Chunk_Spec : constant Node_Id    := Chunk_Specification (Iter);
             Loop_Id    : constant Entity_Id  := Entity (Identifier (N));
 
             Outlined_Body, Outlined_Spec, Chunk_Arg,
@@ -3981,70 +3990,80 @@ package body Sem_Ch5 is
             Set_Parallel_Declarations (N, No_List);
             Set_In_Outlined_Parallel (N);
 
-            if Present (Chunk_Spec) then
-               if Nkind (Chunk_Spec) = N_Chunk_Specification_Int then
-                  --  Set CHUNK_EXPR to the chunk specification's integer
-                  --  expression
-                  Analyze_Chunk_Specifier (Chunk_Spec);
-                  Chunk_Arg := Relocate_Node (Expression (Chunk_Spec));
-               else
-                  --  Process chunk specification range
+            if Present (Chunk_Spec)
+              and then Nkind (Chunk_Spec) = N_Chunk_Specification_Range
+            then
+               --  Process chunk specification range
 
-                  --  Transforms
+               --  Transforms
 
-                  --     parallel (Chunk in Chunk_Low_Expr .. Chunk_Hi_Expr)
-                  --        for ... loop
-                  --           ...
-                  --        end loop;
+               --     parallel (Chunk in Chunk_Low_Expr .. Chunk_Hi_Expr)
+               --        for ... loop
+               --           ...
+               --        end loop;
 
-                  --  into
+               --  into
 
-                  --     Lo : Chunk_Type := Chunk_Low_Expr;
-                  --     Hi : Chunk_Type := Chunk_Hi_Expr;
-                  --     parallel (Chunk in Lo .. Hi)
-                  --        for ... loop
-                  --           ...
-                  --        end loop;
-                  --    ...
+               --     Lo : Chunk_Type := Chunk_Low_Expr;
+               --     Hi : Chunk_Type := Chunk_Hi_Expr;
+               --     parallel (Chunk in Lo .. Hi)
+               --        for ... loop
+               --           ...
+               --        end loop;
+               --    ...
 
-                  --   These values are later used in the parallel call:
+               --   These values are later used in the parallel call:
 
-                  --    Par_Range_Loop_With_Early_Exit (
-                  --      Num_Chunks => Chunk_Type'Pos (Hi) -
-                  --                      Chunk_Type'Pos (Lo) + 1
-                  --      ...);
+               --    Par_Range_Loop_With_Early_Exit (
+               --      Num_Chunks => Chunk_Type'Pos (Hi) -
+               --                      Chunk_Type'Pos (Lo) + 1
+               --      ...);
+
+               declare
+                  Low, Hi, Diff : Node_Id;
+                  Typ : Entity_Id;
+               begin
+                  --  Move chunk specification values with side effects
+                  --  outside of loop before we wrap it in a procedure
+                  Prepare_Loop_Param (Chunk_Spec, Low, Hi, Typ);
+
+                  --  Chunk_Type'Pos (Hi) - Chunk_Type'Pos (Lo)
+                  Diff := Make_Op_Subtract (Loc,
+                    Left_Opnd => Make_Attribute_Reference (Loc,
+                      Prefix => New_Occurrence_Of (Typ, Loc),
+                      Attribute_Name => Name_Pos,
+                      Expressions => New_List
+                        (Copy_Separate_Tree (Hi))),
+                    Right_Opnd => Make_Attribute_Reference (Loc,
+                      Prefix => New_Occurrence_Of (Typ, Loc),
+                      Attribute_Name => Name_Pos,
+                      Expressions => New_List
+                        (Copy_Separate_Tree (Low))));
 
                   declare
-                     Low, Hi, Diff : Node_Id;
-                     Typ : Entity_Id;
+                     Chunk_Temp : constant Entity_Id :=
+                       Make_Temporary (Loc, 'P');
                   begin
-                     --  Move chunk specification values with side effects
-                     --  outside of loop before we wrap it in a procedure
-                     Prepare_Loop_Param (Chunk_Spec, Low, Hi, Typ);
-
-                     --  Chunk_Type'Pos (Hi) - Chunk_Type'Pos (Lo)
-                     Diff := Make_Op_Subtract (Loc,
-                       Left_Opnd => Make_Attribute_Reference (Loc,
-                         Prefix => New_Occurrence_Of (Typ, Loc),
-                         Attribute_Name => Name_Pos,
-                         Expressions => New_List
-                           (Copy_Separate_Tree (Hi))),
-                       Right_Opnd => Make_Attribute_Reference (Loc,
-                         Prefix => New_Occurrence_Of (Typ, Loc),
-                         Attribute_Name => Name_Pos,
-                         Expressions => New_List
-                           (Copy_Separate_Tree (Low))));
-
-                     --  Chunk_Type'Pos (Hi) - Chunk_Type'Pos (Lo) + 1
-                     Chunk_Arg := Make_Op_Add (Loc,
-                       Left_Opnd => Diff,
-                       Right_Opnd => Make_Integer_Literal (Loc, 1));
+                     --  Move computation into an object definition of the
+                     --  positive type to enforce Hi >= Lo
+                     Insert_Before_And_Analyze (N,
+                       Make_Object_Declaration (Loc,
+                         Defining_Identifier => Chunk_Temp,
+                         --  Chunk_Type'Pos (Hi) - Chunk_Type'Pos (Lo) + 1
+                         Expression          => Make_Op_Add (Loc,
+                           Left_Opnd         => Diff,
+                           Right_Opnd        => Make_Integer_Literal (Loc, 1)),
+                         Object_Definition   =>
+                           New_Occurrence_Of (Standard_Positive, Loc)));
+                     Chunk_Arg := New_Occurrence_Of (Chunk_Temp, Loc);
                   end;
-               end if;
+               end;
             else
-               Chunk_Arg := Make_Integer_Literal (Loc, 0);
+               if Present (Chunk_Spec) then
+                  Analyze_Chunk_Specification (Chunk_Spec);
+               end if;
+               Chunk_Arg := Process_Chunk_Specification_Int (N, Chunk_Spec);
             end if;
-            Set_Etype (Chunk_Arg, Standard_Positive);
 
             Outlined_Spec := Build_Parallel_Loop_Spec (Loc,
               Spec_Id       => Spec_Id,
@@ -4112,7 +4131,7 @@ package body Sem_Ch5 is
          ----------------------------
 
          procedure Prepare_Parallel_Chunk (Stop_Processing : out Boolean) is
-            Chunk_Spec : constant Node_Id := Chunk_Specifier (Iter);
+            Chunk_Spec : constant Node_Id := Chunk_Specification (Iter);
 
          begin
             Stop_Processing := False;
@@ -4661,11 +4680,11 @@ package body Sem_Ch5 is
       null;
    end Analyze_Null_Statement;
 
-   -----------------------------
-   -- Analyze_Chunk_Specifier --
-   -----------------------------
+   ---------------------------------
+   -- Analyze_Chunk_Specification --
+   ---------------------------------
 
-   procedure Analyze_Chunk_Specifier (N : Node_Id) is
+   procedure Analyze_Chunk_Specification (N : Node_Id) is
       pragma Assert (Nkind (N) in N_Chunk_Specification_Range |
         N_Chunk_Specification_Int);
    begin
@@ -4693,7 +4712,7 @@ package body Sem_Ch5 is
          when others =>
             pragma Assert (False);
       end case;
-   end Analyze_Chunk_Specifier;
+   end Analyze_Chunk_Specification;
 
    ------------------------------
    -- Build_Parallel_Loop_Spec --
@@ -4772,12 +4791,12 @@ package body Sem_Ch5 is
    --------------------------------------
 
    procedure Analyze_Parallel_Block_Statement (N : Node_Id) is
-      Chunk_Spec  : constant Node_Id    := Chunk_Specifier (N);
+      Chunk_Spec  : constant Node_Id    := Chunk_Specification (N);
       Loc         : constant Source_Ptr := Sloc (N);
       Branch_Node : Node_Id             := First (Parallel_Branches (N));
    begin
       if Present (Chunk_Spec) then
-         Analyze_Chunk_Specifier (Chunk_Spec);
+         Analyze_Chunk_Specification (Chunk_Spec);
       end if;
 
       if not In_Outlined_Parallel (N)
@@ -4822,15 +4841,10 @@ package body Sem_Ch5 is
             Hi_Param      : constant Entity_Id := Make_Temporary (Loc, 'P');
          begin
             Set_Parallel_Declarations (N, No_List);
-            Set_Chunk_Specifier (N, Empty);
+            Set_Chunk_Specification (N, Empty);
             Set_In_Outlined_Parallel (N);
 
-            if Present (Chunk_Spec) then
-               Chunk_Arg := Relocate_Node (Expression (Chunk_Spec));
-            else
-               Chunk_Arg := Make_Integer_Literal (Loc, 0);
-            end if;
-            Set_Etype (Chunk_Arg, Standard_Positive);
+            Chunk_Arg := Process_Chunk_Specification_Int (N, Chunk_Spec);
 
             Outlined_Spec := Build_Parallel_Loop_Spec (Loc,
               Spec_Id     => Spec_Id,
@@ -5603,5 +5617,36 @@ package body Sem_Ch5 is
          Rewrite (High_Bound (R), New_Copy (New_Hi));
       end if;
    end Process_Bounds;
+
+   -------------------------------------
+   -- Process_Chunk_Specification_Int --
+   -------------------------------------
+
+   function Process_Chunk_Specification_Int
+     (N : Node_Id; Chunk : Node_Id) return Node_Id
+   is
+      pragma Assert (No (Chunk)
+        or else Nkind (Chunk) = N_Chunk_Specification_Int);
+      Loc        : constant Source_Ptr := Sloc (Chunk);
+      Chunk_Temp : constant Entity_Id := Make_Temporary (Loc, 'P');
+   begin
+      Set_Etype (Chunk_Temp, Standard_Positive);
+
+      if Present (Chunk) then
+         --  Move chunk specification into an object declaration
+         --  with the positive type so that we can raise a
+         --  constraint error if the chunk expression isn't positive
+         Insert_Before_And_Analyze (N,
+           Make_Object_Declaration (Loc,
+             Defining_Identifier => Chunk_Temp,
+             Expression          =>
+               Relocate_Node (Expression (Chunk)),
+             Object_Definition   =>
+               New_Occurrence_Of (Standard_Positive, Loc)));
+         return New_Occurrence_Of (Chunk_Temp, Loc);
+      else
+         return Make_Integer_Literal (Loc, 0);
+      end if;
+   end Process_Chunk_Specification_Int;
 
 end Sem_Ch5;

@@ -1255,9 +1255,9 @@ package body Sprint is
          when N_Parallel_Block_Statement =>
             Write_Indent_Str_Sloc ("parallel ");
 
-            if Present (Chunk_Specifier (Node)) then
+            if Present (Chunk_Specification (Node)) then
                Write_Char ('(');
-               Sprint_Node (Chunk_Specifier (Node));
+               Sprint_Node (Chunk_Specification (Node));
                Write_Str (") ");
             end if;
 
@@ -2345,9 +2345,9 @@ package body Sprint is
             else
                if Is_Parallel (Node) then
                   Write_Str_With_Col_Check_Sloc ("parallel ");
-                  if Present (Chunk_Specifier (Node)) then
+                  if Present (Chunk_Specification (Node)) then
                      Write_Char ('(');
-                     Sprint_Node (Chunk_Specifier (Node));
+                     Sprint_Node (Chunk_Specification (Node));
                      Write_Str (") ");
                   end if;
                   Write_Str ("for ");

@@ -2495,7 +2495,8 @@ package body Sem_Ch6 is
       --  Undo the transformation done by Exchange_Limited_Views.
 
       procedure Rewrite_Parallel_Exits (Scope_Id : Entity_Id);
-      --
+      --  Rewrites goto/exit/return inside parallel loops as
+      --  calls to LWT
 
       procedure Set_Trivial_Subprogram (N : Node_Id);
       --  Sets the Is_Trivial_Subprogram flag in both spec and body of the
@@ -3530,6 +3531,10 @@ package body Sem_Ch6 is
          Exit_Alt_Count : Nat := 1;
          Exit_Alts      : constant List_Id := New_List;
 
+         --------------------
+         -- Get_Return_Val --
+         --------------------
+
          function Get_Return_Val (Typ : Entity_Id) return Entity_Id
          is
             pragma Assert (Present (Return_Val) or else
@@ -3553,6 +3558,10 @@ package body Sem_Ch6 is
             return Return_Val;
          end Get_Return_Val;
 
+         --------------------
+         -- Get_Return_Ind --
+         --------------------
+
          function Get_Return_Ind return Entity_Id is
          begin
             if Present (Return_Ind) then
@@ -3574,6 +3583,10 @@ package body Sem_Ch6 is
             return Return_Ind;
          end Get_Return_Ind;
 
+         -------------------------
+         -- New_Early_Exit_Case --
+         -------------------------
+
          function New_Early_Exit_Case (Post_Call_Action : Node_Id)
            return Node_Id
          is
@@ -3588,6 +3601,10 @@ package body Sem_Ch6 is
             Exit_Alt_Count := Exit_Alt_Count + 1;
             return Ind;
          end New_Early_Exit_Case;
+
+         ---------------------
+         -- Make_Early_Exit --
+         ---------------------
 
          function Make_Early_Exit
            (Post_Call_Action : Node_Id := Empty;
@@ -3657,6 +3674,10 @@ package body Sem_Ch6 is
             return Exit_Block;
          end Make_Early_Exit;
 
+         ------------------------------
+         -- Scope_Is_Inside_Parallel --
+         ------------------------------
+
          function Scope_Is_Inside_Parallel (S : Entity_Id)
            return Boolean
          is
@@ -3684,6 +3705,10 @@ package body Sem_Ch6 is
             --  function and was already popped off the scope stack.
             return True;
          end Scope_Is_Inside_Parallel;
+
+         ----------------
+         -- Visit_Node --
+         ----------------
 
          function Visit_Node (I : Node_Id) return Traverse_Result is
          begin
@@ -3767,6 +3792,9 @@ package body Sem_Ch6 is
          then
             Set_Is_Outlined_Parallel (Scope_Id, False);
             Replace_Exits (Handled_Statement_Sequence (N));
+
+            --  Create a case statement with our early exit actions
+            --  and attach it to the scope metadata
             if Present (Return_Ind) then
                Append_To (Exit_Alts,
                  Make_Case_Statement_Alternative (Loc,

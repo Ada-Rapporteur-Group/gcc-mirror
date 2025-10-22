@@ -1,8 +1,6 @@
 -- { dg-do compile }
 -- { dg-options "-gnat2022" }
 
-with Ada.Text_IO;
-
 procedure parallel_do_err2 is
 begin
    parallel do
@@ -11,4 +9,4 @@ begin
       null;
    and
       null;
-end parallel_do_err2; -- { dg-error "error: \"end do;\" expected for \"do\" at line 8" }
+end parallel_do_err2; -- { dg-error "error: \"end do;\" expected for \"do\" at line 6" }
