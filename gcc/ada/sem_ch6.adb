@@ -3528,6 +3528,7 @@ package body Sem_Ch6 is
 
          Return_Val     : Entity_Id := Empty;
          Return_Ind     : Entity_Id := Empty;
+         Par_Loop_Id    : Entity_Id := Empty;
          Ret_Is_Void    : Boolean := False;
          Exit_Alt_Count : Nat := 1;
          Exit_Alts      : constant List_Id := New_List;
@@ -3747,6 +3748,17 @@ package body Sem_Ch6 is
                return Skip;
             end if;
 
+            --  Find our outlined region's parallel loop scope
+            --  if applicable.
+
+            if Nkind (I) = N_Loop_Statement
+              and then Is_Parallel_Loop_Scope (
+                Entity (Identifier (I)))
+            then
+               pragma Assert (No (Par_Loop_Id));
+               Par_Loop_Id := Entity (Identifier (I));
+            end if;
+
             --  Rewrite return statements
 
             if Nkind (I) = N_Simple_Return_Statement then
@@ -3807,16 +3819,36 @@ package body Sem_Ch6 is
             --  Rewrite exit statements
 
             if Nkind (I) = N_Exit_Statement then
+
                --  Rewrite exits that exit the current parallel loop
 
-               if (No (Name (I))
-                 and then Ekind (Exits_From (I)) = E_Loop
-                 and then Is_Parallel_Loop_Scope (Exits_From (I)))
+               if Present (Par_Loop_Id)
+                 and then ((No (Name (I))
+                   and then Ekind (Exits_From (I)) = E_Loop
+                   and then Exits_From (I) = Par_Loop_Id)
                  or else (Present (Name (I))
-                   and then Is_Parallel_Loop_Scope (Entity (Name (I))))
+                   and then Entity (Name (I)) = Par_Loop_Id))
                then
                   Rewrite (I, Make_Early_Exit (
                     Predicate => Condition (I)));
+                  Analyze (I);
+                  return Skip;
+
+               --  Rewrite exits without labels that break out of
+               --  enclosing scopes. This happens when an exit statement
+               --  inside a parallel block statement breaks out of an
+               --  enclosing loop.
+
+               elsif No (Name (I))
+                 and then Ekind (Exits_From (I)) = E_Loop
+                 and then not Scope_Is_Inside_Parallel (
+                   Exits_From (I))
+               then
+                  Rewrite (I, Make_Early_Exit (
+                    Predicate        => Condition (I),
+                    Post_Call_Action => Make_Exit_Statement (Loc,
+                      Name           => New_Occurrence_Of (
+                                          Exits_From (I), Loc))));
                   Analyze (I);
                   return Skip;
 
