@@ -1919,6 +1919,7 @@ package body Sem_Ch5 is
 
          --  Skip over blocks, loops, return statement scopes,
          --  and parallel outlined procedures
+
          if Label_Scope = Scope_Id
            or else (Ekind (Scope_Id) not in
                      E_Block | E_Loop | E_Return_Statement
@@ -3968,6 +3969,7 @@ package body Sem_Ch5 is
 
             --  Transforms
 
+            --     ... <PARALLEL_DECLS> ...
             --     parallel (CHUNK) for I in Low .. Hi loop
             --        ...
             --     end loop;
@@ -3978,6 +3980,8 @@ package body Sem_Ch5 is
             --       Hi_Arg : Longest_Integer; Chunk : Positive;
             --       Loop_Id : Par_Loop_Id)
             --     is
+            --        ... <PARALLEL_DECLS> ...
+            --     begin
             --        parallel (CHUNK)
             --           for I in Low_Arg .. Hi_Arg loop
             --              ...
@@ -4420,7 +4424,8 @@ package body Sem_Ch5 is
       Analyze_Iteration_Scheme (Iter);
 
       --  Mark the scope as being parallel so that we can use this information
-      --  later when we transform control flow statements inside parallel scopes.
+      --  later when we transform control flow statements inside parallel
+      --  scopes.
 
       if Is_Parallel (Iter) then
          Set_Is_Parallel_Loop_Scope (Ent);
@@ -4807,6 +4812,7 @@ package body Sem_Ch5 is
    begin
 
       --  Builds the following call:
+
       --     Par_Range_Loop_With_Early_Exit (
       --       Low_Arg, Hi_Arg, Chunk_Arg, null,
       --       Outlined_Proc'Access)

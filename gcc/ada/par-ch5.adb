@@ -1617,6 +1617,12 @@ package body Ch5 is
    --  ITERATION_SCHEME ::=
    --    while CONDITION
    --  | for LOOP_PARAMETER_SPECIFICATION
+   --  | parallel [(CHUNK_SPECIFICATION)]
+   --      for LOOP_PARAMETER_SPECIFICATION
+
+   --  CHUNK_SPECIFICATION ::=
+   --    INTEGER_SIMPLE_EXPRESSION
+   --  | DEFINING_IDENTIFIER in DISCRETE_SUBTYPE_DEFINITION
 
    --  The parsing of loop statements is handled by one of three functions
    --  P_Loop_Statement, P_For_Statement or P_While_Statement depending

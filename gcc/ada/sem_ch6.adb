@@ -3755,7 +3755,7 @@ package body Sem_Ch6 is
 
                --  The exit action should be a return statement
                --  that returns Return_Val instead of the original
-               --  return expression 
+               --  return expression
 
                --     return RETURN_EXPR;
 
@@ -3822,7 +3822,7 @@ package body Sem_Ch6 is
 
                --  Rewrite exits that exit a loop outside the current
                --  parallel loop. We make sure not to include the condition
-               --  in the 
+               --  in the exit actions case statement.
 
                elsif Present (Name (I))
                  and then not Scope_Is_Inside_Parallel (Entity (Name (I)))
