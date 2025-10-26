@@ -27,7 +27,7 @@ begin
       for I in Chunk_Number range 2..6 loop
          Ran_C := True;
       end loop;
-   
+
    if not (Ran_A and then Ran_B and then Ran_C) then
       raise Program_Error;
    end if;
