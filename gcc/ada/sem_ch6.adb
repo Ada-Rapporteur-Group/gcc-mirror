@@ -3763,7 +3763,7 @@ package body Sem_Ch6 is
 
             if Nkind (I) = N_Simple_Return_Statement then
                --  For return statements that return a value,
-               --  move the return value the Return_Val variable
+               --  move the return value into the Return_Val variable
 
                --  The exit action should be a return statement
                --  that returns Return_Val instead of the original

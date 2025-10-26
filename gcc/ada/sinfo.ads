@@ -1512,7 +1512,7 @@ package Sinfo is
 
    --  In_Outlined_Parallel
    --    Set when a N_Parallel_Block_Statement or N_Loop_Statement node
-   --    has been relocated into an outlined parallel procedure.
+   --    has been relocated into an outlined procedure.
 
    --  Includes_Infinities
    --    This flag is present in N_Range nodes. It is set for the range of
@@ -2190,7 +2190,7 @@ package Sinfo is
    --    N_Others_Choice entry.
 
    --  Parallel_Chunk_Id
-   --    Applies to N_Loop_Statements with parallel iteraton schemes. Stores
+   --    Applies to N_Loop_Statements with parallel iteration schemes. Stores
    --    a reference to the enclosing outlined procedure's Chunk_Id parameter.
 
    --  Parallel_Declarations
@@ -2198,11 +2198,10 @@ package Sinfo is
    --    should be an empty list for N_Loop_Statement nodes without parallel
    --    iteration schemes. Neither of these statements have room for
    --    declarations in their syntax, but they are later moved inside of an
-   --    outlined procedure before analysis. This list is used to collect block
-   --    and loop labels that are created inside Par.Labl so that they can be
-   --    moved inside the outlined procedure's declarations. In the case of
-   --    sequential expansion, these declarations are moved inside an
-   --    enclosing block.
+   --    outlined procedure before analysis. This list is used to collect
+   --    implicit block and loop labels so that they can be moved inside
+   --    the outlined procedure's declarations. In the case of sequential
+   --    expansion, these declarations are moved inside an enclosing block.
 
    --  Parallel_Low_Bound
    --    Applies to N_Parallel_Block_Statement. Contains a reference to the
