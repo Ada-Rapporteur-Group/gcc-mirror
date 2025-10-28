@@ -3949,17 +3949,45 @@ package body Sem_Ch5 is
                DS     : constant Node_Id := Discrete_Subtype_Definition (P);
                R_Copy : constant Node_Id := New_Copy_Tree (DS);
             begin
+               Hi := Empty;
+               Lo := Empty;
+
                Set_Parent (R_Copy, Parent (DS));
                Preanalyze_Range (R_Copy);
                Typ := Etype (R_Copy);
+
+               if not Is_Discrete_Type (Etype (R_Copy)) then
+                  Wrong_Type (R_Copy, Any_Discrete);
+               end if;
 
                if Nkind (DS) = N_Range
                  and then Expander_Active
                then
                   Process_Bounds (DS, N, Sloc (P));
                   Read_Bounds (DS, Lo, Hi);
-               else
+
+               elsif Nkind (R_Copy) in N_Subtype_Indication | N_Range then
                   Read_Bounds (R_Copy, Lo, Hi);
+
+               elsif Is_Entity_Name (R_Copy)
+                 and then Is_Type (Entity (R_Copy))
+               then
+                  declare
+                     Typ : constant Entity_Id := Get_Full_View (
+                       Entity (R_Copy));
+                  begin
+                     if not Is_Discrete_Type (Typ) then
+                        Error_Msg_N ("discrete type required for " &
+                          "chunk specifier", N);
+                     end if;
+
+                     Lo := Type_Low_Bound  (Typ);
+                     Hi := Type_High_Bound (Typ);
+                  end;
+
+               else
+                  Error_Msg_N ("invalid subtype mark in discrete range",
+                    R_Copy);
                end if;
             end Prepare_Loop_Param;
 

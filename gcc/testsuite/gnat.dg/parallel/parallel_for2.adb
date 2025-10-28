@@ -12,7 +12,7 @@ procedure parallel_for2 is
      with Default_Component_Value => False;
    Group_Hits : Alphabet_Set;
 begin
-   parallel (Ch in Sub_Alpha'Range)
+   parallel (Ch in Sub_Alpha)
       for I in 25 .. 125 loop
          Group_Hits (Ch) := True;
          Put_Line ("Chunk: " & Sub_Alpha'Image (Ch) &
