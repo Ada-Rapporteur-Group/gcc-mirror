@@ -4867,7 +4867,7 @@ package body Sem_Ch5 is
          Analyze_Chunk_Specification (Chunk_Spec);
       end if;
 
-      --  Pre-analysis transformations for parllel expansion.
+      --  Pre-analysis transformations for parallel expansion.
       --  This entails wrapping the parallel block inside an
       --  outlined procedure
 
