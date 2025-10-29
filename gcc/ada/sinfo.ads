@@ -1265,6 +1265,10 @@ package Sinfo is
    --    to allow a goto is required (and this field contains the label for
    --    this goto). See Exp_Ch11.Expand_Local_Exception_Handlers for details.
 
+   --  Exits_From
+   --     Appears in N_Loop_Flow_Statement nodes. Points to the entity of the
+   --     loop that the loop flow statement breaks out of.
+
    --  Expansion_Delayed
    --    Set on aggregates and extension aggregates that need a top-down rather
    --    than bottom-up expansion. Typically aggregate expansion happens bottom
@@ -1505,6 +1509,10 @@ package Sinfo is
    --    This flag is set in an Interface or Import pragma if a matching
    --    pragma of the other kind is also present. This is used to avoid
    --    generating some unwanted error messages.
+
+   --  In_Outlined_Parallel
+   --    Set when a N_Parallel_Block_Statement or N_Loop_Statement node
+   --    has been relocated into an outlined procedure.
 
    --  Includes_Infinities
    --    This flag is present in N_Range nodes. It is set for the range of
@@ -1802,6 +1810,16 @@ package Sinfo is
    --    A flag present in all expression nodes. Used temporarily during
    --    overloading determination. The setting of this flag is not relevant
    --    once overloading analysis is complete.
+
+   --  Is_Parallel
+   --    This flag is enabled in an N_Iteration_Scheme if the scheme belongs
+   --    to a parallel loop.
+
+   --  Is_Parallel_Exit
+   --    This flag is set when a block statement represents an early exit
+   --    from a parallel construct. These blocks are constructed when
+   --    control flow statements (return, exit, goto) are rewritten using
+   --    a call to LWT's Early_Exit function.
 
    --  Is_Parenthesis_Aggregate
    --    A flag set on an aggregate that uses parentheses as delimiters
@@ -2170,6 +2188,28 @@ package Sinfo is
    --    this materialized list of choices, which is in standard format for a
    --    list of discrete choices, except that of course it cannot contain an
    --    N_Others_Choice entry.
+
+   --  Parallel_Chunk_Id
+   --    Applies to N_Loop_Statements with parallel iteration schemes. Stores
+   --    a reference to the enclosing outlined procedure's Chunk_Id parameter.
+
+   --  Parallel_Declarations
+   --    Applies to N_Parallel_Block_Statement and N_Loop_Statement. This field
+   --    should be an empty list for N_Loop_Statement nodes without parallel
+   --    iteration schemes. Neither of these statements have room for
+   --    declarations in their syntax, but they are later moved inside of an
+   --    outlined procedure before analysis. This list is used to collect
+   --    implicit block and loop labels so that they can be moved inside
+   --    the outlined procedure's declarations. In the case of sequential
+   --    expansion, these declarations are moved inside an enclosing block.
+
+   --  Parallel_Low_Bound
+   --    Applies to N_Parallel_Block_Statement. Contains a reference to the
+   --    parallel outlined procedure's Low parameter.
+
+   --  Parallel_Hi_Bound
+   --    Applies to N_Parallel_Block_Statement. Contains a reference to the
+   --    parallel outlined procedure's Hi parameter.
 
    --  Parent_Spec
    --    For a library unit that is a child unit spec (package or subprogram
@@ -5120,7 +5160,10 @@ package Sinfo is
       --  Statements
       --  End_Label
       --  Has_Created_Identifier
+      --  In_Outlined_Parallel
       --  Is_Null_Loop
+      --  Parallel_Declarations
+      --  Parallel_Chunk_Id
       --  Suppress_Loop_Warnings
 
       --  Note: the parser fills in the Identifier field if there is an
@@ -5138,6 +5181,12 @@ package Sinfo is
       --    while CONDITION
       --  | for LOOP_PARAMETER_SPECIFICATION
       --  | for ITERATOR_SPECIFICATION
+      --  | parallel [(CHUNK_SPECIFICATION)]
+      --      for LOOP_PARAMETER_SPECIFICATION
+
+      --  CHUNK_SPECIFICATION ::=
+      --    INTEGER_SIMPLE_EXPRESSION
+      --  | DEFINING_IDENTIFIER in DISCRETE_SUBTYPE_DEFINITION
 
       --  At most one of (Iterator_Specification, Loop_Parameter_Specification)
       --  is present at a time, in which case the other one is empty. Both are
@@ -5151,6 +5200,8 @@ package Sinfo is
       --  Sloc points to WHILE or FOR
       --  Condition (set to Empty if FOR case)
       --  Condition_Actions
+      --  Chunk_Specification
+      --  Is_Parallel
       --  Iterator_Specification (set to Empty if WHILE case)
       --  Loop_Parameter_Specification (set to Empty if WHILE case)
 
@@ -5248,6 +5299,28 @@ package Sinfo is
       --  Is_Task_Allocation_Block
       --  Is_Task_Master
 
+      -------------------------------------
+      -- 5.6.1  Parallel Block Statement --
+      -------------------------------------
+
+      --  PARALLEL_BLOCK_STATEMENT ::=
+      --    parallel [(CHUNK_SPECIFICATION)] [ASPECT_SPECIFICATION] do
+      --       SEQUENCE_OF_STATEMENTS
+      --    and
+      --       SEQUENCE_OF_STATEMENTS
+      --    {and
+      --       SEQUENCE_OF_STATEMENTS}
+      --    end do;
+
+      --  N_Parallel_Block_Statement
+      --  Sloc points to DO
+      --  Chunk_Specification
+      --  Parallel_Branches
+      --  Parallel_Declarations
+      --  Parallel_Low_Bound
+      --  Parallel_Hi_Bound
+      --  In_Outlined_Parallel
+
       -------------------------
       -- 5.7  Exit Statement --
       -------------------------
@@ -5263,6 +5336,7 @@ package Sinfo is
       --  Name (set to Empty if no loop name present)
       --  Condition (set to Empty if no WHEN part present)
       --  Next_Exit_Statement : Next exit on chain
+      --  Exits_From
 
       ------------------------
       -- Continue Statement --

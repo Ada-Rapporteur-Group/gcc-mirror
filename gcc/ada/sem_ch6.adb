@@ -1935,7 +1935,8 @@ package body Sem_Ch6 is
          Result : Entity_Id := Empty;
 
       begin
-         --  Loop outward through the Scope_Stack, skipping blocks, and loops
+         --  Loop outward through the Scope_Stack, skipping blocks,
+         --  loops, and outlined parallel procedures
 
          for J in reverse 0 .. Scope_Stack.Last loop
             Result := Scope_Stack.Table (J).Entity;
@@ -3527,6 +3528,7 @@ package body Sem_Ch6 is
 
          Return_Val     : Entity_Id := Empty;
          Return_Ind     : Entity_Id := Empty;
+         Par_Loop_Id    : Entity_Id := Empty;
          Ret_Is_Void    : Boolean := False;
          Exit_Alt_Count : Nat := 1;
          Exit_Alts      : constant List_Id := New_List;
@@ -3540,10 +3542,16 @@ package body Sem_Ch6 is
             pragma Assert (Present (Return_Val) or else
               not Ret_Is_Void);
          begin
+            --  Return the variable if it has already been
+            --  created
+
             if Present (Return_Val) then
                pragma Assert (Typ = Etype (Return_Val));
                return Return_Val;
             end if;
+
+            --  Otherwise, create it
+            --    Return_Val : Func_Return_Type;
 
             Return_Val := Make_Temporary (Loc, 'P');
 
@@ -3564,9 +3572,15 @@ package body Sem_Ch6 is
 
          function Get_Return_Ind return Entity_Id is
          begin
+            --  Return the variable if it has already been
+            --  created
+
             if Present (Return_Ind) then
                return Return_Ind;
             end if;
+
+            --  Otherwise, create it
+            --    Return_Ind : Natural := 0;
 
             Return_Ind := Make_Temporary (Loc, 'P');
 
@@ -3594,6 +3608,11 @@ package body Sem_Ch6 is
             Ind : constant Node_Id := Make_Integer_Literal
               (Loc, Exit_Alt_Count);
          begin
+            --  Add the post call action to our case statement
+
+            --  when N =>
+            --     POST_CALL_ACTION
+
             Alt := Make_Case_Statement_Alternative (Loc,
               Discrete_Choices => New_List (Copy_Separate_Tree (Ind)),
               Statements       => New_List (Post_Call_Action));
@@ -3616,6 +3635,7 @@ package body Sem_Ch6 is
             EE_Call, Exit_Block : Node_Id;
          begin
             --  Create call to LWT Early Exit function
+
             EE_Call := Make_Function_Call (Loc,
               Name => New_Occurrence_Of (RTE (RE_Early_Exit), Loc),
               Parameter_Associations => New_List (New_Occurrence_Of (
@@ -3623,6 +3643,7 @@ package body Sem_Ch6 is
 
             --  Create a new post call action index and assign this
             --  value to Return_Ind
+
             if Present (Post_Call_Action) then
                Append_To (If_Body, Make_Assignment_Statement (Loc,
                  Name => New_Occurrence_Of (Get_Return_Ind, Loc),
@@ -3634,6 +3655,7 @@ package body Sem_Ch6 is
 
             --  If this is a return statement, then assign the value
             --  to Return_Val
+
             if Present (Ret_Val) then
                Append_To (If_Body, Make_Assignment_Statement (Loc,
                  Name => New_Occurrence_Of (Get_Return_Val
@@ -3657,6 +3679,7 @@ package body Sem_Ch6 is
 
             --  Wrap contents of block inside an if statement if a
             --  predicate is supplied. This is used for `exit when`
+
             if Present (Predicate) then
                Exit_Stmts := New_List (Make_If_Statement (Loc,
                  Condition       => Predicate,
@@ -3665,6 +3688,7 @@ package body Sem_Ch6 is
 
             --  Wrap the early exit inside a block and mark it as an
             --  early exit so that we don't re-traverse it later
+
             Exit_Block := Make_Block_Statement (Loc,
               Handled_Statement_Sequence =>
                 Make_Handled_Sequence_Of_Statements (Loc,
@@ -3689,12 +3713,14 @@ package body Sem_Ch6 is
 
                --  The current scope (Scop) is the target scope
                --  (Scope (S))
+
                if Scope (S) = Scop then
                   return Inside_Outlined;
 
                --  If the current scope is the outlined function scope
                --  (Scope_Id), then we know we're exiting the outlined
                --  function scope
+
                elsif Scop = Scope_Id then
                   Inside_Outlined := False;
                end if;
@@ -3703,6 +3729,7 @@ package body Sem_Ch6 is
             --  If we can't find the target scope above the outlined
             --  function scope, we can assume it was inside the outlined
             --  function and was already popped off the scope stack.
+
             return True;
          end Scope_Is_Inside_Parallel;
 
@@ -3713,6 +3740,7 @@ package body Sem_Ch6 is
          function Visit_Node (I : Node_Id) return Traverse_Result is
          begin
             --  Don't traverse nested functions or exit blocks
+
             if Nkind (I) = N_Subprogram_Body
               or else (Nkind (I) = N_Block_Statement
                 and then Is_Parallel_Exit (I))
@@ -3720,14 +3748,51 @@ package body Sem_Ch6 is
                return Skip;
             end if;
 
+            --  Find our outlined region's parallel loop scope
+            --  if applicable.
+
+            if Nkind (I) = N_Loop_Statement
+              and then Is_Parallel_Loop_Scope (
+                Entity (Identifier (I)))
+            then
+               pragma Assert (No (Par_Loop_Id));
+               Par_Loop_Id := Entity (Identifier (I));
+            end if;
+
             --  Rewrite return statements
+
             if Nkind (I) = N_Simple_Return_Statement then
+               --  For return statements that return a value,
+               --  move the return value into the Return_Val variable
+
+               --  The exit action should be a return statement
+               --  that returns Return_Val instead of the original
+               --  return expression
+
+               --     return RETURN_EXPR;
+
+               --  becomes
+
+               --     if Early_Exit (Loop_Id) then
+               --        Return_Val := RETURN_EXPR;
+               --        Return_Ind := N;
+               --     end if;
+               --     return;
+               --  ...
+               --     when N =>
+               --        return Return_Val;
+
                if Present (Expression (I)) then
                   Rewrite (I, Make_Early_Exit (
                     Ret_Val          => Expression (I),
                     Post_Call_Action => Make_Simple_Return_Statement
                       (Loc, New_Occurrence_Of (Get_Return_Val (
                         Etype (Expression (I))), Loc))));
+
+               --  In cases where the return statement has no
+               --  return expression, the Return_Val and exit
+               --  action are not needed
+
                else
                   pragma Assert (No (Return_Val));
                   Ret_Is_Void := True;
@@ -3740,6 +3805,7 @@ package body Sem_Ch6 is
             end if;
 
             --  Rewrite goto statements
+
             if Nkind (I) in N_Goto_Statement
               and then not Scope_Is_Inside_Parallel (
                 Entity (Name (I)))
@@ -3751,21 +3817,45 @@ package body Sem_Ch6 is
             end if;
 
             --  Rewrite exit statements
+
             if Nkind (I) = N_Exit_Statement then
+
                --  Rewrite exits that exit the current parallel loop
-               if (No (Name (I))
-                 and then Ekind (Exits_From (I)) = E_Loop
-                 and then Is_Parallel_Loop_Scope (Exits_From (I)))
+
+               if Present (Par_Loop_Id)
+                 and then ((No (Name (I))
+                   and then Ekind (Exits_From (I)) = E_Loop
+                   and then Exits_From (I) = Par_Loop_Id)
                  or else (Present (Name (I))
-                   and then Is_Parallel_Loop_Scope (Entity (Name (I))))
+                   and then Entity (Name (I)) = Par_Loop_Id))
                then
                   Rewrite (I, Make_Early_Exit (
                     Predicate => Condition (I)));
                   Analyze (I);
                   return Skip;
 
+               --  Rewrite exits without labels that break out of
+               --  enclosing scopes. This happens when an exit statement
+               --  inside a parallel block statement breaks out of an
+               --  enclosing loop.
+
+               elsif No (Name (I))
+                 and then Ekind (Exits_From (I)) = E_Loop
+                 and then not Scope_Is_Inside_Parallel (
+                   Exits_From (I))
+               then
+                  Rewrite (I, Make_Early_Exit (
+                    Predicate        => Condition (I),
+                    Post_Call_Action => Make_Exit_Statement (Loc,
+                      Name           => New_Occurrence_Of (
+                                          Exits_From (I), Loc))));
+                  Analyze (I);
+                  return Skip;
+
                --  Rewrite exits that exit a loop outside the current
-               --  parallel loop
+               --  parallel loop. We make sure not to include the condition
+               --  in the exit actions case statement.
+
                elsif Present (Name (I))
                  and then not Scope_Is_Inside_Parallel (Entity (Name (I)))
                then
@@ -3794,7 +3884,10 @@ package body Sem_Ch6 is
             Replace_Exits (Handled_Statement_Sequence (N));
 
             --  Create a case statement with our early exit actions
-            --  and attach it to the scope metadata
+            --  and attach it to the scope semantic data. This statement
+            --  is retrieved in Sem_Ch5 and inserted at the end of
+            --  expanded parallel constructs.
+
             if Present (Return_Ind) then
                Append_To (Exit_Alts,
                  Make_Case_Statement_Alternative (Loc,

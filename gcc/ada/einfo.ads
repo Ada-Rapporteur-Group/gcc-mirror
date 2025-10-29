@@ -3106,6 +3106,11 @@ package Einfo is
 --       out parameter, or if there is some other IN OUT parameter then this
 --       flag is not set in any of them. Used in generation of warnings.
 
+--    Is_Outlined_Parallel
+--       Set if this scope belongs to an outlined procedure associated with a
+--       parallel construct. Parallel constructs are moved into outlined
+--       procedures during preanalysis.
+
 --    Is_Ordinary_Fixed_Point_Type (synthesized)
 --       Applies to all entities, true for ordinary fixed point types and
 --       subtypes.
@@ -3167,6 +3172,9 @@ package Einfo is
 --       allowed are allowed for such types). If Is_Packed_Array_Impl_Type is
 --       set in an entity, then the Original_Array_Type field of this entity
 --       points to the array type for which this is the Packed_Array_Impl_Type.
+
+--    Is_Parallel_Loop_Scope
+--       Set if this scope is a parallel loop scope.
 
 --    Is_Param_Block_Component_Type [base type only]
 --       Defined in access types. Set to indicate that a type is the type of a
@@ -3959,6 +3967,17 @@ package Einfo is
 --       Defined in functions and procedures. Set only on internally built
 --       dispatching subprograms of protected types to reference their original
 --       non-dispatching protected subprogram since their names differ.
+
+--    Parallel_Exit_Actions
+--       Defined for E_Procedure entities that are parallel outlined scopes.
+--       This field is set to a case statement node when control flow
+--       statements (return/goto/exit) are rewritten as parallel exit
+--       blocks.
+
+--    Parallel_Loop_Id_Param
+--       Defined for E_Procedure entities that are parallel outlined scopes.
+--       This field stores a reference to the parallel outlined procedure's
+--       Loop_Id parameter.
 
 --    Original_Record_Component
 --       Defined in components, including discriminants. The usage depends
