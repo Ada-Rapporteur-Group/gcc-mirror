@@ -117,7 +117,7 @@ package body Sem_Ch5 is
    --  domain of iteration is a container.
 
    procedure Process_Bounds (R : Node_Id; N : Node_Id; Loc : Source_Ptr);
-   --  If the iteration is given by a range, create temporaries and
+   --  If a loop parameter is given by a range, create temporaries and
    --  assignment statements block to capture the bounds and perform
    --  required finalization actions in case a bound includes a function
    --  call that uses the temporary stack. We first preanalyze a copy of
@@ -3952,6 +3952,8 @@ package body Sem_Ch5 is
                Hi := Empty;
                Lo := Empty;
 
+               --  Check if the loop param is of a discrete type
+
                Set_Parent (R_Copy, Parent (DS));
                Preanalyze_Range (R_Copy);
                Typ := Etype (R_Copy);
@@ -3960,21 +3962,56 @@ package body Sem_Ch5 is
                   Wrong_Type (R_Copy, Any_Discrete);
                end if;
 
+               --  Analyze the discrete range and move function calls
+               --  inside the range before the parallel loop
+
                if Nkind (DS) = N_Range
                  and then Expander_Active
                then
                   Process_Bounds (DS, N, Sloc (P));
+               else
+                  Analyze (DS);
+               end if;
+
+               --  In the case where the discrete subtype definition is given
+               --  by Function_Call (...)'Range, rewrite the node so that
+               --  the function call is outside the loop. This is to prevent
+               --  Function_Call from executing inside the parallel loop.
+
+               if Nkind (DS) = N_Attribute_Reference
+                 and then Nkind (Prefix (DS)) = N_Function_Call
+                 and then Attribute_Name (DS) = Name_Range
+                 and then Expander_Active
+               then
+                  declare
+                     Func_Temp : constant Entity_Id :=
+                       Make_Temporary (Loc, 'P');
+                     Decl : Node_Id;
+                  begin
+                     Decl := Make_Object_Declaration (Loc,
+                       Defining_Identifier => Func_Temp,
+                       Expression          => Relocate_Node (Prefix (DS)),
+                       Object_Definition   =>
+                         New_Occurrence_Of (Etype (Prefix (DS)), Loc));
+                     Insert_Before_And_Analyze (N, Decl);
+
+                     Rewrite (DS,
+                       Make_Attribute_Reference (Loc,
+                         Prefix         => New_Occurrence_Of (Func_Temp, Loc),
+                         Attribute_Name => Name_Range));
+                     Analyze_And_Resolve (DS);
+                  end;
+               end if;
+
+               if Nkind (DS) in N_Subtype_Indication | N_Range then
                   Read_Bounds (DS, Lo, Hi);
 
-               elsif Nkind (R_Copy) in N_Subtype_Indication | N_Range then
-                  Read_Bounds (R_Copy, Lo, Hi);
-
-               elsif Is_Entity_Name (R_Copy)
-                 and then Is_Type (Entity (R_Copy))
+               elsif Is_Entity_Name (DS)
+                 and then Is_Type (Entity (DS))
                then
                   declare
                      Typ : constant Entity_Id := Get_Full_View (
-                       Entity (R_Copy));
+                       Entity (DS));
                   begin
                      if not Is_Discrete_Type (Typ) then
                         Error_Msg_N ("discrete type required for " &
@@ -3986,8 +4023,7 @@ package body Sem_Ch5 is
                   end;
 
                else
-                  Error_Msg_N ("invalid subtype mark in discrete range",
-                    R_Copy);
+                  Error_Msg_N ("invalid subtype mark in discrete range", DS);
                end if;
             end Prepare_Loop_Param;
 
