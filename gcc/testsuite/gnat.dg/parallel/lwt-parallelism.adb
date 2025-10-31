@@ -14,16 +14,18 @@ package body LWT.Parallelism is
       else
          declare
             Iter_Rng : constant Longest_Integer := High - Low;
+            Active_Chunks : constant Natural := Natural'Min (
+              Num_Chunks, Natural (Iter_Rng));
             Group_Size : constant Longest_Integer :=
-              Iter_Rng / Longest_Integer (Num_Chunks);
+              Iter_Rng / Longest_Integer (Active_Chunks);
             Lower_Bound, Upper_Bound : Longest_Integer;
          begin
-            for I in 1 .. Num_Chunks loop
-               Lower_Bound := Group_Size * Longest_Integer (I);
-               if I = Num_Chunks then
+            for I in 1 .. Active_Chunks loop
+               Lower_Bound := Group_Size * Longest_Integer (I - 1) + Low;
+               if I = Active_Chunks then
                   Upper_Bound := High;
                else
-                  Upper_Bound := Lower_Bound + Group_Size;
+                  Upper_Bound := Lower_Bound + Group_Size - 1;
                end if;
                Loop_Body (Lower_Bound, Upper_Bound, I, PID);
             end loop;
