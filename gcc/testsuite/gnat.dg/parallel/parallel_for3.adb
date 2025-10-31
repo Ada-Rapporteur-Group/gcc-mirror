@@ -3,9 +3,16 @@
 
 with Ada.Text_IO;     use Ada.Text_IO;
 with LWT.Parallelism; use LWT.Parallelism;
+with System.Atomic_Operations.Integer_Arithmetic;
 
 procedure parallel_for3 is
-   Ret_Arr_Called : Integer := 0 with Atomic;
+   type Atomic_Int is new Integer with Atomic;
+
+   package Int_Atomic is new
+     System.Atomic_Operations.Integer_Arithmetic
+       (Atomic_Type => Atomic_Int);
+
+   Ret_Arr_Called : aliased Atomic_Int := 0;
 
    type Group_Set is array (1 .. 5) of Boolean
      with Default_Component_Value => False;
@@ -17,7 +24,7 @@ procedure parallel_for3 is
       function Ret_Arr (J : Integer) return My_Array is
          Arr : My_Array;
       begin
-         Ret_Arr_Called := Ret_Arr_Called + 1;
+         Int_Atomic.Atomic_Add (Ret_Arr_Called, 1);
          for K in My_Array'Range loop
             Arr (K) := J;
          end loop;
