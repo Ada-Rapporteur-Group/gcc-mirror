@@ -3973,34 +3973,45 @@ package body Sem_Ch5 is
                   Analyze (DS);
                end if;
 
-               --  In the case where the discrete subtype definition is given
-               --  by Function_Call (...)'Range, rewrite the node so that
-               --  the function call is outside the loop. This is to prevent
-               --  Function_Call from executing inside the parallel loop.
+               --  Process 'Range attributes
 
                if Nkind (DS) = N_Attribute_Reference
-                 and then Nkind (Prefix (DS)) = N_Function_Call
                  and then Attribute_Name (DS) = Name_Range
-                 and then Expander_Active
                then
-                  declare
-                     Func_Temp : constant Entity_Id :=
-                       Make_Temporary (Loc, 'P');
-                     Decl : Node_Id;
-                  begin
-                     Decl := Make_Object_Declaration (Loc,
-                       Defining_Identifier => Func_Temp,
-                       Expression          => Relocate_Node (Prefix (DS)),
-                       Object_Definition   =>
-                         New_Occurrence_Of (Etype (Prefix (DS)), Loc));
-                     Insert_Before_And_Analyze (N, Decl);
+                  --  Ensure that the prefix expression on an attribute
+                  --  reference is evaluated once outside of the parallel
+                  --  loop. If the prefix is anything but an identifier,
+                  --  we move the expression into a seperate declaration.
 
-                     Rewrite (DS,
-                       Make_Attribute_Reference (Loc,
-                         Prefix         => New_Occurrence_Of (Func_Temp, Loc),
-                         Attribute_Name => Name_Range));
+                  if Nkind (Prefix (DS)) /= N_Identifier
+                    and then Expander_Active
+                  then
+                     declare
+                        Func_Temp : constant Entity_Id :=
+                        Make_Temporary (Loc, 'P');
+                        Decl : Node_Id;
+                     begin
+                        Decl := Make_Object_Declaration (Loc,
+                          Defining_Identifier => Func_Temp,
+                          Expression          => Relocate_Node (Prefix (DS)),
+                          Object_Definition   =>
+                            New_Occurrence_Of (Etype (Prefix (DS)), Loc));
+                        Insert_Before_And_Analyze (N, Decl);
+
+                        Rewrite (DS,
+                          Make_Attribute_Reference (Loc,
+                            Prefix         => New_Occurrence_Of (
+                                                Func_Temp, Loc),
+                            Attribute_Name => Name_Range));
+                        Analyze_And_Resolve (DS);
+                     end;
+
+                  --  Otherwise, resolve the range so that we can extract the
+                  --  upper and lower bounds.
+
+                  else
                      Analyze_And_Resolve (DS);
-                  end;
+                  end if;
                end if;
 
                if Nkind (DS) in N_Subtype_Indication | N_Range then
