@@ -3984,6 +3984,8 @@ package body Sem_Ch5 is
                   --  we move the expression into a seperate declaration.
 
                   if Nkind (Prefix (DS)) /= N_Identifier
+                    and then not (Is_Entity_Name (Prefix (DS))
+                      and then Is_Type (Entity (Prefix (DS))))
                     and then Expander_Active
                   then
                      declare
