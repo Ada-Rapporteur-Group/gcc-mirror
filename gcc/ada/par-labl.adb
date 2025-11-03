@@ -41,7 +41,8 @@ procedure Labl is
    --  Next label node to process
 
    function Find_Enclosing_Body_Or_Block (N : Node_Id) return Node_Id;
-   --  Find the innermost body or block that encloses N
+   --  Find the innermost body, block, or parallel construct
+   --  that encloses N
 
    function Find_Enclosing_Body (N : Node_Id) return Node_Id;
    --  Find the innermost body that encloses N
@@ -54,6 +55,9 @@ procedure Labl is
    --  Recognizes loops created by backward gotos, and rewrites the
    --  corresponding statements into a proper loop, for optimization
    --  purposes (for example, to control reclaiming local storage).
+
+   function Is_Parallel_Loop (N : Node_Id) return Boolean;
+   --  Checks if the given node is a parallel loop
 
    ---------------------------
    -- Check_Distinct_Labels --
@@ -134,6 +138,7 @@ procedure Labl is
       Result : Node_Id := Parent (N);
 
    begin
+
       --  Climb up the parent chain until we find a body or block
 
       while Present (Result)
@@ -143,6 +148,8 @@ procedure Labl is
         and then Nkind (Result) /= N_Package_Body
         and then Nkind (Result) /= N_Subprogram_Body
         and then Nkind (Result) /= N_Block_Statement
+        and then Nkind (Result) /= N_Parallel_Block_Statement
+        and then not Is_Parallel_Loop (Result)
       loop
          Result := Parent (Result);
       end loop;
@@ -477,6 +484,17 @@ procedure Labl is
       end loop;
    end Find_Natural_Loops;
 
+   ----------------------
+   -- Is_Parallel_Loop --
+   ----------------------
+
+   function Is_Parallel_Loop (N : Node_Id) return Boolean is
+   begin
+      return Nkind (N) = N_Loop_Statement
+        and then Present (Iteration_Scheme (N))
+        and then Is_Parallel (Iteration_Scheme (N));
+   end Is_Parallel_Loop;
+
 --  Start of processing for Par.Labl
 
 begin
@@ -488,8 +506,11 @@ begin
          goto Next_Label;
       end if;
 
-      --  Find the innermost enclosing body or block, which is where
-      --  we need to implicitly declare this label
+      --  Find the innermost enclosing body, block, or parallel construct
+      --  which is where we need to implicitly declare this label
+
+      --  Find_Enclosing_Body_Or_Block will only ever return N_Loop_Statement
+      --  for parallel loops
 
       Enclosing_Body_Or_Block := Find_Enclosing_Body_Or_Block (Label_Node);
 
@@ -524,11 +545,26 @@ begin
          --  Now attach the implicit label declaration to the appropriate
          --  declarative region, creating a declaration list if none exists
 
-         if No (Declarations (Enclosing_Body_Or_Block)) then
-            Set_Declarations (Enclosing_Body_Or_Block, New_List);
-         end if;
+         --  For parallel constructs, we add these label declarations to
+         --  Parallel_Declarations instead of Declarations
 
-         Append (Label_Decl_Node, Declarations (Enclosing_Body_Or_Block));
+         if Nkind (Enclosing_Body_Or_Block) in
+           N_Loop_Statement | N_Parallel_Block_Statement
+         then
+            if No (Parallel_Declarations (Enclosing_Body_Or_Block)) then
+               Set_Parallel_Declarations
+                 (Enclosing_Body_Or_Block, New_List);
+            end if;
+
+            Append (Label_Decl_Node, Parallel_Declarations
+              (Enclosing_Body_Or_Block));
+         else
+            if No (Declarations (Enclosing_Body_Or_Block)) then
+               Set_Declarations (Enclosing_Body_Or_Block, New_List);
+            end if;
+
+            Append (Label_Decl_Node, Declarations (Enclosing_Body_Or_Block));
+         end if;
       end if;
 
       <<Next_Label>>
