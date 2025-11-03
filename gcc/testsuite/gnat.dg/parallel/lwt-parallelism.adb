@@ -14,16 +14,25 @@ package body LWT.Parallelism is
       else
          declare
             Iter_Rng : constant Longest_Integer := High - Low;
+
+            --  Active_Chunks represents the number of chunks that are
+            --  actually used when the number of chunks is larger than
+            --  the number of loop iterations. We cap the chunk count so
+            --  that it does not exceed the iteration range. This ensures
+            --  each active chunk has at least one iteration.
+            Active_Chunks : constant Natural := Natural'Min (
+              Num_Chunks, Natural (Iter_Rng));
+
             Group_Size : constant Longest_Integer :=
-              Iter_Rng / Longest_Integer (Num_Chunks);
+              Iter_Rng / Longest_Integer (Active_Chunks);
             Lower_Bound, Upper_Bound : Longest_Integer;
          begin
-            for I in 1 .. Num_Chunks loop
-               Lower_Bound := Group_Size * Longest_Integer (I);
-               if I = Num_Chunks then
+            for I in 1 .. Active_Chunks loop
+               Lower_Bound := Group_Size * Longest_Integer (I - 1) + Low;
+               if I = Active_Chunks then
                   Upper_Bound := High;
                else
-                  Upper_Bound := Lower_Bound + Group_Size;
+                  Upper_Bound := Lower_Bound + Group_Size - 1;
                end if;
                Loop_Body (Lower_Bound, Upper_Bound, I, PID);
             end loop;
