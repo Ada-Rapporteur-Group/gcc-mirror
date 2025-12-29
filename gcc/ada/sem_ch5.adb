@@ -3869,12 +3869,12 @@ package body Sem_Ch5 is
 
          procedure Outline_Loop is
             Loc        : constant Source_Ptr := Sloc (N);
-            Decls      : constant List_Id    := Parallel_Declarations (N);
             Chunk_Spec : constant Node_Id    := Chunk_Specification (Iter);
             Loop_Id    : constant Entity_Id  := Entity (Identifier (N));
 
-            Outlined_Body, Outlined_Spec, Chunk_Arg,
-              Parallel_Call : Node_Id;
+            Outlined_Body, Outlined_Spec, Chunk_Arg, Parallel_Call : Node_Id;
+            Decls : constant List_Id := New_List;
+
             Spec_Id      : constant Entity_Id := Make_Temporary (Loc, 'P');
             Low_Param    : constant Entity_Id := Make_Temporary (Loc, 'P');
             Hi_Param     : constant Entity_Id := Make_Temporary (Loc, 'P');
@@ -4070,6 +4070,9 @@ package body Sem_Ch5 is
             --       Num_Chunks => CHUNK_EXPR,
             --       Loop_Body => Proc_Name'Access);
 
+            if Is_Non_Empty_List (Parallel_Declarations (N)) then
+               Append_List (Parallel_Declarations (N), Decls);
+            end if;
             Set_Parallel_Declarations (N, No_List);
 
             --  Mark the loop as having been moved into an outlined
@@ -4173,15 +4176,49 @@ package body Sem_Ch5 is
                   Statements => New_List (Relocate_Node (N))));
 
             declare
-               Low, Hi, New_DS : Node_Id;
+               DS : constant Node_Id :=
+                 Discrete_Subtype_Definition (Param_Spec);
+               Low, Hi, New_DS, Low_Bound, Hi_Bound : Node_Id;
                Typ : Entity_Id;
+
+               --  Casts parameter value of LWT.Longest_Integer
+               --  type to the original loop's loop parameter type
+               --  with range checks.
+               function Cast_Loop_Bound
+                 (Param : Entity_Id; T : Entity_Id)
+                  return Node_Id;
+
+               ---------------------
+               -- Cast_Loop_Bound --
+               ---------------------
+
+               function Cast_Loop_Bound
+                 (Param : Entity_Id; T : Entity_Id)
+                  return Node_Id
+               is
+                  Cast_Ident : constant Entity_Id :=
+                    Make_Temporary (Loc, 'P');
+                  Cast : constant Node_Id :=
+                    Make_Attribute_Reference (Loc,
+                      Prefix => New_Occurrence_Of (T, Loc),
+                      Attribute_Name => Name_Val,
+                      Expressions => New_List
+                        (New_Occurrence_Of (Param, Loc)));
+                  Cast_Decl : constant Node_Id :=
+                    Make_Object_Declaration (Loc,
+                      Defining_Identifier => Cast_Ident,
+                      Object_Definition   => New_Occurrence_Of (T, Loc),
+                      Expression          => Cast,
+                      Constant_Present    => True);
+               begin
+                  Append (Cast_Decl, Decls);
+                  return New_Occurrence_Of (Cast_Ident, Loc);
+               end Cast_Loop_Bound;
             begin
                --  Move loop parameter values with side effects
                --  outside of loop before we wrap it in a procedure
 
-               Prepare_Loop_Param
-                 (Loop_Parameter_Specification (Iter),
-                   Low, Hi, Typ);
+               Prepare_Loop_Param (Param_Spec, Low, Hi, Typ);
 
                --  Build call to Par_Range_Loop_With_Early_Exit
 
@@ -4191,22 +4228,31 @@ package body Sem_Ch5 is
                  Chunk_Arg => Chunk_Arg,
                  Outlined_Proc => New_Occurrence_Of (Spec_Id, Loc));
 
+               --  Cast loop bounds from Longest_Integer to their type
+               --  in the original loop.
+
+               if Nkind (DS) = N_Subtype_Indication
+                 and then Present (Constraint (DS))
+                 and then Nkind (Constraint (DS)) = N_Range_Constraint
+               then
+                  declare
+                     SM : constant Entity_Id :=
+                       Entity (Subtype_Mark (DS));
+                  begin
+                     Low_Bound := Cast_Loop_Bound (Low_Param, SM);
+                     Hi_Bound := Cast_Loop_Bound (Hi_Param, SM);
+                  end;
+               else
+                  Low_Bound := Cast_Loop_Bound (Low_Param, Typ);
+                  Hi_Bound := Cast_Loop_Bound (Hi_Param, Typ);
+               end if;
+
                --  Rewrite loop range as Low_Param .. High_Param
 
                New_DS := Make_Range (Loc,
-                 Low_Bound => Make_Attribute_Reference (Loc,
-                 Prefix => New_Occurrence_Of (Etype (Low), Loc),
-                   Attribute_Name => Name_Val,
-                   Expressions => New_List
-                     (New_Occurrence_Of (Low_Param, Loc))),
-                 High_Bound => Make_Attribute_Reference (Loc,
-                   Prefix => New_Occurrence_Of (Etype (Hi), Loc),
-                   Attribute_Name => Name_Val,
-                   Expressions => New_List
-                     (New_Occurrence_Of (Hi_Param, Loc))));
-
-               Set_Discrete_Subtype_Definition
-                 (Loop_Parameter_Specification (Iter), New_DS);
+                 Low_Bound => Low_Bound,
+                 High_Bound => Hi_Bound);
+               Set_Discrete_Subtype_Definition (Param_Spec, New_DS);
             end;
 
             Insert_Before_And_Analyze (N, Outlined_Body);
