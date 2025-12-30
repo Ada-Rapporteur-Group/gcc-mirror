@@ -124,6 +124,12 @@ package body Sem_Ch5 is
    --  the range in order to determine the expected type, and analyze and
    --  resolve the original bounds.
 
+   procedure Check_Static_Loop_Bounds
+     (N : Node_Id; DS : Node_Id; Loop_Nod : Node_Id);
+   --  Checks to see if a discrete subtype definition belonging to loop
+   --  parameter N contains any bounds that can be proven invalid at compile
+   --  time. Loop_Node is the loop statement parent of N.
+
    function Build_Parallel_Loop_Spec
      (Loc : Source_Ptr; Spec_Id : Entity_Id;
       Low_Param : Entity_Id; Hi_Param : Entity_Id;
@@ -3277,232 +3283,7 @@ package body Sem_Ch5 is
          end;
       end if;
 
-      --  Case where we have a range or a subtype, get type bounds
-
-      if Nkind (DS) in N_Range | N_Subtype_Indication
-        and then not Error_Posted (DS)
-        and then Etype (DS) /= Any_Type
-        and then Is_Discrete_Type (Etype (DS))
-      then
-         declare
-            L          : Node_Id;
-            H          : Node_Id;
-            Null_Range : Boolean := False;
-
-         begin
-            if Nkind (DS) = N_Range then
-               L := Low_Bound  (DS);
-               H := High_Bound (DS);
-            else
-               L :=
-                 Type_Low_Bound  (Underlying_Type (Etype (Subtype_Mark (DS))));
-               H :=
-                 Type_High_Bound (Underlying_Type (Etype (Subtype_Mark (DS))));
-            end if;
-
-            --  Check for null or possibly null range and issue warning. We
-            --  suppress such messages in generic templates and instances,
-            --  because in practice they tend to be dubious in these cases. The
-            --  check applies as well to rewritten array element loops where a
-            --  null range may be detected statically.
-
-            if Compile_Time_Compare (L, H, Assume_Valid => True) = GT then
-               if Compile_Time_Compare (L, H, Assume_Valid => False) = GT then
-                  --  Since we know the range of the loop is always null,
-                  --  set the appropriate flag to remove the loop entirely
-                  --  during expansion.
-
-                  if Nkind (Loop_Nod) = N_Loop_Statement then
-                     Set_Is_Null_Loop (Loop_Nod);
-                  end if;
-
-                  Null_Range := True;
-               end if;
-
-               --  Suppress the warning if inside a generic template or
-               --  instance, since in practice they tend to be dubious in these
-               --  cases since they can result from intended parameterization.
-
-               if Comes_From_Source (N)
-                 and then not Inside_A_Generic
-                 and then not In_Instance
-               then
-
-                  --  Specialize msg if invalid values could make the loop
-                  --  non-null after all.
-
-                  if Null_Range then
-                     if Nkind (N) = N_Chunk_Specification_Range then
-                        Error_Msg_N
-                          ("??chunk specification range is null, " &
-                           "Program_Error will be raised at runtime", DS);
-                     else
-                        Error_Msg_N
-                          ("??loop range is null, loop will not execute", DS);
-                     end if;
-
-                  --  Here is where the loop could execute because of
-                  --  invalid values, so issue appropriate message.
-
-                  else
-                     if Nkind (N) = N_Chunk_Specification_Range then
-                        Error_Msg_N
-                          ("??chunk specification range may be null," &
-                           " Program_Error could be raised at runtime", DS);
-                     else
-                        Error_Msg_N
-                          ("??loop range may be null, loop may" &
-                           " not execute", DS);
-                        Error_Msg_N
-                          ("??can only execute if invalid values are present",
-                           DS);
-                     end if;
-                  end if;
-               end if;
-
-               --  In either case, suppress warnings in the body of the loop,
-               --  since it is likely that these warnings will be inappropriate
-               --  if the loop never actually executes, which is likely.
-
-               if Nkind (Loop_Nod) = N_Loop_Statement then
-                  Set_Suppress_Loop_Warnings (Loop_Nod);
-               end if;
-
-               --  The other case for a warning is a reverse loop where the
-               --  upper bound is the integer literal zero or one, and the
-               --  lower bound may exceed this value.
-
-               --  For example, we have
-
-               --     for J in reverse N .. 1 loop
-
-               --  In practice, this is very likely to be a case of reversing
-               --  the bounds incorrectly in the range.
-
-            elsif Nkind (N) /= N_Chunk_Specification_Range
-              and then Reverse_Present (N)
-              and then Nkind (Original_Node (H)) = N_Integer_Literal
-              and then
-                (Intval (Original_Node (H)) = Uint_0
-                  or else
-                 Intval (Original_Node (H)) = Uint_1)
-            then
-               --  Lower bound may in fact be known and known not to exceed
-               --  upper bound (e.g. reverse 0 .. 1) and that's OK.
-
-               if Compile_Time_Known_Value (L)
-                 and then Expr_Value (L) <= Expr_Value (H)
-               then
-                  null;
-
-               --  Otherwise warning is warranted
-
-               else
-                  Error_Msg_N ("??loop range may be null", DS);
-                  Error_Msg_N ("\??bounds may be wrong way round", DS);
-               end if;
-            end if;
-
-            --  Check if either bound is known to be outside the range of the
-            --  loop parameter type, this is e.g. the case of a loop from
-            --  20..X where the type is 1..19.
-
-            --  Such a loop is dubious since either it raises CE or it executes
-            --  zero times, and that cannot be useful!
-
-            if Etype (DS) /= Any_Type
-              and then not Error_Posted (DS)
-              and then Nkind (DS) = N_Subtype_Indication
-              and then Nkind (Constraint (DS)) = N_Range_Constraint
-            then
-               declare
-                  LLo : constant Node_Id :=
-                          Low_Bound  (Range_Expression (Constraint (DS)));
-                  LHi : constant Node_Id :=
-                          High_Bound (Range_Expression (Constraint (DS)));
-
-                  Bad_Bound : Node_Id := Empty;
-                  --  Suspicious loop bound
-
-               begin
-                  --  At this stage L, H are the bounds of the type, and LLo
-                  --  Lhi are the low bound and high bound of the loop.
-
-                  if Compile_Time_Compare (LLo, L, Assume_Valid => True) = LT
-                       or else
-                     Compile_Time_Compare (LLo, H, Assume_Valid => True) = GT
-                  then
-                     Bad_Bound := LLo;
-                  end if;
-
-                  if Compile_Time_Compare (LHi, L, Assume_Valid => True) = LT
-                       or else
-                     Compile_Time_Compare (LHi, H, Assume_Valid => True) = GT
-                  then
-                     Bad_Bound := LHi;
-                  end if;
-
-                  if Present (Bad_Bound) then
-                     if Nkind (N) = N_Chunk_Specification_Range then
-                        Error_Msg_N
-                          ("Suspicious chunk_index range: out of range " &
-                           "of chunk_index subtype. ""Constraint_Error"" " &
-                           "will be raised at run-time.??", Bad_Bound);
-                     else
-                        Error_Msg_N
-                          ("suspicious loop bound out of range of "
-                           & "loop subtype??", Bad_Bound);
-                        Error_Msg_N
-                          ("\loop executes zero times or raises "
-                           & "Constraint_Error??", Bad_Bound);
-                     end if;
-                  end if;
-
-                  if Compile_Time_Compare (LLo, LHi, Assume_Valid => False)
-                    = GT
-                  then
-                     Error_Msg_N ("??constrained range is null",
-                       Constraint (DS));
-
-                     --  Additional constraints on modular types can be
-                     --  confusing, add more information.
-
-                     if Ekind (Etype (DS)) = E_Modular_Integer_Subtype then
-                        Error_Msg_Uint_1 := Intval (LLo);
-                        Error_Msg_Uint_2 := Intval (LHi);
-                        Error_Msg_NE ("\iterator has modular type &, " &
-                          "so the loop has bounds ^ ..^",
-                          Constraint (DS),
-                          Subtype_Mark (DS));
-                     end if;
-
-                     if Nkind (Loop_Nod) = N_Loop_Statement then
-                        Set_Is_Null_Loop (Loop_Nod);
-
-                        --  Suppress other warnings about the body of the loop,
-                        --  as it will never execute.
-                        Set_Suppress_Loop_Warnings (Loop_Nod);
-                     end if;
-                  end if;
-               end;
-            end if;
-
-         --  This declare block is about warnings, if we get an exception while
-         --  testing for warnings, we simply abandon the attempt silently. This
-         --  most likely occurs as the result of a previous error, but might
-         --  just be an obscure case we have missed. In either case, not giving
-         --  the warning is perfectly acceptable.
-
-         exception
-            when others =>
-               --  With debug flag K we will get an exception unless an error
-               --  has already occurred (useful for debugging).
-
-               if Debug_Flag_K then
-                  Check_Error_Detected;
-               end if;
-         end;
-      end if;
+      Check_Static_Loop_Bounds (N, DS, Loop_Nod);
 
       --  Preanalyze the filter. Expansion will take place when enclosing
       --  loop is expanded.
@@ -3973,6 +3754,8 @@ package body Sem_Ch5 is
                   Analyze (DS);
                end if;
 
+               Check_Static_Loop_Bounds (P, DS, N);
+
                --  Process 'Range attributes
 
                if Nkind (DS) = N_Attribute_Reference
@@ -3990,7 +3773,7 @@ package body Sem_Ch5 is
                   then
                      declare
                         Func_Temp : constant Entity_Id :=
-                        Make_Temporary (Loc, 'P');
+                          Make_Temporary (Loc, 'P');
                         Decl : Node_Id;
                      begin
                         Decl := Make_Object_Declaration (Loc,
@@ -5819,6 +5602,225 @@ package body Sem_Ch5 is
          Rewrite (High_Bound (R), New_Copy (New_Hi));
       end if;
    end Process_Bounds;
+
+   ------------------------------
+   -- Check_Static_Loop_Bounds --
+   ------------------------------
+
+   procedure Check_Static_Loop_Bounds
+     (N : Node_Id; DS : Node_Id; Loop_Nod : Node_Id)
+   is
+      L, H : Node_Id;
+      Null_Range : Boolean := False;
+   begin
+
+      if Nkind (DS) not in N_Range | N_Subtype_Indication
+        or else Error_Posted (DS)
+        or else Etype (DS) = Any_Type
+        or else not Is_Discrete_Type (Etype (DS))
+      then
+         return;
+      end if;
+
+      --  Case where we have a range or a subtype, get type bounds
+
+      if Nkind (DS) = N_Range then
+         L := Low_Bound  (DS);
+         H := High_Bound (DS);
+      else
+         L :=
+            Type_Low_Bound  (Underlying_Type (Etype (Subtype_Mark (DS))));
+         H :=
+            Type_High_Bound (Underlying_Type (Etype (Subtype_Mark (DS))));
+      end if;
+
+      --  Check for null or possibly null range and issue warning. We
+      --  suppress such messages in generic templates and instances,
+      --  because in practice they tend to be dubious in these cases. The
+      --  check applies as well to rewritten array element loops where a
+      --  null range may be detected statically.
+
+      if Compile_Time_Compare (L, H, Assume_Valid => True) = GT then
+         if Compile_Time_Compare (L, H, Assume_Valid => False) = GT then
+            --  Since we know the range of the loop is always null,
+            --  set the appropriate flag to remove the loop entirely
+            --  during expansion.
+
+            if Nkind (Loop_Nod) = N_Loop_Statement then
+               Set_Is_Null_Loop (Loop_Nod);
+            end if;
+
+            Null_Range := True;
+         end if;
+
+         --  Suppress the warning if inside a generic template or
+         --  instance, since in practice they tend to be dubious in these
+         --  cases since they can result from intended parameterization.
+
+         if Comes_From_Source (N)
+           and then not Inside_A_Generic
+           and then not In_Instance
+         then
+
+            --  Specialize msg if invalid values could make the loop
+            --  non-null after all.
+
+            if Null_Range then
+               if Nkind (N) = N_Chunk_Specification_Range then
+                  Error_Msg_N
+                    ("??chunk specification range is null, " &
+                     "Program_Error will be raised at runtime", DS);
+               else
+                  Error_Msg_N
+                    ("??loop range is null, loop will not execute", DS);
+               end if;
+
+            --  Here is where the loop could execute because of
+            --  invalid values, so issue appropriate message.
+
+            else
+               if Nkind (N) = N_Chunk_Specification_Range then
+                  Error_Msg_N
+                    ("??chunk specification range may be null," &
+                     " Program_Error could be raised at runtime", DS);
+               else
+                  Error_Msg_N
+                    ("??loop range may be null, loop may" &
+                     " not execute", DS);
+                  Error_Msg_N
+                    ("??can only execute if invalid values are present",
+                     DS);
+               end if;
+            end if;
+         end if;
+
+         --  In either case, suppress warnings in the body of the loop,
+         --  since it is likely that these warnings will be inappropriate
+         --  if the loop never actually executes, which is likely.
+
+         if Nkind (Loop_Nod) = N_Loop_Statement then
+            Set_Suppress_Loop_Warnings (Loop_Nod);
+         end if;
+
+         --  The other case for a warning is a reverse loop where the
+         --  upper bound is the integer literal zero or one, and the
+         --  lower bound may exceed this value.
+
+         --  For example, we have
+
+         --     for J in reverse N .. 1 loop
+
+         --  In practice, this is very likely to be a case of reversing
+         --  the bounds incorrectly in the range.
+
+      elsif Nkind (N) /= N_Chunk_Specification_Range
+        and then Reverse_Present (N)
+        and then Nkind (Original_Node (H)) = N_Integer_Literal
+        and then
+          (Intval (Original_Node (H)) = Uint_0
+            or else
+           Intval (Original_Node (H)) = Uint_1)
+      then
+         --  Lower bound may in fact be known and known not to exceed
+         --  upper bound (e.g. reverse 0 .. 1) and that's OK.
+
+         if Compile_Time_Known_Value (L)
+           and then Expr_Value (L) <= Expr_Value (H)
+         then
+            null;
+
+         --  Otherwise warning is warranted
+
+         else
+            Error_Msg_N ("??loop range may be null", DS);
+            Error_Msg_N ("\??bounds may be wrong way round", DS);
+         end if;
+      end if;
+
+      --  Check if either bound is known to be outside the range of the
+      --  loop parameter type, this is e.g. the case of a loop from
+      --  20..X where the type is 1..19.
+
+      --  Such a loop is dubious since either it raises CE or it executes
+      --  zero times, and that cannot be useful!
+
+      if Etype (DS) /= Any_Type
+        and then not Error_Posted (DS)
+        and then Nkind (DS) = N_Subtype_Indication
+        and then Nkind (Constraint (DS)) = N_Range_Constraint
+      then
+         declare
+            LLo : constant Node_Id :=
+                    Low_Bound  (Range_Expression (Constraint (DS)));
+            LHi : constant Node_Id :=
+                    High_Bound (Range_Expression (Constraint (DS)));
+
+            Bad_Bound : Node_Id := Empty;
+            --  Suspicious loop bound
+
+         begin
+            --  At this stage L, H are the bounds of the type, and LLo
+            --  Lhi are the low bound and high bound of the loop.
+
+            if Compile_Time_Compare (LLo, L, Assume_Valid => True) = LT
+                or else
+              Compile_Time_Compare (LLo, H, Assume_Valid => True) = GT
+            then
+               Bad_Bound := LLo;
+            end if;
+
+            if Compile_Time_Compare (LHi, L, Assume_Valid => True) = LT
+                or else
+              Compile_Time_Compare (LHi, H, Assume_Valid => True) = GT
+            then
+               Bad_Bound := LHi;
+            end if;
+
+            if Present (Bad_Bound) then
+               if Nkind (N) = N_Chunk_Specification_Range then
+                  Error_Msg_N
+                    ("Suspicious chunk_index range: out of range " &
+                     "of chunk_index subtype. ""Constraint_Error"" " &
+                     "will be raised at run-time.??", Bad_Bound);
+               else
+                  Error_Msg_N
+                    ("suspicious loop bound out of range of "
+                     & "loop subtype??", Bad_Bound);
+                  Error_Msg_N
+                    ("\loop executes zero times or raises "
+                     & "Constraint_Error??", Bad_Bound);
+               end if;
+            end if;
+
+            if Compile_Time_Compare (LLo, LHi, Assume_Valid => False)
+              = GT
+            then
+               Error_Msg_N ("??constrained range is null",
+                 Constraint (DS));
+
+               --  Additional constraints on modular types can be
+               --  confusing, add more information.
+
+               if Ekind (Etype (DS)) = E_Modular_Integer_Subtype then
+                  Error_Msg_Uint_1 := Intval (LLo);
+                  Error_Msg_Uint_2 := Intval (LHi);
+                  Error_Msg_NE ("\iterator has modular type &, " &
+                    "so the loop has bounds ^ ..^",
+                    Constraint (DS),
+                    Subtype_Mark (DS));
+               end if;
+
+               if Nkind (Loop_Nod) = N_Loop_Statement then
+                  Set_Is_Null_Loop (Loop_Nod);
+
+                  --  Suppress other warnings about the body of the loop,
+                  --  as it will never execute.
+                  Set_Suppress_Loop_Warnings (Loop_Nod);
+               end if;
+            end if;
+         end;
+      end if;
+   end Check_Static_Loop_Bounds;
 
    -------------------------------------
    -- Process_Chunk_Specification_Int --
