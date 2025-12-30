@@ -3811,7 +3811,8 @@ package body Sem_Ch5 is
                   begin
                      if not Is_Discrete_Type (Typ) then
                         Error_Msg_N ("discrete type required for " &
-                          "chunk specifier", N);
+                          (if Nkind (P) = N_Loop_Parameter_Specification then
+                            "loop parameter" else "chunk specification"), N);
                      end if;
 
                      Lo := Type_Low_Bound  (Typ);
