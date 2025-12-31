@@ -3750,7 +3750,17 @@ package body Sem_Ch5 is
                  and then Expander_Active
                then
                   Process_Bounds (DS, N, Sloc (P));
+
                else
+                  if Nkind (DS) = N_Subtype_Indication
+                    and then Present (Constraint (DS))
+                    and then Nkind (Constraint (DS)) = N_Range_Constraint
+                    and then Expander_Active
+                  then
+                     Process_Bounds (Range_Expression (
+                       Constraint (DS)), N, Sloc (P));
+                  end if;
+
                   Analyze (DS);
                end if;
 
