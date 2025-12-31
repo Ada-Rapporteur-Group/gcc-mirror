@@ -3944,20 +3944,13 @@ package body Sem_Ch5 is
             end if;
 
             Outlined_Spec := Build_Parallel_Loop_Spec (Loc,
-              Spec_Id       => Spec_Id,
-              Low_Param     => Low_Param,
-              Hi_Param      => Hi_Param,
-              Chunk_Param   => Chunk_Param);
+              Spec_Id     => Spec_Id,
+              Low_Param   => Low_Param,
+              Hi_Param    => Hi_Param,
+              Chunk_Param => Chunk_Param);
             Set_Parallel_Chunk_Id (N, Chunk_Param);
-
-            --  Move the loop inside the outlined procedure
-
-            Outlined_Body := Make_Subprogram_Body (Loc,
-              Specification => Outlined_Spec,
-              Declarations => Decls,
-              Handled_Statement_Sequence =>
-                Make_Handled_Sequence_Of_Statements (Loc,
-                  Statements => New_List (Relocate_Node (N))));
+            Set_Parallel_Low_Bound (N, Low_Param);
+            Set_Parallel_Hi_Bound (N, Hi_Param);
 
             declare
                DS : constant Node_Id :=
@@ -4003,6 +3996,15 @@ package body Sem_Ch5 is
                --  outside of loop before we wrap it in a procedure
 
                Prepare_Loop_Param (Param_Spec, Low, Hi, Typ);
+
+               --  Move the loop inside the outlined procedure
+
+               Outlined_Body := Make_Subprogram_Body (Loc,
+                 Specification => Outlined_Spec,
+                 Declarations => Decls,
+                 Handled_Statement_Sequence =>
+                   Make_Handled_Sequence_Of_Statements (Loc,
+                     Statements => New_List (Relocate_Node (N))));
 
                --  Build call to Par_Range_Loop_With_Early_Exit
 
