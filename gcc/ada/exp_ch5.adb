@@ -193,6 +193,9 @@ package body Exp_Ch5 is
    procedure Expand_Loop_Flow_Statement (N : N_Loop_Flow_Statement_Id);
    --  Common processing for expansion of "loop flow" statements
 
+   procedure Expand_Parallel_Chunk_Specification (N : Node_Id);
+   --  Expand parallel chunk specification
+
    procedure Expand_Predicated_Loop (N : Node_Id);
    --  Expand for loop over predicated subtype
 
@@ -5827,219 +5830,6 @@ package body Exp_Ch5 is
       Scheme : constant Node_Id    := Iteration_Scheme (N);
       Stmt   : Node_Id;
 
-      function Get_DS_Lower (DS : Node_Id) return Node_Id;
-      --  Gets lower bound on DS, which is a discrete subtype definition
-
-      procedure Expand_Parallel_Loop;
-      --  Expand parallel loop chunk index
-
-      ------------------
-      -- Get_DS_Lower --
-      ------------------
-
-      function Get_DS_Lower (DS : Node_Id) return Node_Id is
-      begin
-         case Nkind (DS) is
-            when N_Range =>
-               return Low_Bound (DS);
-            when N_Subtype_Indication =>
-               if Present (Constraint (DS)) then
-                  return Low_Bound (Range_Expression
-                    (Constraint (DS)));
-               else
-                  return Type_Low_Bound
-                    (Underlying_Type (Etype (Subtype_Mark (DS))));
-               end if;
-            when others =>
-               --  Invalid node found in place of chunk specification
-               pragma Assert (False);
-               raise Program_Error;
-         end case;
-      end Get_DS_Lower;
-
-      --------------------------
-      -- Expand_Parallel_Loop --
-      --------------------------
-
-      procedure Expand_Parallel_Loop is
-         procedure Expand_Parallel;
-         --  Parallel loop expansion
-
-         procedure Expand_Chunk_Spec_Seq (C : Node_Id);
-         --  Fallback sequential expansion for parallel chunk
-
-         ---------------------
-         -- Expand_Parallel --
-         ---------------------
-
-         procedure Expand_Parallel is
-            Chunk_Spec : constant Node_Id := Chunk_Specification (Scheme);
-
-         begin
-            --  Inserts constant chunk index declaration in the outlined
-            --  procedure's declaration. This constant replaces the chunk
-            --  specification loop parameter in scope.
-
-            --  Transforms
-
-            --     parallel (Chunk in Ch_Low .. Ch_Hi) for I in ... loop
-            --        ...
-            --     end loop;
-
-            --  into
-
-            --     Chunk : constant Rng_Type := Rng_Type'Value
-            --       (Rng_Type'Pos (Ch_Low) + Chunk_Index - 1)
-            --     for I in ... loop
-            --        ...
-            --     end loop;
-
-            if Present (Chunk_Spec)
-              and then Nkind (Chunk_Spec) = N_Chunk_Specification_Range
-            then
-               declare
-                  DS    : constant Node_Id := Discrete_Subtype_Definition
-                                                (Chunk_Spec);
-                  Ident : constant Node_Id := Defining_Identifier (Chunk_Spec);
-                  Low   : constant Node_Id := Get_DS_Lower (DS);
-                  Chunk : constant Node_Id := Parallel_Chunk_Id (N);
-                  Expr, Low_Int, Expr_Val : Node_Id;
-               begin
-                  --  Rng_Type'Pos (Ch_Low)
-
-                  Low_Int := Make_Attribute_Reference (Loc,
-                    Prefix         => New_Occurrence_Of (Etype (Ident), Loc),
-                    Attribute_Name => Name_Pos,
-                    Expressions    => New_List (Low));
-
-                  --  Rng_Type'Pos (Ch_Low) + Chunk_Index - 1
-
-                  Expr := Make_Op_Subtract (Loc,
-                    Left_Opnd    => Make_Op_Add (Loc,
-                      Left_Opnd  => Low_Int,
-                      Right_Opnd => New_Occurrence_Of (Chunk, Loc)),
-                    Right_Opnd   => Make_Integer_Literal (Loc, 1));
-
-                  --  Rng_Type'Value (Rng_Type'Pos (Ch_Low) + Chunk_Index - 1)
-
-                  Expr_Val := Make_Attribute_Reference (Loc,
-                    Prefix         => New_Occurrence_Of (Etype (Ident), Loc),
-                    Attribute_Name => Name_Val,
-                    Expressions    => New_List (Expr));
-
-                  Insert_Before_And_Analyze (N, Make_Object_Declaration (Loc,
-                    Defining_Identifier => Ident,
-                    Constant_Present    => True,
-                    Expression          => Expr_Val,
-                    Object_Definition   => New_Occurrence_Of
-                      (Etype (Ident), Loc)));
-
-                  --  Replace old chunk index variable with variable
-
-                  Remove_Homonym (Ident);
-                  Mutate_Ekind (Ident, E_Constant);
-
-                  --  Remove parallel elements
-
-                  Set_Chunk_Specification (Scheme, Empty);
-                  Set_Is_Parallel (Scheme, False);
-               end;
-            end if;
-         end Expand_Parallel;
-
-         ---------------------------
-         -- Expand_Chunk_Spec_Seq --
-         ---------------------------
-
-         procedure Expand_Chunk_Spec_Seq (C : Node_Id) is
-            pragma Assert (Nkind (C) in N_Chunk_Specification_Range |
-              N_Chunk_Specification_Int);
-         begin
-            --  Expansion for range chunk specification
-
-            --  Transforms
-
-            --     parallel (Chunk in Ch_Low .. Ch_Hi) for I in ... loop
-            --        ...
-            --     end loop;
-
-            --  into
-
-            --     Chunk : constant Rng_Type := Ch_Low;
-            --     for I in ... loop
-            --        ...
-            --     end loop;
-
-            if Nkind (C) = N_Chunk_Specification_Range then
-               declare
-                  DS    : constant Node_Id := Discrete_Subtype_Definition (C);
-                  Ident : constant Node_Id := Defining_Identifier (C);
-                  Lower : constant Node_Id := Get_DS_Lower (DS);
-               begin
-                  Insert_Before_And_Analyze (N,
-                    Make_Object_Declaration (Loc,
-                      Defining_Identifier => Ident,
-                      Constant_Present    => True,
-                      Expression          => Lower,
-                      Object_Definition   => New_Occurrence_Of
-                        (Etype (Ident), Loc)));
-                  Remove_Homonym (Ident);
-                  Mutate_Ekind (Ident, E_Constant);
-               end;
-
-            --  Expansion for integer chunk specification
-
-            --  Transforms
-
-            --     parallel (Chunk_Expr) for I in ... loop
-            --        ...
-            --     end loop;
-
-            --  into
-
-            --     Chunk : constant Rng_Type := Chunk_Expr;
-            --     for I in ... loop
-            --        ...
-            --     end loop;
-
-            else
-               declare
-                  Expr     : constant Node_Id := Expression (C);
-                  Expr_Typ : constant Entity_Id := Etype (Expr);
-               begin
-                  Insert_Before_And_Analyze (N,
-                    Make_Object_Declaration (Loc,
-                      Defining_Identifier => Make_Temporary (Loc, 'C', N),
-                      Constant_Present    => True,
-                      Object_Definition   => New_Occurrence_Of (Expr_Typ, Loc),
-                      Expression          => Expr));
-               end;
-            end if;
-
-            --  Remove chunk specification
-
-            Set_Chunk_Specification (Scheme, Empty);
-         end Expand_Chunk_Spec_Seq;
-      begin
-         if No (Scheme) or else not Is_Parallel (Scheme) then
-            return;
-         end if;
-
-         --  Parallel expansion for chunk index
-
-         if RTE_Available (RE_Longest_Integer) then
-            Expand_Parallel;
-
-         --  Handle sequential fallback expansion
-
-         else
-            Set_Is_Parallel (Scheme, False);
-            if Present (Chunk_Specification (Scheme)) then
-               Expand_Chunk_Spec_Seq (Chunk_Specification (Scheme));
-            end if;
-         end if;
-      end Expand_Parallel_Loop;
-
    begin
       --  Delete null loop
 
@@ -6324,8 +6114,7 @@ package body Exp_Ch5 is
       end if;
 
       Process_Statements_For_Controlled_Objects (Stmt);
-
-      Expand_Parallel_Loop;
+      Expand_Parallel_Chunk_Specification (N);
    end Expand_N_Loop_Statement;
 
    --------------------------------
@@ -6339,6 +6128,194 @@ package body Exp_Ch5 is
    begin
       Adjust_Condition (Condition (N));
    end Expand_Loop_Flow_Statement;
+
+   -----------------------------------------
+   -- Expand_Parallel_Chunk_Specification --
+   -----------------------------------------
+
+   procedure Expand_Parallel_Chunk_Specification (N : Node_Id) is
+      Loc    : constant Source_Ptr := Sloc (N);
+      Scheme : constant Node_Id    := Iteration_Scheme (N);
+
+      function Get_DS_Lower (DS : Node_Id) return Node_Id;
+      --  Gets lower bound on DS, which is a discrete subtype definition
+
+      ------------------
+      -- Get_DS_Lower --
+      ------------------
+
+      function Get_DS_Lower (DS : Node_Id) return Node_Id is
+      begin
+         case Nkind (DS) is
+            when N_Range =>
+               return Low_Bound (DS);
+            when N_Subtype_Indication =>
+               if Present (Constraint (DS)) then
+                  return Low_Bound (Range_Expression
+                    (Constraint (DS)));
+               else
+                  return Type_Low_Bound
+                    (Underlying_Type (Etype (Subtype_Mark (DS))));
+               end if;
+            when others =>
+               --  Invalid node found in place of chunk specification
+               pragma Assert (False);
+               raise Program_Error;
+         end case;
+      end Get_DS_Lower;
+
+   begin
+      if No (Scheme) or else not Is_Parallel (Scheme) then
+         return;
+      end if;
+
+      --  Rewrite parallel chunk specifications located inside outlined
+      --  procedures.
+
+      if In_Outlined_Parallel (N) then
+         --  Inserts constant chunk index declaration in the outlined
+         --  procedure's declaration. This constant replaces the chunk
+         --  specification loop parameter in scope.
+
+         --  Transforms
+
+         --     parallel (Chunk in Ch_Low .. Ch_Hi) for I in ... loop
+         --        ...
+         --     end loop;
+
+         --  into
+
+         --     Chunk : constant Rng_Type := Rng_Type'Value
+         --       (Rng_Type'Pos (Ch_Low) + Chunk_Index - 1)
+         --     for I in ... loop
+         --        ...
+         --     end loop;
+
+         if Present (Chunk_Specification (Scheme)) and then
+           Nkind (Chunk_Specification (Scheme)) = N_Chunk_Specification_Range
+         then
+            declare
+               Chunk_Spec : constant Node_Id := Chunk_Specification (Scheme);
+               DS         : constant Node_Id := Discrete_Subtype_Definition
+                                                  (Chunk_Spec);
+               Ident      : constant Node_Id := Defining_Identifier
+                                                  (Chunk_Spec);
+               Low        : constant Node_Id := Get_DS_Lower (DS);
+               Chunk      : constant Node_Id := Parallel_Chunk_Id (N);
+               Expr, Low_Int, Expr_Val : Node_Id;
+            begin
+               --  Rng_Type'Pos (Ch_Low)
+
+               Low_Int := Make_Attribute_Reference (Loc,
+                 Prefix         => New_Occurrence_Of (Etype (Ident), Loc),
+                 Attribute_Name => Name_Pos,
+                 Expressions    => New_List (Low));
+
+               --  Rng_Type'Pos (Ch_Low) + Chunk_Index - 1
+
+               Expr := Make_Op_Subtract (Loc,
+                 Left_Opnd    => Make_Op_Add (Loc,
+                   Left_Opnd  => Low_Int,
+                   Right_Opnd => New_Occurrence_Of (Chunk, Loc)),
+                 Right_Opnd   => Make_Integer_Literal (Loc, 1));
+
+               --  Rng_Type'Value (Rng_Type'Pos (Ch_Low) + Chunk_Index - 1)
+
+               Expr_Val := Make_Attribute_Reference (Loc,
+                 Prefix         => New_Occurrence_Of (Etype (Ident), Loc),
+                 Attribute_Name => Name_Val,
+                 Expressions    => New_List (Expr));
+
+               Insert_Before_And_Analyze (N, Make_Object_Declaration (Loc,
+                 Defining_Identifier => Ident,
+                 Constant_Present    => True,
+                 Expression          => Expr_Val,
+                 Object_Definition   => New_Occurrence_Of
+                   (Etype (Ident), Loc)));
+
+               --  Replace old chunk index variable with new constant
+
+               Remove_Homonym (Ident);
+               Mutate_Ekind (Ident, E_Constant);
+            end;
+         end if;
+
+      --  Sequential fallback expansion
+
+      else
+         --  Expansion for range chunk specification
+
+         --  Transforms
+
+         --     parallel (Chunk in Ch_Low .. Ch_Hi) for I in ... loop
+         --        ...
+         --     end loop;
+
+         --  into
+
+         --     Chunk : constant Rng_Type := Ch_Low;
+         --     for I in ... loop
+         --        ...
+         --     end loop;
+
+         if Nkind (Chunk_Specification (Scheme)) =
+           N_Chunk_Specification_Range
+         then
+            declare
+               Chunk_Spec : constant Node_Id := Chunk_Specification (Scheme);
+               DS         : constant Node_Id := Discrete_Subtype_Definition
+                                                  (Chunk_Spec);
+               Ident      : constant Node_Id := Defining_Identifier
+                                                  (Chunk_Spec);
+               Lower      : constant Node_Id := Get_DS_Lower (DS);
+            begin
+               Insert_Before_And_Analyze (N,
+                 Make_Object_Declaration (Loc,
+                   Defining_Identifier => Ident,
+                   Constant_Present    => True,
+                   Expression          => Lower,
+                   Object_Definition   => New_Occurrence_Of
+                     (Etype (Ident), Loc)));
+               Remove_Homonym (Ident);
+               Mutate_Ekind (Ident, E_Constant);
+            end;
+
+         --  Expansion for integer chunk specification
+
+         --  Transforms
+
+         --     parallel (Chunk_Expr) for I in ... loop
+         --        ...
+         --     end loop;
+
+         --  into
+
+         --     Chunk : constant Rng_Type := Chunk_Expr;
+         --     for I in ... loop
+         --        ...
+         --     end loop;
+
+         else
+            declare
+               Chunk_Spec : constant Node_Id := Chunk_Specification (Scheme);
+               Expr       : constant Node_Id := Expression (Chunk_Spec);
+               Expr_Typ   : constant Entity_Id := Etype (Expr);
+            begin
+               Insert_Before_And_Analyze (N,
+                 Make_Object_Declaration (Loc,
+                   Defining_Identifier => Make_Temporary (Loc, 'C', N),
+                   Constant_Present    => True,
+                   Object_Definition   => New_Occurrence_Of (Expr_Typ, Loc),
+                   Expression          => Expr));
+            end;
+         end if;
+      end if;
+
+      --  Remove parallel elements
+
+      Set_Chunk_Specification (Scheme, Empty);
+      Set_Is_Parallel (Scheme, False);
+   end Expand_Parallel_Chunk_Specification;
 
    ----------------------------
    -- Expand_Predicated_Loop --
