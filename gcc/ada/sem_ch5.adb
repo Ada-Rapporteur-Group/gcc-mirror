@@ -3752,15 +3752,6 @@ package body Sem_Ch5 is
                   Process_Bounds (DS, N, Sloc (P));
 
                else
-                  if Nkind (DS) = N_Subtype_Indication
-                    and then Present (Constraint (DS))
-                    and then Nkind (Constraint (DS)) = N_Range_Constraint
-                    and then Expander_Active
-                  then
-                     Process_Bounds (Range_Expression (
-                       Constraint (DS)), N, Sloc (P));
-                  end if;
-
                   Analyze (DS);
                end if;
 
@@ -3959,8 +3950,6 @@ package body Sem_Ch5 is
               Hi_Param    => Hi_Param,
               Chunk_Param => Chunk_Param);
             Set_Parallel_Chunk_Id (N, Chunk_Param);
-            Set_Parallel_Low_Bound (N, Low_Param);
-            Set_Parallel_Hi_Bound (N, Hi_Param);
 
             declare
                DS : constant Node_Id :=

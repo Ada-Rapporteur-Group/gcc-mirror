@@ -988,8 +988,6 @@ begin -- Gen_IL.Gen.Gen_Nodes
         Sy (Suppress_Loop_Warnings, Flag),
         Sy (Parallel_Declarations, List_Id, Default_No_List),
         Sm (Parallel_Chunk_Id, Node_Id),
-        Sm (Parallel_Low_Bound, Node_Id),
-        Sm (Parallel_Hi_Bound, Node_Id),
         Sm (In_Outlined_Parallel, Flag)));
 
    Ab (N_Loop_Flow_Statement, N_Statement_Other_Than_Procedure_Call,
