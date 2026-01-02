@@ -3375,9 +3375,28 @@ package body Sem_Ch5 is
          --  Wrap parallel loop inside outlined procedure
          --  If Stop_Processing is set to True, should stop further processing.
 
-         procedure Outline_Loop;
-         pragma Inline (Outline_Loop);
-         --  Wrap parallel loop inside an outlined procedure
+         procedure Prepare_Parallel_Loop_Param
+           (P : Node_Id; Lo : out Node_Id;
+            Hi : out Node_Id; Typ : out Entity_Id);
+         pragma Inline (Prepare_Parallel_Loop_Param);
+         --  Prepares loop parameter P by moving any calls into the
+         --  enclosing block. Low and high values are written to Lo
+         --  and Hi respectively.
+
+         procedure Create_Par_Range_Loop
+           (Low_Val : Node_Id; Hi_Val : Node_Id);
+         pragma Inline (Create_Par_Range_Loop);
+         --  Moves the loop into an outlined procedure and passes said
+         --  procedure to a Par_Range_Loop_With_Early_Exit call. Low_Val
+         --  and Hi_Val are the range values passed to
+         --  Par_Range_Loop_With_Early_Exit. The generated function has
+         --  the following signature:
+
+         --     procedure Outlined_Proc
+         --       (Low_Arg : Longest_Integer;
+         --        Hi_Arg : Longest_Integer;
+         --        Chunk : Positive;
+         --        Loop_Id : Par_Loop_Id);
 
          procedure Wrap_Loop_Statement (Manage_Sec_Stack : Boolean);
          pragma Inline (Wrap_Loop_Statement);
@@ -3644,16 +3663,222 @@ package body Sem_Ch5 is
             end if;
          end Prepare_Param_Spec_Loop;
 
-         ------------------
-         -- Outline_Loop --
-         ------------------
+         ---------------------------------
+         -- Prepare_Parallel_Loop_Param --
+         ---------------------------------
 
-         procedure Outline_Loop is
+         procedure Prepare_Parallel_Loop_Param
+           (P : Node_Id; Lo : out Node_Id;
+            Hi : out Node_Id; Typ : out Entity_Id)
+         is
+            pragma Assert (Nkind (P) in
+              N_Loop_Parameter_Specification | N_Chunk_Specification_Range);
+            DS     : constant Node_Id    := Discrete_Subtype_Definition (P);
+            R_Copy : constant Node_Id    := New_Copy_Tree (DS);
+            Loc    : constant Source_Ptr := Sloc (N);
+
+            function Rewrite_Bound
+              (Val : Node_Id; Typ : Entity_Id;
+               Rewrote_Bound : out Boolean)
+               return Node_Id;
+            --  Rewrites bound as reference to constant variable
+
+            procedure Relocate_Subtype_Bounds
+              (S : Node_Id; Typ : Entity_Id);
+            --  Moves discrete subtype definition bounds into variables
+            --  before the loop. This ensures that the bounds are not
+            --  reevaluated inside the loop.
+
+            -------------------
+            -- Rewrite_Bound --
+            -------------------
+
+            function Rewrite_Bound
+              (Val : Node_Id; Typ : Entity_Id;
+               Rewrote_Bound : out Boolean)
+               return Node_Id
+            is
+            begin
+               --  Skip over literal values
+
+               Rewrote_Bound := False;
+               if Nkind (Val) in
+                 N_Integer_Literal | N_Character_Literal
+               then
+                  return Val;
+               end if;
+
+               --  Create a new object declaration to
+               --  store the bound value
+
+               Rewrote_Bound := True;
+               declare
+                  New_Val : constant Entity_Id :=
+                    Make_Temporary (Loc, 'P');
+               begin
+                  --  New_Val : constant Subtype_Mark := Old_Val;
+
+                  Insert_Before_And_Analyze (N,
+                    Make_Object_Declaration (Loc,
+                      Defining_Identifier => New_Val,
+                      Expression          => Val,
+                      Constant_Present    => True,
+                      Object_Definition   =>
+                        New_Occurrence_Of (Typ, Loc)));
+
+                  Set_Is_Safe_To_Reevaluate (New_Val);
+                  return New_Occurrence_Of (New_Val, Loc);
+               end;
+            end Rewrite_Bound;
+
+            -----------------------------
+            -- Relocate_Subtype_Bounds --
+            -----------------------------
+
+            procedure Relocate_Subtype_Bounds
+              (S : Node_Id; Typ : Entity_Id)
+            is
+               C  : constant Node_Id :=
+                 Range_Expression (Constraint (S));
+               SM : constant Entity_Id :=
+                 Etype (Subtype_Mark (S));
+
+               Old_Low : constant Node_Id := Low_Bound (C);
+               Old_Hi  : constant Node_Id := High_Bound (C);
+
+               Rewrote_Hi  : Boolean := False;
+               Rewrote_Low : Boolean := False;
+
+               New_Low : constant Node_Id :=
+                 Rewrite_Bound (Old_Low, SM, Rewrote_Low);
+               New_Hi  : constant Node_Id :=
+                 Rewrite_Bound (Old_Hi, SM, Rewrote_Hi);
+            begin
+               --  Rewrite subtype indication if either bound was
+               --  changed
+               if Rewrote_Hi or else Rewrote_Low then
+                  Rewrite (S, Make_Subtype_Indication (Loc,
+                    Subtype_Mark       => Subtype_Mark (S),
+                    Constraint         => Make_Range_Constraint (Loc,
+                      Range_Expression => Make_Range (Loc,
+                        Low_Bound      => New_Low,
+                        High_Bound     => New_Hi))));
+                  Analyze (S);
+               end if;
+            end Relocate_Subtype_Bounds;
+
+         begin
+            Hi := Empty;
+            Lo := Empty;
+
+            --  Check if the loop param is of a discrete type
+
+            Set_Parent (R_Copy, Parent (DS));
+            Preanalyze_Range (R_Copy);
+            Typ := Etype (R_Copy);
+
+            if not Is_Discrete_Type (Etype (R_Copy)) then
+               Wrong_Type (R_Copy, Any_Discrete);
+            end if;
+
+            --  Analyze the discrete range and move function calls
+            --  inside the range before the parallel loop
+
+            if Nkind (DS) = N_Range
+              and then Expander_Active
+            then
+               Process_Bounds (DS, N, Sloc (P));
+
+            else
+               Analyze (DS);
+
+               if Nkind (DS) = N_Subtype_Indication
+                 and then Present (Constraint (DS))
+                 and then Nkind (Constraint (DS)) = N_Range_Constraint
+               then
+                  Relocate_Subtype_Bounds (DS, Typ);
+               end if;
+            end if;
+
+            --  Process 'Range attributes
+
+            if Nkind (DS) = N_Attribute_Reference
+              and then Attribute_Name (DS) = Name_Range
+            then
+               --  Ensure that the prefix expression on an attribute
+               --  reference is evaluated once outside of the parallel
+               --  loop. If the prefix is anything but an identifier,
+               --  we move the expression into a seperate declaration.
+
+               if Nkind (Prefix (DS)) /= N_Identifier
+                 and then not (Is_Entity_Name (Prefix (DS))
+                   and then Is_Type (Entity (Prefix (DS))))
+                 and then Expander_Active
+               then
+                  declare
+                     Func_Temp : constant Entity_Id :=
+                       Make_Temporary (Loc, 'P');
+                  begin
+                     Insert_Before_And_Analyze (N,
+                       Make_Object_Declaration (Loc,
+                         Defining_Identifier => Func_Temp,
+                         Expression          => Relocate_Node (Prefix (DS)),
+                         Object_Definition   =>
+                           New_Occurrence_Of (Etype (Prefix (DS)), Loc)));
+                     Rewrite (DS,
+                       Make_Attribute_Reference (Loc,
+                         Prefix         => New_Occurrence_Of (Func_Temp, Loc),
+                         Attribute_Name => Name_Range));
+                  end;
+               end if;
+
+               --  Resolve the range so that we can extract the
+               --  upper and lower bounds.
+
+               Analyze_And_Resolve (DS);
+            end if;
+
+            --  Read out high and low bounds for each kind of loop
+            --  parameter discrete subtype definition.
+
+            if Nkind (DS) = N_Subtype_Indication
+              and then Present (Constraint (DS))
+              and then Nkind (Constraint (DS)) = N_Range_Constraint
+            then
+               Lo := Low_Bound (Range_Expression (Constraint (DS)));
+               Hi := High_Bound (Range_Expression (Constraint (DS)));
+
+            elsif Nkind (DS) = N_Range then
+               Lo := Low_Bound (DS);
+               Hi := High_Bound (DS);
+
+            elsif Is_Entity_Name (DS)
+              and then Is_Type (Entity (DS))
+            then
+               declare
+                  Typ : constant Entity_Id := Get_Full_View (Entity (DS));
+               begin
+                  Lo := Type_Low_Bound  (Typ);
+                  Hi := Type_High_Bound (Typ);
+               end;
+
+            else
+               Error_Msg_N ("invalid subtype mark in discrete range", DS);
+            end if;
+         end Prepare_Parallel_Loop_Param;
+
+         ---------------------------
+         -- Create_Par_Range_Loop --
+         ---------------------------
+
+         procedure Create_Par_Range_Loop
+           (Low_Val : Node_Id; Hi_Val : Node_Id)
+         is
             Loc        : constant Source_Ptr := Sloc (N);
             Chunk_Spec : constant Node_Id    := Chunk_Specification (Iter);
             Loop_Id    : constant Entity_Id  := Entity (Identifier (N));
 
-            Outlined_Body, Outlined_Spec, Chunk_Arg, Parallel_Call : Node_Id;
+            Outlined_Spec, Chunk_Arg : Node_Id;
             Decls : constant List_Id := New_List;
 
             Spec_Id      : constant Entity_Id := Make_Temporary (Loc, 'P');
@@ -3662,40 +3887,8 @@ package body Sem_Ch5 is
             Chunk_Param  : constant Entity_Id := Make_Temporary (Loc, 'P');
             Long_Int_Typ : constant Entity_Id := RTE (RE_Longest_Integer);
 
-            procedure Read_Bounds
-              (DS : Node_Id; Lo : out Node_Id; Hi : out Node_Id);
-            --  Reads range or subtype indication's lower and upper bounds
-
             function Create_Bound_Arg (Arg : Node_Id) return Node_Id;
             --  Creates a lower or upper bound argument for the LWT call
-
-            procedure Prepare_Loop_Param
-              (P : Node_Id; Lo : out Node_Id;
-               Hi : out Node_Id; Typ : out Entity_Id);
-            --  Prepares loop parameter P by moving any calls into the
-            --  enclosing block. Low and high values are written to Lo
-            --  and Hi respectively, and Typ is set to the loop parameter
-            --  type.
-
-            -----------------
-            -- Read_Bounds --
-            -----------------
-
-            procedure Read_Bounds
-              (DS : Node_Id; Lo : out Node_Id; Hi : out Node_Id)
-            is
-            begin
-               if Nkind (DS) = N_Subtype_Indication
-                  and then Present (Constraint (DS))
-                  and then Nkind (Constraint (DS)) = N_Range_Constraint
-               then
-                  Lo := Low_Bound (Range_Expression (Constraint (DS)));
-                  Hi := High_Bound (Range_Expression (Constraint (DS)));
-               else
-                  Lo := Low_Bound (DS);
-                  Hi := High_Bound (DS);
-               end if;
-            end Read_Bounds;
 
             ----------------------
             -- Create_Bound_Arg --
@@ -3708,122 +3901,19 @@ package body Sem_Ch5 is
             begin
                --  Creates the expression
                --    Longest_Integer'Value (Range_Typ'Pos (Arg))
+
                To_Pos := Make_Attribute_Reference (Loc,
                  Prefix => New_Occurrence_Of (Etype (Arg), Loc),
                  Attribute_Name => Name_Pos,
                  Expressions => New_List (Copy_Separate_Tree (Arg)));
+
                To_Long_Int := Make_Attribute_Reference (Loc,
                  Prefix => New_Occurrence_Of (Long_Int_Typ, Loc),
                  Attribute_Name => Name_Val,
                  Expressions => New_List (To_Pos));
+
                return To_Long_Int;
             end Create_Bound_Arg;
-
-            ------------------------
-            -- Prepare_Loop_Param --
-            ------------------------
-
-            procedure Prepare_Loop_Param
-              (P : Node_Id; Lo : out Node_Id;
-               Hi : out Node_Id; Typ : out Entity_Id)
-            is
-               DS     : constant Node_Id := Discrete_Subtype_Definition (P);
-               R_Copy : constant Node_Id := New_Copy_Tree (DS);
-            begin
-               Hi := Empty;
-               Lo := Empty;
-
-               --  Check if the loop param is of a discrete type
-
-               Set_Parent (R_Copy, Parent (DS));
-               Preanalyze_Range (R_Copy);
-               Typ := Etype (R_Copy);
-
-               if not Is_Discrete_Type (Etype (R_Copy)) then
-                  Wrong_Type (R_Copy, Any_Discrete);
-               end if;
-
-               --  Analyze the discrete range and move function calls
-               --  inside the range before the parallel loop
-
-               if Nkind (DS) = N_Range
-                 and then Expander_Active
-               then
-                  Process_Bounds (DS, N, Sloc (P));
-
-               else
-                  Analyze (DS);
-               end if;
-
-               Check_Static_Loop_Bounds (P, DS, N);
-
-               --  Process 'Range attributes
-
-               if Nkind (DS) = N_Attribute_Reference
-                 and then Attribute_Name (DS) = Name_Range
-               then
-                  --  Ensure that the prefix expression on an attribute
-                  --  reference is evaluated once outside of the parallel
-                  --  loop. If the prefix is anything but an identifier,
-                  --  we move the expression into a seperate declaration.
-
-                  if Nkind (Prefix (DS)) /= N_Identifier
-                    and then not (Is_Entity_Name (Prefix (DS))
-                      and then Is_Type (Entity (Prefix (DS))))
-                    and then Expander_Active
-                  then
-                     declare
-                        Func_Temp : constant Entity_Id :=
-                          Make_Temporary (Loc, 'P');
-                        Decl : Node_Id;
-                     begin
-                        Decl := Make_Object_Declaration (Loc,
-                          Defining_Identifier => Func_Temp,
-                          Expression          => Relocate_Node (Prefix (DS)),
-                          Object_Definition   =>
-                            New_Occurrence_Of (Etype (Prefix (DS)), Loc));
-                        Insert_Before_And_Analyze (N, Decl);
-
-                        Rewrite (DS,
-                          Make_Attribute_Reference (Loc,
-                            Prefix         => New_Occurrence_Of (
-                                                Func_Temp, Loc),
-                            Attribute_Name => Name_Range));
-                        Analyze_And_Resolve (DS);
-                     end;
-
-                  --  Otherwise, resolve the range so that we can extract the
-                  --  upper and lower bounds.
-
-                  else
-                     Analyze_And_Resolve (DS);
-                  end if;
-               end if;
-
-               if Nkind (DS) in N_Subtype_Indication | N_Range then
-                  Read_Bounds (DS, Lo, Hi);
-
-               elsif Is_Entity_Name (DS)
-                 and then Is_Type (Entity (DS))
-               then
-                  declare
-                     Typ : constant Entity_Id := Get_Full_View (
-                       Entity (DS));
-                  begin
-                     if not Is_Discrete_Type (Typ) then
-                        Error_Msg_N ("discrete type required for " &
-                          (if Nkind (P) = N_Loop_Parameter_Specification then
-                            "loop parameter" else "chunk specification"), N);
-                     end if;
-
-                     Lo := Type_Low_Bound  (Typ);
-                     Hi := Type_High_Bound (Typ);
-                  end;
-
-               else
-                  Error_Msg_N ("invalid subtype mark in discrete range", DS);
-               end if;
-            end Prepare_Loop_Param;
 
          begin
             --  Relocates the parallel loop inside an outlined procedure and
@@ -3901,7 +3991,7 @@ package body Sem_Ch5 is
                   --  Move chunk specification values with side effects
                   --  outside of loop before we wrap it in a procedure
 
-                  Prepare_Loop_Param (Chunk_Spec, Low, Hi, Typ);
+                  Prepare_Parallel_Loop_Param (Chunk_Spec, Low, Hi, Typ);
 
                   --  Chunk_Type'Pos (Hi) - Chunk_Type'Pos (Lo)
 
@@ -3950,99 +4040,26 @@ package body Sem_Ch5 is
               Hi_Param    => Hi_Param,
               Chunk_Param => Chunk_Param);
             Set_Parallel_Chunk_Id (N, Chunk_Param);
+            Set_Parallel_Low_Bound (N, Low_Param);
+            Set_Parallel_Hi_Bound (N, Hi_Param);
 
-            declare
-               DS : constant Node_Id :=
-                 Discrete_Subtype_Definition (Param_Spec);
-               Low, Hi, New_DS, Low_Bound, Hi_Bound : Node_Id;
-               Typ : Entity_Id;
+            --  Move the loop inside the outlined procedure
 
-               --  Casts parameter value of LWT.Longest_Integer
-               --  type to the original loop's loop parameter type
-               --  with range checks.
-               function Cast_Loop_Bound
-                 (Param : Entity_Id; T : Entity_Id)
-                  return Node_Id;
+            Insert_Before_And_Analyze (N, Make_Subprogram_Body (Loc,
+              Specification              => Outlined_Spec,
+              Declarations               => Decls,
+              Handled_Statement_Sequence =>
+                Make_Handled_Sequence_Of_Statements (Loc,
+                  Statements             => New_List
+                    (Relocate_Node (N)))));
 
-               ---------------------
-               -- Cast_Loop_Bound --
-               ---------------------
+            --  Build call to Par_Range_Loop_With_Early_Exit
 
-               function Cast_Loop_Bound
-                 (Param : Entity_Id; T : Entity_Id)
-                  return Node_Id
-               is
-                  Cast_Ident : constant Entity_Id :=
-                    Make_Temporary (Loc, 'P');
-                  Cast : constant Node_Id :=
-                    Make_Attribute_Reference (Loc,
-                      Prefix => New_Occurrence_Of (T, Loc),
-                      Attribute_Name => Name_Val,
-                      Expressions => New_List
-                        (New_Occurrence_Of (Param, Loc)));
-                  Cast_Decl : constant Node_Id :=
-                    Make_Object_Declaration (Loc,
-                      Defining_Identifier => Cast_Ident,
-                      Object_Definition   => New_Occurrence_Of (T, Loc),
-                      Expression          => Cast,
-                      Constant_Present    => True);
-               begin
-                  Append (Cast_Decl, Decls);
-                  return New_Occurrence_Of (Cast_Ident, Loc);
-               end Cast_Loop_Bound;
-            begin
-               --  Move loop parameter values with side effects
-               --  outside of loop before we wrap it in a procedure
-
-               Prepare_Loop_Param (Param_Spec, Low, Hi, Typ);
-
-               --  Move the loop inside the outlined procedure
-
-               Outlined_Body := Make_Subprogram_Body (Loc,
-                 Specification => Outlined_Spec,
-                 Declarations => Decls,
-                 Handled_Statement_Sequence =>
-                   Make_Handled_Sequence_Of_Statements (Loc,
-                     Statements => New_List (Relocate_Node (N))));
-
-               --  Build call to Par_Range_Loop_With_Early_Exit
-
-               Parallel_Call := Build_Parallel_Call (Loc,
-                 Low_Arg => Create_Bound_Arg (Low),
-                 Hi_Arg => Create_Bound_Arg (Hi),
-                 Chunk_Arg => Chunk_Arg,
-                 Outlined_Proc => New_Occurrence_Of (Spec_Id, Loc));
-
-               --  Cast loop bounds from Longest_Integer to their type
-               --  in the original loop.
-
-               if Nkind (DS) = N_Subtype_Indication
-                 and then Present (Constraint (DS))
-                 and then Nkind (Constraint (DS)) = N_Range_Constraint
-               then
-                  declare
-                     SM : constant Entity_Id :=
-                       Entity (Subtype_Mark (DS));
-                  begin
-                     Low_Bound := Cast_Loop_Bound (Low_Param, SM);
-                     Hi_Bound := Cast_Loop_Bound (Hi_Param, SM);
-                  end;
-               else
-                  Low_Bound := Cast_Loop_Bound (Low_Param, Typ);
-                  Hi_Bound := Cast_Loop_Bound (Hi_Param, Typ);
-               end if;
-
-               --  Rewrite loop range as Low_Param .. High_Param
-
-               New_DS := Make_Range (Loc,
-                 Low_Bound => Low_Bound,
-                 High_Bound => Hi_Bound);
-               Set_Discrete_Subtype_Definition (Param_Spec, New_DS);
-            end;
-
-            Insert_Before_And_Analyze (N, Outlined_Body);
-
-            Rewrite (N, Parallel_Call);
+            Rewrite (N, Build_Parallel_Call (Loc,
+              Low_Arg       => Create_Bound_Arg (Low_Val),
+              Hi_Arg        => Create_Bound_Arg (Hi_Val),
+              Chunk_Arg     => Chunk_Arg,
+              Outlined_Proc => New_Occurrence_Of (Spec_Id, Loc)));
             Analyze (N);
 
             --  Check our parallel scope for a saved exit actions
@@ -4059,7 +4076,7 @@ package body Sem_Ch5 is
 
             Remove_Entity (Loop_Id);
             Append_Entity (Loop_Id, Spec_Id);
-         end Outline_Loop;
+         end Create_Par_Range_Loop;
 
          ----------------------------
          -- Prepare_Parallel_Chunk --
@@ -4100,16 +4117,27 @@ package body Sem_Ch5 is
          begin
             Stop_Processing := False;
 
-            if Present (Iter_Spec) then
-               Error_Msg_N ("Parallel iteration over " &
-                 "containers not yet supported", N);
-
-            elsif In_Outlined_Parallel (N) then
+            if In_Outlined_Parallel (N) then
                null;
 
             elsif Lwt_Availible then
-               Outline_Loop;
-               Stop_Processing := True;
+               --  TODO: Iteration over containers
+
+               if Present (Iter_Spec) then
+                  Error_Msg_N ("Parallel iteration over " &
+                    "containers not yet supported", N);
+
+               else
+                  declare
+                     Low, Hi : Node_Id;
+                     Typ : Entity_Id;
+                  begin
+                     Prepare_Parallel_Loop_Param
+                       (Param_Spec, Low, Hi, Typ);
+                     Create_Par_Range_Loop (Low, Hi);
+                  end;
+                  Stop_Processing := True;
+               end if;
 
             else
                Error_Msg_N ("LWT library not found. Parallel loop " &

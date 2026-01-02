@@ -196,6 +196,10 @@ package body Exp_Ch5 is
    procedure Expand_Parallel_Chunk_Specification (N : Node_Id);
    --  Expand parallel chunk specification
 
+   procedure Expand_Parallel_Loop_Param (N : Node_Id);
+   --  Rewrites discrete subtype definition for loop parameter as
+   --  a range over Outlined_Low_Param .. Outlined_Hi_Param.
+
    procedure Expand_Predicated_Loop (N : Node_Id);
    --  Expand for loop over predicated subtype
 
@@ -5844,6 +5848,8 @@ package body Exp_Ch5 is
          Adjust_Condition (Condition (Scheme));
       end if;
 
+      Expand_Parallel_Chunk_Specification (N);
+
       --  Nothing more to do for plain loop with no iteration scheme
 
       if No (Scheme) then
@@ -5887,9 +5893,14 @@ package body Exp_Ch5 is
                Analyze_List (Statements (N));
             end if;
 
+            --  Transform parallel loop discrete subtype
+
+            if In_Outlined_Parallel (N) then
+               Expand_Parallel_Loop_Param (N);
+
             --  Deal with loop over predicates
 
-            if Is_Discrete_Type (Ltype)
+            elsif Is_Discrete_Type (Ltype)
               and then Present (Predicate_Function (Ltype))
             then
                Expand_Predicated_Loop (N);
@@ -6114,7 +6125,6 @@ package body Exp_Ch5 is
       end if;
 
       Process_Statements_For_Controlled_Objects (Stmt);
-      Expand_Parallel_Chunk_Specification (N);
    end Expand_N_Loop_Statement;
 
    --------------------------------
@@ -6316,6 +6326,81 @@ package body Exp_Ch5 is
       Set_Chunk_Specification (Scheme, Empty);
       Set_Is_Parallel (Scheme, False);
    end Expand_Parallel_Chunk_Specification;
+
+   -------------------------------------
+   -- Expand_Parallel_Iteration_Range --
+   -------------------------------------
+
+   procedure Expand_Parallel_Loop_Param (N : Node_Id) is
+      Loc    : constant Source_Ptr := Sloc (N);
+      Scheme : constant Node_Id    := Iteration_Scheme (N);
+
+      pragma Assert (In_Outlined_Parallel (N));
+      pragma Assert (Present (Loop_Parameter_Specification (Scheme)));
+
+      Loop_Param : constant Node_Id := Loop_Parameter_Specification
+                                         (Scheme);
+      DS         : constant Node_Id := Discrete_Subtype_Definition
+                                         (Loop_Param);
+
+      Ident     : constant Entity_Id := Defining_Identifier (Loop_Param);
+      Low_Param : constant Entity_Id := Parallel_Low_Bound (N);
+      Hi_Param  : constant Entity_Id := Parallel_Hi_Bound (N);
+      New_Id    : constant Entity_Id := Make_Temporary (Loc, 'P');
+
+      New_Loop, New_Scheme, New_Body,
+        New_Loop_Param, Param_Def : Node_Id;
+   begin
+      --  Rewrite discrete subtype as range over Low_Param .. Hi_Param
+
+      New_Loop_Param := Make_Loop_Parameter_Specification (Loc,
+        Defining_Identifier         => New_Id,
+        Discrete_Subtype_Definition => Make_Range (Loc,
+          Low_Bound                 => New_Occurrence_Of (Low_Param, Loc),
+          High_Bound                => New_Occurrence_Of (Hi_Param, Loc)));
+
+      New_Scheme := Make_Iteration_Scheme (Loc,
+        Loop_Parameter_Specification => New_Loop_Param);
+
+      --  Rewrite loop body so that the new loop parameter is
+      --  converted to the original loop's type:
+
+      --     for New_Param in Low_Param .. Hi_Param loop
+      --        declare
+      --           Orig_Param : constant Orig_Type :=
+      --             Orig_Type'Val (New_Param);
+      --        begin
+      --           <LOOP BODY>
+      --        end;
+      --     end loop;
+
+      Param_Def := Make_Object_Declaration (Loc,
+        Defining_Identifier => Ident,
+        Object_Definition   => New_Occurrence_Of (Etype (Ident), Loc),
+        Expression          => Make_Attribute_Reference (Loc,
+          Prefix            => New_Occurrence_Of (Etype (Ident), Loc),
+          Attribute_Name    => Name_Val,
+          Expressions       => New_List (New_Occurrence_Of (New_Id, Loc))),
+        Constant_Present    => True);
+
+      New_Body := Make_Block_Statement (Loc,
+        Declarations               => New_List (Param_Def),
+        Handled_Statement_Sequence =>
+          Make_Handled_Sequence_Of_Statements (Loc,
+            Statements             => Statements (N)));
+
+      New_Loop := Make_Loop_Statement (Loc,
+        Identifier       => Identifier (N),
+        Iteration_Scheme => New_Scheme,
+        Statements       => New_List (New_Body),
+        End_Label        => End_Label (N));
+
+      Rewrite (N, New_Loop);
+      Analyze (N);
+
+      Remove_Homonym (Ident);
+      Mutate_Ekind (Ident, E_Constant);
+   end Expand_Parallel_Loop_Param;
 
    ----------------------------
    -- Expand_Predicated_Loop --
