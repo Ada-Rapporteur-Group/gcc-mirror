@@ -130,6 +130,13 @@ package body Sem_Ch5 is
    --  parameter N contains any bounds that can be proven invalid at compile
    --  time. Loop_Node is the loop statement parent of N.
 
+   procedure Check_Controlled_Array_Attribute
+     (DS : Node_Id; Loop_Nod : Node_Id);
+   --  If a loop parameter's bounds are given by a 'Range reference on a
+   --  function call that returns a controlled array, introduce an explicit
+   --  declaration to capture the bounds, so that the function result can be
+   --  finalized in timely fashion.
+
    function Build_Parallel_Loop_Spec
      (Loc : Source_Ptr; Spec_Id : Entity_Id;
       Low_Param : Entity_Id; Hi_Param : Entity_Id;
@@ -2991,61 +2998,11 @@ package body Sem_Ch5 is
    procedure Analyze_Loop_Parameter_Specification (N : Node_Id) is
       Loop_Nod : constant Node_Id := Parent (Parent (N));
 
-      procedure Check_Controlled_Array_Attribute (DS : Node_Id);
-      --  If the bounds are given by a 'Range reference on a function call
-      --  that returns a controlled array, introduce an explicit declaration
-      --  to capture the bounds, so that the function result can be finalized
-      --  in timely fashion.
-
       procedure Check_Predicate_Use (T : Entity_Id);
       --  Diagnose Attempt to iterate through non-static predicate. Note that
       --  a type with inherited predicates may have both static and dynamic
       --  forms. In this case it is not sufficient to check the static
       --  predicate function only, look for a dynamic predicate aspect as well.
-
-      --------------------------------------
-      -- Check_Controlled_Array_Attribute --
-      --------------------------------------
-
-      procedure Check_Controlled_Array_Attribute (DS : Node_Id) is
-      begin
-         if Nkind (DS) = N_Attribute_Reference
-           and then Is_Entity_Name (Prefix (DS))
-           and then Ekind (Entity (Prefix (DS))) = E_Function
-           and then Is_Array_Type (Etype (Entity (Prefix (DS))))
-           and then
-             Is_Controlled (Component_Type (Etype (Entity (Prefix (DS)))))
-           and then Expander_Active
-         then
-            declare
-               Loc  : constant Source_Ptr := Sloc (N);
-               Arr  : constant Entity_Id := Etype (Entity (Prefix (DS)));
-               Indx : constant Entity_Id :=
-                        Base_Type (Etype (First_Index (Arr)));
-               Subt : constant Entity_Id := Make_Temporary (Loc, 'S');
-               Decl : Node_Id;
-
-            begin
-               Decl :=
-                 Make_Subtype_Declaration (Loc,
-                   Defining_Identifier => Subt,
-                   Subtype_Indication  =>
-                      Make_Subtype_Indication (Loc,
-                        Subtype_Mark => New_Occurrence_Of (Indx, Loc),
-                        Constraint   =>
-                          Make_Range_Constraint (Loc, Relocate_Node (DS))));
-               Insert_Before (Loop_Nod, Decl);
-               Analyze (Decl);
-
-               Rewrite (DS,
-                 Make_Attribute_Reference (Loc,
-                   Prefix         => New_Occurrence_Of (Subt, Loc),
-                   Attribute_Name => Attribute_Name (DS)));
-
-               Analyze (DS);
-            end;
-         end if;
-      end Check_Controlled_Array_Attribute;
 
       -------------------------
       -- Check_Predicate_Use --
@@ -3250,7 +3207,7 @@ package body Sem_Ch5 is
          Set_Etype (DS, Any_Type);
       end if;
 
-      Check_Controlled_Array_Attribute (DS);
+      Check_Controlled_Array_Attribute (DS, Loop_Nod);
 
       if Nkind (DS) = N_Subtype_Indication then
          Check_Predicate_Use (Entity (Subtype_Mark (DS)));
@@ -3756,6 +3713,7 @@ package body Sem_Ch5 is
             begin
                --  Rewrite subtype indication if either bound was
                --  changed
+
                if Rewrote_Hi or else Rewrote_Low then
                   Rewrite (S, Make_Subtype_Indication (Loc,
                     Subtype_Mark       => Subtype_Mark (S),
@@ -3805,37 +3763,12 @@ package body Sem_Ch5 is
             if Nkind (DS) = N_Attribute_Reference
               and then Attribute_Name (DS) = Name_Range
             then
-               --  Ensure that the prefix expression on an attribute
-               --  reference is evaluated once outside of the parallel
-               --  loop. If the prefix is anything but an identifier,
-               --  we move the expression into a seperate declaration.
-
-               if Nkind (Prefix (DS)) /= N_Identifier
-                 and then not (Is_Entity_Name (Prefix (DS))
-                   and then Is_Type (Entity (Prefix (DS))))
-                 and then Expander_Active
-               then
-                  declare
-                     Func_Temp : constant Entity_Id :=
-                       Make_Temporary (Loc, 'P');
-                  begin
-                     Insert_Before_And_Analyze (N,
-                       Make_Object_Declaration (Loc,
-                         Defining_Identifier => Func_Temp,
-                         Expression          => Relocate_Node (Prefix (DS)),
-                         Object_Definition   =>
-                           New_Occurrence_Of (Etype (Prefix (DS)), Loc)));
-                     Rewrite (DS,
-                       Make_Attribute_Reference (Loc,
-                         Prefix         => New_Occurrence_Of (Func_Temp, Loc),
-                         Attribute_Name => Name_Range));
-                  end;
-               end if;
+               Check_Controlled_Array_Attribute (DS, N);
 
                --  Resolve the range so that we can extract the
                --  upper and lower bounds.
 
-               Analyze_And_Resolve (DS);
+               Resolve (DS);
             end if;
 
             --  Read out high and low bounds for each kind of loop
@@ -5851,6 +5784,53 @@ package body Sem_Ch5 is
          end;
       end if;
    end Check_Static_Loop_Bounds;
+
+   --------------------------------------
+   -- Check_Controlled_Array_Attribute --
+   --------------------------------------
+
+   procedure Check_Controlled_Array_Attribute
+     (DS : Node_Id; Loop_Nod : Node_Id)
+   is
+      Loc : constant Source_Ptr := Sloc (Loop_Nod);
+   begin
+      if Nkind (DS) = N_Attribute_Reference
+        and then Is_Entity_Name (Prefix (DS))
+        and then Ekind (Entity (Prefix (DS))) = E_Function
+        and then Is_Array_Type (Etype (Entity (Prefix (DS))))
+        and then
+          Is_Controlled (Component_Type (Etype (Entity (Prefix (DS)))))
+        and then Expander_Active
+      then
+         declare
+            Loc  : constant Source_Ptr := Sloc (Parent (DS));
+            Arr  : constant Entity_Id := Etype (Entity (Prefix (DS)));
+            Indx : constant Entity_Id :=
+                     Base_Type (Etype (First_Index (Arr)));
+            Subt : constant Entity_Id := Make_Temporary (Loc, 'S');
+            Decl : Node_Id;
+
+         begin
+            Decl :=
+              Make_Subtype_Declaration (Loc,
+                Defining_Identifier => Subt,
+                Subtype_Indication  =>
+                  Make_Subtype_Indication (Loc,
+                    Subtype_Mark => New_Occurrence_Of (Indx, Loc),
+                    Constraint   =>
+                      Make_Range_Constraint (Loc, Relocate_Node (DS))));
+            Insert_Before (Loop_Nod, Decl);
+            Analyze (Decl);
+
+            Rewrite (DS,
+              Make_Attribute_Reference (Loc,
+                Prefix         => New_Occurrence_Of (Subt, Loc),
+                Attribute_Name => Attribute_Name (DS)));
+
+            Analyze (DS);
+         end;
+      end if;
+   end Check_Controlled_Array_Attribute;
 
    -------------------------------------
    -- Process_Chunk_Specification_Int --
