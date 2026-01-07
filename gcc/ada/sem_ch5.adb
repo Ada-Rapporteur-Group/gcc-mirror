@@ -158,6 +158,17 @@ package body Sem_Ch5 is
    --  the value of Chunk_Arg (the CHUNK_COUNT value that is passed
    --  to LWT)
 
+   procedure Move_Iter_Name (Iter_Name : Node_Id);
+   --  Moves an expression inside an iteration specification name
+   --  into a separate declaration. This expression is rewritten as a
+   --  renaming declaration.
+
+   procedure Check_Reverse_Iteration
+     (I_Spec : Node_Id; Typ : Entity_Id);
+   --  For an iteration over a container, if the loop carries the Reverse
+   --  indicator, verify that the container type has an Iterate aspect that
+   --  implements the reversible iterator interface.
+
    ------------------------
    -- Analyze_Assignment --
    ------------------------
@@ -2229,11 +2240,6 @@ package body Sem_Ch5 is
       Iter_Func : Node_Id;
       Typ : Entity_Id;
 
-      procedure Check_Reverse_Iteration (Typ : Entity_Id);
-      --  For an iteration over a container, if the loop carries the Reverse
-      --  indicator, verify that the container type has an Iterate aspect that
-      --  implements the reversible iterator interface.
-
       procedure Check_Subtype_Definition (Comp_Type : Entity_Id);
       --  If a subtype indication is present, verify that it is consistent
       --  with the component type of the array or container name.
@@ -2244,29 +2250,6 @@ package body Sem_Ch5 is
       --  For containers with Iterator and related aspects, the cursor is
       --  obtained by locating an entity with the proper name in the scope
       --  of the type.
-
-      -----------------------------
-      -- Check_Reverse_Iteration --
-      -----------------------------
-
-      procedure Check_Reverse_Iteration (Typ : Entity_Id) is
-      begin
-         if Reverse_Present (N) then
-            if Is_Array_Type (Typ)
-              or else Is_Reversible_Iterator (Typ)
-              or else
-                (Has_Aspect (Typ, Aspect_Iterable)
-                  and then
-                    Present
-                      (Get_Iterable_Type_Primitive (Typ, Name_Previous)))
-            then
-               null;
-            else
-               Error_Msg_N
-                 ("container type does not support reverse iteration", N);
-            end if;
-         end if;
-      end Check_Reverse_Iteration;
 
       -------------------------------
       --  Check_Subtype_Definition --
@@ -2478,7 +2461,7 @@ package body Sem_Ch5 is
                   end if;
 
                elsif not Is_Overloaded (Iterator) then
-                  Check_Reverse_Iteration (Etype (Iterator));
+                  Check_Reverse_Iteration (N, Etype (Iterator));
 
                --  If Iterator is overloaded, use reversible iterator if one is
                --  available.
@@ -2497,7 +2480,7 @@ package body Sem_Ch5 is
                      Get_Next_Interp (I, It);
                   end loop;
 
-                  Check_Reverse_Iteration (Etype (Iterator));
+                  Check_Reverse_Iteration (N, Etype (Iterator));
                end if;
             end;
          end if;
@@ -2521,97 +2504,7 @@ package body Sem_Ch5 is
 
         and then (Expander_Active or GNATprove_Mode)
       then
-         declare
-            Id    : constant Entity_Id := Make_Temporary (Loc, 'R', Iter_Name);
-            Decl  : Node_Id;
-            Act_S : Node_Id;
-
-         begin
-
-            --  If the domain of iteration is an array component that depends
-            --  on a discriminant, create actual subtype for it. Preanalysis
-            --  does not generate the actual subtype of a selected component.
-
-            if Nkind (Iter_Name) = N_Selected_Component
-              and then Is_Array_Type (Etype (Iter_Name))
-            then
-               Act_S :=
-                 Build_Actual_Subtype_Of_Component
-                   (Etype (Selector_Name (Iter_Name)), Iter_Name);
-               Insert_Action (N, Act_S);
-
-               if Present (Act_S) then
-                  Typ := Defining_Identifier (Act_S);
-               else
-                  Typ := Etype (Iter_Name);
-               end if;
-
-            else
-               Typ := Etype (Iter_Name);
-
-               --  Verify that the expression produces an iterator
-
-               if not Of_Present (N) and then not Is_Iterator (Typ)
-                 and then not Is_Array_Type (Typ)
-                 and then No (Find_Aspect (Typ, Aspect_Iterable))
-               then
-                  Error_Msg_N
-                    ("expect object that implements iterator interface",
-                     Iter_Name);
-               end if;
-            end if;
-
-            --  Protect against malformed iterator
-
-            if Typ = Any_Type then
-               Error_Msg_N ("invalid expression in loop iterator", Iter_Name);
-               return;
-            end if;
-
-            if not Of_Present (N) then
-               Check_Reverse_Iteration (Typ);
-            end if;
-
-            --  For an element iteration over a slice, we must complete
-            --  the resolution and expansion of the slice bounds. These
-            --  can be arbitrary expressions, and the preanalysis that
-            --  was performed in preparation for the iteration may have
-            --  generated an itype whose bounds must be fully expanded.
-            --  We set the parent node to provide a proper insertion
-            --  point for generated actions, if any.
-
-            if Nkind (Iter_Name) = N_Slice
-              and then Nkind (Discrete_Range (Iter_Name)) = N_Range
-              and then not Analyzed (Discrete_Range (Iter_Name))
-            then
-               declare
-                  Indx : constant Node_Id :=
-                     Entity (First_Index (Etype (Iter_Name)));
-               begin
-                  Set_Parent (Indx, Iter_Name);
-                  Resolve (Scalar_Range (Indx), Etype (Indx));
-               end;
-            end if;
-
-            --  The name in the renaming declaration may be a function call.
-            --  Indicate that it does not come from source, to suppress
-            --  spurious warnings on renamings of parameterless functions,
-            --  a common enough idiom in user-defined iterators.
-
-            Decl :=
-              Make_Object_Renaming_Declaration (Loc,
-                Defining_Identifier => Id,
-                Subtype_Mark        => New_Occurrence_Of (Typ, Loc),
-                Name                =>
-                  New_Copy_Tree (Iter_Name, New_Sloc => Loc));
-            Set_Comes_From_Iterator (Decl);
-
-            Insert_Actions (Parent (Parent (N)), New_List (Decl));
-            Rewrite (Name (N), New_Occurrence_Of (Id, Loc));
-            Analyze (Name (N));
-            Set_Etype (Id, Typ);
-            Set_Etype (Name (N), Typ);
-         end;
+         Move_Iter_Name (Iter_Name);
 
       --  Container is an entity or an array with uncontrolled components, or
       --  else it is a container iterator given by a function call, typically
@@ -2658,7 +2551,7 @@ package body Sem_Ch5 is
          end if;
 
          if not Of_Present (N) then
-            Check_Reverse_Iteration (Etype (Iter_Name));
+            Check_Reverse_Iteration (N, Etype (Iter_Name));
          end if;
       end if;
 
@@ -2748,7 +2641,7 @@ package body Sem_Ch5 is
                        ("missing Element primitive for iteration", N);
                   else
                      Set_Etype (Def_Id, Etype (Elt));
-                     Check_Reverse_Iteration (Typ);
+                     Check_Reverse_Iteration (N, Typ);
                   end if;
                end;
 
@@ -2941,7 +2834,7 @@ package body Sem_Ch5 is
                Set_Etype (Def_Id, Get_Cursor_Type (Iter_Asp, Typ));
             else
                Set_Etype (Def_Id, Get_Cursor_Type (Typ));
-               Check_Reverse_Iteration (Etype (Iter_Name));
+               Check_Reverse_Iteration (N, Etype (Iter_Name));
             end if;
 
          end if;
@@ -3638,7 +3531,7 @@ package body Sem_Ch5 is
               (Val : Node_Id; Typ : Entity_Id;
                Rewrote_Bound : out Boolean)
                return Node_Id;
-            --  Rewrites bound as reference to constant variable
+            --  Rewrites bound as reference to constant declaration
 
             procedure Relocate_Subtype_Bounds
               (S : Node_Id; Typ : Entity_Id);
@@ -3807,6 +3700,8 @@ package body Sem_Ch5 is
          procedure Create_Par_Range_Loop
            (Low_Val : Node_Id; Hi_Val : Node_Id)
          is
+            pragma Assert (Lwt_Availible);
+
             Loc        : constant Source_Ptr := Sloc (N);
             Chunk_Spec : constant Node_Id    := Chunk_Specification (Iter);
             Loop_Id    : constant Entity_Id  := Entity (Identifier (N));
@@ -3830,22 +3725,10 @@ package body Sem_Ch5 is
             function Create_Bound_Arg (Arg : Node_Id)
               return Node_Id
             is
-               To_Pos, To_Long_Int : Node_Id;
             begin
-               --  Creates the expression
-               --    Longest_Integer'Value (Range_Typ'Pos (Arg))
-
-               To_Pos := Make_Attribute_Reference (Loc,
-                 Prefix => New_Occurrence_Of (Etype (Arg), Loc),
-                 Attribute_Name => Name_Pos,
-                 Expressions => New_List (Copy_Separate_Tree (Arg)));
-
-               To_Long_Int := Make_Attribute_Reference (Loc,
-                 Prefix => New_Occurrence_Of (Long_Int_Typ, Loc),
-                 Attribute_Name => Name_Val,
-                 Expressions => New_List (To_Pos));
-
-               return To_Long_Int;
+               return Make_Type_Conversion (Loc,
+                 Subtype_Mark => New_Occurrence_Of (Long_Int_Typ, Loc),
+                 Expression   => New_Copy_Tree (Arg));
             end Create_Bound_Arg;
 
          begin
@@ -3989,10 +3872,14 @@ package body Sem_Ch5 is
             --  Build call to Par_Range_Loop_With_Early_Exit
 
             Rewrite (N, Build_Parallel_Call (Loc,
-              Low_Arg       => Create_Bound_Arg (Low_Val),
-              Hi_Arg        => Create_Bound_Arg (Hi_Val),
-              Chunk_Arg     => Chunk_Arg,
-              Outlined_Proc => New_Occurrence_Of (Spec_Id, Loc)));
+              Low_Arg        => Make_Type_Conversion (Loc,
+                Subtype_Mark => New_Occurrence_Of (Long_Int_Typ, Loc),
+                Expression   => New_Copy_Tree (Low_Val)),
+              Hi_Arg         => Make_Type_Conversion (Loc,
+                Subtype_Mark => New_Occurrence_Of (Long_Int_Typ, Loc),
+                Expression   => New_Copy_Tree (Hi_Val)),
+              Chunk_Arg      => Chunk_Arg,
+              Outlined_Proc  => New_Occurrence_Of (Spec_Id, Loc)));
             Analyze (N);
 
             --  Check our parallel scope for a saved exit actions
@@ -4047,31 +3934,134 @@ package body Sem_Ch5 is
          ---------------------------
 
          procedure Prepare_Outlined_Loop (Stop_Processing : out Boolean) is
+
+            function Get_Array_Size (Array_Node : Node_Id) return Node_Id;
+            --  Gets the overall size of a multidimensional array
+
+            procedure Prepare_Iter_Spec (I_Spec : Node_Id);
+            --  Prepare for ... of loop
+
+            procedure Prepare_Loop_Param (LPS : Node_Id);
+            --  Prepare for ... in loop
+
+            --------------------
+            -- Get_Array_Size --
+            --------------------
+
+            function Get_Array_Size (Array_Node : Node_Id) return Node_Id is
+               Loc       : constant Source_Ptr := Sloc (N);
+               Array_Typ : constant Entity_Id  := Base_Type (Etype (Array_Node));
+
+               function Get_Dim (I : Pos) return Node_Id;
+               --  Gets array length for dimension I
+
+               -------------
+               -- Get_Dim --
+               -------------
+
+               function Get_Dim (I : Pos) return Node_Id is
+               begin
+                  return Make_Attribute_Reference (Loc,
+                    Prefix         => New_Copy_Tree (Array_Node),
+                    Attribute_Name => Name_Length,
+                    Expressions    => New_List
+                      (Make_Integer_Literal (Loc, I)));
+               end Get_Dim;
+
+               Array_Dim : constant Pos := Number_Dimensions (Array_Typ);
+               Product   : Node_Id      := Get_Dim (1);
+               Total_Len : Node_Id;
+            begin
+               --  Multiply the lengths of each array dimension length together
+
+               --     Arr_Typ'Length (1) * Arr_Typ'Length (2) *
+               --       ... * Arr_Typ'Length (I)
+
+               for Dim in 2 .. Array_Dim loop
+                  Product := Make_Op_Multiply (Loc,
+                    Left_Opnd  => Product,
+                    Right_Opnd => Get_Dim (Dim));
+               end loop;
+
+               --  Subtract one from the product
+
+               Total_Len := Make_Op_Subtract (Loc,
+                 Left_Opnd => Product,
+                 Right_Opnd => Make_Integer_Literal (Loc, Uint_1));
+
+               Analyze (Total_Len);
+               return Total_Len;
+            end Get_Array_Size;
+
+            -----------------------
+            -- Prepare_Iter_Spec --
+            -----------------------
+
+            procedure Prepare_Iter_Spec (I_Spec : Node_Id) is
+               Iter_Name : constant Node_Id := Name (I_Spec);
+               Loc       : constant Source_Ptr := Sloc (N);
+
+            begin
+               Preanalyze_Range (Iter_Name);
+
+               if not Is_Entity_Name (Iter_Name)
+                 and then Full_Analysis
+                 and then (Expander_Active or GNATprove_Mode)
+               then
+                  Move_Iter_Name (Iter_Name);
+               end if;
+
+               --  Outline and make LWT call for iteration over
+               --  arrays
+
+               if Is_Array_Type (Etype (Iter_Name)) then
+                  declare
+                     Lower_Bound : constant Node_Id :=
+                       Make_Integer_Literal (Loc, Uint_0);
+                     Upper_Bound : constant Node_Id :=
+                       Get_Array_Size (Iter_Name);
+                  begin
+                     Create_Par_Range_Loop (Lower_Bound, Upper_Bound);
+                  end;
+
+               --  TODO: parallel iterators
+
+               else
+                  Error_Msg_N ("Parallel iteration over " &
+                    "containers not yet supported", N);
+               end if;
+            end Prepare_Iter_Spec;
+
+            ------------------------
+            -- Prepare_Loop_Param --
+            ------------------------
+
+            procedure Prepare_Loop_Param (LPS : Node_Id) is
+               Low, Hi : Node_Id;
+               Typ     : Entity_Id;
+            begin
+               Prepare_Parallel_Loop_Param (LPS, Low, Hi, Typ);
+               Create_Par_Range_Loop (Low, Hi);
+            end Prepare_Loop_Param;
+
          begin
             Stop_Processing := False;
 
             if In_Outlined_Parallel (N) then
                null;
 
-            elsif Lwt_Availible then
-               --  TODO: Iteration over containers
+            --  Outline loop if the loop hasn't been outlined yet
+            --  and LWT is availible
 
+            elsif Lwt_Availible then
                if Present (Iter_Spec) then
-                  Error_Msg_N ("Parallel iteration over " &
-                    "containers not yet supported", N);
+                  Prepare_Iter_Spec (Iter_Spec);
 
                else
-                  declare
-                     Low, Hi : Node_Id;
-                     Typ : Entity_Id;
-                  begin
-                     Prepare_Parallel_Loop_Param
-                       (Param_Spec, Low, Hi, Typ);
-                     Create_Par_Range_Loop (Low, Hi);
-                  end;
-                  Stop_Processing := True;
+                  Prepare_Loop_Param (Param_Spec);
                end if;
 
+               Stop_Processing := True;
             else
                Error_Msg_N ("LWT library not found. Parallel loop " &
                  "will execute sequentially??", N);
@@ -4626,6 +4616,7 @@ package body Sem_Ch5 is
       Long_Int_Typ  : constant Entity_Id := RTE (RE_Longest_Integer);
       Loop_Id_Typ   : constant Entity_Id := RTE (RE_Par_Loop_Id);
       Loop_Id_Param : constant Entity_Id := Make_Temporary (Loc, 'P');
+
    begin
       --  Builds out the following procedure specification:
       --     procedure Proc_Name (Low : Longest_Integer;
@@ -5575,6 +5566,7 @@ package body Sem_Ch5 is
    is
       L, H : Node_Id;
       Null_Range : Boolean := False;
+
    begin
 
       if Nkind (DS) not in N_Range | N_Subtype_Indication
@@ -5793,6 +5785,7 @@ package body Sem_Ch5 is
      (DS : Node_Id; Loop_Nod : Node_Id)
    is
       Loc : constant Source_Ptr := Sloc (Loop_Nod);
+
    begin
       if Nkind (DS) = N_Attribute_Reference
         and then Is_Entity_Name (Prefix (DS))
@@ -5843,6 +5836,7 @@ package body Sem_Ch5 is
         or else Nkind (Chunk) = N_Chunk_Specification_Int);
       Loc        : constant Source_Ptr := Sloc (Chunk);
       Chunk_Temp : constant Entity_Id := Make_Temporary (Loc, 'P');
+
    begin
       Set_Etype (Chunk_Temp, Standard_Positive);
 
@@ -5863,5 +5857,132 @@ package body Sem_Ch5 is
          return Make_Integer_Literal (Loc, 0);
       end if;
    end Process_Chunk_Specification_Int;
+
+   --------------------
+   -- Move_Iter_Name --
+   --------------------
+
+   procedure Move_Iter_Name (Iter_Name : Node_Id) is
+      N     : constant Node_Id    := Parent (Iter_Name);
+      Loc   : constant Source_Ptr := Sloc (N);
+      Id    : constant Entity_Id  := Make_Temporary (Loc, 'R', Iter_Name);
+      Decl  : Node_Id;
+      Act_S : Node_Id;
+      Typ   : Entity_Id;
+
+   begin
+      if Is_Entity_Name (Iter_Name) then
+         return;
+      end if;
+
+      --  If the domain of iteration is an array component that depends
+      --  on a discriminant, create actual subtype for it. Preanalysis
+      --  does not generate the actual subtype of a selected component.
+
+      if Nkind (Iter_Name) = N_Selected_Component
+        and then Is_Array_Type (Etype (Iter_Name))
+      then
+         Act_S := Build_Actual_Subtype_Of_Component
+           (Etype (Selector_Name (Iter_Name)), Iter_Name);
+         Insert_Action (N, Act_S);
+
+         if Present (Act_S) then
+            Typ := Defining_Identifier (Act_S);
+         else
+            Typ := Etype (Iter_Name);
+         end if;
+
+      else
+         Typ := Etype (Iter_Name);
+
+         --  Verify that the expression produces an iterator
+
+         if not Of_Present (N) and then not Is_Iterator (Typ)
+           and then not Is_Array_Type (Typ)
+           and then No (Find_Aspect (Typ, Aspect_Iterable))
+         then
+            Error_Msg_N
+              ("expect object that implements iterator interface",
+               Iter_Name);
+         end if;
+      end if;
+
+      --  Protect against malformed iterator
+
+      if Typ = Any_Type then
+         Error_Msg_N ("invalid expression in loop iterator", Iter_Name);
+         return;
+      end if;
+
+      if not Of_Present (N) then
+         Check_Reverse_Iteration (N, Typ);
+      end if;
+
+      --  For an element iteration over a slice, we must complete
+      --  the resolution and expansion of the slice bounds. These
+      --  can be arbitrary expressions, and the preanalysis that
+      --  was performed in preparation for the iteration may have
+      --  generated an itype whose bounds must be fully expanded.
+      --  We set the parent node to provide a proper insertion
+      --  point for generated actions, if any.
+
+      if Nkind (Iter_Name) = N_Slice
+        and then Nkind (Discrete_Range (Iter_Name)) = N_Range
+        and then not Analyzed (Discrete_Range (Iter_Name))
+      then
+         declare
+            Indx : constant Node_Id :=
+              Entity (First_Index (Etype (Iter_Name)));
+         begin
+            Set_Parent (Indx, Iter_Name);
+            Resolve (Scalar_Range (Indx), Etype (Indx));
+         end;
+      end if;
+
+      --  The name in the renaming declaration may be a function call.
+      --  Indicate that it does not come from source, to suppress
+      --  spurious warnings on renamings of parameterless functions,
+      --  a common enough idiom in user-defined iterators.
+
+      Decl :=
+        Make_Object_Renaming_Declaration (Loc,
+          Defining_Identifier => Id,
+          Subtype_Mark        => New_Occurrence_Of (Typ, Loc),
+          Name                =>
+            New_Copy_Tree (Iter_Name, New_Sloc => Loc));
+      Set_Comes_From_Iterator (Decl);
+
+      Insert_Actions (Parent (Parent (N)), New_List (Decl));
+      Rewrite (Name (N), New_Occurrence_Of (Id, Loc));
+      Analyze (Name (N));
+      Set_Etype (Id, Typ);
+      Set_Etype (Name (N), Typ);
+   end Move_Iter_Name;
+
+   -----------------------------
+   -- Check_Reverse_Iteration --
+   -----------------------------
+
+   procedure Check_Reverse_Iteration
+     (I_Spec : Node_Id; Typ : Entity_Id)
+   is
+   begin
+      if Reverse_Present (I_Spec) then
+         if Is_Array_Type (Typ)
+           or else Is_Reversible_Iterator (Typ)
+           or else
+             (Has_Aspect (Typ, Aspect_Iterable)
+           and then
+             Present
+               (Get_Iterable_Type_Primitive (Typ, Name_Previous)))
+         then
+            null;
+         else
+            Error_Msg_N
+               ("container type does not support reverse iteration",
+                I_Spec);
+         end if;
+      end if;
+   end Check_Reverse_Iteration;
 
 end Sem_Ch5;

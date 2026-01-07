@@ -180,6 +180,10 @@ package body Exp_Ch5 is
    --  Expand loop over arrays and containers that uses the form "for X of C"
    --  with an optional subtype mark, or "for Y in C".
 
+   procedure Expand_Parallel_Iterator_Loop (N : Node_Id);
+   --  Expand parallel loops that use the form "for X of C" to iterate over
+   --  arrays (just arrays for now).
+
    procedure Expand_Iterator_Loop_Over_Container
      (N             : Node_Id;
       I_Spec        : Node_Id;
@@ -5042,6 +5046,152 @@ package body Exp_Ch5 is
       end if;
    end Expand_Iterator_Loop;
 
+   procedure Expand_Parallel_Iterator_Loop (N : Node_Id) is
+      Scheme : constant Node_Id    := Iteration_Scheme (N);
+      Loc    : constant Source_Ptr := Sloc (N);
+
+      pragma Assert (In_Outlined_Parallel (N));
+      pragma Assert (Present (Iterator_Specification (Scheme)));
+
+      I_Spec : constant Node_Id := Iterator_Specification (Scheme);
+      pragma Assert (Of_Present (I_Spec));
+
+      Container     : constant Node_Id   := Name (I_Spec);
+      Container_Typ : constant Entity_Id := Base_Type (Etype (Container));
+
+      Low_Param : constant Entity_Id := Parallel_Low_Bound (N);
+      Hi_Param  : constant Entity_Id := Parallel_Hi_Bound (N);
+      Id        : constant Entity_Id := Defining_Identifier (I_Spec);
+
+      Stats : List_Id := Statements (N);
+
+      --  TODO: comments
+
+   begin
+      if Present (Iterator_Filter (I_Spec)) then
+         pragma Assert (Ada_Version >= Ada_2022);
+         Stats := New_List (Make_If_Statement (Loc,
+           Condition => Iterator_Filter (I_Spec),
+           Then_Statements => Stats));
+      end if;
+
+      if Is_Array_Type (Container_Typ) then
+         declare
+            Array_Dim   : constant Pos := Number_Dimensions (Container_Typ);
+            Indices     : constant List_Id := New_List;
+            New_LPS_Id  : constant Entity_Id := Make_Temporary (Loc, 'P');
+            Block_Decls : constant List_Id := New_List;
+            New_Scheme  : Node_Id;
+            Last_Base   : Entity_Id := New_LPS_Id;
+            Index_Type  : Entity_Id := First_Index (Container_Typ);
+
+         begin
+            Set_Debug_Info_Needed (Id);
+
+            for I in 1 .. Array_Dim loop
+               declare
+                  Current_Ind : Node_Id;
+
+                  --  TODO: will this always be a N_Subtype_Indication?
+                  --  UPDATE: it can also be N_Range (somehow)
+                  Base_Index_Type : constant Entity_Id :=
+                    (if Nkind (Index_Type) = N_Subtype_Indication then
+                     Etype (Subtype_Mark (Index_Type)) else Index_Type);
+
+                  Dim_First : constant Node_Id :=
+                    Make_Attribute_Reference (Loc,
+                      Prefix         => New_Copy_Tree (Container),
+                      Attribute_Name => Name_First,
+                      Expressions    => New_List (
+                        Make_Integer_Literal (Loc, I)));
+
+                  First_Ind : constant Node_Id :=
+                    Make_Attribute_Reference (Loc,
+                      Prefix => New_Occurrence_Of (Base_Index_Type, Loc),
+                      Attribute_Name => Name_Pos,
+                      Expressions => New_List (Dim_First));
+               begin
+                  if I = Array_Dim then
+                     Current_Ind := New_Occurrence_Of (Last_Base, Loc);
+                  else
+                     declare
+                        Dim_Len : constant Node_Id :=
+                        Make_Attribute_Reference (Loc,
+                          Prefix         => New_Copy_Tree (Container),
+                          Attribute_Name => Name_Length,
+                          Expressions    => New_List (
+                            Make_Integer_Literal (Loc, I)));
+
+                        Next_Base_Id : constant Entity_Id :=
+                          Make_Temporary (Loc, 'P');
+                     begin
+                        Append_To (Block_Decls, 
+                          Make_Object_Declaration (Loc,
+                            Defining_Identifier => Next_Base_Id,
+                            Constant_Present => True,
+                            Expression => Make_Op_Divide (Loc,
+                              Left_Opnd => New_Occurrence_Of (Last_Base, Loc),
+                              Right_Opnd => Dim_Len),
+                            Object_Definition =>
+                              New_Occurrence_Of (RTE (RE_Longest_Integer), Loc)));
+
+                        Current_Ind := Make_Op_Mod (Loc,
+                          Left_Opnd  => New_Occurrence_Of (Last_Base, Loc),
+                          Right_Opnd => New_Copy_Tree (Dim_Len));
+
+                        Last_Base := Next_Base_Id;
+                     end;
+                  end if;
+
+                  Append_To (Indices,
+                    Make_Attribute_Reference (Loc,
+                      Prefix         => New_Occurrence_Of (Base_Index_Type, Loc),
+                      Attribute_Name => Name_Val,
+                      Expressions    => New_List (Make_Op_Add (Loc,
+                        Left_Opnd    => Current_Ind,
+                        Right_Opnd   => First_Ind))));
+
+                  Next_Index (Index_Type);
+               end;
+            end loop;
+
+            Append_To (Block_Decls,
+              Make_Object_Renaming_Declaration (Loc,
+                Defining_Identifier => Id,
+                Subtype_Mark        => New_Occurrence_Of (
+                  Component_Type (Container_Typ), Loc),
+                Name                =>
+                  Make_Indexed_Component (Loc,
+                    Prefix          => New_Copy_Tree (Container),
+                    Expressions     => Indices)));
+
+            New_Scheme := Make_Iteration_Scheme (Loc,
+              Loop_Parameter_Specification    =>
+                Make_Loop_Parameter_Specification (Loc,
+                  Defining_Identifier         => New_LPS_Id,
+                  Discrete_Subtype_Definition =>
+                    Make_Range (Loc,
+                      Low_Bound               =>
+                        New_Occurrence_Of (Low_Param, Loc),
+                      High_Bound              =>
+                        New_Occurrence_Of (Hi_Param, Loc))));
+
+            Rewrite (N,
+              Make_Loop_Statement (Loc,
+                Identifier                     => Identifier (N),
+                Iteration_Scheme               => New_Scheme,
+                Statements                     => New_List (
+                  Make_Block_Statement (Loc,
+                    Declarations               => Block_Decls,
+                    Handled_Statement_Sequence =>
+                      Make_Handled_Sequence_Of_Statements (Loc,
+                        Statements             => Statements (N)))),
+                End_Label                      => End_Label (N)));
+            Analyze (N);
+         end;
+      end if;
+   end Expand_Parallel_Iterator_Loop;
+
    -------------------------------------
    -- Expand_Iterator_Loop_Over_Array --
    -------------------------------------
@@ -6097,7 +6247,11 @@ package body Exp_Ch5 is
       --  Here to deal with iterator case
 
       elsif Present (Iterator_Specification (Scheme)) then
-         Expand_Iterator_Loop (N);
+         if In_Outlined_Parallel (N) then
+            Expand_Parallel_Iterator_Loop (N);
+         else
+            Expand_Iterator_Loop (N);
+         end if;
 
          --  An iterator loop may generate renaming declarations for elements
          --  that require debug information. This is the case in particular
