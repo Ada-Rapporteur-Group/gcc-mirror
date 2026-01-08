@@ -5185,7 +5185,7 @@ package body Exp_Ch5 is
                     Declarations               => Block_Decls,
                     Handled_Statement_Sequence =>
                       Make_Handled_Sequence_Of_Statements (Loc,
-                        Statements             => Statements (N)))),
+                        Statements             => Stats))),
                 End_Label                      => End_Label (N)));
             Analyze (N);
          end;
@@ -6043,7 +6043,7 @@ package body Exp_Ch5 is
                Analyze_List (Statements (N));
             end if;
 
-            --  Transform parallel loop discrete subtype
+            --  Transform parallel loop param
 
             if In_Outlined_Parallel (N) then
                Expand_Parallel_Loop_Param (N);
@@ -6397,9 +6397,6 @@ package body Exp_Ch5 is
                  Object_Definition   => New_Occurrence_Of
                    (Etype (Ident), Loc)));
 
-               --  Replace old chunk index variable with new constant
-
-               Remove_Homonym (Ident);
                Mutate_Ekind (Ident, E_Constant);
             end;
          end if;
@@ -6440,7 +6437,7 @@ package body Exp_Ch5 is
                    Expression          => Lower,
                    Object_Definition   => New_Occurrence_Of
                      (Etype (Ident), Loc)));
-               Remove_Homonym (Ident);
+
                Mutate_Ekind (Ident, E_Constant);
             end;
 
