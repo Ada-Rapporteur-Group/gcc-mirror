@@ -184,6 +184,9 @@ package body Exp_Ch5 is
    --  Expand parallel loops that use the form "for X of C" to iterate over
    --  arrays (just arrays for now).
 
+   procedure Expand_Parallel_Array_Loop (N : Node_Id);
+   --  Expand parallel iteration over arrays
+
    procedure Expand_Iterator_Loop_Over_Container
      (N             : Node_Id;
       I_Spec        : Node_Id;
@@ -5053,21 +5056,50 @@ package body Exp_Ch5 is
       pragma Assert (In_Outlined_Parallel (N));
       pragma Assert (Present (Iterator_Specification (Scheme)));
 
-      I_Spec : constant Node_Id := Iterator_Specification (Scheme);
-      pragma Assert (Of_Present (I_Spec));
-
+      I_Spec        : constant Node_Id   := Iterator_Specification (Scheme);
       Container     : constant Node_Id   := Name (I_Spec);
       Container_Typ : constant Entity_Id := Base_Type (Etype (Container));
 
+   begin
+      if Is_Array_Type (Container_Typ) then
+         Expand_Parallel_Array_Loop (N);
+
+      --  Unsupported iterator expansion
+
+      else
+         raise Program_Error;
+      end if;
+   end Expand_Parallel_Iterator_Loop;
+
+   --------------------------------
+   -- Expand_Parallel_Array_Loop --
+   --------------------------------
+
+   procedure Expand_Parallel_Array_Loop (N : Node_Id) is
+      Scheme : constant Node_Id    := Iteration_Scheme (N);
+      Loc    : constant Source_Ptr := Sloc (N);
+      I_Spec : constant Node_Id    := Iterator_Specification (Scheme);
+      pragma Assert (Of_Present (I_Spec));
+
+      Array_Val : constant Node_Id   := Name (I_Spec);
+      Array_Typ : constant Entity_Id := Base_Type (Etype (Array_Val));
       Low_Param : constant Entity_Id := Parallel_Low_Bound (N);
       Hi_Param  : constant Entity_Id := Parallel_Hi_Bound (N);
       Id        : constant Entity_Id := Defining_Identifier (I_Spec);
+      Stats     : List_Id := Statements (N);
+      pragma Assert (Is_Array_Type (Array_Typ));
 
-      Stats : List_Id := Statements (N);
-
-      --  TODO: comments
+      Array_Dim   : constant Pos       := Number_Dimensions (Array_Typ);
+      Indices     : constant List_Id   := New_List;
+      New_LPS_Id  : constant Entity_Id := Make_Temporary (Loc, 'P');
+      Block_Decls : constant List_Id   := New_List;
+      Last_Base   : Entity_Id          := New_LPS_Id;
+      Index_Type  : Entity_Id          := First_Index (Array_Typ);
+      New_Scheme  : Node_Id;
 
    begin
+      --  Expand iterator filter
+
       if Present (Iterator_Filter (I_Spec)) then
          pragma Assert (Ada_Version >= Ada_2022);
          Stats := New_List (Make_If_Statement (Loc,
@@ -5075,122 +5107,199 @@ package body Exp_Ch5 is
            Then_Statements => Stats));
       end if;
 
-      if Is_Array_Type (Container_Typ) then
+      Set_Debug_Info_Needed (Id);
+
+      --  Our goal is to build out a single loop that decomposes an index
+      --  into N different subindices, where N is the number of dimensions
+      --  in the array type. To do this, we start with the new loop
+      --  parameter and iteratively divide this value by K, where K is the
+      --  length of the array dimension we are currently iterating over.
+      --  Each of these quotients are saved into a varaible J. Each subindex
+      --  is then given by the modulus of J and K, except for the last
+      --  subindex, which is just the previous J value. Each subindex is then
+      --  added to its index type's 'First value and cast to its appropriate
+      --  type.
+
+      --  For an array with three dimensions, the expanded code would
+      --  look like:
+
+      --     for New_Param in Low_Arg .. Hi_Arg loop
+      --        declare
+      --           J_1 : constant Longest_Integer :=
+      --             New_Param / Array_Val'Length (1);
+      --           J_2 : constant Longest_Integer :=
+      --             J_1 / Array_Val'Length (2);
+      --           J_3 : constant Longest_Integer :=
+      --             J_2 / Array_Val'Length (3);
+
+      --           Index_1 : constant Ind_Type_1 :=
+      --             Ind_Type_1'Val (J_1 mod Array_Val'Length (1) +
+      --               Ind_Type_1'Pos (Ind_Type_1'First));
+      --           Index_2 : constant Ind_Type_1 :=
+      --             Ind_Type_2'Val (J_2 mod Array_Val'Length (2) +
+      --               Ind_Type_2'Pos (Ind_Type_2'First));
+      --           Index_3 : constant Ind_Type_3 :=
+      --             Ind_Type_3'Val (J_3 + Ind_Type_3'Pos (
+      --               Ind_Type_3'First));
+
+      --           Old_Param : Array_Type renames Array_Val
+      --             (Index_1, Index_2, Index_3);
+      --        begin
+      --           ...
+      --        end;
+      --     end loop;
+
+      --  In the rest of these comments, we will refer to the J_* values
+      --  as "base index values" and the Index_* values as "subindex values"
+
+      for I in 1 .. Array_Dim loop
          declare
-            Array_Dim   : constant Pos := Number_Dimensions (Container_Typ);
-            Indices     : constant List_Id := New_List;
-            New_LPS_Id  : constant Entity_Id := Make_Temporary (Loc, 'P');
-            Block_Decls : constant List_Id := New_List;
-            New_Scheme  : Node_Id;
-            Last_Base   : Entity_Id := New_LPS_Id;
-            Index_Type  : Entity_Id := First_Index (Container_Typ);
+            --  The value of our current subindex
+
+            Current_Ind : Node_Id;
+
+            --  TODO: will this always be a N_Subtype_Indication?
+            --  UPDATE: it can also be N_Range (somehow)
+            Base_Index_Type : constant Entity_Id :=
+              (if Nkind (Index_Type) = N_Subtype_Indication then
+               Etype (Subtype_Mark (Index_Type)) else Index_Type);
 
          begin
-            Set_Debug_Info_Needed (Id);
+            --  If we're at the end of our array, our current index value
+            --  is just the previous base index value.
 
-            for I in 1 .. Array_Dim loop
+            if I = Array_Dim then
+               Current_Ind := New_Occurrence_Of (Last_Base, Loc);
+
+            --  Otherwise, we need to compute the next base index value
+            --  as well as its corresponding subindex value.
+
+            else
                declare
-                  Current_Ind : Node_Id;
+                  --  The current dimension's length:
 
-                  --  TODO: will this always be a N_Subtype_Indication?
-                  --  UPDATE: it can also be N_Range (somehow)
-                  Base_Index_Type : constant Entity_Id :=
-                    (if Nkind (Index_Type) = N_Subtype_Indication then
-                     Etype (Subtype_Mark (Index_Type)) else Index_Type);
+                  --     Array_Val'Length (I)
 
-                  Dim_First : constant Node_Id :=
+                  Dim_Len      : constant Node_Id :=
                     Make_Attribute_Reference (Loc,
-                      Prefix         => New_Copy_Tree (Container),
-                      Attribute_Name => Name_First,
+                      Prefix         => New_Copy_Tree (Array_Val),
+                      Attribute_Name => Name_Length,
                       Expressions    => New_List (
                         Make_Integer_Literal (Loc, I)));
-
-                  First_Ind : constant Node_Id :=
-                    Make_Attribute_Reference (Loc,
-                      Prefix => New_Occurrence_Of (Base_Index_Type, Loc),
-                      Attribute_Name => Name_Pos,
-                      Expressions => New_List (Dim_First));
+                  Next_Base_Id : constant Entity_Id :=
+                    Make_Temporary (Loc, 'P');
                begin
-                  if I = Array_Dim then
-                     Current_Ind := New_Occurrence_Of (Last_Base, Loc);
-                  else
-                     declare
-                        Dim_Len : constant Node_Id :=
-                        Make_Attribute_Reference (Loc,
-                          Prefix         => New_Copy_Tree (Container),
-                          Attribute_Name => Name_Length,
-                          Expressions    => New_List (
-                            Make_Integer_Literal (Loc, I)));
+                  --  Compute the value for our current base index:
 
-                        Next_Base_Id : constant Entity_Id :=
-                          Make_Temporary (Loc, 'P');
-                     begin
-                        Append_To (Block_Decls, 
-                          Make_Object_Declaration (Loc,
-                            Defining_Identifier => Next_Base_Id,
-                            Constant_Present => True,
-                            Expression => Make_Op_Divide (Loc,
-                              Left_Opnd => New_Occurrence_Of (Last_Base, Loc),
-                              Right_Opnd => Dim_Len),
-                            Object_Definition =>
-                              New_Occurrence_Of (RTE (RE_Longest_Integer), Loc)));
+                  --     Next_Base := Last_Base / Array_Val'Length (I);
 
-                        Current_Ind := Make_Op_Mod (Loc,
-                          Left_Opnd  => New_Occurrence_Of (Last_Base, Loc),
-                          Right_Opnd => New_Copy_Tree (Dim_Len));
+                  Append_To (Block_Decls,
+                    Make_Object_Declaration (Loc,
+                      Defining_Identifier => Next_Base_Id,
+                      Constant_Present    => True,
+                      Expression          => Make_Op_Divide (Loc,
+                        Left_Opnd         =>
+                          New_Occurrence_Of (Last_Base, Loc),
+                        Right_Opnd        => Dim_Len),
+                      Object_Definition   =>
+                        New_Occurrence_Of (
+                          RTE (RE_Longest_Integer), Loc)));
 
-                        Last_Base := Next_Base_Id;
-                     end;
-                  end if;
+                  --  Generate:
 
-                  Append_To (Indices,
-                    Make_Attribute_Reference (Loc,
-                      Prefix         => New_Occurrence_Of (Base_Index_Type, Loc),
-                      Attribute_Name => Name_Val,
-                      Expressions    => New_List (Make_Op_Add (Loc,
-                        Left_Opnd    => Current_Ind,
-                        Right_Opnd   => First_Ind))));
+                  --     Last_Base mod Array_Val'Length (I)
 
-                  Next_Index (Index_Type);
+                  Current_Ind := Make_Op_Mod (Loc,
+                    Left_Opnd  => New_Occurrence_Of (Last_Base, Loc),
+                    Right_Opnd => New_Copy_Tree (Dim_Len));
+
+                  Last_Base := Next_Base_Id;
                end;
-            end loop;
+            end if;
 
-            Append_To (Block_Decls,
-              Make_Object_Renaming_Declaration (Loc,
-                Defining_Identifier => Id,
-                Subtype_Mark        => New_Occurrence_Of (
-                  Component_Type (Container_Typ), Loc),
-                Name                =>
-                  Make_Indexed_Component (Loc,
-                    Prefix          => New_Copy_Tree (Container),
-                    Expressions     => Indices)));
+            --  Generates current subindex cast to its
+            --  proper type:
 
-            New_Scheme := Make_Iteration_Scheme (Loc,
-              Loop_Parameter_Specification    =>
-                Make_Loop_Parameter_Specification (Loc,
-                  Defining_Identifier         => New_LPS_Id,
-                  Discrete_Subtype_Definition =>
-                    Make_Range (Loc,
-                      Low_Bound               =>
-                        New_Occurrence_Of (Low_Param, Loc),
-                      High_Bound              =>
-                        New_Occurrence_Of (Hi_Param, Loc))));
+            --     Ind_Type'Val (J_1 mod Ind_Type'Length (I) +
+            --       Ind_Type'Pos (Ind_Type'First))
 
-            Rewrite (N,
-              Make_Loop_Statement (Loc,
-                Identifier                     => Identifier (N),
-                Iteration_Scheme               => New_Scheme,
-                Statements                     => New_List (
-                  Make_Block_Statement (Loc,
-                    Declarations               => Block_Decls,
-                    Handled_Statement_Sequence =>
-                      Make_Handled_Sequence_Of_Statements (Loc,
-                        Statements             => Stats))),
-                End_Label                      => End_Label (N)));
-            Analyze (N);
+            Append_To (Indices,
+              Make_Attribute_Reference (Loc,
+                Prefix                   =>
+                  New_Occurrence_Of (Base_Index_Type, Loc),
+                Attribute_Name           => Name_Val,
+                Expressions              => New_List (Make_Op_Add (Loc,
+                  Left_Opnd              => Current_Ind,
+                  Right_Opnd             =>
+                    Make_Attribute_Reference (Loc,
+                      Prefix             =>
+                        New_Occurrence_Of (Base_Index_Type, Loc),
+                      Attribute_Name     => Name_Pos,
+                      Expressions        => New_List (
+                        Make_Attribute_Reference (Loc,
+                          Prefix         => New_Copy_Tree (Array_Val),
+                          Attribute_Name => Name_First,
+                          Expressions    => New_List (
+                            Make_Integer_Literal (Loc, I)))))))));
+
+            Next_Index (Index_Type);
          end;
-      end if;
-   end Expand_Parallel_Iterator_Loop;
+      end loop;
+
+      --  Generate:
+
+      --     declare
+      --        Base_Index_1 : constant Longest_Integer := ...;
+      --        ...
+      --        Old_Param : Old_Type renames Array_Val
+      --          (Index_1, ...);
+      --     begin
+      --        ...
+      --     end;
+
+      --  This block contains our base index definitions as well as our
+      --  loop parameter renaming.
+
+      Append_To (Block_Decls,
+        Make_Object_Renaming_Declaration (Loc,
+          Defining_Identifier => Id,
+          Subtype_Mark        => New_Occurrence_Of (
+            Component_Type (Array_Typ), Loc),
+          Name                =>
+            Make_Indexed_Component (Loc,
+              Prefix          => New_Copy_Tree (Array_Val),
+              Expressions     => Indices)));
+
+      --  Generate:
+
+      --     for New_Param in Low_Arg .. Hi_Arg loop
+      --        ...
+      --     end loop;
+
+      New_Scheme := Make_Iteration_Scheme (Loc,
+        Loop_Parameter_Specification    =>
+          Make_Loop_Parameter_Specification (Loc,
+            Defining_Identifier         => New_LPS_Id,
+            Discrete_Subtype_Definition =>
+              Make_Range (Loc,
+                Low_Bound               =>
+                  New_Occurrence_Of (Low_Param, Loc),
+                High_Bound              =>
+                  New_Occurrence_Of (Hi_Param, Loc))));
+
+      Rewrite (N,
+        Make_Loop_Statement (Loc,
+          Identifier                     => Identifier (N),
+          Iteration_Scheme               => New_Scheme,
+          Statements                     => New_List (
+            Make_Block_Statement (Loc,
+              Declarations               => Block_Decls,
+              Handled_Statement_Sequence =>
+                Make_Handled_Sequence_Of_Statements (Loc,
+                  Statements             => Stats))),
+          End_Label                      => End_Label (N)));
+      Analyze (N);
+   end Expand_Parallel_Array_Loop;
 
    -------------------------------------
    -- Expand_Iterator_Loop_Over_Array --
