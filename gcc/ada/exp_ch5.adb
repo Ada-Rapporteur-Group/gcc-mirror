@@ -5154,15 +5154,8 @@ package body Exp_Ch5 is
 
       for I in 1 .. Array_Dim loop
          declare
-            --  The value of our current subindex
-
-            Current_Ind : Node_Id;
-
-            --  TODO: will this always be a N_Subtype_Indication?
-            --  UPDATE: it can also be N_Range (somehow)
-            Base_Index_Type : constant Entity_Id :=
-              (if Nkind (Index_Type) = N_Subtype_Indication then
-               Etype (Subtype_Mark (Index_Type)) else Index_Type);
+            Base_Index_Type : constant Entity_Id := Etype (Index_Type);
+            Current_Ind     : Node_Id;
 
          begin
             --  If we're at the end of our array, our current index value
