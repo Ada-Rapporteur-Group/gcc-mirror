@@ -3649,7 +3649,6 @@ package body Sem_Ch6 is
                  Name => New_Occurrence_Of (Get_Return_Ind, Loc),
                  Expression => New_Early_Exit_Case (Post_Call_Action)));
             else
-               pragma Assert (No (Return_Val));
                Append_To (If_Body, Make_Null_Statement (Loc));
             end if;
 
