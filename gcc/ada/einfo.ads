@@ -3174,7 +3174,8 @@ package Einfo is
 --       points to the array type for which this is the Packed_Array_Impl_Type.
 
 --    Is_Parallel_Loop_Scope
---       Set if this scope is a parallel loop scope.
+--       Set if this scope is a parallel loop scope inside an outlined
+--       procedure.
 
 --    Is_Param_Block_Component_Type [base type only]
 --       Defined in access types. Set to indicate that a type is the type of a

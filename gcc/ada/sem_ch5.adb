@@ -3950,7 +3950,8 @@ package body Sem_Ch5 is
 
             function Get_Array_Size (Array_Node : Node_Id) return Node_Id is
                Loc       : constant Source_Ptr := Sloc (N);
-               Array_Typ : constant Entity_Id  := Base_Type (Etype (Array_Node));
+               Array_Typ : constant Entity_Id  := Base_Type
+                 (Etype (Array_Node));
 
                function Get_Dim (I : Pos) return Node_Id;
                --  Gets array length for dimension I
@@ -4118,11 +4119,14 @@ package body Sem_Ch5 is
             Rewrite (N, Blk);
             Analyze (N);
 
-            --  Transfer the loop entity from its old scope to the new block
-            --  scope.
+            --  Transfer the loop entity from its old scope to the new
+            --  block scope if it hasn't already been moved inside a
+            --  different procedure.
 
-            Remove_Entity (Loop_Id);
-            Append_Entity (Loop_Id, Blk_Id);
+            if not Is_Parallel_Loop_Scope (Loop_Id) then
+               Remove_Entity (Loop_Id);
+               Append_Entity (Loop_Id, Blk_Id);
+            end if;
          end Wrap_Loop_Statement;
       begin
          Stop_Processing := False;
@@ -4286,7 +4290,7 @@ package body Sem_Ch5 is
       --  later when we transform control flow statements inside parallel
       --  scopes.
 
-      if Is_Parallel (Iter) then
+      if In_Outlined_Parallel (N) then
          Set_Is_Parallel_Loop_Scope (Ent);
       end if;
 
@@ -5871,10 +5875,6 @@ package body Sem_Ch5 is
       Typ   : Entity_Id;
 
    begin
-      if Is_Entity_Name (Iter_Name) then
-         return;
-      end if;
-
       --  If the domain of iteration is an array component that depends
       --  on a discriminant, create actual subtype for it. Preanalysis
       --  does not generate the actual subtype of a selected component.
