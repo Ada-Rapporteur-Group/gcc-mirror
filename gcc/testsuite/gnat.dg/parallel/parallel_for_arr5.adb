@@ -2,7 +2,6 @@
 -- { dg-options "-gnat2022" }
 
 with LWT.Parallelism; use LWT.Parallelism;
-with Ada.Text_IO; use Ada.Text_IO;
 
 procedure parallel_for_arr5 is
    type Array_2D is array
