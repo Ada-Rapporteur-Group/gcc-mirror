@@ -5260,7 +5260,7 @@ package body Exp_Ch5 is
             Component_Type (Array_Typ), Loc),
           Name                =>
             Make_Indexed_Component (Loc,
-              Prefix          => New_Copy_Tree (Array_Val),
+              Prefix          => Relocate_Node (Array_Val),
               Expressions     => Indices)));
 
       --  Generate:
