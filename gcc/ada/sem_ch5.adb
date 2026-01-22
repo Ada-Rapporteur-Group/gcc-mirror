@@ -4224,6 +4224,10 @@ package body Sem_Ch5 is
             begin
                Preanalyze_Range (Iter_Name);
 
+               --  Move the loop's iter name outside of the loop to
+               --  prevent any side effects from occurring inside
+               --  the outlined procedure.
+
                if not Is_Entity_Name (Iter_Name)
                  and then Full_Analysis
                  and then (Expander_Active or GNATprove_Mode)
