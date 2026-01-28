@@ -3498,7 +3498,7 @@ package body Sem_Ch6 is
 
       procedure Rewrite_Parallel_Exits (Scope_Id : Entity_Id) is
 
-         function Get_Return_Val (Typ : Entity_Id) return Entity_Id;
+         --  function Get_Return_Val (Typ : Entity_Id) return Entity_Id;
          --  Retrieves or creates a variable that stores the parallel
          --  construct's return value.
 
@@ -3508,13 +3508,13 @@ package body Sem_Ch6 is
          --  zero.
 
          function New_Early_Exit_Case (Post_Call_Action : Node_Id)
-           return Node_Id;
+           return Nat;
          --  Adds new post call action to exit case at the end of the
-         --  parallel call
+         --  parallel call. Returns the new exit case's index value.
 
          function Make_Early_Exit
-           (Post_Call_Action : Node_Id := Empty;
-            Ret_Val          : Node_Id := Empty;
+           (Post_Call_Action : Nat := 0;
+            Return_Expr      : Node_Id := Empty;
             Predicate        : Node_Id := Empty) return Node_Id;
          --  Creates the parallel exit node
 
@@ -3531,40 +3531,44 @@ package body Sem_Ch6 is
          Par_Loop_Id    : Entity_Id := Empty;
          Ret_Is_Void    : Boolean := False;
          Exit_Alt_Count : Nat := 1;
+         Return_Alt_Id  : Nat;
          Exit_Alts      : constant List_Id := New_List;
+         Requires_SS    : Boolean := False;
+         Enclosing_Sub  : constant Entity_Id :=
+           Enclosing_Subprogram (Scope_Id);
 
          --------------------
          -- Get_Return_Val --
          --------------------
 
-         function Get_Return_Val (Typ : Entity_Id) return Entity_Id
-         is
-            pragma Assert (Present (Return_Val) or else
-              not Ret_Is_Void);
-         begin
-            --  Return the variable if it has already been
-            --  created
+         --  function Get_Return_Val (Typ : Entity_Id) return Entity_Id
+         --  is
+         --     pragma Assert (Present (Return_Val) or else
+         --       not Ret_Is_Void);
+         --  begin
+         --     --  Return the variable if it has already been
+         --     --  created
 
-            if Present (Return_Val) then
-               pragma Assert (Typ = Etype (Return_Val));
-               return Return_Val;
-            end if;
+         --     if Present (Return_Val) then
+         --        pragma Assert (Typ = Etype (Return_Val));
+         --        return Return_Val;
+         --     end if;
 
-            --  Otherwise, create it
-            --    Return_Val : Func_Return_Type;
+         --     --  Otherwise, create it
+         --     --    Return_Val : Func_Return_Type;
 
-            Return_Val := Make_Temporary (Loc, 'P');
+         --     Return_Val := Make_Temporary (Loc, 'P');
 
-            Set_Etype (Return_Val, Typ);
-            Mutate_Ekind (Return_Val, E_Variable);
+         --     Set_Etype (Return_Val, Typ);
+         --     Mutate_Ekind (Return_Val, E_Variable);
 
-            Insert_Before_And_Analyze (N,
-              Make_Object_Declaration (Loc,
-                Defining_Identifier => Return_Val,
-                Object_Definition   => New_Occurrence_Of (Typ, Loc)));
+         --     Insert_Before_And_Analyze (N,
+         --       Make_Object_Declaration (Loc,
+         --         Defining_Identifier => Return_Val,
+         --         Object_Definition   => New_Occurrence_Of (Typ, Loc)));
 
-            return Return_Val;
-         end Get_Return_Val;
+         --     return Return_Val;
+         --  end Get_Return_Val;
 
          --------------------
          -- Get_Return_Ind --
@@ -3602,11 +3606,10 @@ package body Sem_Ch6 is
          -------------------------
 
          function New_Early_Exit_Case (Post_Call_Action : Node_Id)
-           return Node_Id
+           return Nat
          is
             Alt : Node_Id;
-            Ind : constant Node_Id := Make_Integer_Literal
-              (Loc, Exit_Alt_Count);
+            Ind : constant Nat := Exit_Alt_Count;
          begin
             --  Add the post call action to our case statement
 
@@ -3614,8 +3617,9 @@ package body Sem_Ch6 is
             --     POST_CALL_ACTION
 
             Alt := Make_Case_Statement_Alternative (Loc,
-              Discrete_Choices => New_List (Copy_Separate_Tree (Ind)),
-              Statements       => New_List (Post_Call_Action));
+              Statements       => New_List (Post_Call_Action),
+              Discrete_Choices => New_List (
+                Make_Integer_Literal (Loc, Ind)));
             Append_To (Exit_Alts, Alt);
             Exit_Alt_Count := Exit_Alt_Count + 1;
             return Ind;
@@ -3626,8 +3630,8 @@ package body Sem_Ch6 is
          ---------------------
 
          function Make_Early_Exit
-           (Post_Call_Action : Node_Id := Empty;
-            Ret_Val          : Node_Id := Empty;
+           (Post_Call_Action : Nat := 0;
+            Return_Expr      : Node_Id := Empty;
             Predicate        : Node_Id := Empty) return Node_Id
          is
             If_Body    : constant List_Id := New_List;
@@ -3641,25 +3645,25 @@ package body Sem_Ch6 is
               Parameter_Associations => New_List (New_Occurrence_Of (
                 Parallel_Loop_Id_Param (Scope_Id), Loc)));
 
-            --  Create a new post call action index and assign this
-            --  value to Return_Ind
-
-            if Present (Post_Call_Action) then
-               Append_To (If_Body, Make_Assignment_Statement (Loc,
-                 Name => New_Occurrence_Of (Get_Return_Ind, Loc),
-                 Expression => New_Early_Exit_Case (Post_Call_Action)));
-            else
-               Append_To (If_Body, Make_Null_Statement (Loc));
-            end if;
-
             --  If this is a return statement, then assign the value
             --  to Return_Val
 
-            if Present (Ret_Val) then
+            if Present (Return_Expr) then
+               pragma Assert (Present (Return_Val));
                Append_To (If_Body, Make_Assignment_Statement (Loc,
-                 Name => New_Occurrence_Of (Get_Return_Val
-                   (Etype (Ret_Val)), Loc),
-                 Expression => Ret_Val));
+                 Name => New_Occurrence_Of (Return_Val, Loc),
+                 Expression => Return_Expr));
+            end if;
+
+            --  Create a new post call action index and assign this
+            --  value to Return_Ind
+
+            if Post_Call_Action > 0 then
+               Append_To (If_Body, Make_Assignment_Statement (Loc,
+                 Name => New_Occurrence_Of (Get_Return_Ind, Loc),
+                 Expression => Make_Integer_Literal (Loc, Post_Call_Action)));
+            elsif Is_Empty_List (If_Body) then
+               Append_To (If_Body, Make_Null_Statement (Loc));
             end if;
 
             --  Create early exit if statement and return
@@ -3782,11 +3786,26 @@ package body Sem_Ch6 is
                --        return Return_Val;
 
                if Present (Expression (I)) then
-                  Rewrite (I, Make_Early_Exit (
-                    Ret_Val          => Expression (I),
-                    Post_Call_Action => Make_Simple_Return_Statement
-                      (Loc, New_Occurrence_Of (Get_Return_Val (
-                        Etype (Expression (I))), Loc))));
+                  pragma Assert (Present (Return_Val));
+
+                  declare
+                     Return_Expr : Node_Id;
+                  begin
+                     if Requires_SS then
+                        Return_Expr := Make_Allocator (Loc,
+                          Expression => Make_Qualified_Expression (Loc,
+                            Subtype_Mark => New_Occurrence_Of (
+                              Etype (Enclosing_Sub), Loc),
+                            Expression => Relocate_Node (Expression (I))));
+                        Set_No_Initialization (Return_Expr);
+                     else
+                        Return_Expr := Expression (I);
+                     end if;
+
+                     Rewrite (I, Make_Early_Exit (
+                       Return_Expr      => Return_Expr,
+                       Post_Call_Action => Return_Alt_Id));
+                  end;
 
                --  In cases where the return statement has no
                --  return expression, the Return_Val and exit
@@ -3795,8 +3814,10 @@ package body Sem_Ch6 is
                else
                   pragma Assert (No (Return_Val));
                   Ret_Is_Void := True;
-                  Rewrite (I, Make_Early_Exit (Post_Call_Action =>
-                    Make_Simple_Return_Statement (Loc)));
+                  --  TODO: Make singular case for this (Index 1)
+                  Rewrite (I, Make_Early_Exit (
+                    Post_Call_Action => New_Early_Exit_Case (
+                      Make_Simple_Return_Statement (Loc))));
                end if;
 
                Analyze (I);
@@ -3810,7 +3831,8 @@ package body Sem_Ch6 is
                 Entity (Name (I)))
             then
                Rewrite (I, Make_Early_Exit (
-                 Post_Call_Action => Copy_Separate_Tree (I)));
+                 Post_Call_Action => New_Early_Exit_Case (
+                   Copy_Separate_Tree (I))));
                Analyze (I);
                return Skip;
             end if;
@@ -3845,9 +3867,10 @@ package body Sem_Ch6 is
                then
                   Rewrite (I, Make_Early_Exit (
                     Predicate        => Condition (I),
-                    Post_Call_Action => Make_Exit_Statement (Loc,
-                      Name           => New_Occurrence_Of (
-                                          Exits_From (I), Loc))));
+                    Post_Call_Action => New_Early_Exit_Case (
+                      Make_Exit_Statement (Loc,
+                        Name         => New_Occurrence_Of (
+                          Exits_From (I), Loc)))));
                   Analyze (I);
                   return Skip;
 
@@ -3860,9 +3883,10 @@ package body Sem_Ch6 is
                then
                   Rewrite (I, Make_Early_Exit (
                     Predicate        => Condition (I),
-                    Post_Call_Action => Make_Exit_Statement (Loc,
-                      Name           => New_Occurrence_Of (Entity (Name (I)),
-                                          Loc))));
+                    Post_Call_Action => New_Early_Exit_Case (
+                      Make_Exit_Statement (Loc,
+                        Name         => New_Occurrence_Of (
+                          Entity (Name (I)), Loc)))));
                   Analyze (I);
                   return Skip;
                end if;
@@ -3875,28 +3899,69 @@ package body Sem_Ch6 is
            new Traverse_Proc (Visit_Node);
 
       begin
-         if Present (Scope_Id)
-           and then Ekind (Scope_Id) = E_Procedure
-           and then Is_Outlined_Parallel (Scope_Id)
+
+         --  Generate return value
+
+         if Present (Enclosing_Sub) and then
+           Return_Present (Enclosing_Sub) and then
+           Ekind (Enclosing_Sub) = E_Function
          then
-            Set_Is_Outlined_Parallel (Scope_Id, False);
-            Replace_Exits (Handled_Statement_Sequence (N));
+            Return_Val := Make_Temporary (Loc, 'P');
+            declare
+               Return_Typ : Entity_Id;
+               Ret_Action : Node_Id;
+            begin
+               if Sec_Stack_Needed_For_Return (Enclosing_Sub) then
+                  Return_Typ := Make_Temporary (Loc, 'P');
+                  Requires_SS := True;
 
-            --  Create a case statement with our early exit actions
-            --  and attach it to the scope semantic data. This statement
-            --  is retrieved in Sem_Ch5 and inserted at the end of
-            --  expanded parallel constructs.
+                  Mutate_Ekind (Return_Typ, E_Access_Type);
+                  Set_Associated_Storage_Pool (Return_Typ, RTE (RE_SS_Pool));
 
-            if Present (Return_Ind) then
-               Append_To (Exit_Alts,
-                 Make_Case_Statement_Alternative (Loc,
-                   Discrete_Choices => New_List (Make_Others_Choice (Loc)),
-                   Statements => New_List (Make_Null_Statement (Loc))));
-               Set_Parallel_Exit_Actions (Scope_Id,
-                 Make_Case_Statement (Loc,
-                   Expression   => New_Occurrence_Of (Return_Ind, Loc),
-                   Alternatives => Exit_Alts));
-            end if;
+                  Insert_Before_And_Analyze (N,
+                    Make_Full_Type_Declaration (Loc,
+                      Defining_Identifier => Return_Typ,
+                      Type_Definition     =>
+                        Make_Access_To_Object_Definition (Loc,
+                          Subtype_Indication => New_Occurrence_Of (
+                            Etype (Enclosing_Sub), Loc))));
+
+                  Ret_Action := Make_Simple_Return_Statement (Loc,
+                    Make_Explicit_Dereference (Loc,
+                      Prefix => New_Occurrence_Of (Return_Val, Loc)));
+               else
+                  Return_Typ := Etype (Enclosing_Sub);
+                  Ret_Action := Make_Simple_Return_Statement (Loc,
+                    New_Occurrence_Of (Return_Val, Loc));
+               end if;
+
+               Insert_Before_And_Analyze (N,
+                 Make_Object_Declaration (Loc,
+                   Defining_Identifier => Return_Val,
+                   Object_Definition   => New_Occurrence_Of
+                     (Return_Typ, Loc)));
+
+               Return_Alt_Id := New_Early_Exit_Case (Ret_Action);
+            end;
+         end if;
+
+         Set_Is_Outlined_Parallel (Scope_Id, False);
+         Replace_Exits (Handled_Statement_Sequence (N));
+
+         --  Create a case statement with our early exit actions
+         --  and attach it to the scope semantic data. This statement
+         --  is retrieved in Sem_Ch5 and inserted at the end of
+         --  expanded parallel constructs.
+
+         if Present (Return_Ind) then
+            Append_To (Exit_Alts,
+              Make_Case_Statement_Alternative (Loc,
+                Discrete_Choices => New_List (Make_Others_Choice (Loc)),
+                Statements       => New_List (Make_Null_Statement (Loc))));
+            Set_Parallel_Exit_Actions (Scope_Id,
+              Make_Case_Statement (Loc,
+                Expression   => New_Occurrence_Of (Return_Ind, Loc),
+                Alternatives => Exit_Alts));
          end if;
       end Rewrite_Parallel_Exits;
 
@@ -5153,7 +5218,15 @@ package body Sem_Ch6 is
       Inspect_Deferred_Constant_Completion (Declarations (N));
       Analyze (Handled_Statement_Sequence (N));
 
-      Rewrite_Parallel_Exits (Body_Id);
+      --  If we're in an parallel outlined procedure, rewrite
+      --  exits, returns, and gotos
+
+      if Present (Body_Id)
+        and then Ekind (Body_Id) = E_Procedure
+        and then Is_Outlined_Parallel (Body_Id)
+      then
+         Rewrite_Parallel_Exits (Body_Id);
+      end if;
 
       --  Add the generated minimum accessibility objects to the subprogram
       --  body's list of declarations after analysis of the statements and
