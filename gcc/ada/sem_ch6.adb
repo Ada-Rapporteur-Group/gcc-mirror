@@ -3498,10 +3498,6 @@ package body Sem_Ch6 is
 
       procedure Rewrite_Parallel_Exits (Scope_Id : Entity_Id) is
 
-         --  function Get_Return_Val (Typ : Entity_Id) return Entity_Id;
-         --  Retrieves or creates a variable that stores the parallel
-         --  construct's return value.
-
          function Get_Return_Ind return Entity_Id;
          --  Retrieves or creates a variable that stores which exit
          --  action should be run after the call to LWT. Default is
@@ -3529,46 +3525,12 @@ package body Sem_Ch6 is
          Return_Val     : Entity_Id := Empty;
          Return_Ind     : Entity_Id := Empty;
          Par_Loop_Id    : Entity_Id := Empty;
-         Ret_Is_Void    : Boolean := False;
          Exit_Alt_Count : Nat := 1;
          Return_Alt_Id  : Nat;
          Exit_Alts      : constant List_Id := New_List;
          Requires_SS    : Boolean := False;
          Enclosing_Sub  : constant Entity_Id :=
            Enclosing_Subprogram (Scope_Id);
-
-         --------------------
-         -- Get_Return_Val --
-         --------------------
-
-         --  function Get_Return_Val (Typ : Entity_Id) return Entity_Id
-         --  is
-         --     pragma Assert (Present (Return_Val) or else
-         --       not Ret_Is_Void);
-         --  begin
-         --     --  Return the variable if it has already been
-         --     --  created
-
-         --     if Present (Return_Val) then
-         --        pragma Assert (Typ = Etype (Return_Val));
-         --        return Return_Val;
-         --     end if;
-
-         --     --  Otherwise, create it
-         --     --    Return_Val : Func_Return_Type;
-
-         --     Return_Val := Make_Temporary (Loc, 'P');
-
-         --     Set_Etype (Return_Val, Typ);
-         --     Mutate_Ekind (Return_Val, E_Variable);
-
-         --     Insert_Before_And_Analyze (N,
-         --       Make_Object_Declaration (Loc,
-         --         Defining_Identifier => Return_Val,
-         --         Object_Definition   => New_Occurrence_Of (Typ, Loc)));
-
-         --     return Return_Val;
-         --  end Get_Return_Val;
 
          --------------------
          -- Get_Return_Ind --
@@ -3808,16 +3770,12 @@ package body Sem_Ch6 is
                   end;
 
                --  In cases where the return statement has no
-               --  return expression, the Return_Val and exit
-               --  action are not needed
+               --  return expression, the Return_Val is not needed
 
                else
                   pragma Assert (No (Return_Val));
-                  Ret_Is_Void := True;
-                  --  TODO: Make singular case for this (Index 1)
                   Rewrite (I, Make_Early_Exit (
-                    Post_Call_Action => New_Early_Exit_Case (
-                      Make_Simple_Return_Statement (Loc))));
+                    Post_Call_Action => Return_Alt_Id));
                end if;
 
                Analyze (I);
@@ -3900,49 +3858,111 @@ package body Sem_Ch6 is
 
       begin
 
-         --  Generate return value
+         --  Here we generate the return exit action as well as the
+         --  variable we use to store the return value (if applicable).
+         --  All return statements in a parallel construct share a
+         --  single return exit action. The exit action ID for returns
+         --  will always be 1 if returns are present in the parallel
+         --  construct.
 
          if Present (Enclosing_Sub) and then
-           Return_Present (Enclosing_Sub) and then
-           Ekind (Enclosing_Sub) = E_Function
+           Return_Present (Enclosing_Sub)
          then
-            Return_Val := Make_Temporary (Loc, 'P');
-            declare
-               Return_Typ : Entity_Id;
-               Ret_Action : Node_Id;
-            begin
-               if Sec_Stack_Needed_For_Return (Enclosing_Sub) then
-                  Return_Typ := Make_Temporary (Loc, 'P');
-                  Requires_SS := True;
+            --  Generate the exit action for returns without expressions.
 
-                  Mutate_Ekind (Return_Typ, E_Access_Type);
-                  Set_Associated_Storage_Pool (Return_Typ, RTE (RE_SS_Pool));
+            --    when 1 =>
+            --       return;
+
+            if Etype (Enclosing_Sub) = Standard_Void_Type then
+               Return_Alt_Id := New_Early_Exit_Case (
+                 Make_Simple_Return_Statement (Loc));
+
+            --  We need to create a variable that stores return values if
+            --  the parallel construct's original enclosing scope is a
+            --  function that returns a value. This value is then used as
+            --  a return statement expression inside the parallel call's
+            --  exit actions.
+
+            --     Return_Val : Ret_Type;
+            --     Return_Ind : Natural := 0;
+
+            --     procedure Proc_Name (...) is
+            --        ...
+            --     end Proc_Name;
+
+            --     Par_Range_Loop_With_Early_Exit (
+            --       Low => Low, High => Hi,
+            --       Num_Chunks => CHUNK_EXPR,
+            --       Loop_Body => Proc_Name'Access);
+
+            --     case Return_Ind is
+            --        when 1 =>
+            --           return Return_Val;
+            --        ...
+            --     end case;
+
+            else
+               Return_Val := Make_Temporary (Loc, 'P');
+
+               declare
+                  Return_Typ : Entity_Id;
+                  Ret_Action : Node_Id;
+
+               begin
+                  --  If the enclosing function returns a value that
+                  --  uses the secondary stack, Return_Val should be
+                  --  an access type.
+
+                  if Sec_Stack_Needed_For_Return (Enclosing_Sub) then
+                     Requires_SS := True;
+
+                     --  Create an access type that uses the secondary
+                     --  stack as a storage pool
+
+                     --     type Acc_Typ is access Ret_Type;
+                     --     for Acc_Typ'Storage_Pool use SS_Pool;
+
+                     Return_Typ := Make_Temporary (Loc, 'P');
+                     Mutate_Ekind (Return_Typ, E_Access_Type);
+                     Set_Associated_Storage_Pool (Return_Typ,
+                       RTE (RE_SS_Pool));
+
+                     Insert_Before_And_Analyze (N,
+                       Make_Full_Type_Declaration (Loc,
+                         Defining_Identifier    => Return_Typ,
+                         Type_Definition        =>
+                           Make_Access_To_Object_Definition (Loc,
+                             Subtype_Indication => New_Occurrence_Of (
+                               Etype (Enclosing_Sub), Loc))));
+
+                     --  Create a post call action that dereferences and
+                     --  returns Return_Val
+
+                     --     when 1 =>
+                     --        return Return_Val.all;
+
+                     Ret_Action := Make_Simple_Return_Statement (Loc,
+                       Make_Explicit_Dereference (Loc,
+                         Prefix => New_Occurrence_Of (Return_Val, Loc)));
+
+                  --  Otherwise, Return_Val has the same type that its
+                  --  original enclosing scope returns
+
+                  else
+                     Return_Typ := Etype (Enclosing_Sub);
+                     Ret_Action := Make_Simple_Return_Statement (Loc,
+                       New_Occurrence_Of (Return_Val, Loc));
+                  end if;
 
                   Insert_Before_And_Analyze (N,
-                    Make_Full_Type_Declaration (Loc,
-                      Defining_Identifier => Return_Typ,
-                      Type_Definition     =>
-                        Make_Access_To_Object_Definition (Loc,
-                          Subtype_Indication => New_Occurrence_Of (
-                            Etype (Enclosing_Sub), Loc))));
+                    Make_Object_Declaration (Loc,
+                      Defining_Identifier => Return_Val,
+                      Object_Definition   => New_Occurrence_Of
+                        (Return_Typ, Loc)));
 
-                  Ret_Action := Make_Simple_Return_Statement (Loc,
-                    Make_Explicit_Dereference (Loc,
-                      Prefix => New_Occurrence_Of (Return_Val, Loc)));
-               else
-                  Return_Typ := Etype (Enclosing_Sub);
-                  Ret_Action := Make_Simple_Return_Statement (Loc,
-                    New_Occurrence_Of (Return_Val, Loc));
-               end if;
-
-               Insert_Before_And_Analyze (N,
-                 Make_Object_Declaration (Loc,
-                   Defining_Identifier => Return_Val,
-                   Object_Definition   => New_Occurrence_Of
-                     (Return_Typ, Loc)));
-
-               Return_Alt_Id := New_Early_Exit_Case (Ret_Action);
-            end;
+                  Return_Alt_Id := New_Early_Exit_Case (Ret_Action);
+               end;
+            end if;
          end if;
 
          Set_Is_Outlined_Parallel (Scope_Id, False);
