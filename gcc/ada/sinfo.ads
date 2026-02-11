@@ -2481,9 +2481,9 @@ package Sinfo is
    --    the substituted node can be copied.
 
    --  Wraps_Return
-   --    This flag is flag is set for block statements that wrap return statements
-   --    inside a parallel scope. This is done so that expanded return statements
-   --    can be rewritten as calls to LWT.
+   --    This flag is flag is set for block statements that wrap return
+   --    statements inside a parallel scope. This is done so that expanded
+   --    return statements can be rewritten as calls to LWT.
 
    --------------------------------------------------
    -- Note on Use of End_Label and End_Span Fields --
