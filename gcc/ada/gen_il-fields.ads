@@ -442,6 +442,7 @@ package Gen_IL.Fields is
       Was_Default_Init_Box_Association,
       Was_Expression_Function,
       Was_Originally_Stub,
+      Wraps_Return,
 
       --  End of node fields.
 

@@ -1920,7 +1920,9 @@ package body Sem_Ch6 is
       --  body; otherwise N should apply to a procedure body, entry body,
       --  accept statement, or extended return statement.
 
-      function Find_What_It_Applies_To return Entity_Id;
+      function Find_What_It_Applies_To
+        (Should_Wrap : out Boolean)
+         return Entity_Id;
       --  Find the entity representing the innermost enclosing body, accept
       --  statement, or extended return statement. If the result is a callable
       --  construct or extended return statement, then this will be the value
@@ -1931,8 +1933,13 @@ package body Sem_Ch6 is
       -- Find_What_It_Applies_To --
       -----------------------------
 
-      function Find_What_It_Applies_To return Entity_Id is
-         Result : Entity_Id := Empty;
+      function Find_What_It_Applies_To
+        (Should_Wrap : out Boolean)
+         return Entity_Id
+      is
+         In_Par_Scope    : Boolean   := False;
+         Already_Wrapped : Boolean   := False;
+         Result          : Entity_Id := Empty;
 
       begin
          --  Loop outward through the Scope_Stack, skipping blocks,
@@ -1940,12 +1947,33 @@ package body Sem_Ch6 is
 
          for J in reverse 0 .. Scope_Stack.Last loop
             Result := Scope_Stack.Table (J).Entity;
+
+            --  Check for parallel scope
+
             if Ekind (Result) = E_Procedure then
                exit when not Is_Outlined_Parallel (Result);
+               In_Par_Scope := True;
+
             else
                exit when Ekind (Result) not in E_Block | E_Loop;
+
+               --  Check if the current block is marked as being
+               --  a return wrapper
+
+               if Ekind (Result) = E_Block
+                 and then Present (Block_Node (Result))
+                 and then Wraps_Return (
+                   Parent (Block_Node (Result)))
+               then
+                  Already_Wrapped := True;
+               end if;
             end if;
          end loop;
+
+         --  A return statement needs to be wrapped if it is
+         --  inside a parallel scope and hasn't been wrapped already
+
+         Should_Wrap := In_Par_Scope and then not Already_Wrapped;
 
          pragma Assert (Present (Result));
          return Result;
@@ -1953,16 +1981,42 @@ package body Sem_Ch6 is
 
       --  Local declarations
 
-      Scope_Id   : constant Entity_Id   := Find_What_It_Applies_To;
-      Kind       : constant Entity_Kind := Ekind (Scope_Id);
-      Loc        : constant Source_Ptr  := Sloc (N);
-      Stm_Entity : constant Entity_Id   :=
+      Should_Wrap : Boolean              := False;
+      Scope_Id    : constant Entity_Id   :=
+                     Find_What_It_Applies_To (Should_Wrap);
+      Kind        : constant Entity_Kind := Ekind (Scope_Id);
+      Loc         : constant Source_Ptr  := Sloc (N);
+      Stm_Entity  : constant Entity_Id   :=
                      New_Internal_Entity
                        (E_Return_Statement, Current_Scope, Loc, 'R');
 
    --  Start of processing for Analyze_Return_Statement
 
    begin
+      --  We need to wrap the return statement inside a special
+      --  block if it is inside a parallel construct. This is important
+      --  because return statements inside parallel constructs need to
+      --  be rewritten as calls to LWT. By wrapping the return in a block,
+      --  we enclose any expansion done to the return statement inside
+      --  our wrapper block, which makes it easier to move our expanded
+      --  return later on.
+
+      if Should_Wrap then
+         declare
+            Return_Wrapper : constant Node_Id :=
+              Make_Block_Statement (Loc,
+                Handled_Statement_Sequence =>
+                  Make_Handled_Sequence_Of_Statements (Loc,
+                    Statements             => New_List (
+                      Relocate_Node (N))));
+         begin
+            Set_Wraps_Return (Return_Wrapper);
+            Rewrite (N, Return_Wrapper);
+            Analyze (N);
+            return;
+         end;
+      end if;
+
       Set_Return_Statement_Entity (N, Stm_Entity);
 
       Set_Etype (Stm_Entity, Standard_Void_Type);
@@ -3499,31 +3553,51 @@ package body Sem_Ch6 is
       procedure Rewrite_Parallel_Exits (Scope_Id : Entity_Id) is
 
          function Get_Return_Ind return Entity_Id;
-         --  Retrieves or creates a variable that stores which exit
-         --  action should be run after the call to LWT. Default is
-         --  zero.
+         --  Retrieves or creates a variable that stores which exit action
+         --  should be run after the call to LWT. Default is zero.
 
          function New_Early_Exit_Case (Post_Call_Action : Node_Id)
            return Nat;
          --  Adds new post call action to exit case at the end of the
          --  parallel call. Returns the new exit case's index value.
 
+         function Make_Early_Exit_Block
+           (Loc       : Source_Ptr;
+            Exit_Body : List_Id := Empty_List;
+            Predicate : Node_Id := Empty)
+            return Node_Id;
+         --  Wraps the given statement list in an early exit block
+
          function Make_Early_Exit
-           (Post_Call_Action : Nat := 0;
-            Return_Expr      : Node_Id := Empty;
-            Predicate        : Node_Id := Empty) return Node_Id;
-         --  Creates the parallel exit node
+           (Loc              : Source_Ptr;
+            Post_Call_Action : Node_Id := Empty;
+            Predicate        : Node_Id := Empty)
+            return Node_Id;
+         --  Creates the parallel exit node for a given post call action
+
+         function Get_Return_Stmt_Expr (R : Node_Id)
+           return Node_Id;
+         --  Gets a return statement's expression and transforms it
+         --  into a value that can be assigned to the return value
+         --  variable.
+
+         function Visit_Return_Node (I : Node_Id) return Traverse_Result;
+         --  Vistor function specifically for rewriting return statements.
+         --  This visitor is called when Visit_Node encounters a return
+         --  wrapper block.
 
          function Visit_Node (I : Node_Id) return Traverse_Result;
          --  Visitor function that rewrites control flow statements
-         --  as parallel exits
+         --  as parallel exits. This function doesn't handle return
+         --  statements directly, but it does handle return wrapper
+         --  blocks.
 
          function Scope_Is_Inside_Parallel (S : Entity_Id)
            return Boolean;
          --  Checks if a given scope is inside the parallel construct
 
-         Return_Val     : Entity_Id := Empty;
          Return_Ind     : Entity_Id := Empty;
+         Return_Val     : Entity_Id := Empty;
          Par_Loop_Id    : Entity_Id := Empty;
          Exit_Alt_Count : Nat := 1;
          Return_Alt_Id  : Nat;
@@ -3545,7 +3619,8 @@ package body Sem_Ch6 is
                return Return_Ind;
             end if;
 
-            --  Otherwise, create it
+            --  Otherwise, create it:
+
             --    Return_Ind : Natural := 0;
 
             Return_Ind := Make_Temporary (Loc, 'P');
@@ -3562,6 +3637,124 @@ package body Sem_Ch6 is
 
             return Return_Ind;
          end Get_Return_Ind;
+
+         ---------------------------
+         -- Make_Early_Exit_Block --
+         ---------------------------
+
+         function Make_Early_Exit_Block
+           (Loc       : Source_Ptr;
+            Exit_Body : List_Id := Empty_List;
+            Predicate : Node_Id := Empty)
+            return Node_Id
+         is
+            EE_Call, Exit_Block : Node_Id;
+            Exit_Block_Stmts    : List_Id := New_List;
+         begin
+            --  Create a call to LWT's Early_Exit function
+
+            EE_Call := Make_Function_Call (Loc,
+              Name                   => New_Occurrence_Of (
+                RTE (RE_Early_Exit), Loc),
+              Parameter_Associations => New_List (New_Occurrence_Of (
+                Parallel_Loop_Id_Param (Scope_Id), Loc)));
+
+            if Is_Empty_List (Exit_Body) then
+               Append_To (Exit_Body, Make_Null_Statement (Loc));
+            end if;
+
+            --  Create early exit if statement and return
+
+            --     if Early_Exit (Loop_Id) then
+            --        ...
+            --     end if;
+            --     return;
+
+            Append_To (Exit_Block_Stmts, Make_If_Statement (Loc,
+              Condition => EE_Call,
+              Then_Statements => Exit_Body));
+            Append_To (Exit_Block_Stmts,
+              Make_Simple_Return_Statement (Loc));
+
+            --  Wrap contents of block inside an if statement if a
+            --  predicate is supplied. This is used for `exit when`
+
+            if Present (Predicate) then
+               Exit_Block_Stmts := New_List (
+                 Make_If_Statement (Loc,
+                   Condition       => Predicate,
+                   Then_Statements => Exit_Block_Stmts));
+            end if;
+
+            --  Wrap the early exit inside a block and mark it as an
+            --  early exit so that we don't re-traverse it later
+
+            Exit_Block := Make_Block_Statement (Loc,
+              Handled_Statement_Sequence =>
+                Make_Handled_Sequence_Of_Statements (Loc,
+                  Statements             => Exit_Block_Stmts));
+            Set_Is_Parallel_Exit (Exit_Block);
+
+            return Exit_Block;
+         end Make_Early_Exit_Block;
+
+         --------------------------
+         -- Get_Return_Stmt_Expr --
+         --------------------------
+
+         function Get_Return_Stmt_Expr (R : Node_Id) return Node_Id is
+         begin
+            if Present (Expression (R)) then
+               pragma Assert (Present (Return_Val));
+
+               --  Rewrite secondary stack returns as allocator expression
+
+               --     Return_Val := new RETURN_TYPE'(RETURN_EXPR);
+
+               if Requires_SS
+                 and then Present (Procedure_To_Call (R))
+                 and then Procedure_To_Call (R) = RTE (RE_SS_Allocate)
+               then
+                  declare
+                     Return_Expr : Node_Id := Make_Allocator (Loc,
+                       Expression => Make_Qualified_Expression (Loc,
+                         Subtype_Mark => New_Occurrence_Of (
+                           Etype (Enclosing_Sub), Loc),
+                           Expression => Relocate_Node (Expression (R))));
+                  begin
+                     Set_No_Initialization (Return_Expr);
+                     return Return_Expr;
+                  end;
+
+               --  The secondary stack allocation is already being handled
+               --  if the return requires the secondary stack but doesn't
+               --  specify a procedure to call. In this case, set the
+               --  return expression to a reference.
+
+               --     Return_Val := RETURN_EXPR'Reference;
+
+               elsif Requires_SS then
+                  return Make_Attribute_Reference (Loc,
+                    Prefix         => Relocate_Node (Expression (R)),
+                    Attribute_Name => Name_Access);
+
+               --  In the case of a regular return statement, just set
+               --  the return value to the return expression
+
+               else
+                  return Expression (R);
+               end if;
+
+            --  In cases where the return statement has no
+            --  return expression, the Return_Val is not needed
+
+            else
+               pragma Assert (No (Return_Val));
+               null;
+            end if;
+
+            return Empty;
+         end Get_Return_Stmt_Expr;
 
          -------------------------
          -- New_Early_Exit_Case --
@@ -3592,75 +3785,21 @@ package body Sem_Ch6 is
          ---------------------
 
          function Make_Early_Exit
-           (Post_Call_Action : Nat := 0;
-            Return_Expr      : Node_Id := Empty;
-            Predicate        : Node_Id := Empty) return Node_Id
+           (Loc              : Source_Ptr;
+            Post_Call_Action : Node_Id := Empty;
+            Predicate        : Node_Id := Empty)
+            return Node_Id
          is
-            If_Body    : constant List_Id := New_List;
-            Exit_Stmts : List_Id := New_List;
-            EE_Call, Exit_Block : Node_Id;
+            Exit_Stmts : constant List_Id := New_List;
          begin
-            --  Create call to LWT Early Exit function
-
-            EE_Call := Make_Function_Call (Loc,
-              Name => New_Occurrence_Of (RTE (RE_Early_Exit), Loc),
-              Parameter_Associations => New_List (New_Occurrence_Of (
-                Parallel_Loop_Id_Param (Scope_Id), Loc)));
-
-            --  If this is a return statement, then assign the value
-            --  to Return_Val
-
-            if Present (Return_Expr) then
-               pragma Assert (Present (Return_Val));
-               Append_To (If_Body, Make_Assignment_Statement (Loc,
-                 Name => New_Occurrence_Of (Return_Val, Loc),
-                 Expression => Return_Expr));
+            if Present (Post_Call_Action) then
+               Append_To (Exit_Stmts, Make_Assignment_Statement (Loc,
+                 Name       => New_Occurrence_Of (Get_Return_Ind, Loc),
+                 Expression => Make_Integer_Literal (Loc,
+                   New_Early_Exit_Case (Post_Call_Action))));
             end if;
 
-            --  Create a new post call action index and assign this
-            --  value to Return_Ind
-
-            if Post_Call_Action > 0 then
-               Append_To (If_Body, Make_Assignment_Statement (Loc,
-                 Name => New_Occurrence_Of (Get_Return_Ind, Loc),
-                 Expression => Make_Integer_Literal (Loc, Post_Call_Action)));
-            elsif Is_Empty_List (If_Body) then
-               Append_To (If_Body, Make_Null_Statement (Loc));
-            end if;
-
-            --  Create early exit if statement and return
-
-            --     if Early_Exit (Loop_Id) then
-            --        Return_Val := ___;
-            --        Return_Ind := ___;
-            --     end if;
-            --     return;
-
-            Append_To (Exit_Stmts, Make_If_Statement (Loc,
-              Condition => EE_Call,
-              Then_Statements => If_Body));
-            Append_To (Exit_Stmts,
-              Make_Simple_Return_Statement (Loc));
-
-            --  Wrap contents of block inside an if statement if a
-            --  predicate is supplied. This is used for `exit when`
-
-            if Present (Predicate) then
-               Exit_Stmts := New_List (Make_If_Statement (Loc,
-                 Condition       => Predicate,
-                 Then_Statements => Exit_Stmts));
-            end if;
-
-            --  Wrap the early exit inside a block and mark it as an
-            --  early exit so that we don't re-traverse it later
-
-            Exit_Block := Make_Block_Statement (Loc,
-              Handled_Statement_Sequence =>
-                Make_Handled_Sequence_Of_Statements (Loc,
-                  Statements => Exit_Stmts));
-            Set_Is_Parallel_Exit (Exit_Block);
-
-            return Exit_Block;
+            return Make_Early_Exit_Block (Loc, Exit_Stmts, Predicate);
          end Make_Early_Exit;
 
          ------------------------------
@@ -3698,11 +3837,62 @@ package body Sem_Ch6 is
             return True;
          end Scope_Is_Inside_Parallel;
 
+         -----------------------
+         -- Visit_Return_Node --
+         -----------------------
+
+         function Visit_Return_Node (I : Node_Id) return Traverse_Result is
+         begin
+            if Nkind (I) /= N_Simple_Return_Statement then
+               return OK;
+            end if;
+
+            --  For return statements that return a value,
+            --  move the return value into the Return_Val variable
+
+            --  The exit action should be a return statement
+            --  that returns Return_Val instead of the original
+            --  return expression.
+
+            --     return RETURN_EXPR;
+
+            --  becomes
+
+            --     Return_Val := RETURN_EXPR;
+            --     Return_Ind := N;
+            --  ...
+            --     when N =>
+            --        return Return_Val;
+
+            declare
+               Return_Expr : constant Node_Id := Get_Return_Stmt_Expr (I);
+            begin
+               if Present (Return_Expr) then
+                  Insert_Before_And_Analyze (I,
+                    Make_Assignment_Statement (Loc,
+                      Name       => New_Occurrence_Of (Return_Val, Loc),
+                      Expression => Return_Expr));
+               end if;
+            end;
+
+            Rewrite (I, Make_Assignment_Statement (Loc,
+              Name       => New_Occurrence_Of (Get_Return_Ind, Loc),
+              Expression => Make_Integer_Literal (Loc, Return_Alt_Id)));
+            Analyze (I);
+
+            return Skip;
+         end Visit_Return_Node;
+
+         procedure Replace_Returns is
+           new Traverse_Proc (Visit_Return_Node);
+
          ----------------
          -- Visit_Node --
          ----------------
 
          function Visit_Node (I : Node_Id) return Traverse_Result is
+            Loc : constant Source_Ptr := Sloc (I);
+
          begin
             --  Don't traverse nested functions or exit blocks
 
@@ -3710,6 +3900,19 @@ package body Sem_Ch6 is
               or else (Nkind (I) = N_Block_Statement
                 and then Is_Parallel_Exit (I))
             then
+               return Skip;
+            end if;
+
+            --  Move return blocks into early exit blocks and replace
+            --  nested return statements.
+
+            if Nkind (I) = N_Block_Statement
+              and then Wraps_Return (I)
+            then
+               Replace_Returns (I);
+               Rewrite (I, Make_Early_Exit_Block (Loc,
+                 New_List (Relocate_Node (I))));
+               Analyze (I);
                return Skip;
             end if;
 
@@ -3724,63 +3927,11 @@ package body Sem_Ch6 is
                Par_Loop_Id := Entity (Identifier (I));
             end if;
 
-            --  Rewrite return statements
+            --  All return statements inside a parallel construct are
+            --  expected to be wrapped in a return wrapper block. We
+            --  shouldn't see any returns at this stage.
 
-            if Nkind (I) = N_Simple_Return_Statement then
-               --  For return statements that return a value,
-               --  move the return value into the Return_Val variable
-
-               --  The exit action should be a return statement
-               --  that returns Return_Val instead of the original
-               --  return expression
-
-               --     return RETURN_EXPR;
-
-               --  becomes
-
-               --     if Early_Exit (Loop_Id) then
-               --        Return_Val := RETURN_EXPR;
-               --        Return_Ind := N;
-               --     end if;
-               --     return;
-               --  ...
-               --     when N =>
-               --        return Return_Val;
-
-               if Present (Expression (I)) then
-                  pragma Assert (Present (Return_Val));
-
-                  declare
-                     Return_Expr : Node_Id;
-                  begin
-                     if Requires_SS then
-                        Return_Expr := Make_Allocator (Loc,
-                          Expression => Make_Qualified_Expression (Loc,
-                            Subtype_Mark => New_Occurrence_Of (
-                              Etype (Enclosing_Sub), Loc),
-                            Expression => Relocate_Node (Expression (I))));
-                        Set_No_Initialization (Return_Expr);
-                     else
-                        Return_Expr := Expression (I);
-                     end if;
-
-                     Rewrite (I, Make_Early_Exit (
-                       Return_Expr      => Return_Expr,
-                       Post_Call_Action => Return_Alt_Id));
-                  end;
-
-               --  In cases where the return statement has no
-               --  return expression, the Return_Val is not needed
-
-               else
-                  pragma Assert (No (Return_Val));
-                  Rewrite (I, Make_Early_Exit (
-                    Post_Call_Action => Return_Alt_Id));
-               end if;
-
-               Analyze (I);
-               return Skip;
-            end if;
+            pragma Assert (Nkind (I) /= N_Simple_Return_Statement);
 
             --  Rewrite goto statements
 
@@ -3788,9 +3939,8 @@ package body Sem_Ch6 is
               and then not Scope_Is_Inside_Parallel (
                 Entity (Name (I)))
             then
-               Rewrite (I, Make_Early_Exit (
-                 Post_Call_Action => New_Early_Exit_Case (
-                   Copy_Separate_Tree (I))));
+               Rewrite (I, Make_Early_Exit (Loc,
+                 Post_Call_Action => Copy_Separate_Tree (I)));
                Analyze (I);
                return Skip;
             end if;
@@ -3808,7 +3958,22 @@ package body Sem_Ch6 is
                  or else (Present (Name (I))
                    and then Entity (Name (I)) = Par_Loop_Id))
                then
-                  Rewrite (I, Make_Early_Exit (
+                  --  Transforms
+                  
+                  --     exit;
+
+                  --  or
+
+                  --     exit CURRENT_SCOPE;
+
+                  --  into
+
+                  --     if Early_Exit (Loop_Id) then
+                  --        null;
+                  --     end if;
+                  --     return;
+
+                  Rewrite (I, Make_Early_Exit (Loc,
                     Predicate => Condition (I)));
                   Analyze (I);
                   return Skip;
@@ -3823,12 +3988,25 @@ package body Sem_Ch6 is
                  and then not Scope_Is_Inside_Parallel (
                    Exits_From (I))
                then
-                  Rewrite (I, Make_Early_Exit (
+                  --  Transforms
+
+                  --     exit;
+
+                  --  into
+
+                  --     if Early_Exit (Loop_Id) then
+                  --        Return_Ind := N;
+                  --     end if;
+                  --     return;
+                  --  ...
+                  --     when N =>
+                  --        exit ENCLOSING_SCOPE;
+
+                  Rewrite (I, Make_Early_Exit (Loc,
                     Predicate        => Condition (I),
-                    Post_Call_Action => New_Early_Exit_Case (
-                      Make_Exit_Statement (Loc,
-                        Name         => New_Occurrence_Of (
-                          Exits_From (I), Loc)))));
+                    Post_Call_Action => Make_Exit_Statement (Loc,
+                      Name           => New_Occurrence_Of (
+                        Exits_From (I), Loc))));
                   Analyze (I);
                   return Skip;
 
@@ -3839,12 +4017,25 @@ package body Sem_Ch6 is
                elsif Present (Name (I))
                  and then not Scope_Is_Inside_Parallel (Entity (Name (I)))
                then
-                  Rewrite (I, Make_Early_Exit (
+                  --  Transforms
+
+                  --     exit LABEL;
+
+                  --  into
+
+                  --     if Early_Exit (Loop_Id) then
+                  --        Return_Ind := N;
+                  --     end if;
+                  --     return;
+                  --  ...
+                  --     when N =>
+                  --        exit LABEL;
+
+                  Rewrite (I, Make_Early_Exit (Loc,
                     Predicate        => Condition (I),
-                    Post_Call_Action => New_Early_Exit_Case (
-                      Make_Exit_Statement (Loc,
-                        Name         => New_Occurrence_Of (
-                          Entity (Name (I)), Loc)))));
+                    Post_Call_Action => Make_Exit_Statement (Loc,
+                      Name           => New_Occurrence_Of (
+                        Entity (Name (I)), Loc))));
                   Analyze (I);
                   return Skip;
                end if;
@@ -3857,7 +4048,6 @@ package body Sem_Ch6 is
            new Traverse_Proc (Visit_Node);
 
       begin
-
          --  Here we generate the return exit action as well as the
          --  variable we use to store the return value (if applicable).
          --  All return statements in a parallel construct share a
@@ -3919,7 +4109,7 @@ package body Sem_Ch6 is
                      --  Create an access type that uses the secondary
                      --  stack as a storage pool
 
-                     --     type Acc_Typ is access Ret_Type;
+                     --     type Acc_Typ is access all Ret_Type;
                      --     for Acc_Typ'Storage_Pool use SS_Pool;
 
                      Return_Typ := Make_Temporary (Loc, 'P');
@@ -3932,6 +4122,7 @@ package body Sem_Ch6 is
                          Defining_Identifier    => Return_Typ,
                          Type_Definition        =>
                            Make_Access_To_Object_Definition (Loc,
+                             All_Present        => True,
                              Subtype_Indication => New_Occurrence_Of (
                                Etype (Enclosing_Sub), Loc))));
 

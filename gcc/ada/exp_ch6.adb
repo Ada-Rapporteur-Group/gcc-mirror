@@ -7789,6 +7789,7 @@ package body Exp_Ch6 is
                    Defining_Identifier => Acc_Typ,
                    Type_Definition     =>
                      Make_Access_To_Object_Definition (Loc,
+                       All_Present        => True,
                        Subtype_Indication => Subtype_Ind)),
 
                  Make_Object_Declaration (Loc,
