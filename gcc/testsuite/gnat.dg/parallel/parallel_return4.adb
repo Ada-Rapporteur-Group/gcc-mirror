@@ -1,7 +1,7 @@
 -- { dg-do run }
 -- { dg-options "-gnat2022" }
 
-with LWT.Parallelism;  use LWT.Parallelism;
+with LWT.Parallelism;   use LWT.Parallelism;
 with Ada.Strings.Fixed; use Ada.Strings.Fixed;
 
 --  Secondary stack return value (string)

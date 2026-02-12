@@ -3605,6 +3605,8 @@ package body Sem_Ch6 is
          Requires_SS    : Boolean := False;
          Enclosing_Sub  : constant Entity_Id :=
            Enclosing_Subprogram (Scope_Id);
+         Is_BIP         : constant Boolean :=
+           Is_Build_In_Place_Function (Enclosing_Sub);
 
          --------------------
          -- Get_Return_Ind --
@@ -3704,9 +3706,14 @@ package body Sem_Ch6 is
 
          function Get_Return_Stmt_Expr (R : Node_Id) return Node_Id is
          begin
-            if Present (Expression (R)) then
-               pragma Assert (Present (Return_Val));
+            --  In cases where the return statement has no
+            --  return expression, the Return_Val is not needed
 
+            if Is_BIP or else No (Expression (R)) then
+               pragma Assert (No (Return_Val));
+               null;
+
+            else
                --  Rewrite secondary stack returns as allocator expression
 
                --     Return_Val := new RETURN_TYPE'(RETURN_EXPR);
@@ -3744,13 +3751,6 @@ package body Sem_Ch6 is
                else
                   return Expression (R);
                end if;
-
-            --  In cases where the return statement has no
-            --  return expression, the Return_Val is not needed
-
-            else
-               pragma Assert (No (Return_Val));
-               null;
             end if;
 
             return Empty;
@@ -3959,7 +3959,7 @@ package body Sem_Ch6 is
                    and then Entity (Name (I)) = Par_Loop_Id))
                then
                   --  Transforms
-                  
+
                   --     exit;
 
                   --  or
@@ -4055,8 +4055,8 @@ package body Sem_Ch6 is
          --  will always be 1 if returns are present in the parallel
          --  construct.
 
-         if Present (Enclosing_Sub) and then
-           Return_Present (Enclosing_Sub)
+         if Present (Enclosing_Sub)
+           and then Return_Present (Enclosing_Sub)
          then
             --  Generate the exit action for returns without expressions.
 
@@ -4066,6 +4066,29 @@ package body Sem_Ch6 is
             if Etype (Enclosing_Sub) = Standard_Void_Type then
                Return_Alt_Id := New_Early_Exit_Case (
                  Make_Simple_Return_Statement (Loc));
+
+            --  If the function is build-in-place, our exit action should
+            --  return the BIP formal. We don't generate assignment statements
+            --  for BIP returns.
+
+            elsif Is_BIP then
+               declare
+                  Formal     : constant Entity_Id :=
+                    Build_In_Place_Formal (
+                      Enclosing_Sub, BIP_Object_Access);
+                  Lim_Return : constant Node_Id   :=
+                    Make_Simple_Return_Statement (Loc,
+                      Make_Explicit_Dereference (Loc,
+                        Prefix => New_Occurrence_Of (Formal, Loc)));
+               begin
+                  --  We need to mark this return as being from an extended
+                  --  return to prevent semenatic errors. Besides, any BIP
+                  --  returns up until here should have been in extended
+                  --  returns anyway. 
+
+                  Set_Comes_From_Extended_Return_Statement (Lim_Return);
+                  Return_Alt_Id := New_Early_Exit_Case (Lim_Return);
+               end;
 
             --  We need to create a variable that stores return values if
             --  the parallel construct's original enclosing scope is a
