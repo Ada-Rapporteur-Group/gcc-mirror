@@ -3723,7 +3723,7 @@ package body Sem_Ch6 is
                  and then Procedure_To_Call (R) = RTE (RE_SS_Allocate)
                then
                   declare
-                     Return_Expr : Node_Id := Make_Allocator (Loc,
+                     Return_Expr : constant Node_Id := Make_Allocator (Loc,
                        Expression => Make_Qualified_Expression (Loc,
                          Subtype_Mark => New_Occurrence_Of (
                            Etype (Enclosing_Sub), Loc),
@@ -4084,7 +4084,7 @@ package body Sem_Ch6 is
                   --  We need to mark this return as being from an extended
                   --  return to prevent semenatic errors. Besides, any BIP
                   --  returns up until here should have been in extended
-                  --  returns anyway. 
+                  --  returns anyway.
 
                   Set_Comes_From_Extended_Return_Statement (Lim_Return);
                   Return_Alt_Id := New_Early_Exit_Case (Lim_Return);
