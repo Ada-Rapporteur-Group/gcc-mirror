@@ -6619,7 +6619,10 @@ package body Exp_Ch5 is
          end if;
       end if;
 
-      --  Remove chunk specification
+      --  Remove parallel elements. From this point on, outlined
+      --  parallel constructs will be distinguished by the
+      --  In_Outlined_Parallel field. Sequentially expanded constructs
+      --  do not need further expansion.
 
       Set_Chunk_Specification (Scheme, Empty);
    end Expand_Parallel_Chunk_Specification;
