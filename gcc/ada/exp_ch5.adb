@@ -6475,7 +6475,9 @@ package body Exp_Ch5 is
       end Get_DS_Lower;
 
    begin
-      if No (Scheme) or else not Is_Parallel (Scheme) then
+      if No (Scheme) or else not Is_Parallel (Scheme)
+        or else No (Chunk_Specification (Scheme))
+      then
          return;
       end if;
 
@@ -6501,8 +6503,8 @@ package body Exp_Ch5 is
          --        ...
          --     end loop;
 
-         if Present (Chunk_Specification (Scheme)) and then
-           Nkind (Chunk_Specification (Scheme)) = N_Chunk_Specification_Range
+         if Nkind (Chunk_Specification (Scheme)) =
+           N_Chunk_Specification_Range
          then
             declare
                Chunk_Spec : constant Node_Id := Chunk_Specification (Scheme);
@@ -6618,7 +6620,10 @@ package body Exp_Ch5 is
          end if;
       end if;
 
-      --  Remove parallel elements
+      --  Remove parallel elements. From this point on, outlined
+      --  parallel constructs will be distinguished by the
+      --  In_Outlined_Parallel field. Sequentially expanded constructs
+      --  do not need further expansion.
 
       Set_Chunk_Specification (Scheme, Empty);
       Set_Is_Parallel (Scheme, False);
