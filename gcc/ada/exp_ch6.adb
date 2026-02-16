@@ -7645,6 +7645,7 @@ package body Exp_Ch6 is
            and then Needs_Finalization (Utyp)
            and then not (Exp_Is_Function_Call
                           and then Needs_Finalization (Exp_Typ))
+           and then not Is_In_Outlined_Parallel_Subprogram (N)
          then
             declare
                Acc_Typ : constant Entity_Id := Make_Temporary (Loc, 'A');

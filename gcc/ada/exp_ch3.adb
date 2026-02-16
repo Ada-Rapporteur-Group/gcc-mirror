@@ -9186,6 +9186,7 @@ package body Exp_Ch3 is
 
       elsif Back_End_Return_Slot
         and then Is_By_Reference_Return_Object (Def_Id)
+        and then not Is_In_Outlined_Parallel_Subprogram (N)
       then
          declare
             Acc_Typ        : Entity_Id;

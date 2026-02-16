@@ -18414,6 +18414,26 @@ package body Sem_Util is
       return False;
    end Is_In_Context_Clause;
 
+   ----------------------------------
+   -- Is_In_Outlined_Parallel_Subp --
+   ----------------------------------
+
+   function Is_In_Outlined_Parallel_Subprogram (N : Node_Id)
+     return Boolean
+   is
+      P : Node_Id := N;
+
+   begin
+      while Present (P) loop
+         exit when Nkind (P) = N_Subprogram_Body;
+         P := Parent (P);
+      end loop;
+
+      pragma Assert (Present (P));
+      return Ekind (Defining_Entity (P)) = E_Procedure
+        and then Is_Outlined_Parallel (Defining_Entity (P));
+   end Is_In_Outlined_Parallel_Subprogram;
+
    ---------------------------
    -- Is_Independent_Object --
    ---------------------------

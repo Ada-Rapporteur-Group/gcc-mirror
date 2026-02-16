@@ -3714,7 +3714,7 @@ package body Sem_Ch6 is
                null;
 
             else
-               --  Rewrite secondary stack returns as allocator expression
+               --  Rewrite secondary stack returns as allocator expressions
 
                --     Return_Val := new RETURN_TYPE'(RETURN_EXPR);
 
@@ -3738,12 +3738,12 @@ package body Sem_Ch6 is
                --  specify a procedure to call. In this case, set the
                --  return expression to a reference.
 
-               --     Return_Val := RETURN_EXPR'Reference;
+               --     Return_Val := RETURN_EXPR'Unchecked_Access;
 
                elsif Requires_SS then
                   return Make_Attribute_Reference (Loc,
                     Prefix         => Relocate_Node (Expression (R)),
-                    Attribute_Name => Name_Access);
+                    Attribute_Name => Name_Unchecked_Access);
 
                --  In the case of a regular return statement, just set
                --  the return value to the return expression
@@ -3843,7 +3843,16 @@ package body Sem_Ch6 is
 
          function Visit_Return_Node (I : Node_Id) return Traverse_Result is
          begin
-            if Nkind (I) /= N_Simple_Return_Statement then
+            --  Subprogram bodies can be found inside return statements
+            --  that return controlled types. We need to skip over these
+            --  nodes.
+
+            if Nkind (I) = N_Subprogram_Body then
+               return Skip;
+
+            --  Nothing to do for non return statements
+
+            elsif Nkind (I) /= N_Simple_Return_Statement then
                return OK;
             end if;
 
