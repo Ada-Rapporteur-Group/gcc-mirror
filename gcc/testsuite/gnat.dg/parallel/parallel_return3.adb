@@ -3,6 +3,9 @@
 
 with LWT.Parallelism; use LWT.Parallelism;
 
+--  Check if the bodies of extended return statements are called at
+--  the right time (after Early_Exit).
+
 procedure parallel_return3 is
 
    function Ret_Val (N : Positive) return Positive is

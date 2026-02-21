@@ -25,8 +25,8 @@ procedure parallel_return5 is
       end return;
    end Ret_Limited;
 
-   L1 : Limited_Val := Ret_Limited (20, 30);
-   L2 : Limited_Val := Ret_Limited (98, 30);
+   L1 : Limited_Val := Ret_Limited (20, 300);
+   L2 : Limited_Val := Ret_Limited (980, 30);
    L3 : Limited_Val := Ret_Limited (200, 300);
 begin
    if L1.Value /= 42 then
