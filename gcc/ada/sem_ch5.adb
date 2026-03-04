@@ -4228,10 +4228,7 @@ package body Sem_Ch5 is
                --  prevent any side effects from occurring inside
                --  the outlined procedure.
 
-               if not Is_Entity_Name (Iter_Name)
-                 and then Full_Analysis
-                 and then (Expander_Active or GNATprove_Mode)
-               then
+               if not Is_Entity_Name (Iter_Name) then
                   Move_Iter_Name (Iter_Name);
                end if;
 
