@@ -4135,7 +4135,9 @@ package body Sem_Ch6 is
                   --  uses the secondary stack, Return_Val should be
                   --  an access type.
 
-                  if Sec_Stack_Needed_For_Return (Enclosing_Sub) then
+                  if Sec_Stack_Needed_For_Return (Enclosing_Sub)
+                    or else Needs_Finalization (Underlying_Type (Etype (Enclosing_Sub)))
+                  then
                      Requires_SS := True;
 
                      --  Create an access type that uses the secondary

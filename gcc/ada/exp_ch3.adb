@@ -9093,7 +9093,10 @@ package body Exp_Ch3 is
 
       --    Result : T renames Rxx.all;
 
-      elsif Is_Secondary_Stack_Return_Object (Def_Id) then
+      elsif Is_Secondary_Stack_Return_Object (Def_Id)
+        or else (Is_By_Reference_Return_Object (Def_Id)
+          and then Is_In_Outlined_Parallel_Subprogram (N))
+      then
          declare
             Desig_Typ : constant Entity_Id :=
               (if Ekind (Typ) = E_Array_Subtype
@@ -9186,7 +9189,6 @@ package body Exp_Ch3 is
 
       elsif Back_End_Return_Slot
         and then Is_By_Reference_Return_Object (Def_Id)
-        and then not Is_In_Outlined_Parallel_Subprogram (N)
       then
          declare
             Acc_Typ        : Entity_Id;
