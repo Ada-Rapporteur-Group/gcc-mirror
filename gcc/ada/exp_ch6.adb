@@ -361,6 +361,9 @@ package body Exp_Ch6 is
    --  function and all blocks and loops that the return statement is jumping
    --  out of. This ensures that the secondary stack is not released; otherwise
    --  the function result would be reclaimed before returning to the caller.
+   --  If Skip_Outlined is true, then Set_Enclosing_Sec_Stack_Return will
+   --  continue to mark nodes until it reaches a subprogram body that isn't
+   --  marked as being a parallel outlined procedure.
 
    procedure Warn_BIP (Func_Call : Node_Id);
    --  Give a warning on a build-in-place function call if the -gnatd_B switch
@@ -7599,7 +7602,8 @@ package body Exp_Ch6 is
          return;
 
       --  A return statement from an ignored Ghost function does not use the
-      --  secondary stack (or any other one).
+      --  secondary stack unless it returns a type that needs finalization
+      --  from inside a parallel construct.
 
       elsif (not Return_Requires_SS
         or else Is_Ignored_Ghost_Entity_In_Codegen (Scope_Id))
@@ -7709,8 +7713,6 @@ package body Exp_Ch6 is
          --  Prevent the reclamation of the secondary stack by all enclosing
          --  blocks and loops as well as the related function; otherwise the
          --  result would be reclaimed too early.
-
-         --  TODO: Document this
 
          Set_Enclosing_Sec_Stack_Return (N, Return_Requires_SS);
 
