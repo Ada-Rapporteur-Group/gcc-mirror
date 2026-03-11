@@ -97,6 +97,10 @@ package body Sem_Ch5 is
    --  statements. On success, the return value is the entity of the loop
    --  referenced by the statement.
 
+   procedure Analyze_Parallel_Block_Statement_Helper
+     (N : Node_Id; Suppress_Parallel : Boolean);
+   --  Does the main work of Analyze_Parallel_Block_Statement
+
    function Has_Sec_Stack_Call (N : Node_Id) return Boolean;
    --  N is the node for an arbitrary construct. This function searches the
    --  construct N to see if it contains a function call that returns on the
@@ -3388,8 +3392,8 @@ package body Sem_Ch5 is
          Iter_Spec  : constant Node_Id := Iterator_Specification (Iter);
          Param_Spec : constant Node_Id := Loop_Parameter_Specification (Iter);
 
-         Lwt_Available : constant Boolean :=
-           Present (Iter) and then Is_Parallel (Iter)
+         Lwt_Available : constant Boolean := Present (Iter)
+           and then Is_Parallel (Iter)
            and then RTE_Available (RE_Par_Range_Loop_With_Early_Exit);
 
          function Has_Sec_Stack_Default_Iterator
@@ -4286,15 +4290,29 @@ package body Sem_Ch5 is
             if In_Outlined_Parallel (N) then
                null;
 
-            --  Outline loop if the loop hasn't been outlined yet
-            --  and LWT is availible
-
             elsif Lwt_Available then
-               if Present (Iter_Spec) then
+               --  Move parallel loop into an outlined procedure and
+               --  generate its associated calls to LWT.
+
+               if Expander_Active and then Present (Iter_Spec) then
                   Prepare_Iter_Spec (Iter_Spec);
 
-               else
+               elsif Expander_Active then
                   Prepare_Loop_Param (Param_Spec);
+
+               --  Pre-analyze a copy of the loop sequentially if the
+               --  expander is inactive. Return statements that return
+               --  generic type formals can cause issues because we don't
+               --  know if the return type requires secondary stack handling.
+
+               else
+                  declare
+                     L_Copy : constant Node_Id := New_Copy_Tree (N);
+                  begin
+                     Set_Parent (L_Copy, Parent (N));
+                     Set_Is_Parallel (Iteration_Scheme (L_Copy), False);
+                     Analyze (L_Copy);
+                  end;
                end if;
 
                Stop_Processing := True;
@@ -4930,111 +4948,150 @@ package body Sem_Ch5 is
    --------------------------------------
 
    procedure Analyze_Parallel_Block_Statement (N : Node_Id) is
-      Chunk_Spec  : constant Node_Id    := Chunk_Specification (N);
-      Loc         : constant Source_Ptr := Sloc (N);
-      Branch_Node : Node_Id             := First (Parallel_Branches (N));
+   begin
+      Analyze_Parallel_Block_Statement_Helper (N, False);
+   end Analyze_Parallel_Block_Statement;
+
+   ---------------------------------------------
+   -- Analyze_Parallel_Block_Statement_Helper --
+   ---------------------------------------------
+
+   procedure Analyze_Parallel_Block_Statement_Helper
+     (N : Node_Id; Suppress_Parallel : Boolean)
+   is
+      Chunk_Spec    : constant Node_Id    := Chunk_Specification (N);
+      Loc           : constant Source_Ptr := Sloc (N);
+      Branch_Node   : Node_Id             := First (Parallel_Branches (N));
+      Lwt_Available : constant Boolean    := not Suppress_Parallel
+           and then RTE_Available (RE_Par_Range_Loop_With_Early_Exit);
+
+      procedure Outline_Block;
+      --  Pre-analysis transformations for parallel expansion.
+      --  This entails wrapping the parallel block inside an
+      --  outlined procedure
+
+      -------------------
+      -- Outline_Block --
+      -------------------
+
+      procedure Outline_Block is
+         Outlined_Body, Outlined_Spec, Chunk_Arg, Parallel_Call : Node_Id;
+         Branch_Count  : constant Nat       := List_Length
+                                                    (Parallel_Branches (N));
+         Old_Decls     : constant List_Id   := Parallel_Declarations (N);
+         Spec_Id       : constant Entity_Id := Make_Temporary (Loc, 'P');
+         Low_Param     : constant Entity_Id := Make_Temporary (Loc, 'P');
+         Hi_Param      : constant Entity_Id := Make_Temporary (Loc, 'P');
+
+      begin
+         --  Transforms
+
+         --     ... <PARALLEL_DECLS> ...
+         --     parallel (Chunk_Expr) do
+         --        ...
+         --     and
+         --        ...
+         --     end do;
+
+         --  into
+
+         --     procedure Proc_Name (Low : Longest_Integer;
+         --       Hi : Longest_Integer; Chunk : Positive;
+         --       Loop_Id : Par_Loop_Id)
+         --     is
+         --        ... <PARALLEL_DECLS> ...
+         --     begin
+         --        parallel do
+         --           ...
+         --        and
+         --           ...
+         --        end do;
+         --     end Proc_Name;
+
+         --     Par_Range_Loop_With_Early_Exit (
+         --       Low => 1, High => NUM_BRANCHES_LITERAL,
+         --       Num_Chunks => Chunk_Expr,
+         --       Loop_Body => Proc_Name'Access);
+
+         Set_Parallel_Declarations (N, No_List);
+         Set_Chunk_Specification (N, Empty);
+
+         --  Mark the parallel block as having been moved into
+         --  the outlined scope
+
+         Set_In_Outlined_Parallel (N);
+
+         Chunk_Arg := Process_Chunk_Specification_Int (N, Chunk_Spec);
+         Outlined_Spec := Build_Parallel_Loop_Spec (Loc,
+           Spec_Id     => Spec_Id,
+           Low_Param   => Low_Param,
+           Hi_Param    => Hi_Param,
+           Chunk_Param => Make_Temporary (Loc, 'P'));
+
+         --  Pass loop parameters to N so that they can be accessed
+         --  during expansion.
+
+         Set_Parallel_Low_Bound (N, Low_Param);
+         Set_Parallel_Hi_Bound (N, Hi_Param);
+
+         --  Move the parallel block inside the outlined procedure
+
+         Outlined_Body := Make_Subprogram_Body (Loc,
+           Specification => Outlined_Spec,
+           Declarations => Old_Decls,
+           Handled_Statement_Sequence =>
+             Make_Handled_Sequence_Of_Statements (Loc,
+               Statements => New_List (Relocate_Node (N))));
+         Insert_Before_And_Analyze (N, Outlined_Body);
+
+         --  Build a call to Par_Range_Loop_With_Early_Exit that
+         --  iterates over 1 .. NUM_BRANCHES
+
+         Parallel_Call := Build_Parallel_Call (Loc,
+           Low_Arg => Make_Integer_Literal (Loc, 1),
+           Hi_Arg => Make_Integer_Literal (Loc, Branch_Count),
+           Chunk_Arg => Chunk_Arg,
+           Outlined_Proc => New_Occurrence_Of
+             (Defining_Unit_Name (Outlined_Spec), Loc));
+
+         Rewrite (N, Parallel_Call);
+         Analyze (N);
+
+         --  Insert exit actions case statement after the LWT call
+
+         if Present (Parallel_Exit_Actions (Spec_Id)) then
+            Insert_After_And_Analyze (N,
+              Parallel_Exit_Actions (Spec_Id));
+         end if;
+
+      end Outline_Block;
    begin
       if Present (Chunk_Spec) then
          Analyze_Chunk_Specification (Chunk_Spec);
       end if;
 
-      --  Pre-analysis transformations for parallel expansion.
-      --  This entails wrapping the parallel block inside an
-      --  outlined procedure
+      --  Pre-analysis parallel expansion
 
-      --  Transforms
+      if not In_Outlined_Parallel (N) and then Lwt_Available then
+         --  Wrap the parallel do block in an outlined procedure if
+         --  the expander is active.
 
-      --     ... <PARALLEL_DECLS> ...
-      --     parallel (Chunk_Expr) do
-      --        ...
-      --     and
-      --        ...
-      --     end do;
+         if Expander_Active then
+            Outline_Block;
 
-      --  into
+         --  Analyze a copy of the block sequentially if the expander
+         --  isn't active. As with parallel for loops, we encounter
+         --  issues when expanding parallel blocks inside generic
+         --  contexts.
 
-      --     procedure Proc_Name (Low : Longest_Integer;
-      --       Hi : Longest_Integer; Chunk : Positive;
-      --       Loop_Id : Par_Loop_Id)
-      --     is
-      --        ... <PARALLEL_DECLS> ...
-      --     begin
-      --        parallel do
-      --           ...
-      --        and
-      --           ...
-      --        end do;
-      --     end Proc_Name;
-
-      --     Par_Range_Loop_With_Early_Exit (
-      --       Low => 1, High => NUM_BRANCHES_LITERAL,
-      --       Num_Chunks => Chunk_Expr,
-      --       Loop_Body => Proc_Name'Access);
-
-      if not In_Outlined_Parallel (N)
-        and then RTE_Available (RE_Par_Range_Loop_With_Early_Exit)
-      then
-         declare
-            Outlined_Body, Outlined_Spec, Chunk_Arg,
-              Parallel_Call : Node_Id;
-            Branch_Count  : constant Nat       := List_Length
-                                                    (Parallel_Branches (N));
-            Old_Decls     : constant List_Id   := Parallel_Declarations (N);
-            Spec_Id       : constant Entity_Id := Make_Temporary (Loc, 'P');
-            Low_Param     : constant Entity_Id := Make_Temporary (Loc, 'P');
-            Hi_Param      : constant Entity_Id := Make_Temporary (Loc, 'P');
-         begin
-            Set_Parallel_Declarations (N, No_List);
-            Set_Chunk_Specification (N, Empty);
-
-            --  Mark the parallel block as having been moved into
-            --  the outlined scope
-
-            Set_In_Outlined_Parallel (N);
-
-            Chunk_Arg := Process_Chunk_Specification_Int (N, Chunk_Spec);
-            Outlined_Spec := Build_Parallel_Loop_Spec (Loc,
-              Spec_Id     => Spec_Id,
-              Low_Param   => Low_Param,
-              Hi_Param    => Hi_Param,
-              Chunk_Param => Make_Temporary (Loc, 'P'));
-
-            --  Pass loop parameters to N so that they can be accessed
-            --  during expansion.
-
-            Set_Parallel_Low_Bound (N, Low_Param);
-            Set_Parallel_Hi_Bound (N, Hi_Param);
-
-            --  Move the parallel block inside the outlined procedure
-
-            Outlined_Body := Make_Subprogram_Body (Loc,
-              Specification => Outlined_Spec,
-              Declarations => Old_Decls,
-              Handled_Statement_Sequence =>
-                Make_Handled_Sequence_Of_Statements (Loc,
-                  Statements => New_List (Relocate_Node (N))));
-            Insert_Before_And_Analyze (N, Outlined_Body);
-
-            --  Build a call to Par_Range_Loop_With_Early_Exit that
-            --  iterates over 1 .. NUM_BRANCHES
-
-            Parallel_Call := Build_Parallel_Call (Loc,
-              Low_Arg => Make_Integer_Literal (Loc, 1),
-              Hi_Arg => Make_Integer_Literal (Loc, Branch_Count),
-              Chunk_Arg => Chunk_Arg,
-              Outlined_Proc => New_Occurrence_Of
-                (Defining_Unit_Name (Outlined_Spec), Loc));
-
-            Rewrite (N, Parallel_Call);
-            Analyze (N);
-
-            --  Insert exit actions case statement after the LWT call
-
-            if Present (Parallel_Exit_Actions (Spec_Id)) then
-               Insert_After_And_Analyze (N,
-                 Parallel_Exit_Actions (Spec_Id));
-            end if;
-         end;
+         else
+            declare
+               B_Copy : constant Node_Id := New_Copy_Tree (N);
+            begin
+               Set_Parent (B_Copy, Parent (N));
+               Analyze_Parallel_Block_Statement_Helper (B_Copy, True);
+            end;
+         end if;
 
       --  Pre-analysis expansion for the sequential fallback.
       --  Move the parallel block and its associated declarations
@@ -5096,7 +5153,7 @@ package body Sem_Ch5 is
               "will execute sequentially??", N);
          end if;
       end if;
-   end Analyze_Parallel_Block_Statement;
+   end Analyze_Parallel_Block_Statement_Helper;
 
    -------------------------
    -- Analyze_Target_Name --

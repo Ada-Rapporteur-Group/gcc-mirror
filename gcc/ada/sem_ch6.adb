@@ -4136,7 +4136,8 @@ package body Sem_Ch6 is
                   --  an access type.
 
                   if Sec_Stack_Needed_For_Return (Enclosing_Sub)
-                    or else Needs_Finalization (Underlying_Type (Etype (Enclosing_Sub)))
+                    or else Needs_Finalization (
+                      Underlying_Type (Etype (Enclosing_Sub)))
                   then
                      Requires_SS := True;
 
