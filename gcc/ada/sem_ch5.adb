@@ -3388,7 +3388,7 @@ package body Sem_Ch5 is
          Iter_Spec  : constant Node_Id := Iterator_Specification (Iter);
          Param_Spec : constant Node_Id := Loop_Parameter_Specification (Iter);
 
-         Lwt_Availible : constant Boolean :=
+         Lwt_Available : constant Boolean :=
            Present (Iter) and then Is_Parallel (Iter)
            and then RTE_Available (RE_Par_Range_Loop_With_Early_Exit);
 
@@ -3919,7 +3919,7 @@ package body Sem_Ch5 is
          procedure Create_Par_Range_Loop
            (Low_Val : Node_Id; Hi_Val : Node_Id)
          is
-            pragma Assert (Lwt_Availible);
+            pragma Assert (Lwt_Available);
 
             Loc        : constant Source_Ptr := Sloc (N);
             Chunk_Spec : constant Node_Id    := Chunk_Specification (Iter);
@@ -4274,7 +4274,7 @@ package body Sem_Ch5 is
             --  Outline loop if the loop hasn't been outlined yet
             --  and LWT is availible
 
-            elsif Lwt_Availible then
+            elsif Lwt_Available then
                if Present (Iter_Spec) then
                   Prepare_Iter_Spec (Iter_Spec);
 
@@ -4320,7 +4320,7 @@ package body Sem_Ch5 is
 
             if Present (P_Decls)
               and then not Is_Empty_List (P_Decls)
-              and then not Lwt_Availible
+              and then not Lwt_Available
             then
                Blk_Dcl := P_Decls;
                Set_Parallel_Declarations (N, No_List);
