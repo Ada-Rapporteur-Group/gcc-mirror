@@ -5094,8 +5094,157 @@ package body Exp_Ch5 is
       New_LPS_Id  : constant Entity_Id := Make_Temporary (Loc, 'P');
       Block_Decls : constant List_Id   := New_List;
       Last_Base   : Entity_Id          := New_LPS_Id;
-      Index_Type  : Entity_Id          := First_Index (Array_Typ);
       New_Scheme  : Node_Id;
+
+      subtype Array_Index is Pos range 1 .. Array_Dim;
+      Index_Types  : array (Array_Index) of Entity_Id;
+      Fortran_Mode : constant Boolean := (Convention (Array_Typ) =
+                                           Convention_Fortran);
+      Last_Ind     : constant Pos := (if Fortran_Mode then Array_Index'Last
+                                       else Array_Index'First);
+
+      procedure Build_Index (I : Array_Index; Last_Base : in out Entity_Id);
+      --  Body of the loop that builds the index value for array dimension I.
+      --  We need to move this loop body in its own procedure because the loop
+      --  runs backwards normally and forward when the array type uses Fortran
+      --  convention.
+
+      -----------------
+      -- Build_Index --
+      -----------------
+
+      procedure Build_Index (I : Array_Index; Last_Base : in out Entity_Id) is
+         Base_Index_Type : constant Entity_Id := Etype (Index_Types (I));
+         Current_Ind, Index_Value : Node_Id;
+
+         --  Our goal is to build out a single loop that decomposes an
+         --  index into N different subindices, where N is the number of
+         --  dimensions in the array type. To do this, we start with the new
+         --  loop parameter and iteratively divide this value by K, where K
+         --  is the length of the array dimension we are currently iterating
+         --  over. Each of these quotients are saved into a varaible J. Each
+         --  subindex is then given by the modulus of J and K, except for the
+         --  last subindex, which is just the previous J value. Each subindex
+         --  is then added to its index type's 'First value and cast to its
+         --  appropriate type.
+
+         --  For an array with three dimensions, the expanded code would
+         --  look like:
+
+         --     for New_Param in Low_Arg .. Hi_Arg loop
+         --        declare
+         --           J_1 : constant Longest_Integer :=
+         --             New_Param / Array_Val'Length (1);
+         --           J_2 : constant Longest_Integer :=
+         --             J_1 / Array_Val'Length (2);
+         --           J_3 : constant Longest_Integer :=
+         --             J_2 / Array_Val'Length (3);
+
+         --           Index_1 : constant Ind_Type_1 :=
+         --             Ind_Type_1'Val (J_1 mod Array_Val'Length (1) +
+         --               Ind_Type_1'Pos (Ind_Type_1'First));
+         --           Index_2 : constant Ind_Type_1 :=
+         --             Ind_Type_2'Val (J_2 mod Array_Val'Length (2) +
+         --               Ind_Type_2'Pos (Ind_Type_2'First));
+         --           Index_3 : constant Ind_Type_3 :=
+         --             Ind_Type_3'Val (J_3 + Ind_Type_3'Pos (
+         --               Ind_Type_3'First));
+
+         --           Old_Param : Array_Type renames Array_Val
+         --             (Index_1, Index_2, Index_3);
+         --        begin
+         --           ...
+         --        end;
+         --     end loop;
+
+         --  In the rest of these comments, we will refer to the J_*
+         --  values as "base index values" and the Index_* values as
+         --  "subindex values". This procedure focuses on building a
+         --  single base/subindex pair.
+
+      begin
+         --  If we're at the end of our array, our current index value
+         --  is just the previous base index value.
+
+         if I = Last_Ind then
+            Current_Ind := New_Occurrence_Of (Last_Base, Loc);
+
+         --  Otherwise, we need to compute the next base index value
+         --  as well as its corresponding subindex value.
+
+         else
+            declare
+               --  The current dimension's length:
+
+               --     Array_Val'Length (I)
+
+               Dim_Len      : constant Node_Id :=
+                 Make_Attribute_Reference (Loc,
+                   Prefix         => New_Copy_Tree (Array_Val),
+                   Attribute_Name => Name_Length,
+                   Expressions    => New_List (
+                     Make_Integer_Literal (Loc, I)));
+               Next_Base_Id : constant Entity_Id :=
+                 Make_Temporary (Loc, 'P');
+            begin
+               --  Compute the value for our current base index:
+
+               --     Next_Base := Last_Base / Array_Val'Length (I);
+
+               Append_To (Block_Decls,
+                 Make_Object_Declaration (Loc,
+                   Defining_Identifier => Next_Base_Id,
+                   Constant_Present    => True,
+                   Expression          => Make_Op_Divide (Loc,
+                     Left_Opnd         =>
+                       New_Occurrence_Of (Last_Base, Loc),
+                     Right_Opnd        => Dim_Len),
+                   Object_Definition   =>
+                     New_Occurrence_Of (
+                       RTE (RE_Longest_Integer), Loc)));
+
+               --  Generate:
+
+               --     Last_Base mod Array_Val'Length (I)
+
+               Current_Ind := Make_Op_Mod (Loc,
+                 Left_Opnd  => New_Occurrence_Of (Last_Base, Loc),
+                 Right_Opnd => New_Copy_Tree (Dim_Len));
+
+               Last_Base := Next_Base_Id;
+            end;
+         end if;
+
+         --  Generates current subindex cast to its
+         --  proper type:
+
+         --     Ind_Type'Val (J_1 mod Ind_Type'Length (I) +
+         --       Ind_Type'Pos (Ind_Type'First))
+
+         Index_Value := Make_Attribute_Reference (Loc,
+           Prefix                   =>
+             New_Occurrence_Of (Base_Index_Type, Loc),
+               Attribute_Name           => Name_Val,
+               Expressions              => New_List (Make_Op_Add (Loc,
+               Left_Opnd              => Current_Ind,
+               Right_Opnd             =>
+                 Make_Attribute_Reference (Loc,
+                   Prefix             =>
+                     New_Occurrence_Of (Base_Index_Type, Loc),
+                 Attribute_Name     => Name_Pos,
+                   Expressions        => New_List (
+                     Make_Attribute_Reference (Loc,
+                       Prefix         => New_Copy_Tree (Array_Val),
+                       Attribute_Name => Name_First,
+                       Expressions    => New_List (
+                         Make_Integer_Literal (Loc, I))))))));
+
+         if Fortran_Mode then
+            Append_To (Indices, Index_Value);
+         else
+            Prepend_To (Indices, Index_Value);
+         end if;
+      end Build_Index;
 
    begin
       --  Expand iterator filter
@@ -5109,135 +5258,29 @@ package body Exp_Ch5 is
 
       Set_Debug_Info_Needed (Id);
 
-      --  Our goal is to build out a single loop that decomposes an index
-      --  into N different subindices, where N is the number of dimensions
-      --  in the array type. To do this, we start with the new loop
-      --  parameter and iteratively divide this value by K, where K is the
-      --  length of the array dimension we are currently iterating over.
-      --  Each of these quotients are saved into a varaible J. Each subindex
-      --  is then given by the modulus of J and K, except for the last
-      --  subindex, which is just the previous J value. Each subindex is then
-      --  added to its index type's 'First value and cast to its appropriate
-      --  type.
+      --  Get the type for each index. We need to iterate over these types
+      --  in reverse unless the array uses Fortran convention.
 
-      --  For an array with three dimensions, the expanded code would
-      --  look like:
-
-      --     for New_Param in Low_Arg .. Hi_Arg loop
-      --        declare
-      --           J_1 : constant Longest_Integer :=
-      --             New_Param / Array_Val'Length (1);
-      --           J_2 : constant Longest_Integer :=
-      --             J_1 / Array_Val'Length (2);
-      --           J_3 : constant Longest_Integer :=
-      --             J_2 / Array_Val'Length (3);
-
-      --           Index_1 : constant Ind_Type_1 :=
-      --             Ind_Type_1'Val (J_1 mod Array_Val'Length (1) +
-      --               Ind_Type_1'Pos (Ind_Type_1'First));
-      --           Index_2 : constant Ind_Type_1 :=
-      --             Ind_Type_2'Val (J_2 mod Array_Val'Length (2) +
-      --               Ind_Type_2'Pos (Ind_Type_2'First));
-      --           Index_3 : constant Ind_Type_3 :=
-      --             Ind_Type_3'Val (J_3 + Ind_Type_3'Pos (
-      --               Ind_Type_3'First));
-
-      --           Old_Param : Array_Type renames Array_Val
-      --             (Index_1, Index_2, Index_3);
-      --        begin
-      --           ...
-      --        end;
-      --     end loop;
-
-      --  In the rest of these comments, we will refer to the J_* values
-      --  as "base index values" and the Index_* values as "subindex values"
-
-      for I in 1 .. Array_Dim loop
-         declare
-            Base_Index_Type : constant Entity_Id := Etype (Index_Type);
-            Current_Ind     : Node_Id;
-
-         begin
-            --  If we're at the end of our array, our current index value
-            --  is just the previous base index value.
-
-            if I = Array_Dim then
-               Current_Ind := New_Occurrence_Of (Last_Base, Loc);
-
-            --  Otherwise, we need to compute the next base index value
-            --  as well as its corresponding subindex value.
-
-            else
-               declare
-                  --  The current dimension's length:
-
-                  --     Array_Val'Length (I)
-
-                  Dim_Len      : constant Node_Id :=
-                    Make_Attribute_Reference (Loc,
-                      Prefix         => New_Copy_Tree (Array_Val),
-                      Attribute_Name => Name_Length,
-                      Expressions    => New_List (
-                        Make_Integer_Literal (Loc, I)));
-                  Next_Base_Id : constant Entity_Id :=
-                    Make_Temporary (Loc, 'P');
-               begin
-                  --  Compute the value for our current base index:
-
-                  --     Next_Base := Last_Base / Array_Val'Length (I);
-
-                  Append_To (Block_Decls,
-                    Make_Object_Declaration (Loc,
-                      Defining_Identifier => Next_Base_Id,
-                      Constant_Present    => True,
-                      Expression          => Make_Op_Divide (Loc,
-                        Left_Opnd         =>
-                          New_Occurrence_Of (Last_Base, Loc),
-                        Right_Opnd        => Dim_Len),
-                      Object_Definition   =>
-                        New_Occurrence_Of (
-                          RTE (RE_Longest_Integer), Loc)));
-
-                  --  Generate:
-
-                  --     Last_Base mod Array_Val'Length (I)
-
-                  Current_Ind := Make_Op_Mod (Loc,
-                    Left_Opnd  => New_Occurrence_Of (Last_Base, Loc),
-                    Right_Opnd => New_Copy_Tree (Dim_Len));
-
-                  Last_Base := Next_Base_Id;
-               end;
-            end if;
-
-            --  Generates current subindex cast to its
-            --  proper type:
-
-            --     Ind_Type'Val (J_1 mod Ind_Type'Length (I) +
-            --       Ind_Type'Pos (Ind_Type'First))
-
-            Append_To (Indices,
-              Make_Attribute_Reference (Loc,
-                Prefix                   =>
-                  New_Occurrence_Of (Base_Index_Type, Loc),
-                Attribute_Name           => Name_Val,
-                Expressions              => New_List (Make_Op_Add (Loc,
-                  Left_Opnd              => Current_Ind,
-                  Right_Opnd             =>
-                    Make_Attribute_Reference (Loc,
-                      Prefix             =>
-                        New_Occurrence_Of (Base_Index_Type, Loc),
-                      Attribute_Name     => Name_Pos,
-                      Expressions        => New_List (
-                        Make_Attribute_Reference (Loc,
-                          Prefix         => New_Copy_Tree (Array_Val),
-                          Attribute_Name => Name_First,
-                          Expressions    => New_List (
-                            Make_Integer_Literal (Loc, I)))))))));
-
+      declare
+         Index_Type  : Entity_Id := First_Index (Array_Typ);
+      begin
+         for I in 1 .. Array_Dim loop
+            Index_Types (I) := Index_Type;
             Next_Index (Index_Type);
-         end;
-      end loop;
+         end loop;
+      end;
+
+      --  Build the index values for our array access
+
+      if Fortran_Mode then
+         for I in 1 .. Array_Dim loop
+            Build_Index (I, Last_Base);
+         end loop;
+      else
+         for I in reverse 1 .. Array_Dim loop
+            Build_Index (I, Last_Base);
+         end loop;
+      end if;
 
       --  Generate:
 
