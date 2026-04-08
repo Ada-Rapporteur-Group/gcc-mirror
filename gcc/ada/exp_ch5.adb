@@ -6636,6 +6636,7 @@ package body Exp_Ch5 is
    procedure Expand_Parallel_Loop_Param (N : Node_Id) is
       Loc    : constant Source_Ptr := Sloc (N);
       Scheme : constant Node_Id    := Iteration_Scheme (N);
+      Stmts  : List_Id             := Statements (N);
 
       pragma Assert (In_Outlined_Parallel (N));
       pragma Assert (Present (Loop_Parameter_Specification (Scheme)));
@@ -6649,9 +6650,12 @@ package body Exp_Ch5 is
       Low_Param : constant Entity_Id := Parallel_Low_Bound (N);
       Hi_Param  : constant Entity_Id := Parallel_Hi_Bound (N);
       New_Id    : constant Entity_Id := Make_Temporary (Loc, 'P');
+      Ltype     : constant Entity_Id := Etype (Ident);
+      Btype     : constant Entity_Id := Base_Type (Ltype);
 
       New_Loop, New_Scheme, New_Body,
         New_Loop_Param, Param_Def : Node_Id;
+
    begin
       --  Rewrite discrete subtype as range over Low_Param .. Hi_Param
 
@@ -6678,18 +6682,55 @@ package body Exp_Ch5 is
 
       Param_Def := Make_Object_Declaration (Loc,
         Defining_Identifier => Ident,
-        Object_Definition   => New_Occurrence_Of (Etype (Ident), Loc),
+        Object_Definition   => New_Occurrence_Of (Ltype, Loc),
         Expression          => Make_Attribute_Reference (Loc,
-          Prefix            => New_Occurrence_Of (Etype (Ident), Loc),
+          Prefix            => New_Occurrence_Of (Ltype, Loc),
           Attribute_Name    => Name_Val,
           Expressions       => New_List (New_Occurrence_Of (New_Id, Loc))),
         Constant_Present    => True);
+
+      --  Add filter condition for iteration over predicated types
+
+      if Is_Discrete_Type (Ltype)
+        and then Present (Predicate_Function (Ltype))
+        and then Present (Static_Discrete_Predicate (Ltype))
+        and then not Is_Empty_List (Static_Discrete_Predicate (Ltype))
+      then
+         declare
+            Stat : constant List_Id := Static_Discrete_Predicate (Ltype);
+            P    : Node_Id := First (Stat);
+            Cond : Node_Id := Empty;
+            Alt  : Node_Id;
+
+         begin
+            while Present (P) loop
+               Alt := Make_In (Loc,
+                 Left_Opnd  => New_Occurrence_Of (Ident, Loc),
+                 Right_Opnd => Copy_Separate_Tree (P));
+
+               if No (Cond) then
+                  Cond := Alt;
+               else
+                  Cond := Make_Op_Or (Loc,
+                    Left_Opnd  => Cond,
+                    Right_Opnd => Alt);
+               end if;
+
+               Next (P);
+            end loop;
+
+            Stmts := New_List (
+              Make_If_Statement (Loc,
+                Condition           => Cond,
+                Then_Statements     => Stmts));
+         end;
+      end if;
 
       New_Body := Make_Block_Statement (Loc,
         Declarations               => New_List (Param_Def),
         Handled_Statement_Sequence =>
           Make_Handled_Sequence_Of_Statements (Loc,
-            Statements             => Statements (N)));
+            Statements             => Stmts));
 
       New_Loop := Make_Loop_Statement (Loc,
         Identifier       => Identifier (N),
