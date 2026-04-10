@@ -5097,11 +5097,12 @@ package body Exp_Ch5 is
       New_Scheme  : Node_Id;
 
       subtype Array_Index is Pos range 1 .. Array_Dim;
-      Index_Types  : array (Array_Index) of Entity_Id;
-      Fortran_Mode : constant Boolean := (Convention (Array_Typ) =
+      Index_Types   : array (Array_Index) of Entity_Id;
+      Row_Major_Ord : constant Boolean := (Convention (Array_Typ) /=
                                            Convention_Fortran);
-      Last_Ind     : constant Pos := (if Fortran_Mode then Array_Index'Last
-                                       else Array_Index'First);
+      Last_Ind      : constant Pos := (if Row_Major_Ord then
+                                       Array_Index'First else
+                                       Array_Index'Last);
 
       procedure Build_Index (I : Array_Index; Last_Base : in out Entity_Id);
       --  Body of the loop that builds the index value for array dimension I.
@@ -5122,7 +5123,7 @@ package body Exp_Ch5 is
          --  dimensions in the array type. To do this, we start with the new
          --  loop parameter and iteratively divide this value by K, where K
          --  is the length of the array dimension we are currently iterating
-         --  over. Each of these quotients are saved into a varaible J. Each
+         --  over. Each of these quotients are saved into a variable J_n. Each
          --  subindex is then given by the modulus of J and K, except for the
          --  last subindex, which is just the previous J value. Each subindex
          --  is then added to its index type's 'First value and cast to its
@@ -5239,10 +5240,10 @@ package body Exp_Ch5 is
                        Expressions    => New_List (
                          Make_Integer_Literal (Loc, I))))))));
 
-         if Fortran_Mode then
-            Append_To (Indices, Index_Value);
-         else
+         if Row_Major_Ord then
             Prepend_To (Indices, Index_Value);
+         else
+            Append_To (Indices, Index_Value);
          end if;
       end Build_Index;
 
@@ -5272,12 +5273,12 @@ package body Exp_Ch5 is
 
       --  Build the index values for our array access
 
-      if Fortran_Mode then
-         for I in 1 .. Array_Dim loop
+      if Row_Major_Ord then
+         for I in reverse 1 .. Array_Dim loop
             Build_Index (I, Last_Base);
          end loop;
       else
-         for I in reverse 1 .. Array_Dim loop
+         for I in 1 .. Array_Dim loop
             Build_Index (I, Last_Base);
          end loop;
       end if;

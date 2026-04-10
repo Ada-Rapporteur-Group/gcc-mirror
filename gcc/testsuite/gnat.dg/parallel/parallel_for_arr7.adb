@@ -11,14 +11,14 @@ procedure parallel_for_arr7 is
 
    Visited : array (Lo .. Hi) of Boolean := (others => False);
 
-   procedure Print_Int (I : Integer) is
+   procedure Visit (I : Integer) is
    begin
       Visited (I) := True;
-   end Print_Int;
+   end Visit;
 
    package Inst is new parallel_for_arr7_pkg
      (Element_Type => Integer,
-      Element_Operation => Print_Int);
+      Element_Operation => Visit);
    
    Arr : Inst.Arr_Typ (1 .. 3) := (1, 2, 3);
 begin
