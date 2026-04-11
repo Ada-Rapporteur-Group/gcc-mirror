@@ -2204,12 +2204,12 @@ package Sinfo is
    --    expansion, these declarations are moved inside an enclosing block.
 
    --  Parallel_Low_Bound
-   --    Applies to N_Parallel_Block_Statement. Contains a reference to the
-   --    parallel outlined procedure's Low parameter.
+   --    Applies to N_Parallel_Block_Statement and N_Loop_Statement. Contains
+   --    a reference to the parallel outlined procedure's Low parameter.
 
    --  Parallel_Hi_Bound
-   --    Applies to N_Parallel_Block_Statement. Contains a reference to the
-   --    parallel outlined procedure's Hi parameter.
+   --    Applies to N_Parallel_Block_Statement and N_Loop_Statement. Contains
+   --    a reference to the parallel outlined procedure's Hi parameter.
 
    --  Parent_Spec
    --    For a library unit that is a child unit spec (package or subprogram
