@@ -4080,6 +4080,8 @@ package body Sem_Ch5 is
 
             --  Move the loop inside the outlined procedure
 
+            Set_Scope (Loop_Id, Spec_Id);
+
             Insert_Before_And_Analyze (N, Make_Subprogram_Body (Loc,
               Specification              => Outlined_Spec,
               Declarations               => Decls,
@@ -4109,12 +4111,6 @@ package body Sem_Ch5 is
                Insert_After_And_Analyze (N,
                  Parallel_Exit_Actions (Spec_Id));
             end if;
-
-            --  Move the loop label into the outlined procedure
-            --  scope
-
-            Remove_Entity (Loop_Id);
-            Append_Entity (Loop_Id, Spec_Id);
          end Create_Par_Range_Loop;
 
          ----------------------------
