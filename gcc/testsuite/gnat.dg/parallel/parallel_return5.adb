@@ -8,16 +8,21 @@ procedure parallel_return5 is
       Value : Integer;
    end record;
 
-   function Ret_Limited (A : Natural; B : Natural) return Limited_Val is
+   type Ret_Type is (EXT_RET, AGGR, FUNC);
+
+   function Ret_Limited (R : Ret_Type; Val : Natural) return Limited_Val is
    begin
       parallel for J in 1 .. 100 loop
-         if J = A then
-            return Z : Limited_Val do
-               Z.Value := 42;
-            end return;
-         elsif J = B then
-            return (Value => 99);
-         end if;
+         case R is
+            when EXT_RET =>
+               return Z : Limited_Val do
+                  Z.Value := Val;
+               end return;
+            when AGGR =>
+               return (Value => Val);
+            when FUNC =>
+               return Ret_Limited (EXT_RET, Val);
+         end case;
       end loop;
 
       return L : Limited_Val do
@@ -25,9 +30,10 @@ procedure parallel_return5 is
       end return;
    end Ret_Limited;
 
-   L1 : Limited_Val := Ret_Limited (20, 300);
-   L2 : Limited_Val := Ret_Limited (980, 30);
-   L3 : Limited_Val := Ret_Limited (200, 300);
+   L1 : Limited_Val := Ret_Limited (EXT_RET, 42);
+   L2 : Limited_Val := Ret_Limited (AGGR, 99);
+   L3 : Limited_Val := Ret_Limited (FUNC, 12);
+
 begin
    if L1.Value /= 42 then
       raise Program_Error;
@@ -45,11 +51,11 @@ begin
       raise Program_Error;
    end if;
 
-   if L3.Value /= 3 then
+   if L3.Value /= 12 then
       raise Program_Error;
    end if;
 
-   if Mock_Check_Loop (3) /= ENDED then
+   if Mock_Check_Loop (3) /= TERMINATED then
       raise Program_Error;
    end if;
 end parallel_return5;
