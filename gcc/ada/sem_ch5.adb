@@ -3958,7 +3958,7 @@ package body Sem_Ch5 is
 
                --  Creates the expression
 
-               --    Longest_Integer'Value (Range_Typ'Pos (Arg))
+               --    Longest_Integer'Val (Range_Typ'Pos (Arg))
 
                --  This type of conversion is needed for some types
                --  (e.g. enums) that can't be directly converted into
