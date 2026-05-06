@@ -3718,9 +3718,13 @@ package body Sem_Ch6 is
 
                --     Return_Val := new RETURN_TYPE'(RETURN_EXPR);
 
+               --  TODO: more docs for this
+
                if Requires_SS
-                 and then Present (Procedure_To_Call (R))
-                 and then Procedure_To_Call (R) = RTE (RE_SS_Allocate)
+                 and then ((Present (Procedure_To_Call (R))
+                   and then Procedure_To_Call (R) = RTE (RE_SS_Allocate))
+                 or else (not Needs_Secondary_Stack (Etype (Expression (R)))
+                   and then Needs_Finalization (Etype (Expression (R)))))
                then
                   declare
                      Return_Expr : constant Node_Id := Make_Allocator (Loc,

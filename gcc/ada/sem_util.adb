@@ -18414,9 +18414,9 @@ package body Sem_Util is
       return False;
    end Is_In_Context_Clause;
 
-   ----------------------------------
-   -- Is_In_Outlined_Parallel_Subp --
-   ----------------------------------
+   ----------------------------------------
+   -- Is_In_Outlined_Parallel_Subprogram --
+   ----------------------------------------
 
    function Is_In_Outlined_Parallel_Subprogram (N : Node_Id)
      return Boolean
