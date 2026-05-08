@@ -6620,13 +6620,9 @@ package body Exp_Ch5 is
          end if;
       end if;
 
-      --  Remove parallel elements. From this point on, outlined
-      --  parallel constructs will be distinguished by the
-      --  In_Outlined_Parallel field. Sequentially expanded constructs
-      --  do not need further expansion.
+      --  Remove chunk specification
 
       Set_Chunk_Specification (Scheme, Empty);
-      Set_Is_Parallel (Scheme, False);
    end Expand_Parallel_Chunk_Specification;
 
    -------------------------------------
