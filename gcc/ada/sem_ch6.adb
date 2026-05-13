@@ -3598,6 +3598,7 @@ package body Sem_Ch6 is
 
          Return_Ind     : Entity_Id := Empty;
          Return_Val     : Entity_Id := Empty;
+         Return_Typ     : Entity_Id := Empty;
          Par_Loop_Id    : Entity_Id := Empty;
          Exit_Alt_Count : Nat := 1;
          Return_Alt_Id  : Nat;
@@ -3709,7 +3710,9 @@ package body Sem_Ch6 is
             --  In cases where the return statement has no
             --  return expression, the Return_Val is not needed
 
-            if Is_BIP or else No (Expression (R)) then
+            if (Is_BIP and then not Requires_SS)
+              or else No (Expression (R))
+            then
                pragma Assert (No (Return_Val));
                null;
 
@@ -3742,12 +3745,16 @@ package body Sem_Ch6 is
                --  specify a procedure to call. In this case, set the
                --  return expression to a reference.
 
-               --     Return_Val := RETURN_EXPR'Unchecked_Access;
+               --     Return_Val := RETURN_ACCESS_TYPE'(
+               --        RETURN_EXPR'Unrestricted_Access);
 
                elsif Requires_SS then
-                  return Make_Attribute_Reference (Loc,
-                    Prefix         => Relocate_Node (Expression (R)),
-                    Attribute_Name => Name_Unchecked_Access);
+                  return Make_Qualified_Expression (Loc,
+                    Subtype_Mark     => New_Occurrence_Of (
+                      Etype (Return_Typ), Loc),
+                    Expression       => Make_Attribute_Reference (Loc,
+                      Prefix         => Relocate_Node (Expression (R)),
+                      Attribute_Name => Name_Unrestricted_Access));
 
                --  In the case of a regular return statement, just set
                --  the return value to the return expression
@@ -4084,7 +4091,9 @@ package body Sem_Ch6 is
             --  return the BIP formal. We don't generate assignment statements
             --  for BIP returns.
 
-            elsif Is_BIP then
+            elsif Is_BIP
+              and then not Sec_Stack_Needed_For_Return (Enclosing_Sub)
+            then
                declare
                   Formal     : constant Entity_Id :=
                     Build_In_Place_Formal (
@@ -4131,7 +4140,6 @@ package body Sem_Ch6 is
                Return_Val := Make_Temporary (Loc, 'P');
 
                declare
-                  Return_Typ : Entity_Id;
                   Ret_Action : Node_Id;
 
                begin
@@ -4174,6 +4182,7 @@ package body Sem_Ch6 is
                      Ret_Action := Make_Simple_Return_Statement (Loc,
                        Make_Explicit_Dereference (Loc,
                          Prefix => New_Occurrence_Of (Return_Val, Loc)));
+                     Set_Comes_From_Extended_Return_Statement (Ret_Action);
 
                   --  Otherwise, Return_Val has the same type that its
                   --  original enclosing scope returns
