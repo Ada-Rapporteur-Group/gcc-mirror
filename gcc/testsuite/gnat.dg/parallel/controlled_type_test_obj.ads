@@ -36,19 +36,6 @@ package controlled_type_test_obj is
 
 private
 
-   type Finalization_Arr is array (Object_Index) of Boolean;
-
-   --  Controlled object that manages the creation of new IDs
-
-   protected Id_Store is
-      procedure New_Index (Id : out Object_Index);
-      procedure Finalize (I : Object_Index);
-      function Finalized (I : Object_Index) return Boolean;
-   private
-      Index     : Object_Index := Object_Index'First;
-      Final_Ids : Finalization_Arr := (others => False);
-   end Id_Store;
-
    type CI is new Controlled with record
       Index : Object_Index;
       Value : Integer := 0;
