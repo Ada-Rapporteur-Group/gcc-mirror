@@ -71,43 +71,57 @@ procedure parallel_return11 is
       return C2;
    end Get_Item;
 
-   Obj_True  : Base_Type'Class := Get_Item (True, OBJ, 3);
-   Obj_False : Base_Type'Class := Get_Item (False, OBJ, 5);
-   Fn_True   : Base_Type'Class := Get_Item (True, FUNC, 7);
-   Fn_False  : Base_Type'Class := Get_Item (False, FUNC, 11);
-
 begin
 
-   if Test_Method (Obj_True) /= 3 then
-      raise Program_Error;
-   end if;
+   declare
+      Obj_True  : Base_Type'Class := Get_Item (True, OBJ, 3);
+      Obj_False : Base_Type'Class := Get_Item (False, OBJ, 5);
+      Fn_True   : Base_Type'Class := Get_Item (True, FUNC, 7);
+      Fn_False  : Base_Type'Class := Get_Item (False, FUNC, 11);
+   begin
+      if Test_Method (Obj_True) /= 3 then
+         raise Program_Error;
+      end if;
 
-   if Test_Method (Fn_True) /= 7 then
-      raise Program_Error;
-   end if;
+      if Test_Method (Fn_True) /= 7 then
+         raise Program_Error;
+      end if;
 
-   if Obj_True not in Child_Ctrl'Class
-     or else Get_C_Id (Child_Ctrl (Obj_True).Val) /= 1
-   then
-      raise Program_Error;
-   end if;
+      if Obj_True not in Child_Ctrl'Class
+        or else Get_C_Id (Child_Ctrl (Obj_True).Val) /= 1
+      then
+         raise Program_Error;
+      end if;
 
-   if Fn_True not in Child_Ctrl'Class
-     or else Get_C_Id (Child_Ctrl (Fn_True).Val) /= 2
-   then
-      raise Program_Error;
-   end if;
+      if Fn_True not in Child_Ctrl'Class
+        or else Get_C_Id (Child_Ctrl (Fn_True).Val) /= 2
+      then
+         raise Program_Error;
+      end if;
 
-   if Test_Method (Obj_False) /= 5 then
-      raise Program_Error;
-   end if;
+      if Test_Method (Obj_False) /= 5 then
+         raise Program_Error;
+      end if;
 
-   if Test_Method (Fn_False) /= 11 then
-      raise Program_Error;
-   end if;
+      if Test_Method (Fn_False) /= 11 then
+         raise Program_Error;
+      end if;
+   end;
 
    for I in Par_Loop_Id range 1 .. 4 loop
       if Mock_Check_Loop (I) /= TERMINATED then
+         raise Program_Error;
+      end if;
+   end loop;
+
+   for I in Object_Index range 1 .. 2 loop
+      if not Did_Finalize (I) then
+         raise Program_Error;
+      end if;
+   end loop;
+
+   for I in Object_Index range 3 .. 10 loop
+      if Did_Finalize (I) then
          raise Program_Error;
       end if;
    end loop;
