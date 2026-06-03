@@ -3603,11 +3603,14 @@ package body Sem_Ch6 is
          Exit_Alt_Count : Nat := 1;
          Return_Alt_Id  : Nat;
          Exit_Alts      : constant List_Id := New_List;
-         Requires_SS    : Boolean := False;
          Enclosing_Sub  : constant Entity_Id :=
            Enclosing_Subprogram (Scope_Id);
          Is_BIP         : constant Boolean :=
            Is_Build_In_Place_Function (Enclosing_Sub);
+         Requires_SS    : constant Boolean :=
+           Sec_Stack_Needed_For_Return (Enclosing_Sub)
+             or else Needs_Finalization (
+               Underlying_Type (Etype (Enclosing_Sub)));
 
          --------------------
          -- Get_Return_Ind --
@@ -3710,58 +3713,58 @@ package body Sem_Ch6 is
             --  In cases where the return statement has no
             --  return expression, the Return_Val is not needed
 
-            if (Is_BIP and then not Requires_SS)
-              or else No (Expression (R))
-            then
+            if No (Expression (R)) then
                pragma Assert (No (Return_Val));
                null;
 
+            --  Rewrite secondary stack returns as allocator expressions
+
+            --     Return_Val := new RETURN_TYPE'(RETURN_EXPR);
+
+            --  TODO: more docs for this
+
+            elsif Requires_SS
+              and then ((Present (Procedure_To_Call (R))
+                and then Procedure_To_Call (R) = RTE (RE_SS_Allocate))
+              or else (not Needs_Secondary_Stack (Etype (Expression (R)))
+                and then Needs_Finalization (Etype (Expression (R)))))
+            then
+               declare
+                  Return_Expr : constant Node_Id := Make_Allocator (Loc,
+                    Expression => Make_Qualified_Expression (Loc,
+                      Subtype_Mark => New_Occurrence_Of (
+                        Etype (Enclosing_Sub), Loc),
+                        Expression => Relocate_Node (Expression (R))));
+               begin
+                  Set_No_Initialization (Return_Expr);
+                  return Return_Expr;
+               end;
+
+            --  A secondary stack allocation is already being handled
+            --  if the return requires the secondary stack but doesn't
+            --  specify a procedure to call. In this case, set the
+            --  return expression to a reference.
+
+            --     Return_Val := RETURN_ACCESS_TYPE'(
+            --        RETURN_EXPR'Unrestricted_Access);
+
+            --  The same is true for build-in-place values. BIP
+            --  values are already stored where they should be and
+            --  do not require any additional allocations.
+
+            elsif Requires_SS or else Is_BIP then
+               return Make_Qualified_Expression (Loc,
+                 Subtype_Mark     => New_Occurrence_Of (
+                   Etype (Return_Typ), Loc),
+                 Expression       => Make_Attribute_Reference (Loc,
+                   Prefix         => Relocate_Node (Expression (R)),
+                   Attribute_Name => Name_Unrestricted_Access));
+
+            --  In the case of a regular return statement, just set
+            --  the return value to the return expression
+
             else
-               --  Rewrite secondary stack returns as allocator expressions
-
-               --     Return_Val := new RETURN_TYPE'(RETURN_EXPR);
-
-               --  TODO: more docs for this
-
-               if Requires_SS
-                 and then ((Present (Procedure_To_Call (R))
-                   and then Procedure_To_Call (R) = RTE (RE_SS_Allocate))
-                 or else (not Needs_Secondary_Stack (Etype (Expression (R)))
-                   and then Needs_Finalization (Etype (Expression (R)))))
-               then
-                  declare
-                     Return_Expr : constant Node_Id := Make_Allocator (Loc,
-                       Expression => Make_Qualified_Expression (Loc,
-                         Subtype_Mark => New_Occurrence_Of (
-                           Etype (Enclosing_Sub), Loc),
-                           Expression => Relocate_Node (Expression (R))));
-                  begin
-                     Set_No_Initialization (Return_Expr);
-                     return Return_Expr;
-                  end;
-
-               --  The secondary stack allocation is already being handled
-               --  if the return requires the secondary stack but doesn't
-               --  specify a procedure to call. In this case, set the
-               --  return expression to a reference.
-
-               --     Return_Val := RETURN_ACCESS_TYPE'(
-               --        RETURN_EXPR'Unrestricted_Access);
-
-               elsif Requires_SS then
-                  return Make_Qualified_Expression (Loc,
-                    Subtype_Mark     => New_Occurrence_Of (
-                      Etype (Return_Typ), Loc),
-                    Expression       => Make_Attribute_Reference (Loc,
-                      Prefix         => Relocate_Node (Expression (R)),
-                      Attribute_Name => Name_Unrestricted_Access));
-
-               --  In the case of a regular return statement, just set
-               --  the return value to the return expression
-
-               else
-                  return Expression (R);
-               end if;
+               return Expression (R);
             end if;
 
             return Empty;
@@ -4087,31 +4090,6 @@ package body Sem_Ch6 is
                Return_Alt_Id := New_Early_Exit_Case (
                  Make_Simple_Return_Statement (Loc));
 
-            --  If the function is build-in-place, our exit action should
-            --  return the BIP formal. We don't generate assignment statements
-            --  for BIP returns.
-
-            elsif Is_BIP
-              and then not Sec_Stack_Needed_For_Return (Enclosing_Sub)
-            then
-               declare
-                  Formal     : constant Entity_Id :=
-                    Build_In_Place_Formal (
-                      Enclosing_Sub, BIP_Object_Access);
-                  Lim_Return : constant Node_Id   :=
-                    Make_Simple_Return_Statement (Loc,
-                      Make_Explicit_Dereference (Loc,
-                        Prefix => New_Occurrence_Of (Formal, Loc)));
-               begin
-                  --  We need to mark this return as being from an extended
-                  --  return to prevent semenatic errors. Besides, any BIP
-                  --  returns up until here should have been in extended
-                  --  returns anyway.
-
-                  Set_Comes_From_Extended_Return_Statement (Lim_Return);
-                  Return_Alt_Id := New_Early_Exit_Case (Lim_Return);
-               end;
-
             --  We need to create a variable that stores return values if
             --  the parallel construct's original enclosing scope is a
             --  function that returns a value. This value is then used as
@@ -4144,25 +4122,27 @@ package body Sem_Ch6 is
 
                begin
                   --  If the enclosing function returns a value that
-                  --  uses the secondary stack, Return_Val should be
-                  --  an access type.
+                  --  uses the secondary stack or is build-in-place,
+                  --  Return_Val should be an access type.
 
-                  if Sec_Stack_Needed_For_Return (Enclosing_Sub)
-                    or else Needs_Finalization (
-                      Underlying_Type (Etype (Enclosing_Sub)))
-                  then
-                     Requires_SS := True;
+                  if Requires_SS or Is_BIP then
 
-                     --  Create an access type that uses the secondary
-                     --  stack as a storage pool
+                     --  Create an access type for the return value
 
                      --     type Acc_Typ is access all Ret_Type;
-                     --     for Acc_Typ'Storage_Pool use SS_Pool;
 
                      Return_Typ := Make_Temporary (Loc, 'P');
                      Mutate_Ekind (Return_Typ, E_Access_Type);
-                     Set_Associated_Storage_Pool (Return_Typ,
-                       RTE (RE_SS_Pool));
+
+                     --  Set the access type's storage pool if the
+                     --  secondary stack is needed
+
+                     --     for Acc_Typ'Storage_Pool use SS_Pool;
+
+                     if Requires_SS then
+                        Set_Associated_Storage_Pool (Return_Typ,
+                          RTE (RE_SS_Pool));
+                     end if;
 
                      Insert_Before_And_Analyze (N,
                        Make_Full_Type_Declaration (Loc,
@@ -4182,7 +4162,10 @@ package body Sem_Ch6 is
                      Ret_Action := Make_Simple_Return_Statement (Loc,
                        Make_Explicit_Dereference (Loc,
                          Prefix => New_Occurrence_Of (Return_Val, Loc)));
-                     Set_Comes_From_Extended_Return_Statement (Ret_Action);
+
+                     if Is_BIP then
+                        Set_Comes_From_Extended_Return_Statement (Ret_Action);
+                     end if;
 
                   --  Otherwise, Return_Val has the same type that its
                   --  original enclosing scope returns
