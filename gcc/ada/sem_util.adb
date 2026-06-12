@@ -7937,7 +7937,10 @@ package body Sem_Util is
       elsif Ekind (Dyn_Scop) = E_Subprogram_Body then
          return Corresponding_Spec (Parent (Parent (Dyn_Scop)));
 
-      elsif Ekind (Dyn_Scop) in E_Block | E_Loop | E_Return_Statement then
+      elsif Ekind (Dyn_Scop) in E_Block | E_Loop | E_Return_Statement
+        or else (EKind (Dyn_Scop) = E_Procedure
+          and then Is_Outlined_Parallel (Dyn_Scop))
+      then
          return Enclosing_Subprogram (Dyn_Scop);
 
       elsif Ekind (Dyn_Scop) in E_Entry | E_Entry_Family then
