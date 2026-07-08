@@ -3607,10 +3607,11 @@ package body Sem_Ch6 is
            Enclosing_Subprogram (Scope_Id);
          Is_BIP         : constant Boolean :=
            Is_Build_In_Place_Function (Enclosing_Sub);
+         Requires_Fin   : constant Boolean := Needs_Finalization (
+           Underlying_Type (Etype (Enclosing_Sub)));
          Requires_SS    : constant Boolean :=
            Sec_Stack_Needed_For_Return (Enclosing_Sub)
-             or else Needs_Finalization (
-               Underlying_Type (Etype (Enclosing_Sub)));
+             or else Requires_Fin;
 
          --------------------
          -- Get_Return_Ind --
@@ -3723,18 +3724,17 @@ package body Sem_Ch6 is
 
             --  TODO: more docs for this
 
-            elsif Requires_SS
+            elsif (Requires_SS
               and then ((Present (Procedure_To_Call (R))
-                and then Procedure_To_Call (R) = RTE (RE_SS_Allocate))
-              or else (not Needs_Secondary_Stack (Etype (Expression (R)))
-                and then Needs_Finalization (Etype (Expression (R)))))
+                and then Procedure_To_Call (R) = RTE (RE_SS_Allocate))))
+              or else Requires_Fin
             then
                declare
                   Return_Expr : constant Node_Id := Make_Allocator (Loc,
                     Expression => Make_Qualified_Expression (Loc,
                       Subtype_Mark => New_Occurrence_Of (
-                        Etype (Enclosing_Sub), Loc),
-                        Expression => Relocate_Node (Expression (R))));
+                        Etype (Expression (R)), Loc),
+                      Expression => Relocate_Node (Expression (R))));
                begin
                   Set_No_Initialization (Return_Expr);
                   return Return_Expr;

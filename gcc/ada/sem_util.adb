@@ -18427,6 +18427,10 @@ package body Sem_Util is
       P : Node_Id := N;
 
    begin
+      if Ada_Version < Ada_2022 then
+         return False;
+      end if;
+
       while Present (P) loop
          exit when Nkind (P) = N_Subprogram_Body;
          P := Parent (P);
