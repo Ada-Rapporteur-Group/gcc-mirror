@@ -6647,7 +6647,6 @@ package body Exp_Ch5 is
       Hi_Param  : constant Entity_Id := Parallel_Hi_Bound (N);
       New_Id    : constant Entity_Id := Make_Temporary (Loc, 'P');
       Ltype     : constant Entity_Id := Etype (Ident);
-      Btype     : constant Entity_Id := Base_Type (Ltype);
 
       New_Loop, New_Scheme, New_Body,
         New_Loop_Param, Param_Def : Node_Id;
