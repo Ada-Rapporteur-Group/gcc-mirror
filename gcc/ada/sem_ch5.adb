@@ -3944,10 +3944,36 @@ package body Sem_Ch5 is
             function Create_Bound_Arg (Arg : Node_Id)
               return Node_Id
             is
+               To_Pos, To_Long_Int : Node_Id;
             begin
-               return Make_Type_Conversion (Loc,
-                 Subtype_Mark => New_Occurrence_Of (Long_Int_Typ, Loc),
-                 Expression   => New_Copy_Tree (Arg));
+               --  We're dealing with a generated integer literal if no
+               --  type is present for arg. In this case, just use a
+               --  type conversion
+
+               if No (Etype (Arg)) then
+                  return Make_Type_Conversion (Loc,
+                    Subtype_Mark => New_Occurrence_Of (Long_Int_Typ, Loc),
+                    Expression   => New_Copy_Tree (Arg));
+               end if;
+
+               --  Creates the expression
+
+               --    Longest_Integer'Val (Range_Typ'Pos (Arg))
+
+               --  This type of conversion is needed for some types
+               --  (e.g. enums) that can't be directly converted into
+               --  the longest integer type.
+
+               To_Pos := Make_Attribute_Reference (Loc,
+                 Prefix => New_Occurrence_Of (Etype (Arg), Loc),
+                 Attribute_Name => Name_Pos,
+                 Expressions => New_List (Copy_Separate_Tree (Arg)));
+               To_Long_Int := Make_Attribute_Reference (Loc,
+                 Prefix => New_Occurrence_Of (Long_Int_Typ, Loc),
+                 Attribute_Name => Name_Val,
+                 Expressions => New_List (To_Pos));
+
+               return To_Long_Int;
             end Create_Bound_Arg;
 
          begin
@@ -4093,12 +4119,8 @@ package body Sem_Ch5 is
             --  Build call to Par_Range_Loop_With_Early_Exit
 
             Rewrite (N, Build_Parallel_Call (Loc,
-              Low_Arg        => Make_Type_Conversion (Loc,
-                Subtype_Mark => New_Occurrence_Of (Long_Int_Typ, Loc),
-                Expression   => New_Copy_Tree (Low_Val)),
-              Hi_Arg         => Make_Type_Conversion (Loc,
-                Subtype_Mark => New_Occurrence_Of (Long_Int_Typ, Loc),
-                Expression   => New_Copy_Tree (Hi_Val)),
+              Low_Arg        => Create_Bound_Arg (Low_Val),
+              Hi_Arg         => Create_Bound_Arg (Hi_Val),
               Chunk_Arg      => Chunk_Arg,
               Outlined_Proc  => New_Occurrence_Of (Spec_Id, Loc)));
             Analyze (N);
