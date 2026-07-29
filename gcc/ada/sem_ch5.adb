@@ -3752,8 +3752,7 @@ package body Sem_Ch5 is
                return Node_Id;
             --  Rewrites bound as reference to constant declaration
 
-            procedure Relocate_Subtype_Bounds
-              (S : Node_Id; Typ : Entity_Id);
+            procedure Relocate_Subtype_Bounds (S : Node_Id);
             --  Moves discrete subtype definition bounds into variables
             --  before the loop. This ensures that the bounds are not
             --  reevaluated inside the loop.
@@ -3804,9 +3803,7 @@ package body Sem_Ch5 is
             -- Relocate_Subtype_Bounds --
             -----------------------------
 
-            procedure Relocate_Subtype_Bounds
-              (S : Node_Id; Typ : Entity_Id)
-            is
+            procedure Relocate_Subtype_Bounds (S : Node_Id) is
                C  : constant Node_Id :=
                  Range_Expression (Constraint (S));
                SM : constant Entity_Id :=
@@ -3866,7 +3863,7 @@ package body Sem_Ch5 is
                  and then Present (Constraint (DS))
                  and then Nkind (Constraint (DS)) = N_Range_Constraint
                then
-                  Relocate_Subtype_Bounds (DS, Typ);
+                  Relocate_Subtype_Bounds (DS);
                end if;
             end if;
 
@@ -5806,8 +5803,6 @@ package body Sem_Ch5 is
    procedure Check_Controlled_Array_Attribute
      (DS : Node_Id; Loop_Nod : Node_Id)
    is
-      Loc : constant Source_Ptr := Sloc (Loop_Nod);
-
    begin
       if Nkind (DS) = N_Attribute_Reference
         and then Is_Entity_Name (Prefix (DS))

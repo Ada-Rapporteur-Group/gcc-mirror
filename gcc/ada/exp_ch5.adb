@@ -5050,8 +5050,7 @@ package body Exp_Ch5 is
    end Expand_Iterator_Loop;
 
    procedure Expand_Parallel_Iterator_Loop (N : Node_Id) is
-      Scheme : constant Node_Id    := Iteration_Scheme (N);
-      Loc    : constant Source_Ptr := Sloc (N);
+      Scheme : constant Node_Id := Iteration_Scheme (N);
 
       pragma Assert (In_Outlined_Parallel (N));
       pragma Assert (Present (Iterator_Specification (Scheme)));
@@ -6637,16 +6636,13 @@ package body Exp_Ch5 is
       pragma Assert (In_Outlined_Parallel (N));
       pragma Assert (Present (Loop_Parameter_Specification (Scheme)));
 
-      Loop_Param : constant Node_Id := Loop_Parameter_Specification
-                                         (Scheme);
-      DS         : constant Node_Id := Discrete_Subtype_Definition
-                                         (Loop_Param);
-
-      Ident     : constant Entity_Id := Defining_Identifier (Loop_Param);
-      Low_Param : constant Entity_Id := Parallel_Low_Bound (N);
-      Hi_Param  : constant Entity_Id := Parallel_Hi_Bound (N);
-      New_Id    : constant Entity_Id := Make_Temporary (Loc, 'P');
-      Ltype     : constant Entity_Id := Etype (Ident);
+      Loop_Param : constant Node_Id   := Loop_Parameter_Specification
+                                           (Scheme);
+      Ident      : constant Entity_Id := Defining_Identifier (Loop_Param);
+      Low_Param  : constant Entity_Id := Parallel_Low_Bound (N);
+      Hi_Param   : constant Entity_Id := Parallel_Hi_Bound (N);
+      New_Id     : constant Entity_Id := Make_Temporary (Loc, 'P');
+      Ltype      : constant Entity_Id := Etype (Ident);
 
       New_Loop, New_Scheme, New_Body,
         New_Loop_Param, Param_Def : Node_Id;
