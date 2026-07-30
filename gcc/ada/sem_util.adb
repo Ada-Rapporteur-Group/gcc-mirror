@@ -7937,7 +7937,10 @@ package body Sem_Util is
       elsif Ekind (Dyn_Scop) = E_Subprogram_Body then
          return Corresponding_Spec (Parent (Parent (Dyn_Scop)));
 
-      elsif Ekind (Dyn_Scop) in E_Block | E_Loop | E_Return_Statement then
+      elsif Ekind (Dyn_Scop) in E_Block | E_Loop | E_Return_Statement
+        or else (Ekind (Dyn_Scop) = E_Procedure
+          and then Is_Outlined_Parallel (Dyn_Scop))
+      then
          return Enclosing_Subprogram (Dyn_Scop);
 
       elsif Ekind (Dyn_Scop) in E_Entry | E_Entry_Family then
@@ -18413,6 +18416,30 @@ package body Sem_Util is
 
       return False;
    end Is_In_Context_Clause;
+
+   ----------------------------------------
+   -- Is_In_Outlined_Parallel_Subprogram --
+   ----------------------------------------
+
+   function Is_In_Outlined_Parallel_Subprogram (N : Node_Id)
+     return Boolean
+   is
+      P : Node_Id := N;
+
+   begin
+      if Ada_Version < Ada_2022 then
+         return False;
+      end if;
+
+      while Present (P) loop
+         exit when Nkind (P) = N_Subprogram_Body;
+         P := Parent (P);
+      end loop;
+
+      pragma Assert (Present (P));
+      return Ekind (Defining_Entity (P)) = E_Procedure
+        and then Is_Outlined_Parallel (Defining_Entity (P));
+   end Is_In_Outlined_Parallel_Subprogram;
 
    ---------------------------
    -- Is_Independent_Object --

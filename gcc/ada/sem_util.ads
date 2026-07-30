@@ -2202,6 +2202,9 @@ package Sem_Util is
    --  Returns True if N appears within the context clause of a unit, and False
    --  for any other placement.
 
+   function Is_In_Outlined_Parallel_Subprogram (N : Node_Id) return Boolean;
+   --  Returns True if N appears inside an outlined parallel subprogram
+
    function Is_Independent_Object (N : Node_Id) return Boolean;
    --  Determine whether arbitrary node N denotes a reference to an independent
    --  object as per RM C.6(8).

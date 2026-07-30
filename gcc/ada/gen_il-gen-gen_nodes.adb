@@ -913,7 +913,8 @@ begin -- Gen_IL.Gen.Gen_Nodes
         Sm (Is_Expanded_Dispatching_Call, Flag),
         Sm (Is_Initialization_Block, Flag),
         Sm (Is_Parallel_Exit, Flag),
-        Sm (Is_Task_Master, Flag)));
+        Sm (Is_Task_Master, Flag),
+        Sm (Wraps_Return, Flag)));
 
    Cc (N_Chunk_Specification_Range, Node_Kind,
        (Sy (Defining_Identifier, Node_Id),
